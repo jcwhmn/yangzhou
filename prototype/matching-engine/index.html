@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Yangzhou · 匹配引擎 Prototype(Q10-iii)</title>
+<style>
+:root{--ink:#1c2333;--sub:#6b7280;--line:#e5e7eb;--bg:#f6f7f9;--card:#fff;--accent:#2f6fed;
+--ok:#15803d;--okbg:#e9f7ef;--warn:#b45309;--warnbg:#fdf4e0;--bad:#b91c1c;--badbg:#fdecec;}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.7 system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;color:var(--ink);background:var(--bg)}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:20px 28px}
+.proto{display:inline-block;font-size:12px;letter-spacing:.12em;color:#fff;background:var(--warn);border-radius:4px;padding:2px 10px;margin-bottom:10px}
+h1{margin:0 0 8px;font-size:21px}
+.q{margin:4px 0;color:var(--sub);max-width:900px}
+.q strong{color:var(--ink)}
+nav{background:var(--card);border-bottom:1px solid var(--line);padding:0 28px;display:flex;flex-wrap:wrap;gap:6px;position:sticky;top:0;z-index:5}
+nav button{border:0;background:none;padding:12px 14px;font:inherit;color:var(--sub);cursor:pointer;border-bottom:2.5px solid transparent}
+nav button.on{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+main{max-width:980px;margin:20px auto 60px;padding:0 20px;display:flex;flex-direction:column;gap:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 20px}
+.card h2{font-size:16px;margin:0 0 4px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.card h2 .pid{color:var(--sub);font-weight:400;font-size:13px}
+badge, .badge{display:inline-block;font-size:12.5px;border-radius:999px;padding:1px 10px;font-weight:600}
+.b-green{background:var(--okbg);color:var(--ok)} .b-yellow{background:var(--warnbg);color:var(--warn)} .b-red{background:var(--badbg);color:var(--bad)}
+.b-gray{background:#eef0f3;color:var(--sub)}
+.scen{background:#f0f4ff;border:1px solid #d7e3fc;border-radius:10px;padding:14px 18px}
+.scen h3{margin:0 0 6px;font-size:14.5px}
+.scen p{margin:0 0 10px;color:#374151;font-size:14px}
+.steps{display:flex;flex-direction:column;gap:6px}
+.steps button{text-align:left;font:inherit;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:7px 12px;cursor:pointer}
+.steps button:hover{border-color:var(--accent)}
+.steps button.done{opacity:.45;text-decoration:line-through}
+#last{font-size:13.5px;color:var(--accent);min-height:20px;margin:0 0 4px}
+table{border-collapse:collapse;width:100%;font-size:14px}
+td{padding:5px 8px 5px 0;vertical-align:middle}
+td.k{color:var(--sub);white-space:nowrap;font-size:12.5px}
+select{font:inherit;padding:2px 6px;border:1px solid var(--line);border-radius:6px;background:#fff}
+.item{border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin-top:10px}
+.item.focus{border-color:var(--accent);box-shadow:0 0 0 3px #2f6fed22}
+.item .t{font-weight:600}
+.item .t .pid{color:var(--sub);font-weight:400;font-size:12.5px;margin-right:6px}
+.verdicts{margin:8px 0 0;font-size:14px}
+.verdicts div{padding:2px 0}
+.v-ok{color:var(--ok)} .v-gap{color:var(--warn)} .v-missing{color:var(--bad)} .v-unknown{color:#7c6fbd}
+.v-extra{color:var(--sub);font-size:12.5px}
+.reqrow{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:6px;font-size:13.5px;color:var(--sub)}
+.cand{border-top:1px dashed var(--line);padding:10px 0}
+.cand:first-child{border-top:0}
+.cand .nm{font-weight:600}
+.cand .why{color:var(--sub);font-size:13px;margin-top:2px}
+footer{max-width:980px;margin:0 auto 40px;padding:0 20px;color:var(--sub);font-size:12.5px}
+.modebtns{display:flex;gap:8px}
+.modebtns button{font:inherit;border:1px solid var(--line);background:var(--card);border-radius:8px;padding:5px 14px;cursor:pointer}
+.modebtns button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+</style>
+</head>
+<body>
+<header>
+  <div class="proto">PROTOTYPE · 一次性原型 · 只回答一个问题</div>
+  <h1>匹配引擎:差距 / 可行性输出,长什么样才算「顺手」?</h1>
+  <p class="q"><strong>问题(Q10-iii):</strong>单人模式下,Item 的 <strong>Requirement 需求</strong>(属性 + 最低等级?)× Member 的 <strong>Capability 能力</strong>(属性 + 等级?),算出来的输出——差距行、可行性信号——用着顺不顺手?顺手 → 定稿进 DOMAIN.md;不顺 → 改这里,不动 schema。</p>
+  <p class="q">规则来自 ADR-0003:统一属性词表;label 无等级、skill 有;能力未评级只算「有」。等级刻度 <strong>1–4</strong>。角色(如「高级工程师」)不直接进匹配——<strong>翻译成技能需求</strong>(如 Java≥3)。</p>
+</header>
+<nav id="tabs"></nav>
+<main id="app"></main>
+<footer>fixture:chess 三条(JCW-30/44/46)+ BOO-UI + 我的能力 = 真实;其余(猜)可随手改 · 纯前端、无持久化,刷新即重置 · D:/code/yangzhou/prototype/matching-engine/index.html</footer>
+
+<script>
+// ============================================================
+// ① 纯逻辑模块 —— 将来整体抬进 Kotlin 引擎;无 DOM,无副作用
+// ============================================================
+const YZ = (() => {
+
+  // 判定一条 requirement 对一组 capabilities
+  // 返回 { kind: ok|extra|gap|unknown|missing, delta?, text }
+  function judge(req, caps) {
+    const cap = caps.find(c => c.attribute === req.attribute);
+    if (!cap) return { kind: 'missing', text: `✗ 缺能力(${req.attribute})` };
+    if (req.minLevel == null)                       // presence 需求:有即可
+      return { kind: 'ok', text: `✓ 具备(${req.attribute})` };
+    if (cap.level == null)                          // 有能力但未评级:不假装会算差距
+      return { kind: 'unknown', text: `△ 有但未评级(${req.attribute},需 ≥${req.minLevel})——评级后才能算差距` };
+    const d = req.minLevel - cap.level;
+    if (d <= 0) return { kind: d === 0 ? 'ok' : 'extra',
+      text: d === 0 ? `✓ 满足(${req.attribute}:需 ${req.minLevel},有 ${cap.level})`
+                    : `✓ 满足(${req.attribute}:需 ${req.minLevel},有 ${cap.level})<span class="v-extra">· 有余</span>` };
+    return { kind: 'gap', delta: d, text: `△ 差 ${d} 级(${req.attribute}:需 ≥${req.minLevel},有 ${cap.level})` };
+  }
+
+  // 单 item 匹配:逐条判定 + 汇总(worst: green|yellow|red)
+  function matchItem(item, member) {
+    const verdicts = item.requirements.map(r => ({ req: r, ...judge(r, member.capabilities) }));
+    const missing = verdicts.filter(v => v.kind === 'missing').length;
+    const gaps    = verdicts.filter(v => v.kind === 'gap' || v.kind === 'unknown');
+    const totalDelta = verdicts.reduce((s, v) => s + (v.delta || 0), 0);
+    const worst = missing > 0 ? 'red' : (gaps.length ? 'yellow' : 'green');
+    return { verdicts, missing, totalDelta, worst };
+  }
+
+  // 项目级聚合:所有 item 过一遍,取最差信号
+  function rollupProject(project, member) {
+    const R = { green: 0, yellow: 1, red: 2 };
+    const results = project.items.map(it => ({ item: it, ...matchItem(it, member) }));
+    const worst = results.reduce((w, r) => R[r.worst] > R[w] ? r.worst : w, 'green');
+    return { results, worst };
+  }
+
+  // 团队模式:候选排序。规则(可解释,非打分):缺门少者优先 → 总差距小者优先
+  function rankCandidates(item, members) {
+    return members.map(m => ({ member: m, ...matchItem(item, m) }))
+                  .sort((a, b) => (a.missing - b.missing) || (a.totalDelta - b.totalDelta));
+  }
+
+  return { judge, matchItem, rollupProject, rankCandidates };
+})();
+
+// ============================================================
+// ② fixture(重启即重置)
+// ============================================================
+const ATTRS = [
+  { name: 'Java',          kind: 'skill', leveled: true  },
+  { name: '架构 Architect', kind: 'skill', leveled: true  },
+  { name: 'React',         kind: 'skill', leveled: true  },
+  { name: 'Postgres',      kind: 'skill', leveled: true  },
+  { name: '会计准则',       kind: 'skill', leveled: true  },
+  { name: 'UI 设计',        kind: 'skill', leveled: true  },
+  { name: '前端',          kind: 'skill', leveled: true  }, // fixture 实证:用户按分级用 → 从 label 升 skill(ADR-0003:改数据不改代码)
+  { name: '后端',          kind: 'label', leveled: false },
+];
+const FIXTURE = () => ({
+  mode: 'solo',
+  focusItem: null,
+  me: { name: '我', capabilities: [
+    { attribute: 'Java',          level: 4 },
+    { attribute: '架构 Architect', level: 1 },
+    { attribute: 'React',         level: 1 },
+    { attribute: '前端',          level: 2 },
+    { attribute: 'Postgres',      level: 3 },
+    { attribute: '后端',          level: null },
+  ]},
+  team: [
+    { name: '小李(猜)', capabilities: [
+      { attribute: 'Java', level: 3 }, { attribute: '架构 Architect', level: 2 },
+      { attribute: 'Postgres', level: 2 }, { attribute: '后端', level: null } ]},
+    { name: '小王(猜)', capabilities: [
+      { attribute: '会计准则', level: 3 }, { attribute: 'Java', level: 2 },
+      { attribute: 'React', level: 3 }, { attribute: '前端', level: 2 },
+      { attribute: 'UI 设计', level: 2 } ]},
+    { name: '小张(猜)', capabilities: [
+      { attribute: '架构 Architect', level: 3 }, { attribute: 'Java', level: 2 },
+      { attribute: 'React', level: null } ]},
+  ],
+  projects: [
+    { name: 'chess', items: [
+      { id: 'JCW-30', title: 'Apply architecture decisions to Auth/PlayerConfig baseline(真)',
+        requirements: [ { attribute: 'Java', minLevel: 3 }, { attribute: '架构 Architect', minLevel: 2 } ] },
+      { id: 'JCW-44', title: 'Backend: draw offer/accept/reject via WebSocket(真)',
+        requirements: [ { attribute: 'Java', minLevel: 3 } ] },
+      { id: 'JCW-46', title: 'Frontend: wire real backend calls + update tests(真)',
+        requirements: [ { attribute: '前端', minLevel: 1 }, { attribute: 'React', minLevel: 2 } ] },
+    ]},
+    { name: 'bookkeeping', items: [
+      { id: 'BOO-1', title: '复式记账核心模块(猜)',
+        requirements: [ { attribute: '会计准则', minLevel: 2 }, { attribute: 'Java', minLevel: 2 } ] },
+      { id: 'BOO-2', title: '报表导出 CSV/JSON(猜)',
+        requirements: [ { attribute: 'Postgres', minLevel: null }, { attribute: '后端', minLevel: null } ] },
+      { id: 'BOO-UI', title: 'UI 设计(真,尚未编号)',
+        requirements: [ { attribute: 'UI 设计', minLevel: 3 } ] },
+    ]},
+  ],
+});
+
+let state = FIXTURE();
+let lastChange = '';
+
+// ---------- helpers(页面壳专用,非逻辑) ----------
+const attr = n => ATTRS.find(a => a.name === n);
+const findItem = id => state.projects.flatMap(p => p.items.map(i => ({ p, i }))).find(x => x.i.id === id).i;
+const capOf = (m, n) => m.capabilities.find(c => c.attribute === n);
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+
+function setCap(name, v) { // 'none' | 'unrated' | '1'..'4'
+  const me = state.me, i = me.capabilities.findIndex(c => c.attribute === name);
+  if (v === 'none') { if (i >= 0) me.capabilities.splice(i, 1); }
+  else if (i >= 0) me.capabilities[i].level = v === 'unrated' ? null : Number(v);
+  else me.capabilities.push({ attribute: name, level: v === 'unrated' ? null : Number(v) });
+  lastChange = `我的能力「${name}」→ ${v === 'none' ? '无' : v === 'unrated' ? '未评级' : 'Lv' + v}`;
+  render();
+}
+function setReq(itemId, name, v) { // 'none' | 'presence' | '1'..'4'
+  const it = findItem(itemId), i = it.requirements.findIndex(r => r.attribute === name);
+  const val = v === 'none' ? null : { attribute: name, minLevel: v === 'presence' ? null : Number(v) };
+  if (v === 'none') { if (i >= 0) it.requirements.splice(i, 1); }
+  else if (i >= 0) it.requirements[i] = val;
+  else it.requirements.push(val);
+  lastChange = `${itemId} 需求「${name}」→ ${v === 'none' ? '无' : v === 'presence' ? '需要(不分级)' : '≥' + v}`;
+  render();
+}
+function setMode(m) { state.mode = m; lastChange = `切到${m === 'solo' ? '单人' : '团队'}模式`; render(); }
+function setFocus(id) {
+  state.focusItem = id; state.mode = 'solo'; lastChange = `聚焦 ${id}`;
+  render();
+  const el = document.getElementById('item-' + id);
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+// ============================================================
+// ③ 场景(每个 tab 激活时重置到 fixture,再跑 setup)
+// ============================================================
+const SCENARIOS = [
+  { id: 'free', title: '自由拨弄',
+    desc: '随便改:调自己的能力等级、增删 item 的需求、切团队模式。看输出怎么跟着变。',
+    setup() {}, steps: [] },
+
+  { id: 's1', title: 'S1 绿灯',
+    desc: '把「架构 Architect」从 1 提到 2 —— JCW-30 由黄变绿。看「全满足」长什么样,以及刚好满足 vs 有余的显示差别。',
+    setup() {}, steps: [
+      { label: '① 聚焦 JCW-30(当前:Java 有余、架构差 1 级 → 黄)', run() { setFocus('JCW-30'); } },
+      { label: '② 我的 架构 Architect → Lv2(变绿)', run() { setCap('架构 Architect', '2'); } },
+      { label: '③ JCW-30 的 Java 需求 → ≥4(有余消失,变刚好)', run() { setReq('JCW-30', 'Java', '4'); } },
+    ]},
+
+  { id: 's2', title: 'S2 真实差距 JCW-30',
+    desc: '你的真实数据:JCW-30 需 Java≥3 / 架构≥2;你 Java 4 / 架构 1。看「超配 + 差 1 级」混在一个 item 里,输出是否一眼看懂。',
+    setup() {}, steps: [
+      { label: '① 聚焦 JCW-30', run() { setFocus('JCW-30'); } },
+      { label: '② 假如架构练到 2(变绿,给自己看终点)', run() { setCap('架构 Architect', '2'); } },
+      { label: '③ 回到真实(架构 1,差距回来)', run() { setCap('架构 Architect', '1'); } },
+    ]},
+
+  { id: 's3', title: 'S3 整块缺失',
+    desc: 'BOO-1 需要会计准则≥2,我完全没有。看「缺门」(红)与「差级」(黄)的显示差别——这是两种不同性质的缺口。',
+    setup() {}, steps: [
+      { label: '① 聚焦 BOO-1(会计准则 = ✗ 缺能力 → 红)', run() { setFocus('BOO-1'); } },
+      { label: '② 给自己加「会计准则:未评级」(缺门 → 未知)', run() { setCap('会计准则', 'unrated'); } },
+    ]},
+
+  { id: 's4', title: 'S4 超配克制',
+    desc: 'JCW-46 要 前端≥1,我有 2。看输出是否克制:只标「有余」,不炫耀;再把需求提到 ≥2,有余消失。',
+    setup() {}, steps: [
+      { label: '① 聚焦 JCW-46(前端:有余;React:差 1 级)', run() { setFocus('JCW-46'); } },
+      { label: '② 前端需求 → ≥2(有余消失,变刚好)', run() { setReq('JCW-46', '前端', '2'); } },
+    ]},
+
+  { id: 's5', title: 'S5 未评级',
+    desc: '我的 React(真实 Lv1)改成「未评级」——JCW-46 要 React≥2,输出变成「有但未评级,差距未知」,不假装会算。这条规则(ADR-0003)的体感对不对?',
+    setup() {}, steps: [
+      { label: '① 我的 React → 未评级', run() { setCap('React', 'unrated'); } },
+      { label: '② 聚焦 JCW-46,看判定行', run() { setFocus('JCW-46'); } },
+    ]},
+
+  { id: 's6', title: 'S6 团队预览',
+    desc: '同一引擎切团队输出:3 个虚拟成员(猜)+ 我,谁该接 JCW-30?排序规则:缺门少者优先 → 总差距小者优先。看理由可不可解释。',
+    setup() { state.mode = 'team'; state.focusItem = 'JCW-30'; }, steps: [
+      { label: '① 已切团队模式、聚焦 JCW-30(就是上面)', run() { setMode('team'); } },
+      { label: '② 回单人模式(可行性视角)', run() { setMode('solo'); } },
+    ]},
+
+  { id: 's7', title: 'S7 缺门×现实',
+    desc: '真实案例:BOO-UI 需要 UI 设计≥3,我完全没有——现实里我请 AI(opendesign)帮我把活干了。引擎只会说「✗ 缺能力」。问题:缓解手段(AI 协作/外包/学习)要不要进模型,还是留给人自己定?',
+    setup() {}, steps: [
+      { label: '① 聚焦 BOO-UI(红:整块缺失)', run() { setFocus('BOO-UI'); } },
+      { label: '② 切团队模式:小王 UI 设计 Lv2,无缺门只差 1 级 → 他排第一', run() { setMode('team'); } },
+    ]},
+];
+
+let activeTab = 'free', stepIdx = 0;
+function activateTab(id) {
+  activeTab = id; stepIdx = 0; state = FIXTURE(); lastChange = '已重置到初始 fixture';
+  const sc = SCENARIOS.find(s => s.id === id); sc.setup(); render();
+  window.scrollTo({ top: 0 });
+}
+function runStep(i) {
+  stepIdx = i + 1;
+  SCENARIOS.find(s => s.id === activeTab).steps[i].run();
+  render();
+}
+
+// ============================================================
+// ④ 渲染(一次性页面壳)
+// ============================================================
+function capSelect(name) {
+  const a = attr(name); if (!a.leveled) {
+    const c = capOf(state.me, name);
+    return `<select onchange="setCap('${name}', this.value)">
+      <option value="none"${!c ? ' selected' : ''}>无</option>
+      <option value="unrated"${c ? ' selected' : ''}>有</option></select>`;
+  }
+  const c = capOf(state.me, name);
+  const cur = !c ? 'none' : c.level == null ? 'unrated' : String(c.level);
+  return `<select onchange="setCap('${name}', this.value)">
+    <option value="none"${cur === 'none' ? ' selected' : ''}>无</option>
+    <option value="unrated"${cur === 'unrated' ? ' selected' : ''}>未评级</option>
+    ${[1,2,3,4].map(l => `<option value="${l}"${cur === String(l) ? ' selected' : ''}>Lv${l}</option>`).join('')}
+  </select>`;
+}
+function reqSelect(item, name) {
+  const a = attr(name);
+  const r = item.requirements.find(x => x.attribute === name);
+  const cur = !r ? 'none' : r.minLevel == null ? 'presence' : String(r.minLevel);
+  if (!a.leveled) return `<select onchange="setReq('${item.id}','${name}', this.value)">
+    <option value="none"${cur === 'none' ? ' selected' : ''}>无</option>
+    <option value="presence"${cur !== 'none' ? ' selected' : ''}>需要</option></select>`;
+  return `<select onchange="setReq('${item.id}','${name}', this.value)">
+    <option value="none"${cur === 'none' ? ' selected' : ''}>无</option>
+    <option value="presence"${cur === 'presence' ? ' selected' : ''}>需要(不分级)</option>
+    ${[1,2,3,4].map(l => `<option value="${l}"${cur === String(l) ? ' selected' : ''}>≥${l}</option>`).join('')}
+  </select>`;
+}
+const WORST_TXT = { green: '✔ 全满足', yellow: '△ 有差距', red: '✗ 有缺门' };
+const V_CLS = { ok: 'v-ok', extra: 'v-ok', gap: 'v-gap', missing: 'v-missing', unknown: 'v-unknown' };
+
+function render() {
+  // tabs
+  document.getElementById('tabs').innerHTML = SCENARIOS.map(s =>
+    `<button class="${s.id === activeTab ? 'on' : ''}" onclick="activateTab('${s.id}')">${s.title}</button>`).join('');
+
+  const sc = SCENARIOS.find(s => s.id === activeTab);
+  let h = '';
+
+  // 场景说明 + 步骤
+  h += `<div class="scen"><h3>${sc.title === '自由拨弄' ? '' : '🎯 '}${sc.title}</h3><p>${sc.desc}</p>`;
+  if (sc.steps.length) h += `<div class="steps">${sc.steps.map((st, i) =>
+    `<button class="${i < stepIdx ? 'done' : ''}" onclick="runStep(${i})">${st.label}</button>`).join('')}</div>`;
+  h += `</div>`;
+
+  h += `<p id="last">${esc(lastChange)}</p>`;
+
+  // 模式切换
+  h += `<div class="modebtns">
+    <button class="${state.mode === 'solo' ? 'on' : ''}" onclick="setMode('solo')">单人模式(可行性 / 差距)</button>
+    <button class="${state.mode === 'team' ? 'on' : ''}" onclick="setMode('team')">团队模式(分配建议)</button>
+  </div>`;
+
+  if (state.mode === 'solo') {
+    // 我的能力
+    h += `<div class="card"><h2>我的能力 <span class="pid">Capability · 词表 = Workspace 级</span></h2><table>`;
+    for (const a of ATTRS) h += `<tr><td><b>${a.name}</b> <span class="pid">[${a.kind}]</span></td><td>${capSelect(a.name)}</td></tr>`;
+    h += `</table></div>`;
+
+    // 项目(逐 item 判定 + 聚合)
+    for (const p of state.projects) {
+      const roll = YZ.rollupProject(p, state.me);
+      h += `<div class="card"><h2>${p.name} <span class="badge b-${roll.worst}">${WORST_TXT[roll.worst]}</span></h2>`;
+      for (const r of roll.results) {
+        const it = r.item;
+        h += `<div class="item ${state.focusItem === it.id ? 'focus' : ''}" id="item-${it.id}">
+          <div class="t"><span class="pid">${it.id}</span>${esc(it.title)}
+            <span class="badge b-${r.worst}">${WORST_TXT[r.worst]}</span></div>
+          <div class="reqrow">${ATTRS.map(a => `<span>${a.name} ${reqSelect(it, a.name)}</span>`).join('')}</div>
+          <div class="verdicts">${r.verdicts.length ? r.verdicts.map(v =>
+            `<div class="${V_CLS[v.kind]}">${v.text}</div>`).join('') : '<div class="v-ok">(无需求)</div>'}
+            <div class="v-extra">缺门 ${r.missing} · 总差距 ${r.totalDelta} 级</div>
+          </div></div>`;
+      }
+      h += `</div>`;
+    }
+  } else {
+    // 团队模式
+    const all = [...state.team, state.me];
+    const opts = state.projects.flatMap(p => p.items.map(i => `<option value="${i.id}"${state.focusItem === i.id ? ' selected' : ''}>${p.name}/${i.id}</option>`)).join('');
+    h += `<div class="card"><h2>团队模式 · 谁该接这个 item?
+      <select onchange="state.focusItem=this.value;render()">${opts}</select></h2>`;
+    if (state.focusItem) {
+      const it = findItem(state.focusItem);
+      const ranked = YZ.rankCandidates(it, all);
+      ranked.forEach((r, idx) => {
+        h += `<div class="cand"><span class="nm">#${idx + 1} ${esc(r.member.name)}</span>
+          <span class="badge b-${r.worst}">${WORST_TXT[r.worst]}</span>
+          <div class="why">缺门 ${r.missing} · 总差距 ${r.totalDelta} 级${r.missing === 0 && r.totalDelta === 0 ? ' —— 完全胜任' : ''}</div>
+          ${r.verdicts.map(v => `<div class="${V_CLS[v.kind]}" style="font-size:13.5px">${v.text}</div>`).join('')}</div>`;
+      });
+      h += `<div class="v-extra" style="margin-top:8px">排序规则:缺门少者优先 → 总差距小者优先。无加权打分——保持可解释。</div></div>`;
+    } else h += `</div>`;
+  }
+
+  document.getElementById('app').innerHTML = h;
+}
+
+render();
+</script>
+</body>
+</html>
