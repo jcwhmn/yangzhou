@@ -1,26 +1,26 @@
 package yangzhou.domain.matching
 
+import yangzhou.domain.Attribute
+import yangzhou.domain.Capability
 import yangzhou.domain.Item
 import yangzhou.domain.Member
 import yangzhou.domain.Project
-
-import yangzhou.domain.Capability
 import yangzhou.domain.Requirement
 
 /** 单条 requirement 的判定,形态见 DOMAIN.md「输出形态」表。 */
 sealed interface Verdict {
-    val attribute: String
+    val attribute: Attribute
 
-    data class Satisfied(override val attribute: String) : Verdict
-    data class Surplus(override val attribute: String) : Verdict
+    data class Satisfied(override val attribute: Attribute) : Verdict
+    data class Surplus(override val attribute: Attribute) : Verdict
     data class Gap(
-        override val attribute: String,
+        override val attribute: Attribute,
         val delta: Int,
         val required: Int,
         val actual: Int,
     ) : Verdict
-    data class Unrated(override val attribute: String, val required: Int) : Verdict
-    data class Missing(override val attribute: String) : Verdict
+    data class Unrated(override val attribute: Attribute, val required: Int) : Verdict
+    data class Missing(override val attribute: Attribute) : Verdict
 }
 
 /** 聚合信号:红=有缺门 > 黄=有差距/未知 > 绿=全满足。 */

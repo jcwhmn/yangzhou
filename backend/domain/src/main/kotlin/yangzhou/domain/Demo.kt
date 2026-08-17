@@ -1,5 +1,6 @@
 package yangzhou.domain
 
+import yangzhou.domain.Attribute
 import yangzhou.domain.matching.Candidate
 import yangzhou.domain.matching.MatchResult
 import yangzhou.domain.matching.MatchingEngine
@@ -13,28 +14,28 @@ import yangzhou.domain.matching.Verdict
 fun main() {
     val me = Member(
         "我",
-        listOf(Capability("Java", 4), Capability("架构", 1), Capability("前端", 2), Capability("React", 1)),
+        listOf(Capability(Attribute("Java"), 4), Capability(Attribute("架构"), 1), Capability(Attribute("前端"), 2), Capability(Attribute("React"), 1)),
     )
     val team = listOf(
-        Member("小李", listOf(Capability("Java", 3), Capability("架构", 2))),
-        Member("小王", listOf(Capability("会计准则", 3), Capability("UI 设计", 2), Capability("React", 3))),
-        Member("小张", listOf(Capability("架构", 3), Capability("Java", 2))),
+        Member("小李", listOf(Capability(Attribute("Java"), 3), Capability(Attribute("架构"), 2))),
+        Member("小王", listOf(Capability(Attribute("会计准则"), 3), Capability(Attribute("UI 设计"), 2), Capability(Attribute("React"), 3))),
+        Member("小张", listOf(Capability(Attribute("架构"), 3), Capability(Attribute("Java"), 2))),
     )
     val chess = Project(
         "chess",
         listOf(
             Item("JCW-30", "Apply architecture decisions to Auth/PlayerConfig baseline",
-                listOf(Requirement("Java", 3), Requirement("架构", 2))),
-            Item("JCW-44", "Backend: draw offer/accept/reject via WebSocket", listOf(Requirement("Java", 3))),
+                listOf(Requirement(Attribute("Java"), 3), Requirement(Attribute("架构"), 2))),
+            Item("JCW-44", "Backend: draw offer/accept/reject via WebSocket", listOf(Requirement(Attribute("Java"), 3))),
             Item("JCW-46", "Frontend: wire real backend calls + update tests",
-                listOf(Requirement("前端", 1), Requirement("React", 2))),
+                listOf(Requirement(Attribute("前端"), 1), Requirement(Attribute("React"), 2))),
         ),
     )
     val bookkeeping = Project(
         "bookkeeping",
         listOf(
-            Item("BOO-1", "复式记账核心模块", listOf(Requirement("会计准则", 2), Requirement("Java", 2))),
-            Item("BOO-UI", "UI 设计", listOf(Requirement("UI 设计", 3))),
+            Item("BOO-1", "复式记账核心模块", listOf(Requirement(Attribute("会计准则"), 2), Requirement(Attribute("Java"), 2))),
+            Item("BOO-UI", "UI 设计", listOf(Requirement(Attribute("UI 设计"), 3))),
         ),
     )
 
@@ -57,9 +58,9 @@ private fun printItem(item: Item, r: MatchResult) {
 }
 
 private fun describe(v: Verdict): String = when (v) {
-    is Verdict.Satisfied -> "✓ 满足(${v.attribute})"
-    is Verdict.Surplus -> "✓ 有余(${v.attribute})"
-    is Verdict.Gap -> "△ 差 ${v.delta} 级(${v.attribute}:需≥${v.required},有 ${v.actual})"
-    is Verdict.Unrated -> "△ 有但未评级(${v.attribute},需≥${v.required})——差距未知"
-    is Verdict.Missing -> "✗ 缺能力(${v.attribute})"
+    is Verdict.Satisfied -> "✓ 满足(${v.attribute.name})"
+    is Verdict.Surplus -> "✓ 有余(${v.attribute.name})"
+    is Verdict.Gap -> "△ 差 ${v.delta} 级(${v.attribute.name}:需≥${v.required},有 ${v.actual})"
+    is Verdict.Unrated -> "△ 有但未评级(${v.attribute.name},需≥${v.required})——差距未知"
+    is Verdict.Missing -> "✗ 缺能力(${v.attribute.name})"
 }

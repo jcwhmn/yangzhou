@@ -1,9 +1,13 @@
 @startuml
 ' yangzhou.domain — 匹配引擎域模型。真相源是 backend/domain 的代码:改代码必须同步此图(AGENTS.md「类图」)。
 ' 注:Workspace/Attribute/Workflow 等 schema 级实体随 JCW-79(api tracer)入库后补入此图。
+hide empty members
 skinparam classAttributeIconSize 0
 
 package "yangzhou.domain" {
+  class Attribute <<value>> {
+    name: String
+  }
   class Project {
     name: String
     items: List<Item>
@@ -75,6 +79,8 @@ package "yangzhou.domain.matching" {
 Project "1" *-- "*" Item
 Item "1" o-- "*" Requirement
 Member "1" o-- "*" Capability
+Requirement --> Attribute
+Capability --> Attribute
 
 Verdict <|.. Satisfied
 Verdict <|.. Surplus

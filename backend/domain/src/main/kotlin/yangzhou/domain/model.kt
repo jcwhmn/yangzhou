@@ -1,10 +1,17 @@
 package yangzhou.domain
 
+/**
+ * 对词表属性(ADR-0003)的引用,以名字为值:零开销值类。
+ * 词表实体本身(kind/leveled,Workspace 级目录)是 schema 层的 AttributeDefinition,随 JCW-79 落库。
+ */
+@JvmInline
+value class Attribute(val name: String)
+
 /** Item 侧的属性附着:不设 minLevel 即 presence 需求(有即可)。 */
-data class Requirement(val attribute: String, val minLevel: Int? = null)
+data class Requirement(val attribute: Attribute, val minLevel: Int? = null)
 
 /** Member 侧的属性附着:level 为 null 表示「有但未评级」。 */
-data class Capability(val attribute: String, val level: Int? = null)
+data class Capability(val attribute: Attribute, val level: Int? = null)
 
 /** 人。匹配引擎读取其能力清单。 */
 data class Member(val name: String, val capabilities: List<Capability> = emptyList())
