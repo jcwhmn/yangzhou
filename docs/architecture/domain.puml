@@ -1,6 +1,6 @@
 @startuml
 ' yangzhou.domain — 匹配引擎域模型。真相源是 backend/domain 的代码:改代码必须同步此图(AGENTS.md「类图」)。
-' 注:Workspace/Attribute/Workflow 等 schema 级实体随 JCW-79(api tracer)入库后补入此图。
+' 注:schema 级实体(Workspace/AttributeDefinition/Project/Status/Item/Requirement/Capability)已随 JCW-79 落在 persistence 模块;此图只画 domain 匹配模型,持久层实体以 schema(V1__core.sql)为准。
 hide empty members
 skinparam classAttributeIconSize 0
 

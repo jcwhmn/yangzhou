@@ -1,0 +1,18 @@
+spring:
+  application:
+    name: yangzhou-api
+  datasource:
+    url: jdbc:postgresql://localhost:5432/yangzhou
+    username: postgres
+    password: postgres
+  flyway:
+    enabled: true
+
+server:
+  error:
+    include-message: always
+
+yangzhou:
+  jwt:
+    secret: ${YANGZHOU_JWT_SECRET:yangzhou-dev-secret-0123456789abcdef0123456789abcdef}
+    ttl-hours: 24

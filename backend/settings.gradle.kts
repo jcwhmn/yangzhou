@@ -1,3 +1,3 @@
 rootProject.name = "yangzhou-backend"
 
-include("domain")
+include("domain", "persistence", "api")
