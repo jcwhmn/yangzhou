@@ -71,7 +71,9 @@ docs/      adr/ · spec/
 
 ## 构建与运行
 
-(票 1 落地 Gradle 时补:JDK 25、`./gradlew` 命令、测试起法。)
+- JDK 25(LTS)。后端在 `backend/`:`gradle build`(含测试)/ `gradle :domain:run`(引擎 Demo,输出与 prototype S1–S7 可比对)。
+- `./gradlew` 同效;首次需下载发行包,国内网络慢属已知,用本地 gradle 即可。
+- CI(GitHub Actions):backend 路径变更时跑 `gradle build`;Testcontainers 集成测试随票 2 引入。
 
 ## 工作流
 
