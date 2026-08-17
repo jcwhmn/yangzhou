@@ -1,0 +1,109 @@
+@startuml
+' yangzhou.domain — 匹配引擎域模型。真相源是 backend/domain 的代码:改代码必须同步此图(AGENTS.md「类图」)。
+' 注:Workspace/Attribute/Workflow 等 schema 级实体随 JCW-79(api tracer)入库后补入此图。
+skinparam classAttributeIconSize 0
+
+package "yangzhou.domain" {
+  class Project {
+    name: String
+    items: List<Item>
+  }
+  class Item {
+    id: String
+    title: String
+    requirements: List<Requirement>
+  }
+  class Requirement {
+    attribute: String
+    minLevel: Int?
+  }
+  class Member {
+    name: String
+    capabilities: List<Capability>
+  }
+  class Capability {
+    attribute: String
+    level: Int?
+  }
+}
+
+package "yangzhou.domain.matching" {
+  object MatchingEngine {
+    judge(req: Requirement, caps: List<Capability>): Verdict
+    matchItem(item: Item, member: Member): MatchResult
+    rollupProject(project: Project, member: Member): RollupResult
+    rankCandidates(item: Item, members: List<Member>): List<Candidate>
+  }
+
+  interface Verdict <<sealed>> {
+    attribute: String
+  }
+  class Satisfied
+  class Surplus
+  class Gap {
+    delta: Int
+    required: Int
+    actual: Int
+  }
+  class Unrated {
+    required: Int
+  }
+  class Missing
+
+  enum Signal {
+    GREEN
+    YELLOW
+    RED
+  }
+
+  class MatchResult {
+    verdicts: List<Verdict>
+    missingCount: Int
+    totalDelta: Int
+    worst: Signal
+  }
+  class RollupResult {
+    results: List<Pair<Item, MatchResult>>
+    worst: Signal
+  }
+  class Candidate {
+    member: Member
+    match: MatchResult
+  }
+}
+
+Project "1" *-- "*" Item
+Item "1" o-- "*" Requirement
+Member "1" o-- "*" Capability
+
+Verdict <|.. Satisfied
+Verdict <|.. Surplus
+Verdict <|.. Gap
+Verdict <|.. Unrated
+Verdict <|.. Missing
+
+MatchResult "1" o-- "*" Verdict
+MatchResult --> Signal
+RollupResult "1" o-- "*" MatchResult
+RollupResult --> Signal
+Candidate --> Member
+Candidate --> MatchResult
+
+MatchingEngine ..> Verdict : judge
+MatchingEngine ..> MatchResult : matchItem
+MatchingEngine ..> RollupResult : rollupProject
+MatchingEngine ..> Candidate : rankCandidates
+
+note bottom of MatchingEngine
+  无状态纯函数;无加权打分。
+  团队排序:缺门少者优先 → 总差距小者优先(稳定排序)。
+  V1 单人模式只暴露 judge/matchItem/rollupProject;
+  rankCandidates 留库内不进 API。
+end note
+note right of Verdict
+  语义见 DOMAIN.md「输出形态」:
+  Satisfied/Surplus 不展开余量;
+  Unrated = 有但未评级,差距未知(不假装会算);
+  Missing = 整块缺失(红)。
+end note
+@enduml

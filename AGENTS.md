@@ -23,6 +23,10 @@ docs/      adr/ · spec/
 - 角色永不进匹配输入(ADR-0003);等级刻度 1–4;presence 需求为默认,min-level 只用于关键路径。
 - 用户可见文案中文优先,文案外置。
 
+## 类图
+
+- 领域类图 = PlantUML 源码 `docs/architecture/domain.puml`(不提交生成图片)。**改 `backend/domain` 的实体或引擎签名后必须同步更新它**——真相源是代码,图是缓存;不同步即过期。用 VSCode PlantUML 插件或 plantuml.com 渲染预览。
+
 ## 过程(chess 实战约定平移)
 
 - 票即计划:实现前读 Linear 票 + spec 对应故事,不凭记忆。
