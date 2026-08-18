@@ -53,8 +53,8 @@ docs/      adr/ · spec/
 
 ## 命名分层
 
-- **domain**(引擎模型)与 **persistence**(DB 行)共用裸名(Item/Member/Capability/Requirement/…),包即命名空间;同文件两用时用 
-- API 线型(wire)一律语义后缀: / ,不复用裸名——裸名永无三义
+- **domain**(引擎模型)与 **persistence**(DB 行)共用裸名(Item/Member/Capability/Requirement/…),包即命名空间;同文件两用时用 import 别名(`import yangzhou.domain.Item as DomainItem`)
+- API 线型(wire)一律语义后缀(`XxxRequest` / `XxxResponse`),不复用裸名——裸名永无三义
 
 ## 持久层(ADR-0004;chess 实战约定平移)
 
