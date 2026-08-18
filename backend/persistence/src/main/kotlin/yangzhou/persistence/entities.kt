@@ -68,8 +68,20 @@ data class Status(
     val objectId: UUID = UUID.randomUUID(),
     val projectId: Long,
     val name: String,
+    val icon: String? = null,
     val isFinal: Boolean = false,
     val position: Int = 0,
+    val createdAt: Instant = Instant.now(),
+    val updatedAt: Instant = Instant.now(),
+)
+
+@Table("status_transition")
+data class StatusTransition(
+    @Id val id: Long? = null,
+    val objectId: UUID = UUID.randomUUID(),
+    val projectId: Long,
+    val fromStatusId: Long,
+    val toStatusId: Long,
     val createdAt: Instant = Instant.now(),
     val updatedAt: Instant = Instant.now(),
 )

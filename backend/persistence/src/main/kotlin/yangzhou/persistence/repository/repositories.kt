@@ -8,6 +8,7 @@ import yangzhou.persistence.Member
 import yangzhou.persistence.Project
 import yangzhou.persistence.Requirement
 import yangzhou.persistence.Status
+import yangzhou.persistence.StatusTransition
 import yangzhou.persistence.Workspace
 import java.util.UUID
 
@@ -37,6 +38,13 @@ interface ProjectRepository : CrudRepository<Project, Long> {
 interface StatusRepository : CrudRepository<Status, Long> {
     fun findByProjectIdOrderByPosition(projectId: Long): List<Status>
     fun findByProjectIdAndObjectId(projectId: Long, objectId: UUID): Status?
+    fun findByObjectId(objectId: UUID): Status?
+    fun deleteByObjectId(objectId: UUID)
+}
+
+interface StatusTransitionRepository : CrudRepository<StatusTransition, Long> {
+    fun findByProjectId(projectId: Long): List<StatusTransition>
+    fun deleteByProjectId(projectId: Long)
 }
 
 interface ItemRepository : CrudRepository<Item, Long> {
