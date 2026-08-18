@@ -9,14 +9,14 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 
 @RestController
-@RequestMapping("/api/auth")
+@RequestMapping("/api")
 class AuthController(private val authService: AuthService) {
 
-    @PostMapping("/bootstrap")
+    @PostMapping("/auth/bootstrap")
     fun bootstrap(@Valid @RequestBody request: BootstrapRequest): ResponseEntity<AuthService.TokenResponse> =
         ResponseEntity.status(HttpStatus.CREATED).body(authService.bootstrap(request.username, request.password))
 
-    @PostMapping("/login")
+    @PostMapping("/auth/login")
     fun login(@Valid @RequestBody request: BootstrapRequest): ResponseEntity<AuthService.TokenResponse> =
         ResponseEntity.ok(authService.login(request.username, request.password))
 }

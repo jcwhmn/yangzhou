@@ -14,24 +14,24 @@ import org.springframework.http.HttpStatus
 import java.util.UUID
 
 @RestController
-@RequestMapping("/api/attributes")
+@RequestMapping("/api")
 class AttributeController(private val service: AttributeService) {
 
-    @PostMapping
+    @PostMapping("/attributes")
     @ResponseStatus(HttpStatus.CREATED)
     fun create(@Valid @RequestBody request: CreateAttributeRequest): AttributeService.AttributeDto =
         service.create(request.name.trim(), request.kind, request.leveled)
 
-    @GetMapping
+    @GetMapping("/attributes")
     fun list(): List<AttributeService.AttributeDto> = service.list()
 
-    @PatchMapping("/{attributeId}")
+    @PatchMapping("/attributes/{attributeId}")
     fun update(
         @PathVariable attributeId: UUID,
         @RequestBody request: UpdateAttributeRequest,
     ): AttributeService.AttributeDto = service.update(attributeId, request.kind, request.leveled)
 
-    @DeleteMapping("/{attributeId}")
+    @DeleteMapping("/attributes/{attributeId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun delete(@PathVariable attributeId: UUID) = service.delete(attributeId)
 }

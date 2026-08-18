@@ -12,17 +12,17 @@ import org.springframework.web.bind.annotation.RestController
 import org.springframework.http.HttpStatus
 
 @RestController
-@RequestMapping("/api/capabilities")
+@RequestMapping("/api")
 class CapabilityController(private val service: CapabilityService) {
 
-    @GetMapping
+    @GetMapping("/capabilities")
     fun list(): List<CapabilityService.CapabilityDto> = service.list()
 
-    @PutMapping
+    @PutMapping("/capabilities")
     fun upsert(@Valid @RequestBody request: UpsertCapabilityRequest): CapabilityService.CapabilityDto =
         service.upsert(request.attribute.trim(), request.level)
 
-    @DeleteMapping("/{attribute}")
+    @DeleteMapping("/capabilities/{attribute}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun delete(@PathVariable attribute: String) = service.delete(attribute)
 }

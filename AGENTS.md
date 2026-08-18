@@ -75,6 +75,7 @@ docs/      adr/ · spec/
 
 - service fail-fast 抛业务异常;HTTP 映射集中 GlobalExceptionHandler;统一错误形状(code/message/path/可选 fields);请求校验用 Bean Validation
 - OpenAPI + Scalar(不用 Swagger UI/Knife4j);注解最少(controller @Tag + 偶尔摘要),字段级只在生成文档误导时补
+- Controller 统一格式:类级 `@RequestMapping("/api")` 只扛 API 前缀(未来 /api/v1 一次替换),资源段(/projects、/items…)全在方法级
 - 日志:默认 SLF4J/Logback,YAML 配级别;不加 MDC/关联 ID/自定义 logback 除非新决策
 - 不加 mapstruct;slice 内手写小 mapper
 

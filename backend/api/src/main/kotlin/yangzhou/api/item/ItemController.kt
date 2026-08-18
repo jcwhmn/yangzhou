@@ -13,9 +13,10 @@ import org.springframework.http.HttpStatus
 import java.util.UUID
 
 @RestController
+@RequestMapping("/api")
 class ItemController(private val service: ItemService) {
 
-    @PostMapping("/api/projects/{key}/items")
+    @PostMapping("/projects/{key}/items")
     @ResponseStatus(HttpStatus.CREATED)
     fun create(
         @PathVariable key: String,
@@ -30,13 +31,13 @@ class ItemController(private val service: ItemService) {
         requirements = request.requirements.map { ItemService.RequirementDto(it.attribute.trim(), it.minLevel) },
     )
 
-    @GetMapping("/api/projects/{key}/items")
+    @GetMapping("/projects/{key}/items")
     fun list(@PathVariable key: String): List<ItemService.ItemDto> = service.list(key)
 
-    @GetMapping("/api/items/{itemId}")
+    @GetMapping("/items/{itemId}")
     fun get(@PathVariable itemId: UUID): ItemService.ItemDto = service.get(itemId)
 
-    @PatchMapping("/api/items/{itemId}")
+    @PatchMapping("/items/{itemId}")
     fun update(
         @PathVariable itemId: UUID,
         @RequestBody request: UpdateItemRequest,

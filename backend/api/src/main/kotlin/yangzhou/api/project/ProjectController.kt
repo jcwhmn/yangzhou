@@ -11,17 +11,17 @@ import org.springframework.web.bind.annotation.RestController
 import org.springframework.http.HttpStatus
 
 @RestController
-@RequestMapping("/api/projects")
+@RequestMapping("/api")
 class ProjectController(private val service: ProjectService) {
 
-    @PostMapping
+    @PostMapping("/projects")
     @ResponseStatus(HttpStatus.CREATED)
     fun create(@Valid @RequestBody request: CreateProjectRequest): ProjectService.ProjectDto =
         service.create(request.key.trim(), request.name.trim())
 
-    @GetMapping
+    @GetMapping("/projects")
     fun list(): List<ProjectService.ProjectDto> = service.list()
 
-    @GetMapping("/{key}")
+    @GetMapping("/projects/{key}")
     fun get(@PathVariable key: String): ProjectService.ProjectDto = service.get(key)
 }
