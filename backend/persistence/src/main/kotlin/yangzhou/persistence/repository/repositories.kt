@@ -1,51 +1,51 @@
 package yangzhou.persistence.repository
 
 import org.springframework.data.repository.CrudRepository
-import yangzhou.persistence.AttributeDefinitionEntity
-import yangzhou.persistence.CapabilityEntity
-import yangzhou.persistence.ItemEntity
-import yangzhou.persistence.MemberEntity
-import yangzhou.persistence.ProjectEntity
-import yangzhou.persistence.RequirementEntity
-import yangzhou.persistence.StatusEntity
-import yangzhou.persistence.WorkspaceEntity
+import yangzhou.persistence.AttributeDefinition
+import yangzhou.persistence.Capability
+import yangzhou.persistence.Item
+import yangzhou.persistence.Member
+import yangzhou.persistence.Project
+import yangzhou.persistence.Requirement
+import yangzhou.persistence.Status
+import yangzhou.persistence.Workspace
 import java.util.UUID
 
-interface WorkspaceRepository : CrudRepository<WorkspaceEntity, Long>
+interface WorkspaceRepository : CrudRepository<Workspace, Long>
 
-interface MemberRepository : CrudRepository<MemberEntity, Long> {
-    fun findByUsername(username: String): MemberEntity?
+interface MemberRepository : CrudRepository<Member, Long> {
+    fun findByUsername(username: String): Member?
 }
 
-interface AttributeDefinitionRepository : CrudRepository<AttributeDefinitionEntity, Long> {
-    fun findByWorkspaceId(workspaceId: Long): List<AttributeDefinitionEntity>
-    fun findByWorkspaceIdAndName(workspaceId: Long, name: String): AttributeDefinitionEntity?
-    fun findByWorkspaceIdAndObjectId(workspaceId: Long, objectId: UUID): AttributeDefinitionEntity?
+interface AttributeDefinitionRepository : CrudRepository<AttributeDefinition, Long> {
+    fun findByWorkspaceId(workspaceId: Long): List<AttributeDefinition>
+    fun findByWorkspaceIdAndName(workspaceId: Long, name: String): AttributeDefinition?
+    fun findByWorkspaceIdAndObjectId(workspaceId: Long, objectId: UUID): AttributeDefinition?
     fun existsByWorkspaceIdAndName(workspaceId: Long, name: String): Boolean
 }
 
-interface CapabilityRepository : CrudRepository<CapabilityEntity, Long> {
-    fun findByMemberId(memberId: Long): List<CapabilityEntity>
-    fun findByMemberIdAndAttributeDefinitionId(memberId: Long, attributeDefinitionId: Long): CapabilityEntity?
+interface CapabilityRepository : CrudRepository<Capability, Long> {
+    fun findByMemberId(memberId: Long): List<Capability>
+    fun findByMemberIdAndAttributeDefinitionId(memberId: Long, attributeDefinitionId: Long): Capability?
 }
 
-interface ProjectRepository : CrudRepository<ProjectEntity, Long> {
-    fun findByKey(key: String): ProjectEntity?
+interface ProjectRepository : CrudRepository<Project, Long> {
+    fun findByKey(key: String): Project?
     fun existsByKey(key: String): Boolean
 }
 
-interface StatusRepository : CrudRepository<StatusEntity, Long> {
-    fun findByProjectIdOrderByPosition(projectId: Long): List<StatusEntity>
-    fun findByProjectIdAndObjectId(projectId: Long, objectId: UUID): StatusEntity?
+interface StatusRepository : CrudRepository<Status, Long> {
+    fun findByProjectIdOrderByPosition(projectId: Long): List<Status>
+    fun findByProjectIdAndObjectId(projectId: Long, objectId: UUID): Status?
 }
 
-interface ItemRepository : CrudRepository<ItemEntity, Long> {
-    fun findByObjectId(objectId: UUID): ItemEntity?
-    fun findByProjectIdOrderByNumber(projectId: Long): List<ItemEntity>
+interface ItemRepository : CrudRepository<Item, Long> {
+    fun findByObjectId(objectId: UUID): Item?
+    fun findByProjectIdOrderByNumber(projectId: Long): List<Item>
 }
 
-interface RequirementRepository : CrudRepository<RequirementEntity, Long> {
-    fun findByItemId(itemId: Long): List<RequirementEntity>
-    fun findByItemIdIn(itemIds: Collection<Long>): List<RequirementEntity>
+interface RequirementRepository : CrudRepository<Requirement, Long> {
+    fun findByItemId(itemId: Long): List<Requirement>
+    fun findByItemIdIn(itemIds: Collection<Long>): List<Requirement>
     fun deleteByItemId(itemId: Long)
 }

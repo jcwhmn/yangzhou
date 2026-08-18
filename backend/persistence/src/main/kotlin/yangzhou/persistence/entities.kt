@@ -6,7 +6,7 @@ import java.time.Instant
 import java.util.UUID
 
 @Table("workspace")
-data class WorkspaceEntity(
+data class Workspace(
     @Id val id: Long? = null,
     val objectId: UUID = UUID.randomUUID(),
     val name: String = "default",
@@ -15,7 +15,7 @@ data class WorkspaceEntity(
 )
 
 @Table("member")
-data class MemberEntity(
+data class Member(
     @Id val id: Long? = null,
     val objectId: UUID = UUID.randomUUID(),
     val workspaceId: Long,
@@ -27,7 +27,7 @@ data class MemberEntity(
 )
 
 @Table("attribute_definition")
-data class AttributeDefinitionEntity(
+data class AttributeDefinition(
     @Id val id: Long? = null,
     val objectId: UUID = UUID.randomUUID(),
     val workspaceId: Long,
@@ -39,7 +39,7 @@ data class AttributeDefinitionEntity(
 )
 
 @Table("capability")
-data class CapabilityEntity(
+data class Capability(
     @Id val id: Long? = null,
     val objectId: UUID = UUID.randomUUID(),
     val memberId: Long,
@@ -50,7 +50,7 @@ data class CapabilityEntity(
 )
 
 @Table("project")
-data class ProjectEntity(
+data class Project(
     @Id val id: Long? = null,
     val objectId: UUID = UUID.randomUUID(),
     val workspaceId: Long,
@@ -63,7 +63,7 @@ data class ProjectEntity(
 )
 
 @Table("status")
-data class StatusEntity(
+data class Status(
     @Id val id: Long? = null,
     val objectId: UUID = UUID.randomUUID(),
     val projectId: Long,
@@ -75,7 +75,7 @@ data class StatusEntity(
 )
 
 @Table("item")
-data class ItemEntity(
+data class Item(
     @Id val id: Long? = null,
     val objectId: UUID = UUID.randomUUID(),
     val projectId: Long,
@@ -90,7 +90,7 @@ data class ItemEntity(
 )
 
 @Table("requirement")
-data class RequirementEntity(
+data class Requirement(
     @Id val id: Long? = null,
     val objectId: UUID = UUID.randomUUID(),
     val itemId: Long,

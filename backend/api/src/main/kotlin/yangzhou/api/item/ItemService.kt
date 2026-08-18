@@ -7,8 +7,8 @@ import org.springframework.transaction.annotation.Transactional
 import yangzhou.api.support.BadRequestException
 import yangzhou.api.support.ConflictException
 import yangzhou.api.support.NotFoundException
-import yangzhou.persistence.ItemEntity
-import yangzhou.persistence.RequirementEntity
+import yangzhou.persistence.Item
+import yangzhou.persistence.Requirement
 import yangzhou.persistence.repository.AttributeDefinitionRepository
 import yangzhou.persistence.repository.ItemNumberRepository
 import yangzhou.persistence.repository.ItemRepository
@@ -70,7 +70,7 @@ class ItemService(
         }
 
         val item = itemRepo.save(
-            ItemEntity(
+            Item(
                 projectId = projectId,
                 number = number,
                 title = title,
@@ -82,7 +82,7 @@ class ItemService(
         )
         val itemId = item.id!!
         resolveRequirements(project.workspaceId, requirements).forEach { (defId, minLevel) ->
-            requirementRepo.save(RequirementEntity(itemId = itemId, attributeDefinitionId = defId, minLevel = minLevel))
+            requirementRepo.save(Requirement(itemId = itemId, attributeDefinitionId = defId, minLevel = minLevel))
         }
         return get(item.objectId)
     }
@@ -152,7 +152,7 @@ class ItemService(
     // ---------- 内部 ----------
 
     /** 防环:沿新父链上行,遇到自身即拒绝(领域规则 2)。 */
-    private fun ensureNoCycle(item: ItemEntity, newParent: ItemEntity) {
+    private fun ensureNoCycle(item: Item, newParent: Item) {
         var cursor: UUID? = newParent.objectId
         var hops = 0
         while (cursor != null) {

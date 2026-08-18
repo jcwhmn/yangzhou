@@ -7,7 +7,7 @@ import org.springframework.transaction.annotation.Transactional
 import yangzhou.api.config.JwtService
 import yangzhou.api.workspace.WorkspaceService
 import yangzhou.api.support.ConflictException
-import yangzhou.persistence.MemberEntity
+import yangzhou.persistence.Member
 import yangzhou.persistence.repository.MemberRepository
 import org.springframework.security.authentication.BadCredentialsException
 
@@ -26,7 +26,7 @@ class AuthService(
         if (members.count() > 0) throw ConflictException("已初始化,请直接登录")
         val workspace = workspaceService.ensureDefault()
         val member = members.save(
-            MemberEntity(
+            Member(
                 workspaceId = workspace.id!!,
                 username = username,
                 passwordHash = encoder.encode(password),
@@ -43,7 +43,7 @@ class AuthService(
         return tokenFor(member)
     }
 
-    private fun tokenFor(member: MemberEntity) =
+    private fun tokenFor(member: Member) =
         TokenResponse(
             token = jwt.generate(member.objectId.toString()),
             memberId = member.objectId.toString(),

@@ -113,7 +113,7 @@ class FeasibilityService(
         return yangzhou.domain.Member(me.displayName, caps)
     }
 
-    private fun yangzhou.persistence.ItemEntity.toDomain(): yangzhou.domain.Item {
+    private fun yangzhou.persistence.Item.toDomain(): yangzhou.domain.Item {
         val attrs = definitions.findByWorkspaceId(workspaceService.required().id!!).associate { it.id!! to it.name }
         val reqs = requirementRepo.findByItemId(id!!)
             .mapNotNull { r ->

@@ -9,7 +9,7 @@ import yangzhou.api.support.BadRequestException
 import yangzhou.api.support.ConflictException
 import yangzhou.api.support.NotFoundException
 import yangzhou.api.workspace.WorkspaceService
-import yangzhou.persistence.CapabilityEntity
+import yangzhou.persistence.Capability
 import yangzhou.persistence.repository.AttributeDefinitionRepository
 import yangzhou.persistence.repository.CapabilityRepository
 import java.util.UUID
@@ -43,7 +43,7 @@ class CapabilityService(
         val existing = capabilities.findByMemberIdAndAttributeDefinitionId(memberId, defId)
         val saved = try {
             capabilities.save(
-                (existing ?: CapabilityEntity(memberId = memberId, attributeDefinitionId = defId))
+                (existing ?: Capability(memberId = memberId, attributeDefinitionId = defId))
                     .copy(level = level),
             )
         } catch (_: DataIntegrityViolationException) {

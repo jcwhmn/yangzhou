@@ -7,8 +7,8 @@ import org.springframework.transaction.annotation.Transactional
 import yangzhou.api.support.ConflictException
 import yangzhou.api.support.NotFoundException
 import yangzhou.api.workspace.WorkspaceService
-import yangzhou.persistence.ProjectEntity
-import yangzhou.persistence.StatusEntity
+import yangzhou.persistence.Project
+import yangzhou.persistence.Status
 import yangzhou.persistence.repository.ProjectRepository
 import yangzhou.persistence.repository.StatusRepository
 import java.util.UUID
@@ -34,7 +34,7 @@ class ProjectService(
     fun create(key: String, name: String): ProjectDto {
         if (projects.existsByKey(key)) throw ConflictException("项目 key 已存在:$key")
         val workspaceId = workspaceService.required().id!!
-        val project = projects.save(ProjectEntity(workspaceId = workspaceId, key = key, name = name))
+        val project = projects.save(Project(workspaceId = workspaceId, key = key, name = name))
         // 默认 workflow:To Do / In Progress / Done(Done 终态)——模板系统的最小预置
         defaultStatuses(project.id!!).forEach { statuses.save(it) }
         return get(key)
@@ -52,9 +52,9 @@ class ProjectService(
     }
 
     private fun defaultStatuses(projectId: Long) = listOf(
-        StatusEntity(projectId = projectId, name = "To Do", position = 0),
-        StatusEntity(projectId = projectId, name = "In Progress", position = 1),
-        StatusEntity(projectId = projectId, name = "Done", isFinal = true, position = 2),
+        Status(projectId = projectId, name = "To Do", position = 0),
+        Status(projectId = projectId, name = "In Progress", position = 1),
+        Status(projectId = projectId, name = "Done", isFinal = true, position = 2),
     )
 }
 

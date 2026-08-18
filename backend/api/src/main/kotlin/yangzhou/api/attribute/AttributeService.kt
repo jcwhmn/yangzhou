@@ -8,7 +8,7 @@ import yangzhou.api.support.BadRequestException
 import yangzhou.api.support.ConflictException
 import yangzhou.api.support.NotFoundException
 import yangzhou.api.workspace.WorkspaceService
-import yangzhou.persistence.AttributeDefinitionEntity
+import yangzhou.persistence.AttributeDefinition
 import yangzhou.persistence.repository.AttributeDefinitionRepository
 import java.util.UUID
 
@@ -34,7 +34,7 @@ class AttributeService(
             throw ConflictException("属性已存在:$name")
         }
         val saved = definitions.save(
-            AttributeDefinitionEntity(workspaceId = workspaceId, name = name, kind = kind, leveled = leveled),
+            AttributeDefinition(workspaceId = workspaceId, name = name, kind = kind, leveled = leveled),
         )
         return saved.toDto()
     }
@@ -78,7 +78,7 @@ class AttributeService(
         }
     }
 
-    private fun AttributeDefinitionEntity.toDto() =
+    private fun AttributeDefinition.toDto() =
         AttributeDto(objectId, name, kind, leveled)
 }
 

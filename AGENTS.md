@@ -51,6 +51,11 @@ docs/      adr/ · spec/
 - 更新用 `copy(...)` + save,用返回实例
 - 小切片的 DTO/请求/响应放同一文件,吵了再拆
 
+## 命名分层
+
+- **domain**(引擎模型)与 **persistence**(DB 行)共用裸名(Item/Member/Capability/Requirement/…),包即命名空间;同文件两用时用 
+- API 线型(wire)一律语义后缀: / ,不复用裸名——裸名永无三义
+
 ## 持久层(ADR-0004;chess 实战约定平移)
 
 - Spring Data JDBC + Flyway;禁 JPA/Hibernate/Exposed/BaseEntity 继承
