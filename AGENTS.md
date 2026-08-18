@@ -51,6 +51,11 @@ docs/      adr/ · spec/
 - 更新用 `copy(...)` + save,用返回实例
 - 小切片的 DTO/请求/响应放同一文件,吵了再拆
 
+## 命名分层
+
+- **domain**(引擎模型)与 **persistence**(DB 行)共用裸名(Item/Member/Capability/Requirement/…),包即命名空间;同文件两用时用 import 别名(`import yangzhou.domain.Item as DomainItem`)
+- API 线型(wire)一律语义后缀(`XxxRequest` / `XxxResponse`),不复用裸名——裸名永无三义
+
 ## 持久层(ADR-0004;chess 实战约定平移)
 
 - Spring Data JDBC + Flyway;禁 JPA/Hibernate/Exposed/BaseEntity 继承
@@ -70,6 +75,7 @@ docs/      adr/ · spec/
 
 - service fail-fast 抛业务异常;HTTP 映射集中 GlobalExceptionHandler;统一错误形状(code/message/path/可选 fields);请求校验用 Bean Validation
 - OpenAPI + Scalar(不用 Swagger UI/Knife4j);注解最少(controller @Tag + 偶尔摘要),字段级只在生成文档误导时补
+- Controller 统一格式:类级 `@RequestMapping("/api")` 只扛 API 前缀(未来 /api/v1 一次替换),资源段(/projects、/items…)全在方法级
 - 日志:默认 SLF4J/Logback,YAML 配级别;不加 MDC/关联 ID/自定义 logback 除非新决策
 - 不加 mapstruct;slice 内手写小 mapper
 
@@ -77,7 +83,8 @@ docs/      adr/ · spec/
 
 - JDK 25(LTS)。后端在 `backend/`:`gradle build`(含测试)/ `gradle :domain:run`(引擎 Demo,输出与 prototype S1–S7 可比对)。
 - `./gradlew` 同效;首次需下载发行包,国内网络慢属已知,用本地 gradle 即可。
-- CI(GitHub Actions):backend 路径变更时跑 `gradle build`;Testcontainers 集成测试随票 2 引入。
+- CI(GitHub Actions):backend 路径变更时跑 `gradle build`(含 Testcontainers 集成测试,需 Docker)。
+- 本机开发库:`yangzhou`(共享 compose,已建);bootRun 用 `gradle :api:bootRun`。
 
 ## 工作流
 
