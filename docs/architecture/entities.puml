@@ -1,0 +1,73 @@
+@startuml
+' yangzhou.persistence — schema 实体概念图(V1__core.sql + V2__workflow.sql)
+' 只画领域字段;infra(id/objectId/createdAt/updatedAt/passwordHash/lastItemNumber)不画;
+' parentId 不画,反转为父侧 children(List)。真相源是 Flyway schema:改表必须同步此图(AGENTS.md「类图」)。
+skinparam classAttributeIconSize 0
+
+class Workspace {
+  name: String
+}
+class Member {
+  username: String
+  displayName: String
+}
+class AttributeDefinition {
+  name: String
+  kind: String
+  leveled: Boolean
+}
+class Capability {
+  level: Int?
+}
+class Project {
+  key: String
+  name: String
+}
+class Status {
+  name: String
+  icon: String?
+  isFinal: Boolean
+  position: Int
+}
+class StatusTransition
+class Item {
+  number: Int
+  title: String
+  description: String?
+  type: String
+  children: List<Item>
+}
+class Requirement {
+  minLevel: Int?
+}
+
+Workspace "1" *-- "*" Member : 目录
+Workspace "1" *-- "*" AttributeDefinition : 词表
+Workspace "1" *-- "*" Project
+
+Member "1" *-- "*" Capability
+Capability "*" *-- "1" AttributeDefinition
+
+Project "1" *-- "*" Item : 编号序列
+Project "1" *-- "*" Status
+Project "1" *-- "*" StatusTransition
+
+Item "父 0..1" o-- "children *" Item : 同质树(防环)
+
+Item "*" *-- "1" Status : 当前状态
+Item "1" *-- "*" Requirement
+Requirement "*" *-- "1" AttributeDefinition
+
+StatusTransition "*" --> "from 1" Status
+StatusTransition "*" --> "to 1" Status
+
+note bottom of StatusTransition
+  迁移表无行 = 自由迁移(V1 默认);
+  有行 = 仅列出的 from→to 合法。
+end note
+note right of Item
+  number 为项目内递增编号,
+  对外展示为 "{key}-{number}"(如 CHE-1)。
+  type ∈ {task, bug, goal, story}。
+end note
+@enduml

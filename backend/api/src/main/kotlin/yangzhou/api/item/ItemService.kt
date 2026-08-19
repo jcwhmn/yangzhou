@@ -27,6 +27,7 @@ class ItemService(
     private val definitions: AttributeDefinitionRepository,
     private val numbering: ItemNumberRepository,
     private val jdbc: JdbcOperations,
+    private val workflow: yangzhou.api.workflow.WorkflowService,
 ) {
 
     data class RequirementDto(val attribute: String, val minLevel: Int?)
@@ -130,10 +131,16 @@ class ItemService(
             ?: throw NotFoundException("项目不存在")
         var current = item
 
+        val projectId = project.id ?: error("no id")
         if (statusItemId != null) {
-            val status = statuses.findByProjectIdAndObjectId(project.id ?: error("no id"), statusItemId)
+            val status = statuses.findByProjectIdAndObjectId(projectId, statusItemId)
                 ?: throw BadRequestException("状态不属于该项目")
-            current = itemRepo.save(current.copy(statusObjectId = status.objectId)) // V1 自由迁移
+            val oldStatus = statuses.findByProjectIdOrderByPosition(projectId)
+                .firstOrNull { it.objectId == current.statusObjectId }
+            if (oldStatus != null) {
+                workflow.assertTransitionAllowed(projectId, oldStatus.id!!, status.id!!)
+            }
+            current = itemRepo.save(current.copy(statusObjectId = status.objectId))
         }
 
         if (parentItemId != null) {
