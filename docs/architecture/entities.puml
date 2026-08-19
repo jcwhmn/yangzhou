@@ -1,7 +1,9 @@
 @startuml
+hide empty members
 ' yangzhou.persistence — schema 实体概念图(V1__core.sql + V2__workflow.sql)
 ' 只画领域字段;infra(id/objectId/createdAt/updatedAt/passwordHash/lastItemNumber)不画;
 ' parentId 不画,反转为父侧 children(List)。真相源是 Flyway schema:改表必须同步此图(AGENTS.md「类图」)。
+hide empty members
 skinparam classAttributeIconSize 0
 
 class Workspace {

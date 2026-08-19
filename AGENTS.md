@@ -27,7 +27,7 @@ docs/      adr/ · spec/
 
 - 领域类图 = PlantUML 源码 `docs/architecture/domain.puml`(引擎模型)。**改 `backend/domain` 的实体或引擎签名后必须同步更新它**。
 - 实体概念图 = `docs/architecture/entities.puml`(persistence/schema,只画领域字段,parentId 反转为父侧 children)。**改 Flyway schema 后必须同步更新它**。
-- 两图真相源都是代码/表结构,图是缓存;不同步即过期。不提交生成图片;用 VSCode PlantUML 插件或 plantuml.com 渲染预览。
+- 两图真相源都是代码/表结构,图是缓存;不同步即过期。**顶部一律加 `hide empty members`**。不提交生成图片;用 VSCode PlantUML 插件或 plantuml.com 渲染预览。
 
 ## 过程(chess 实战约定平移)
 
