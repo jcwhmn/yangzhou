@@ -36,6 +36,11 @@ java -jar yz.jar feasibility CHE
 - [ ] `feasibility CHE --json` → 与 API `/api/projects/CHE/feasibility` 同构 JSON
 - [ ] `feasibility CHE --item <itemId>` → 单 item 判定
 - [ ] 未登录(删会话文件后)任意命令 → `错误:未登录...`
+- [ ] `export CHE --file che.json` → `已导出 N 个 item`;文件含 format/yangzhou-items/1、树、type、状态名、requirement
+- [ ] `import CHE2 che.json` → 编号重排(CHE2-1..N),round-trip(export→import→export)语义等价:标题/type/状态/需求/树一致
+- [ ] `export CHE --csv` → 扁平列;含逗号/引号的字段正确加引号
+- [ ] `import CHE3 linear.csv`(Title,Status,Labels 头)→ 标签→presence 需求,`属性>=N` 生效;缺失属性自动建 label;未知状态名静默落默认态
+- [ ] 大批量:1000 item JSON 导入可用,每 100 条打印进度
 - [ ] 中文与 ✓△✗ 在 Windows 控制台不乱码(CLI 强制 UTF-8 输出)
 
 ## 与 API 的关系

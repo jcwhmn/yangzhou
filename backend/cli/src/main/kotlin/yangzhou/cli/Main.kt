@@ -37,6 +37,8 @@ private fun usage() {
           caps rm <属性>                               移除能力
           caps list [--json]                           能力清单
           feasibility <KEY> [--item <ID>] [--json]     可行性/差距分析
+          export <KEY> [--csv] [--file <路径>]          导出(JSON 全保真/CSV 扁平)
+          import <KEY> <文件>                           导入(JSON 按扩展名或 .csv;Linear CSV 可直接灌)
 
         会话文件:${ApiClient.sessionFile().absolutePath}
         """.trimIndent(),
@@ -64,6 +66,22 @@ private fun run(args: List<String>) {
     val api = ApiClient.create()
     if (noun == "feasibility") {
         return feasibility(api, positional.getOrNull(1), flags)
+    }
+    if (noun == "export") {
+        val key = positional.getOrNull(1) ?: error("缺少项目 KEY")
+        val csv = flags.containsKey("csv")
+        val file = java.io.File(flags["file"] ?: "$key-items.${if (csv) "csv" else "json"}")
+        return if (csv) yangzhou.cli.ExportImport.exportCsv(api, key, file) else yangzhou.cli.ExportImport.exportJson(api, key, file)
+    }
+    if (noun == "import") {
+        val key = positional.getOrNull(1) ?: error("缺少项目 KEY")
+        val path = positional.getOrNull(2) ?: flags["file"] ?: error("缺少文件路径")
+        val file = java.io.File(path)
+        return if (file.extension.equals("csv", ignoreCase = true)) {
+            yangzhou.cli.ExportImport.importCsv(api, key, file)
+        } else {
+            yangzhou.cli.ExportImport.importJson(api, key, file)
+        }
     }
     when ("$noun $verb") {
         "login null", "login " -> {
