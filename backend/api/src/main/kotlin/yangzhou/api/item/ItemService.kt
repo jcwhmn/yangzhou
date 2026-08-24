@@ -156,6 +156,20 @@ class ItemService(
         return get(current.objectId)
     }
 
+    /** 需求整表替换(同 transitions 语义);供 item 详情编辑用。 */
+    @Transactional
+    fun replaceRequirements(itemId: UUID, requirements: List<RequirementDto>): ItemDto {
+        val item = itemRepo.findByObjectId(itemId) ?: throw NotFoundException("item 不存在")
+        val project = projects.findAll().firstOrNull { it.id == item.projectId }
+            ?: throw NotFoundException("项目不存在")
+        val rowId = item.id!!
+        requirementRepo.deleteByItemId(rowId)
+        resolveRequirements(project.workspaceId, requirements).forEach { (defId, minLevel) ->
+            requirementRepo.save(Requirement(itemId = rowId, attributeDefinitionId = defId, minLevel = minLevel))
+        }
+        return get(item.objectId)
+    }
+
     // ---------- 内部 ----------
 
     /** 防环:沿新父链上行,遇到自身即拒绝(领域规则 2)。 */
@@ -188,6 +202,8 @@ class ItemService(
     }
 }
 
+data class RequirementInput(val attribute: String, val minLevel: Int? = null)
+
 data class CreateItemRequest(
     @field:NotBlank val title: String,
     val description: String? = null,
@@ -195,9 +211,9 @@ data class CreateItemRequest(
     val parentItemId: UUID? = null,
     val statusItemId: UUID? = null,
     val requirements: List<RequirementInput> = emptyList(),
-) {
-    data class RequirementInput(val attribute: String, val minLevel: Int? = null)
-}
+)
+
+data class ReplaceRequirementsRequest(val requirements: List<RequirementInput> = emptyList())
 
 data class UpdateItemRequest(
     val title: String? = null,

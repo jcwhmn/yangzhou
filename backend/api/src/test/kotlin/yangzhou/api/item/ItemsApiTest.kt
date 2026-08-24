@@ -82,6 +82,40 @@ class ItemsApiTest : AbstractApiTest() {
     }
 
     @Test
+    fun `需求整表替换——增删改一次落库`() {
+        val authed = bootstrapAndAuth()
+        createProject(authed, "CHE")
+        createSkillAttribute(authed, "Java")
+        createSkillAttribute(authed, "架构")
+        val item = createItem(authed, "CHE", "x", listOf(mapOf("attribute" to "Java", "minLevel" to 3)))
+
+        // 替换:Java 改门槛 + 新增架构 presence + 移除(整表替换语义)
+        val updated = json.readTree(
+            authed.put().uri("/api/items/${item["itemId"].asText()}/requirements")
+                .body(mapOf("requirements" to listOf(
+                    mapOf("attribute" to "Java", "minLevel" to 4),
+                    mapOf("attribute" to "架构", "minLevel" to null),
+                )))
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String::class.java).returnResult().responseBody!!,
+        )
+        val reqs = updated["requirements"].map { it["attribute"].asText() to if (it["minLevel"].isNull) null else it["minLevel"].asInt() }
+        assertEquals(listOf("Java" to 4, "架构" to null), reqs)
+
+        // 再替换为空 = 清空
+        authed.put().uri("/api/items/${item["itemId"].asText()}/requirements")
+            .body(mapOf("requirements" to emptyList<String>()))
+            .exchange().expectStatus().isOk()
+        val cleared = json.readTree(
+            authed.get().uri("/api/items/${item["itemId"].asText()}").exchange()
+                .expectStatus().isOk()
+                .expectBody(String::class.java).returnResult().responseBody!!,
+        )
+        assertEquals(0, cleared["requirements"].size())
+    }
+
+    @Test
     fun `未知属性的需求 400`() {
         val authed = bootstrapAndAuth()
         createProject(authed, "CHE")
