@@ -1,5 +1,6 @@
-// API 瘦客户端:token 存 localStorage;401 → 登录页
-export const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+// API 瘦客户端:token 存 localStorage;401 → 登录页。
+// 默认同源(经 Next rewrites 代理到后端,浏览器零 CORS);自部署 API 时用 NEXT_PUBLIC_API_URL 覆盖。
+export const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 export class ApiError extends Error {
   constructor(
@@ -47,11 +48,13 @@ export function clearToken() {
 
 /** 全新服务器 bootstrap,否则 login(同 CLI 语义)。 */
 export async function bootstrapOrLogin(username: string, password: string): Promise<string> {
-  let res = await fetch(`${API_BASE}/api/auth/bootstrap`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, password }),
-  });
+  const post = () =>
+    fetch(`${API_BASE}/api/auth/bootstrap`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }),
+    });
+  let res = await post();
   if (res.status === 409) {
     res = await fetch(`${API_BASE}/api/auth/login`, {
       method: "POST",

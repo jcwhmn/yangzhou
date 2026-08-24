@@ -27,8 +27,9 @@ class SecurityConfig(private val jwtAuthFilter: JwtAuthFilter) {
         .exceptionHandling { cfg ->
             cfg.authenticationEntryPoint { _, response, _ ->
                 response.status = 401
-                response.contentType = "application/json"
-                response.writer.write("""{"code":"UNAUTHORIZED","message":"未认证"}""")
+                response.contentType = "application/json;charset=UTF-8"
+                // 字节流直写:绕开 servlet writer 编码(Tomcat GBK 环境下 writer 会把中文变 ?)
+                response.outputStream.use { it.write("""{"code":"UNAUTHORIZED","message":"未认证"}""".toByteArray(Charsets.UTF_8)) }
             }
         }
         .build()
