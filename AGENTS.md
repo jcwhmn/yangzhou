@@ -88,6 +88,10 @@ docs/      adr/ · spec/
 - CI(GitHub Actions):backend 路径变更时跑 `gradle build`(含 Testcontainers 集成测试,需 Docker)。
 - 本机开发库:`yangzhou`(共享 compose,已建);bootRun 用 `gradle :api:bootRun`。
 
+## 进程管理(本机实操)
+
+- **严禁 `taskkill /IM node.exe`**——pi 本体就是 node 进程,按进程名杀会自杀;也慎杀全部 java.exe(gradle daemon 可杀,但用完再起更省)。停开发服务一律**按端口找 PID**:`netstat -ano | findstr :3000` → `taskkill /PID <pid> /F`。
+
 ## 工作流
 
 main 干线开发;原型留 `prototype/*` 分支;每张票 = 一个 Linear issue,验收清单全绿才关票。
