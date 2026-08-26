@@ -61,7 +61,8 @@ class ItemService(
         val status = when {
             statusItemId != null -> statuses.findByProjectIdAndObjectId(projectId, statusItemId)
                 ?: throw BadRequestException("状态不属于该项目")
-            else -> statuses.findByProjectIdOrderByPosition(projectId).firstOrNull()
+            else -> statuses.findByProjectIdOrderByPosition(projectId)
+                .let { list -> list.filter { it.isStart }.minByOrNull { it.position } ?: list.firstOrNull() }
                 ?: throw ConflictException("项目无状态")
         }
 

@@ -70,6 +70,7 @@ data class Status(
     val name: String,
     val icon: String? = null,
     val isFinal: Boolean = false,
+    val isStart: Boolean = false,
     val position: Int = 0,
     val createdAt: Instant = Instant.now(),
     val updatedAt: Instant = Instant.now(),

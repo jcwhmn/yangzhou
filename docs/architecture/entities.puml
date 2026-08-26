@@ -28,6 +28,7 @@ class Project {
 class Status {
   name: String
   icon: String?
+  isStart: Boolean
   isFinal: Boolean
   position: Int
 }
