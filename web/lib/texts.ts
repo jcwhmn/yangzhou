@@ -1,6 +1,11 @@
 // 文案外置(中文优先;加英文时改这里)
 export const t = {
   appName: "扬州 yangzhou",
+  nav: {
+    projects: "项目",
+    capabilities: "我的能力",
+    attributes: "词表",
+  },
   login: {
     title: "登录",
     username: "用户名",
@@ -39,6 +44,41 @@ export const t = {
     verdicts: "判定",
     signal: "聚合信号",
     back: "← 返回看板",
+  },
+  caps: {
+    title: "我的能力",
+    hint: "自评等级 1–4;「未评级」= 有但不算差距;改动立即生效,各项目可行性随之更新。",
+    none: "无",
+    unrated: "未评级",
+    has: "有",
+    level: (l: number) => `Lv${l}`,
+    empty: "词表为空,先到「词表」页添加属性。",
+    saved: "已保存",
+    saveFailed: "保存失败",
+    back: "回到项目",
+  },
+  attrs: {
+    title: "词表",
+    hint: "Workspace 级统一语言:chess 练的 React,bookkeeping 也认。label→skill 只是一行数据,已有等级休眠不删。",
+    name: "属性名",
+    kindSkill: "skill(分级)",
+    kindLabel: "label(不分级)",
+    leveled: "分级",
+    add: "添加",
+    toKind: (target: string) => `→${target}`,
+    unleveled: "取消分级",
+    delete: "删除",
+    createFailed: "创建失败",
+    updateFailed: "更新失败",
+    deleteFailed: "删除失败",
+  },
+  shortfall: {
+    title: "短板面板",
+    hint: "跨项目聚合缺口——我该练什么。",
+    empty: "暂无缺口 ✔",
+    missing: (n: number) => `缺门 ${n}`,
+    delta: (n: number) => `共差 ${n} 级`,
+    unrated: (n: number) => `未评级 ${n}`,
   },
   verdicts: {
     satisfied: (a: string) => `✓ 满足(${a})`,
