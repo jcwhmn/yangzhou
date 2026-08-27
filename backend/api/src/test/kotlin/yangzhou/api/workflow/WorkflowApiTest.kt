@@ -117,6 +117,35 @@ class WorkflowApiTest : AbstractApiTest() {
     }
 
     @Test
+    fun `新 item 默认落起点——多起点取 position 最小,无起点回退首列`() {
+        val authed = bootstrapAndAuth()
+        createProject(authed, "CHE")
+        val statuses = json.readTree(
+            authed.get().uri("/api/projects/CHE").exchange()
+                .expectStatus().isOk().expectBody(String::class.java).returnResult().responseBody!!,
+        )["statuses"]
+        // 默认:To Do 是起点
+        assertEquals(true, statuses[0]["isStart"].asBoolean())
+
+        // 加第二个起点(position 更小)→ 新 item 落它
+        authed.post().uri("/api/projects/CHE/statuses")
+            .body(mapOf("name" to "Backlog", "isStart" to true, "position" to -1))
+            .exchange().expectStatus().isCreated()
+        val item = createItem(authed, "CHE", "x")
+        assertEquals("Backlog", item["status"].asText())
+
+        // 全部取消起点 → 回退首列(position 最小 = Backlog)
+        val all = json.readTree(authed.get().uri("/api/projects/CHE").exchange()
+            .expectStatus().isOk().expectBody(String::class.java).returnResult().responseBody!!)["statuses"]
+        all.forEach { st ->
+            authed.patch().uri("/api/statuses/${st["statusId"].asText()}")
+                .body(mapOf("isStart" to false)).exchange().expectStatus().isOk()
+        }
+        val item2 = createItem(authed, "CHE", "y")
+        assertEquals("Backlog", item2["status"].asText()) // position -1 < 0
+    }
+
+    @Test
     fun `默认 workflow 仍为三列`() {
         val authed = bootstrapAndAuth()
         val project = createProject(authed, "CHE")

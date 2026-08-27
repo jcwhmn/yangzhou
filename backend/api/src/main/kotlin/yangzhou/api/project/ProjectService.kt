@@ -21,7 +21,7 @@ class ProjectService(
     private val workspaceService: WorkspaceService,
 ) {
 
-    data class StatusDto(val statusId: UUID, val name: String, val icon: String?, val isFinal: Boolean, val position: Int)
+    data class StatusDto(val statusId: UUID, val name: String, val icon: String?, val isStart: Boolean, val isFinal: Boolean, val position: Int)
     data class ProjectDto(
         val projectId: UUID,
         val key: String,
@@ -46,13 +46,13 @@ class ProjectService(
     fun get(key: String): ProjectDto {
         val project = projects.findByKey(key) ?: throw NotFoundException("项目不存在:$key")
         val statusDtos = statuses.findByProjectIdOrderByPosition(project.id!!).map {
-            StatusDto(it.objectId, it.name, it.icon, it.isFinal, it.position)
+            StatusDto(it.objectId, it.name, it.icon, it.isStart, it.isFinal, it.position)
         }
         return ProjectDto(project.objectId, project.key, project.name, project.archivedAt != null, statusDtos)
     }
 
     private fun defaultStatuses(projectId: Long) = listOf(
-        Status(projectId = projectId, name = "To Do", position = 0),
+        Status(projectId = projectId, name = "To Do", isStart = true, position = 0),
         Status(projectId = projectId, name = "In Progress", position = 1),
         Status(projectId = projectId, name = "Done", isFinal = true, position = 2),
     )

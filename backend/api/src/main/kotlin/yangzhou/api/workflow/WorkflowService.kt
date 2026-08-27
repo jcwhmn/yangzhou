@@ -28,6 +28,7 @@ class WorkflowService(
         val statusId: UUID,
         val name: String,
         val icon: String?,
+        val isStart: Boolean,
         val isFinal: Boolean,
         val position: Int,
     )
@@ -37,7 +38,7 @@ class WorkflowService(
     // ---------- Status ----------
 
     @Transactional
-    fun createStatus(projectKey: String, name: String, icon: String?, isFinal: Boolean, position: Int?): StatusDto {
+    fun createStatus(projectKey: String, name: String, icon: String?, isStart: Boolean, isFinal: Boolean, position: Int?): StatusDto {
         val project = projects.findByKey(projectKey) ?: throw NotFoundException("项目不存在:$projectKey")
         val projectId = project.id!!
         val existing = statuses.findByProjectIdOrderByPosition(projectId)
@@ -47,6 +48,7 @@ class WorkflowService(
                 projectId = projectId,
                 name = name,
                 icon = icon,
+                isStart = isStart,
                 isFinal = isFinal,
                 position = position ?: ((existing.maxOfOrNull { it.position } ?: -1) + 1),
             ),
@@ -55,13 +57,14 @@ class WorkflowService(
     }
 
     @Transactional
-    fun updateStatus(statusId: UUID, name: String?, icon: String?, isFinal: Boolean?, position: Int?): StatusDto {
+    fun updateStatus(statusId: UUID, name: String?, icon: String?, isStart: Boolean?, isFinal: Boolean?, position: Int?): StatusDto {
         val status = statuses.findByObjectId(statusId) ?: throw NotFoundException("状态不存在")
         try {
             val updated = statuses.save(
                 status.copy(
                     name = name ?: status.name,
                     icon = icon ?: status.icon,
+                    isStart = isStart ?: status.isStart,
                     isFinal = isFinal ?: status.isFinal,
                     position = position ?: status.position,
                 ),
@@ -126,12 +129,13 @@ class WorkflowService(
         }
     }
 
-    private fun Status.toDto() = StatusDto(objectId, name, icon, isFinal, position)
+    private fun Status.toDto() = StatusDto(objectId, name, icon, isStart, isFinal, position)
 }
 
 data class CreateStatusRequest(
     @field:NotBlank val name: String,
     val icon: String? = null,
+    val isStart: Boolean = false,
     val isFinal: Boolean = false,
     val position: Int? = null,
 )
@@ -139,6 +143,7 @@ data class CreateStatusRequest(
 data class UpdateStatusRequest(
     val name: String? = null,
     val icon: String? = null,
+    val isStart: Boolean? = null,
     val isFinal: Boolean? = null,
     val position: Int? = null,
 )
