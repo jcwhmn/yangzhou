@@ -47,7 +47,7 @@ class AuthService(
         TokenResponse(
             token = jwt.generate(member.objectId.toString()),
             memberId = member.objectId.toString(),
-            username = member.username,
+            username = member.username ?: member.displayName,
         )
 }
 

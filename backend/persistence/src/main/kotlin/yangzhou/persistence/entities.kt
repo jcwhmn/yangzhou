@@ -19,9 +19,29 @@ data class Member(
     @Id val id: Long? = null,
     val objectId: UUID = UUID.randomUUID(),
     val workspaceId: Long,
-    val username: String,
-    val passwordHash: String,
+    val username: String?,
+    val passwordHash: String?,
     val displayName: String,
+    val createdAt: Instant = Instant.now(),
+    val updatedAt: Instant = Instant.now(),
+)
+
+@Table("team")
+data class Team(
+    @Id val id: Long? = null,
+    val objectId: UUID = UUID.randomUUID(),
+    val workspaceId: Long,
+    val name: String,
+    val createdAt: Instant = Instant.now(),
+    val updatedAt: Instant = Instant.now(),
+)
+
+@Table("team_member")
+data class TeamMember(
+    @Id val id: Long? = null,
+    val objectId: UUID = UUID.randomUUID(),
+    val teamId: Long,
+    val memberId: Long,
     val createdAt: Instant = Instant.now(),
     val updatedAt: Instant = Instant.now(),
 )
