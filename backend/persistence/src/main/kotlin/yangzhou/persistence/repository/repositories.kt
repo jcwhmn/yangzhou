@@ -8,6 +8,8 @@ import yangzhou.persistence.Member
 import yangzhou.persistence.Project
 import yangzhou.persistence.Requirement
 import yangzhou.persistence.Status
+import yangzhou.persistence.Team
+import yangzhou.persistence.TeamMember
 import yangzhou.persistence.StatusTransition
 import yangzhou.persistence.Workspace
 import java.util.UUID
@@ -16,6 +18,20 @@ interface WorkspaceRepository : CrudRepository<Workspace, Long>
 
 interface MemberRepository : CrudRepository<Member, Long> {
     fun findByUsername(username: String): Member?
+    fun findByObjectId(objectId: UUID): Member?
+    fun findByWorkspaceId(workspaceId: Long): List<Member>
+}
+
+interface TeamRepository : CrudRepository<Team, Long> {
+    fun findByWorkspaceId(workspaceId: Long): List<Team>
+    fun findByWorkspaceIdAndName(workspaceId: Long, name: String): Team?
+    fun findByObjectId(objectId: UUID): Team?
+    fun existsByWorkspaceIdAndName(workspaceId: Long, name: String): Boolean
+}
+
+interface TeamMemberRepository : CrudRepository<TeamMember, Long> {
+    fun findByTeamId(teamId: Long): List<TeamMember>
+    fun existsByTeamIdAndMemberId(teamId: Long, memberId: Long): Boolean
 }
 
 interface AttributeDefinitionRepository : CrudRepository<AttributeDefinition, Long> {
@@ -28,6 +44,7 @@ interface AttributeDefinitionRepository : CrudRepository<AttributeDefinition, Lo
 interface CapabilityRepository : CrudRepository<Capability, Long> {
     fun findByMemberId(memberId: Long): List<Capability>
     fun findByMemberIdAndAttributeDefinitionId(memberId: Long, attributeDefinitionId: Long): Capability?
+    fun deleteByMemberId(memberId: Long)
 }
 
 interface ProjectRepository : CrudRepository<Project, Long> {

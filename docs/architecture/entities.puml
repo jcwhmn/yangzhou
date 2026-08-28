@@ -10,7 +10,7 @@ class Workspace {
   name: String
 }
 class Member {
-  username: String
+  username: String?
   displayName: String
 }
 class AttributeDefinition {
@@ -33,6 +33,9 @@ class Status {
   position: Int
 }
 class StatusTransition
+class Team {
+  name: String
+}
 class Item {
   number: Int
   title: String
@@ -46,6 +49,10 @@ class Requirement {
 
 Workspace "1" *-- "*" Member : 目录
 Workspace "1" *-- "*" AttributeDefinition : 词表
+Workspace "1" *-- "*" Team : 分组
+Team "1" *-- "*" TeamMember
+TeamMember "*" *-- "1" Member
+
 Workspace "1" *-- "*" Project
 
 Member "1" *-- "*" Capability
@@ -67,6 +74,12 @@ StatusTransition "*" --> "to 1" Status
 note bottom of StatusTransition
   迁移表无行 = 自由迁移(V1 默认);
   有行 = 仅列出的 from→to 合法。
+end note
+note right of Member
+  凭据(password_hash)可空:
+  空 = 虚拟成员(只参与匹配,不登录)。
+  Team 为纯分组(池),匹配/候选
+  在全 workspace 成员池上算。
 end note
 note right of Item
   number 为项目内递增编号,

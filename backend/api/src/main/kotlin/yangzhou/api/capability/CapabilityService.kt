@@ -5,6 +5,7 @@ import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import yangzhou.api.member.MemberService
+import yangzhou.persistence.Member
 import yangzhou.api.support.BadRequestException
 import yangzhou.api.support.ConflictException
 import yangzhou.api.support.NotFoundException
@@ -25,17 +26,21 @@ class CapabilityService(
 
     data class CapabilityDto(val attribute: String, val level: Int?)
 
-    fun list(): List<CapabilityDto> {
-        val member = memberService.current()
+    fun list(): List<CapabilityDto> = listFor(memberService.current())
+
+    fun listFor(member: Member): List<CapabilityDto> {
         val names = definitionNames()
         return capabilities.findByMemberId(member.id!!).map { CapabilityDto(names[it.attributeDefinitionId] ?: "?", it.level) }
     }
 
     /** 按属性名 upsert;level=null 表示未评级,attribute=null 表示移除等级只保留 presence。 */
     @Transactional
-    fun upsert(attribute: String, level: Int?): CapabilityDto {
+    fun upsert(attribute: String, level: Int?): CapabilityDto =
+        upsertFor(memberService.current(), attribute, level)
+
+    @Transactional
+    fun upsertFor(member: Member, attribute: String, level: Int?): CapabilityDto {
         if (level != null && level !in 1..4) throw BadRequestException("level 只能是 1–4 或不填")
-        val member = memberService.current()
         val memberId = member.id!!
         val def = definitions.findByWorkspaceIdAndName(workspaceService.required().id!!, attribute)
             ?: throw NotFoundException("词表中没有属性:$attribute(先建属性)")
@@ -53,8 +58,10 @@ class CapabilityService(
     }
 
     @Transactional
-    fun delete(attribute: String) {
-        val member = memberService.current()
+    fun delete(attribute: String) = deleteFor(memberService.current(), attribute)
+
+    @Transactional
+    fun deleteFor(member: Member, attribute: String) {
         val def = definitions.findByWorkspaceIdAndName(workspaceService.required().id!!, attribute)
             ?: throw NotFoundException("词表中没有属性:$attribute")
         capabilities.findByMemberIdAndAttributeDefinitionId(member.id!!, def.id!!)
