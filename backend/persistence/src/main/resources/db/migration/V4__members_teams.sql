@@ -5,6 +5,7 @@
 alter table member alter column password_hash drop not null;
 alter table member alter column username drop not null;
 
+
 create table team (
     id           bigint generated always as identity primary key,
     object_id    uuid         not null,

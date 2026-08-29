@@ -27,6 +27,11 @@ private fun usage() {
 
           login --server <URL> -u <用户名> -p <密码>   登录(全新服务器自动 bootstrap,保存会话)
           attrs create <属性> [--kind skill|label] [--leveled]   建词表属性
+          members add <显示名>                         建虚拟成员(无凭据,不登录)
+          members list [--json]                        成员目录(含我与虚拟)
+          members rm <成员名>                          删虚拟成员(登录账号不可删)
+          members set <成员名> <属性> [1-4]            给成员自评能力(不带数字=未评级)
+          teams add <组名> / teams list                建组/列组(纯分组,视图过滤)
           attrs list [--json]                        词表列表
           projects create <KEY> [名称]                 建项目(自动带三态 workflow)
           projects list [--json]                       项目列表
@@ -68,6 +73,63 @@ private fun run(args: List<String>) {
     val api = ApiClient.create()
     if (noun == "feasibility") {
         return feasibility(api, positional.getOrNull(1), flags)
+    }
+    if (noun == "members") {
+        return when (verb) {
+            "add" -> {
+                val displayName = rest.getOrNull(0) ?: error("缺少显示名")
+                val body = api.json("POST", "/api/members", mapOf("displayName" to displayName.trim()))
+                println("已建虚拟成员:${body["displayName"].asString()}(无凭据,不登录)")
+            }
+            "rm" -> {
+                val name = rest.getOrNull(0) ?: error("缺少成员名")
+                val id = memberIdByDisplayName(api, name) ?: error("成员不存在:$name")
+                api.json("DELETE", "/api/members/$id")
+                println("已删除:$name")
+            }
+            "list" -> {
+                val body = api.json("GET", "/api/members")
+                if (flags.containsKey("json")) return printRaw(body.toString())
+                println("成员     性质     用户名")
+                body.forEach {
+                    println("%-8s %-8s %s".format(
+                        it["displayName"].asString(),
+                        if (it["virtual"].asBoolean()) "虚拟" else "登录",
+                        it["username"]?.let { u -> if (u.isNull) "-" else u.asString() } ?: "-",
+                    ))
+                }
+            }
+            "set" -> {
+                val name = rest.getOrNull(0) ?: error("缺少成员名")
+                val attr = rest.getOrNull(1) ?: error("缺少属性名")
+                val level = rest.getOrNull(2)?.let {
+                    it.toIntOrNull()?.takeIf { l -> l in 1..4 } ?: error("等级只能是 1-4 或不填(未评级)")
+                }
+                val memberId = memberIdByDisplayName(api, name) ?: error("成员不存在:$name")
+                val body = api.json("PUT", "/api/members/$memberId/capabilities", mapOf("attribute" to attr, "level" to level))
+                val lvl = body["level"]
+                println("已设置:$name · $attr = ${if (lvl.isNull) "未评级" else lvl.asInt()}")
+            }
+            else -> usage()
+        }
+    }
+    if (noun == "teams") {
+        return when (verb) {
+            "add" -> {
+                val name = rest.getOrNull(0) ?: error("缺少组名")
+                val body = api.json("POST", "/api/teams", mapOf("name" to name.trim()))
+                println("已建组:${body["name"].asString()}")
+            }
+            "list" -> {
+                val body = api.json("GET", "/api/teams")
+                if (flags.containsKey("json")) return printRaw(body.toString())
+                if (body.size() == 0) return println("(无分组)")
+                body.forEach { team ->
+                    println("${team["name"].asString()}:${team["members"].joinToString("、") { m -> m["displayName"].asString() }.ifEmpty { "(空)" }}")
+                }
+            }
+            else -> usage()
+        }
     }
     if (noun == "candidates" || noun == "assign") {
         val ref = positional.getOrNull(1) ?: error("缺少 <KEY-N|itemId>(如 CHE-1)")
@@ -251,6 +313,15 @@ private fun run(args: List<String>) {
 
         else -> usage()
     }
+}
+
+/** 成员名 → memberId(显示名精确匹配)。 */
+private fun memberIdByDisplayName(api: ApiClient, name: String): String? {
+    var found: String? = null
+    api.json("GET", "/api/members").forEach { m ->
+        if (m["displayName"].asString() == name) found = m["memberId"].asString()
+    }
+    return found
 }
 
 /** KEY-N(如 CHE-1)→ itemId;直接给 UUID 也认。 */
