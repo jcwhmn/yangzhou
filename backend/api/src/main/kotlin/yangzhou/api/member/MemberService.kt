@@ -40,6 +40,9 @@ class MemberService(
     /** 建虚拟成员:纯数据人,无凭据无登录;能力自评走 /api/members/{id}/capabilities。 */
     @Transactional
     fun createVirtual(displayName: String): MemberResponse {
+        val workspaceId = workspaceService.required().id!!
+        members.findByWorkspaceId(workspaceId).firstOrNull { it.displayName == displayName }
+            ?.let { throw ConflictException("成员已存在:$displayName") }
         val saved = members.save(
             Member(
                 workspaceId = workspaceService.required().id!!,
