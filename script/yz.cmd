@@ -1,6 +1,8 @@
 @echo off
-setlocal enabledelayedexpansion
 rem yz - yangzhou CLI wrapper (auto-builds fat-jar on first run)
+rem chcp 65001: force UTF-8 console so Chinese output is not garbled under GBK codepage
+chcp 65001 >nul
+setlocal enabledelayedexpansion
 cd /d "%~dp0.."
 
 set "JAR="
