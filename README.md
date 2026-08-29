@@ -4,4 +4,14 @@
 
 Kotlin · Spring Boot 4 · PostgreSQL · Next.js · CLI-first · MIT
 
-状态:纸面阶段(spec/ADR 就绪,实现进行中)。文档:`docs/`;开发票:Linear `JCW-77`。
+状态:V1 已交付(引擎/API/Workflow/CLI/导入导出/Web);V2 团队分配进行中。
+
+## CLI
+
+```bash
+script/yz.cmd members list        # Windows(首次自动构建 fat-jar)
+script/yz members list            # Linux/macOS
+script/yz feasibility CHE         # 示例:项目可行性/技能差距
+```
+
+全部命令:`script/yz`(无参数)看用法;详见 `backend/cli/README.md`。文档:`docs/`;开发票:Linear `JCW-77`。
