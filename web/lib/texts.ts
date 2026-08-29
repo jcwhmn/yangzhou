@@ -57,6 +57,17 @@ export const t = {
     saveFailed: "保存失败",
     back: "回到项目",
   },
+  members: {
+    title: "成员管理",
+    newName: "新成员显示名",
+    add: "建虚拟成员",
+    virtual: "虚拟",
+    real: "登录账号",
+    teams: "分组",
+    teamName: "组名",
+    addTeam: "建分组",
+    deleteTeam: "删组",
+  },
   attrs: {
     title: "词表",
     hint: "Workspace 级统一语言:chess 练的 React,bookkeeping 也认。label→skill 只是一行数据,已有等级休眠不删。",
