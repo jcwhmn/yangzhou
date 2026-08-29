@@ -117,6 +117,7 @@ data class Item(
     val description: String? = null,
     val type: String = "task",
     val parentObjectId: UUID? = null,
+    val assigneeObjectId: UUID? = null,
     val statusObjectId: UUID,
     val createdAt: Instant = Instant.now(),
     val updatedAt: Instant = Instant.now(),

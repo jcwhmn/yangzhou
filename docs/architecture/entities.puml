@@ -64,6 +64,7 @@ Project "1" *-- "*" StatusTransition
 
 Item "父 0..1" o-- "children *" Item : 同质树(防环)
 
+Item "负责人 0..1" --> "1" Member : assignee(删人置空)
 Item "*" *-- "1" Status : 当前状态
 Item "1" *-- "*" Requirement
 Requirement "*" *-- "1" AttributeDefinition

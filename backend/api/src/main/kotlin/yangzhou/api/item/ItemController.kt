@@ -47,6 +47,12 @@ class ItemController(private val service: ItemService) {
         request.requirements.map { ItemService.RequirementDto(it.attribute.trim(), it.minLevel) },
     )
 
+    @PutMapping("/items/{itemId}/assignee")
+    fun assign(
+        @PathVariable itemId: UUID,
+        @RequestBody request: AssigneeRequest,
+    ): ItemService.ItemDto = service.assign(itemId, request.assigneeItemId)
+
     @PatchMapping("/items/{itemId}")
     fun update(
         @PathVariable itemId: UUID,
