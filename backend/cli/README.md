@@ -43,6 +43,13 @@ java -jar yz.jar feasibility CHE
 - [ ] 大批量:1000 item JSON 导入可用,每 100 条打印进度
 - [ ] 中文与 ✓△✗ 在 Windows 控制台不乱码(CLI 强制 UTF-8 输出)
 
+## 团队(V2)
+
+- [ ] `yz candidates CHE-1` → 候选表(名次/成员/性质/信号/缺门/差距)+ 逐条判定;`--json` 同构
+- [ ] `yz assign CHE-1 小李` → `已指派:CHE-1 → 小李`;不存在成员 → 错误并列出可用名单
+- [ ] `yz assign CHE-1 --clear` → `已取消指派:CHE-1`
+- [ ] KEY-N 解析:`CHE-1` 等项目编号自动换 itemId
+
 ## 与 API 的关系
 
 CLI 不含业务逻辑——所有校验(词表存在性、等级范围、状态迁移约束、防环)都在 API;CLI 只是编排与展示。新增能力先在 API(契约),CLI 加一行调用。

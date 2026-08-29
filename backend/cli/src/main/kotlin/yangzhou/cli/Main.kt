@@ -37,6 +37,8 @@ private fun usage() {
           caps rm <属性>                               移除能力
           caps list [--json]                           能力清单
           feasibility <KEY> [--item <ID>] [--json]     可行性/差距分析
+          candidates <KEY-N|itemId> [--json]          候选建议(谁来做:排序+理由)
+          assign <KEY-N|itemId> <成员名|--clear>      指派/取消(引擎建议,人拍板)
           export <KEY> [--csv] [--file <路径>]          导出(JSON 全保真/CSV 扁平)
           import <KEY> <文件>                           导入(JSON 按扩展名或 .csv;Linear CSV 可直接灌)
 
@@ -66,6 +68,52 @@ private fun run(args: List<String>) {
     val api = ApiClient.create()
     if (noun == "feasibility") {
         return feasibility(api, positional.getOrNull(1), flags)
+    }
+    if (noun == "candidates" || noun == "assign") {
+        val ref = positional.getOrNull(1) ?: error("缺少 <KEY-N|itemId>(如 CHE-1)")
+        val itemId = resolveItemId(api, ref)
+        if (noun == "candidates") {
+            val body = api.json("GET", "/api/items/$itemId/candidates")
+            if (flags.containsKey("json")) return printRaw(body.toString())
+            if (body.size() == 0) return println("(无候选——先建成员)")
+            println("名次  成员     性质     信号     缺门  差距")
+            body.forEach {
+                println(
+                    "%-5s %-8s %-8s %-8s %-5s %s".format(
+                        "#${it["rank"].asInt()}",
+                        it["displayName"].asString(),
+                        if (it["virtual"].asBoolean()) "虚拟" else "我",
+                        when (it["signal"].asString()) { "GREEN" -> "[绿]"; "YELLOW" -> "[黄]"; else -> "[红]" },
+                        it["missingCount"].asInt(),
+                        "${it["totalDelta"].asInt()}级",
+                    ),
+                )
+                it["verdicts"].forEach { v ->
+                    val attr = v["attribute"].asString()
+                    val line = when (v["kind"].asString()) {
+                        "satisfied" -> "      ✓ 满足($attr)"
+                        "surplus" -> "      ✓ 有余($attr)"
+                        "gap" -> "      △ 差 ${v["delta"].asInt()} 级($attr:需≥${v["required"].asInt()},有 ${v["actual"].asInt()})"
+                        "unrated" -> "      △ 有但未评级($attr,需≥${v["required"].asInt()})——差距未知"
+                        else -> "      ✗ 缺能力($attr)"
+                    }
+                    println(line)
+                }
+            }
+            return
+        }
+        // assign
+        val name = flags["clear"]?.takeIf { it.isNotEmpty() } ?: positional.getOrNull(2)
+        val assigneeId: String? = if (name == null || name == "--") null else {
+            val members = api.json("GET", "/api/members")
+            var found: String? = null
+            members.forEach { m -> if (m["displayName"].asString() == name) found = m["memberId"].asString() }
+            found ?: error("成员不存在:$name(可用:${members.joinToString("/") { m -> m["displayName"].asString() }})")
+        }
+        val body = api.json("PUT", "/api/items/$itemId/assignee", mapOf("assigneeItemId" to assigneeId))
+        val who = body["assignee"]
+        println(if (who.isNull) "已取消指派:${body["number"].asString()}" else "已指派:${body["number"].asString()}" + " → " + who.asString())
+        return
     }
     if (noun == "export") {
         val key = positional.getOrNull(1) ?: error("缺少项目 KEY")
@@ -203,6 +251,18 @@ private fun run(args: List<String>) {
 
         else -> usage()
     }
+}
+
+/** KEY-N(如 CHE-1)→ itemId;直接给 UUID 也认。 */
+private fun resolveItemId(api: ApiClient, ref: String): String {
+    if (ref.contains('-') && !ref.contains(' ')) {
+        val key = ref.substringBefore('-')
+        runCatching {
+            val items = api.json("GET", "/api/projects/$key/items")
+            items.forEach { if (it["number"].asString() == ref) return it["itemId"].asString() }
+        }
+    }
+    error("找不到 item:$ref")
 }
 
 private fun feasibility(api: ApiClient, key: String?, flags: Map<String, String>) {

@@ -61,7 +61,7 @@ class FeasibilityService(
         val project = projects.findByKey(projectKey) ?: throw NotFoundException("项目不存在:$projectKey")
         val member = domainMember()
         val projectItems = itemRepo.findByProjectIdOrderByNumber(project.id!!)
-        val domainItems = projectItems.map { it.toDomain() }
+        val domainItems = projectItems.map { itemToDomain(it) }
         val rollup: RollupResult = MatchingEngine.rollupProject(
             yangzhou.domain.Project(project.key, domainItems),
             member,
@@ -90,7 +90,7 @@ class FeasibilityService(
         val item = itemRepo.findByObjectId(itemId) ?: throw NotFoundException("item 不存在")
         val project = projects.findAll().firstOrNull { it.id == item.projectId }
             ?: throw NotFoundException("项目不存在")
-        val match: MatchResult = MatchingEngine.matchItem(item.toDomain(), domainMember())
+        val match: MatchResult = MatchingEngine.matchItem(itemToDomain(item), domainMember())
         return ItemResultDto(
             itemId = item.objectId,
             number = "${project.key}-${item.number}",
@@ -104,8 +104,10 @@ class FeasibilityService(
 
     // ---------- 装配 ----------
 
-    private fun domainMember(): yangzhou.domain.Member {
-        val me = memberService.current()
+    fun domainMember(): yangzhou.domain.Member = domainMemberOf(memberService.current())
+
+    /** 装配:任一持久层成员 → 引擎输入(候选服务复用)。 */
+    fun domainMemberOf(me: yangzhou.persistence.Member): yangzhou.domain.Member {
         val attrNames = definitions.findByWorkspaceId(workspaceService.required().id!!).associate { it.id!! to it.name }
         val caps = capabilities.findByMemberId(me.id!!).mapNotNull { c ->
             attrNames[c.attributeDefinitionId]?.let { yangzhou.domain.Capability(yangzhou.domain.Attribute(it), c.level) }
@@ -113,18 +115,18 @@ class FeasibilityService(
         return yangzhou.domain.Member(me.displayName, caps)
     }
 
-    private fun yangzhou.persistence.Item.toDomain(): yangzhou.domain.Item {
+    fun itemToDomain(item: yangzhou.persistence.Item): yangzhou.domain.Item {
         val attrs = definitions.findByWorkspaceId(workspaceService.required().id!!).associate { it.id!! to it.name }
-        val reqs = requirementRepo.findByItemId(id!!)
+        val reqs = requirementRepo.findByItemId(item.id!!)
             .mapNotNull { r ->
                 attrs[r.attributeDefinitionId]?.let {
                     yangzhou.domain.Requirement(yangzhou.domain.Attribute(it), r.minLevel)
                 }
             }
         // domain Item.id 就是「编号」——引擎输出直接可读
-        val project = projects.findAll().firstOrNull { p -> p.id == projectId }
-        val number = "${project?.key ?: "?"}-$number"
-        return yangzhou.domain.Item(number, title, reqs)
+        val project = projects.findAll().firstOrNull { p -> p.id == item.projectId }
+        val number = "${project?.key ?: "?"}-${item.number}"
+        return yangzhou.domain.Item(number, item.title, reqs)
     }
 
     private fun Verdict.toDto() = when (this) {

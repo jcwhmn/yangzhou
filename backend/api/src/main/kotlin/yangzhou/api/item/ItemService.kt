@@ -28,6 +28,7 @@ class ItemService(
     private val numbering: ItemNumberRepository,
     private val jdbc: JdbcOperations,
     private val workflow: yangzhou.api.workflow.WorkflowService,
+    private val members: yangzhou.persistence.repository.MemberRepository,
 ) {
 
     data class RequirementDto(val attribute: String, val minLevel: Int?)
@@ -38,6 +39,7 @@ class ItemService(
         val description: String?,
         val type: String,
         val status: String,
+        val assignee: String?,
         val parentItemId: UUID?,
         val requirements: List<RequirementDto>,
     )
@@ -94,6 +96,7 @@ class ItemService(
         val projectId = project.id!!
         val statusNames = statuses.findByProjectIdOrderByPosition(projectId).associate { it.objectId to it.name }
         val attrNames = definitions.findByWorkspaceId(project.workspaceId).associate { it.id!! to it.name }
+        val memberNames = members.findByWorkspaceId(project.workspaceId).associate { it.objectId to it.displayName }
         val projectItems = itemRepo.findByProjectIdOrderByNumber(projectId)
         val reqs = requirementRepo.findByItemIdIn(projectItems.mapNotNull { it.id })
         return projectItems.map { item ->
@@ -104,6 +107,7 @@ class ItemService(
                 description = item.description,
                 type = item.type,
                 status = statusNames[item.statusObjectId] ?: "?",
+                assignee = item.assigneeObjectId?.let { memberNames[it] },
                 parentItemId = item.parentObjectId,
                 requirements = reqs.filter { it.itemId == item.id }.map {
                     RequirementDto(attrNames[it.attributeDefinitionId] ?: "?", it.minLevel)
@@ -171,6 +175,17 @@ class ItemService(
         return get(item.objectId)
     }
 
+    /** 指派/取消(assigneeItemId=null 取消);成员不存在 404。 */
+    @Transactional
+    fun assign(itemId: UUID, assigneeItemId: UUID?): ItemDto {
+        val item = itemRepo.findByObjectId(itemId) ?: throw NotFoundException("item 不存在")
+        if (assigneeItemId != null) {
+            members.findByObjectId(assigneeItemId) ?: throw NotFoundException("成员不存在")
+        }
+        itemRepo.save(item.copy(assigneeObjectId = assigneeItemId))
+        return get(item.objectId)
+    }
+
     // ---------- 内部 ----------
 
     /** 防环:沿新父链上行,遇到自身即拒绝(领域规则 2)。 */
@@ -213,6 +228,8 @@ data class CreateItemRequest(
     val statusItemId: UUID? = null,
     val requirements: List<RequirementInput> = emptyList(),
 )
+
+data class AssigneeRequest(val assigneeItemId: UUID? = null)
 
 data class ReplaceRequirementsRequest(val requirements: List<RequirementInput> = emptyList())
 
