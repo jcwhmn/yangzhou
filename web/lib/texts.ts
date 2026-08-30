@@ -5,6 +5,7 @@ export const t = {
     projects: "项目",
     capabilities: "我的能力",
     attributes: "词表",
+    members: "成员",
   },
   login: {
     title: "登录",
