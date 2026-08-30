@@ -190,7 +190,7 @@ object ExportImport {
     }
 
     /** 解析 CSV 文本 → 行×列(带表头映射);支持引号包裹、双引号转义、字段内逗号与换行。 */
-    private fun parseCsv(text: String): List<Map<String, String>> {
+    fun parseCsv(text: String): List<Map<String, String>> {
         val rows = mutableListOf<List<String>>()
         var field = StringBuilder()
         var record = mutableListOf<String>()

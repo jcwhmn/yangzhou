@@ -41,6 +41,7 @@ class ItemService(
         val status: String,
         val assignee: String?,
         val parentItemId: UUID?,
+        val externalRef: String?,
         val requirements: List<RequirementDto>,
     )
 
@@ -53,6 +54,7 @@ class ItemService(
         parentItemId: UUID?,
         statusItemId: UUID?,
         requirements: List<RequirementDto>,
+        externalRef: String? = null,
     ): ItemDto {
         val project = projects.findByKey(projectKey) ?: throw NotFoundException("项目不存在:$projectKey")
         if (type !in setOf("task", "bug", "goal", "story")) throw BadRequestException("type 非法:$type")
@@ -81,6 +83,7 @@ class ItemService(
                 description = description,
                 type = type,
                 parentObjectId = parentItemId,
+                externalRef = externalRef,
                 statusObjectId = status.objectId,
             ),
         )
@@ -108,6 +111,7 @@ class ItemService(
                 type = item.type,
                 status = statusNames[item.statusObjectId] ?: "?",
                 assignee = item.assigneeObjectId?.let { memberNames[it] },
+                externalRef = item.externalRef,
                 parentItemId = item.parentObjectId,
                 requirements = reqs.filter { it.itemId == item.id }.map {
                     RequirementDto(attrNames[it.attributeDefinitionId] ?: "?", it.minLevel)
@@ -226,6 +230,7 @@ data class CreateItemRequest(
     val type: String = "task",
     val parentItemId: UUID? = null,
     val statusItemId: UUID? = null,
+    val externalRef: String? = null,
     val requirements: List<RequirementInput> = emptyList(),
 )
 

@@ -10,3 +10,4 @@ bin/
 .kotlin/
 web/pnpm-lock.yaml
 web/pnpm-workspace.yaml
+*.log

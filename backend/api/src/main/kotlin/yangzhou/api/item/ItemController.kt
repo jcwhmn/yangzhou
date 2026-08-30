@@ -29,6 +29,7 @@ class ItemController(private val service: ItemService) {
         type = request.type,
         parentItemId = request.parentItemId,
         statusItemId = request.statusItemId,
+        externalRef = request.externalRef,
         requirements = request.requirements.map { ItemService.RequirementDto(it.attribute.trim(), it.minLevel) },
     )
 

@@ -67,6 +67,7 @@ interface StatusTransitionRepository : CrudRepository<StatusTransition, Long> {
 interface ItemRepository : CrudRepository<Item, Long> {
     fun findByObjectId(objectId: UUID): Item?
     fun findByProjectIdOrderByNumber(projectId: Long): List<Item>
+    fun findByProjectIdAndExternalRef(projectId: Long, externalRef: String): Item?
 }
 
 interface RequirementRepository : CrudRepository<Requirement, Long> {

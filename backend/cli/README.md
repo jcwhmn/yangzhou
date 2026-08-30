@@ -50,6 +50,16 @@ java -jar yz.jar feasibility CHE
 - [ ] `yz assign CHE-1 --clear` → `已取消指派:CHE-1`
 - [ ] KEY-N 解析:`CHE-1` 等项目编号自动换 itemId
 
+## Linear 联邦(V3)
+
+- [ ] Linear 网页导出 CSV(workspace → Settings → Import/Export),保存为 linear.csv
+- [ ] `yz sync-linear YPJ linear.csv` → 首跑:新建 N(编号自动分配,external_ref = linear:<identifier>)
+- [ ] **重跑同一命令** → 零新建(幂等;变更行更新标题/描述/状态/需求)
+- [ ] Linear 改状态后重新导出再同步 → yangzhou 状态回放;未知状态名 → 落默认起点不报错
+- [ ] Labels 自动建 label 属性;`标签>=N` 分级
+- [ ] **镜像 item 是 Linear 的影子**:在 yangzhou 改它的标题/需求,下次同步会被覆盖
+- [ ] 大批量 1000 行同步可用,每 100 条进度
+
 ## 与 API 的关系
 
 CLI 不含业务逻辑——所有校验(词表存在性、等级范围、状态迁移约束、防环)都在 API;CLI 只是编排与展示。新增能力先在 API(契约),CLI 加一行调用。
