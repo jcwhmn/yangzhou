@@ -19,6 +19,9 @@ export function AppNav() {
       <Typography component={Link} href="/attributes" sx={{ textDecoration: "none", color: "primary.main" }}>
         {t.nav.attributes}
       </Typography>
+      <Typography component={Link} href="/members" sx={{ textDecoration: "none", color: "primary.main" }}>
+        {t.nav.members}
+      </Typography>
     </Stack>
   );
 }

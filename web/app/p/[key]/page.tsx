@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { t } from "@/lib/texts";
+import { AppNav } from "@/components/AppNav";
 import type { Signal } from "@/components/Verdict";
 
 type Status = { statusId: string; name: string; isFinal: boolean; position: number };
@@ -89,6 +90,7 @@ export default function BoardPage() {
 
   return (
     <Box sx={{ p: 3 }}>
+      <AppNav />
       <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
         <Typography variant="h5">
           {String(key).toUpperCase()} · 看板

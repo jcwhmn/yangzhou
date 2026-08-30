@@ -5,6 +5,7 @@ export const t = {
     projects: "项目",
     capabilities: "我的能力",
     attributes: "词表",
+    members: "成员",
   },
   login: {
     title: "登录",
@@ -56,6 +57,17 @@ export const t = {
     saved: "已保存",
     saveFailed: "保存失败",
     back: "回到项目",
+  },
+  members: {
+    title: "成员管理",
+    newName: "新成员显示名",
+    add: "建虚拟成员",
+    virtual: "虚拟",
+    real: "登录账号",
+    teams: "分组",
+    teamName: "组名",
+    addTeam: "建分组",
+    deleteTeam: "删组",
   },
   attrs: {
     title: "词表",
