@@ -14,7 +14,7 @@ fun main(args: Array<String>) {
     try {
         run(args.toList())
     } catch (e: Exception) {
-        System.err.println("错误:${e.message}")
+        System.err.println("错误:${e.message ?: e::class.simpleName}")
         kotlin.system.exitProcess(1)
     }
 }
@@ -25,7 +25,7 @@ private fun usage() {
         yz — yangzhou 命令行
         用法:yz <命令> [参数] [选项]
 
-          login --server <URL> -u <用户名> -p <密码>   登录(全新服务器自动 bootstrap,保存会话)
+          login [-u 用户名] [-p 密码] [--server URL]      登录(默认 8080;全新服务器自动 bootstrap)
           attrs create <属性> [--kind skill|label] [--leveled]   建词表属性
           members add <显示名>                         建虚拟成员(无凭据,不登录)
           members list [--json]                        成员目录(含我与虚拟)
@@ -45,6 +45,7 @@ private fun usage() {
           candidates <KEY-N|itemId> [--json]          候选建议(谁来做:排序+理由)
           assign <KEY-N|itemId> <成员名|--clear>      指派/取消(引擎建议,人拍板)
           export <KEY> [--csv] [--file <路径>]          导出(JSON 全保真/CSV 扁平)
+          sync-linear <KEY> <linear.csv>                Linear 导出 CSV 幂等同步(首跑导入,重跑更新)
           import <KEY> <文件>                           导入(JSON 按扩展名或 .csv;Linear CSV 可直接灌)
 
         会话文件:${ApiClient.sessionFile().absolutePath}
@@ -177,6 +178,12 @@ private fun run(args: List<String>) {
         println(if (who.isNull) "已取消指派:${body["number"].asString()}" else "已指派:${body["number"].asString()}" + " → " + who.asString())
         return
     }
+    if (noun == "sync-linear") {
+        val key = positional.getOrNull(1) ?: error("缺少项目 KEY")
+        val path = positional.getOrNull(2) ?: flags["file"] ?: error("缺少 Linear 导出 CSV 路径")
+        yangzhou.cli.LinearSync.sync(api, key, java.io.File(path))
+        return
+    }
     if (noun == "export") {
         val key = positional.getOrNull(1) ?: error("缺少项目 KEY")
         val csv = flags.containsKey("csv")
@@ -195,7 +202,7 @@ private fun run(args: List<String>) {
     }
     when ("$noun $verb") {
         "login null", "login " -> {
-            val server = flags["server"] ?: error("缺少 --server")
+            val server = (flags["server"] ?: "http://localhost:8080").trimEnd('/')
             val user = flags["u"] ?: error("缺少 -u")
             val pass = flags["p"] ?: error("缺少 -p")
             ApiClient.login(server, user, pass).let { println("已登录:$server") }

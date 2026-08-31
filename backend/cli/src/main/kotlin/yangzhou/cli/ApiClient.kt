@@ -47,8 +47,10 @@ class ApiClient private constructor(
                 HttpResponse.BodyHandlers.ofString(),
             )
 
-            val response = post("/api/auth/bootstrap").let { r ->
-                if (r.statusCode() == 409) post("/api/auth/login") else r
+            val response = try {
+                post("/api/auth/bootstrap").let { r -> if (r.statusCode() == 409) post("/api/auth/login") else r }
+            } catch (e: java.io.IOException) {
+                throw IllegalStateException("无法连接 API 服务器:$normalized(确认服务器已启动、端口正确)", e)
             }
             if (response.statusCode() !in 200..299) {
                 error("登录失败(${response.statusCode()}):${response.body().take(200)}")
@@ -73,7 +75,11 @@ class ApiClient private constructor(
             method == "GET" -> builder.GET()
             else -> builder.method(method, HttpRequest.BodyPublishers.noBody())
         }
-        return http.send(builder.build(), HttpResponse.BodyHandlers.ofString())
+        return try {
+            http.send(builder.build(), HttpResponse.BodyHandlers.ofString())
+        } catch (e: java.io.IOException) {
+            throw IllegalStateException("无法连接 API 服务器:${s.server}(确认服务器已启动、端口正确)", e)
+        }
     }
 
     /** 返回解析后的 JSON;非 2xx 抛用户可读错误。 */

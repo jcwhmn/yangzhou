@@ -116,6 +116,24 @@ class ItemsApiTest : AbstractApiTest() {
     }
 
     @Test
+    fun `externalRef 创建带出且同 ref 重复创建被约束拒绝`() {
+        val authed = bootstrapAndAuth()
+        createProject(authed, "CHE")
+
+        val first = json.readTree(
+            authed.post().uri("/api/projects/CHE/items")
+                .body(mapOf("title" to "x", "externalRef" to "linear:JCW-30"))
+                .exchange().expectStatus().isCreated()
+                .expectBody(String::class.java).returnResult().responseBody!!,
+        )
+        assertEquals("linear:JCW-30", first["externalRef"].asText())
+
+        authed.post().uri("/api/projects/CHE/items")
+            .body(mapOf("title" to "dup", "externalRef" to "linear:JCW-30"))
+            .exchange().expectStatus().isEqualTo(409)
+    }
+
+    @Test
     fun `未知属性的需求 400`() {
         val authed = bootstrapAndAuth()
         createProject(authed, "CHE")
