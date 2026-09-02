@@ -70,7 +70,8 @@ class WorkflowApiTest : AbstractApiTest() {
         val project = createProject(authed, "CHE")
         val toDo = project["statuses"][0]["statusId"].asText()
         val inProgress = project["statuses"][1]["statusId"].asText()
-        val done = project["statuses"][2]["statusId"].asText()
+        val qa = project["statuses"][2]["statusId"].asText()
+        val done = project["statuses"][3]["statusId"].asText()
         val item = createItem(authed, "CHE", "x") // To Do
 
         // 空:To Do → Done 直跳自由通过
@@ -86,8 +87,9 @@ class WorkflowApiTest : AbstractApiTest() {
             .body(
                 mapOf(
                     "transitions" to listOf(
-                        mapOf("from" to "To Do", "to" to "In Progress"),
-                        mapOf("from" to "In Progress", "to" to "Done"),
+                        mapOf("from" to "To Do", "to" to "Development"),
+                        mapOf("from" to "Development", "to" to "QA"),
+                        mapOf("from" to "QA", "to" to "Done"),
                     ),
                 ),
             )
@@ -98,7 +100,7 @@ class WorkflowApiTest : AbstractApiTest() {
                 .expectStatus().isOk()
                 .expectBody(String::class.java).returnResult().responseBody!!,
         )
-        assertEquals(2, list.size())
+        assertEquals(3, list.size())
 
         // 非法:To Do → Done(表里没有)
         authed.patch().uri("/api/items/${item["itemId"].asText()}")
@@ -146,10 +148,10 @@ class WorkflowApiTest : AbstractApiTest() {
     }
 
     @Test
-    fun `默认 workflow 仍为三列`() {
+    fun `默认 workflow 仍为四列`() {
         val authed = bootstrapAndAuth()
         val project = createProject(authed, "CHE")
         val names = project["statuses"].map { it["name"].asText() }
-        assertEquals(listOf("To Do", "In Progress", "Done"), names)
+        assertEquals(listOf("To Do", "Development", "QA", "Done"), names)
     }
 }

@@ -5,6 +5,16 @@ out/
 *.iml
 node_modules/
 .next/
+# 本地调试转储(排查 API 时 curl -o 的临时文件)
+/.*.json
+/.nav.html
+/.*.txt
+backend/.*.log
+backend/.*.json
+backend/.*.txt
+web/pnpm-lock.yaml
+web/pnpm-workspace.yaml
+.next/
 .DS_Store
 bin/
 .kotlin/

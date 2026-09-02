@@ -36,7 +36,7 @@ mark block items: 当当前item被block时，需要有办法能标记它们，�
 
 WIP：如何处理WIP的概念？如何设置WIP数量？每个member一个/2个WIP？
 
-
+每日站会的作用：同步项目组内所有成员的状态，更主要的是发现当前阻塞点在哪，以便能尽快解决它
 
 ```plantuml
 @startuml

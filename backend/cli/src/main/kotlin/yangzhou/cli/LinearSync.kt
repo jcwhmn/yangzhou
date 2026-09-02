@@ -30,6 +30,10 @@ object LinearSync {
         val project = api.json("GET", "/api/projects/$projectKey")
         val statusByName = mutableMapOf<String, String>()
         project["statuses"].forEach { st -> statusByName[st["name"].asString()] = st["statusId"].asString() }
+        // 别名:Linear 的 "In Progress" → 项目改名为 "Development" 的列(默认模板 V3.5 起)
+        if (!statusByName.containsKey("In Progress") && statusByName.containsKey("Development")) {
+            statusByName["In Progress"] = statusByName.getValue("Development")
+        }
         val knownAttrs = mutableSetOf<String>()
         api.json("GET", "/api/attributes").forEach { a -> knownAttrs += a["name"].asString() }
 
