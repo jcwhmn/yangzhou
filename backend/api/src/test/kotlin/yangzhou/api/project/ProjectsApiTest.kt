@@ -8,14 +8,14 @@ import kotlin.test.assertTrue
 class ProjectsApiTest : AbstractApiTest() {
 
     @Test
-    fun `建项目自带默认三态 workflow,Done 终态`() {
+    fun `建项目自带默认四态 workflow,Done 终态`() {
         val authed = bootstrapAndAuth()
         val project = createProject(authed, "CHE", "chess")
 
         assertEquals("CHE", project["key"].asText())
         val names = project["statuses"].map { it["name"].asText() }
-        assertEquals(listOf("To Do", "In Progress", "Done"), names)
-        assertTrue(project["statuses"][2]["isFinal"].asBoolean())
+        assertEquals(listOf("To Do", "Development", "QA", "Done"), names)
+        assertTrue(project["statuses"][3]["isFinal"].asBoolean())
     }
 
     @Test

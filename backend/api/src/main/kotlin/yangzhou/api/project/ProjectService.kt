@@ -35,7 +35,7 @@ class ProjectService(
         if (projects.existsByKey(key)) throw ConflictException("项目 key 已存在:$key")
         val workspaceId = workspaceService.required().id!!
         val project = projects.save(Project(workspaceId = workspaceId, key = key, name = name))
-        // 默认 workflow:To Do / In Progress / Done(Done 终态)——模板系统的最小预置
+        // 默认 workflow:To Do / Development / QA / Done(final)——模板系统的最小预置
         defaultStatuses(project.id!!).forEach { statuses.save(it) }
         return get(key)
     }
@@ -53,8 +53,9 @@ class ProjectService(
 
     private fun defaultStatuses(projectId: Long) = listOf(
         Status(projectId = projectId, name = "To Do", isStart = true, position = 0),
-        Status(projectId = projectId, name = "In Progress", position = 1),
-        Status(projectId = projectId, name = "Done", isFinal = true, position = 2),
+        Status(projectId = projectId, name = "Development", position = 1),
+        Status(projectId = projectId, name = "QA", position = 2),
+        Status(projectId = projectId, name = "Done", isFinal = true, position = 3),
     )
 }
 
