@@ -29,6 +29,7 @@ class ItemService(
     private val jdbc: JdbcOperations,
     private val workflow: yangzhou.api.workflow.WorkflowService,
     private val members: yangzhou.persistence.repository.MemberRepository,
+    private val projectMembers: yangzhou.api.projectmember.ProjectMemberService,
 ) {
 
     data class RequirementDto(val attribute: String, val minLevel: Int?)
@@ -179,12 +180,13 @@ class ItemService(
         return get(item.objectId)
     }
 
-    /** 指派/取消(assigneeItemId=null 取消);成员不存在 404。 */
+    /** 指派/取消(assigneeItemId=null 取消);成员不存在 404;池外指派 409(V3.5-B,未配置池全放行)。 */
     @Transactional
     fun assign(itemId: UUID, assigneeItemId: UUID?): ItemDto {
         val item = itemRepo.findByObjectId(itemId) ?: throw NotFoundException("item 不存在")
         if (assigneeItemId != null) {
-            members.findByObjectId(assigneeItemId) ?: throw NotFoundException("成员不存在")
+            val member = members.findByObjectId(assigneeItemId) ?: throw NotFoundException("成员不存在")
+            projectMembers.assertAssignable(item.projectId, member.id!!)
         }
         itemRepo.save(item.copy(assigneeObjectId = assigneeItemId))
         return get(item.objectId)

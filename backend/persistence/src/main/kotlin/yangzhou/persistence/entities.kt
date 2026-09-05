@@ -82,6 +82,16 @@ data class Project(
     val updatedAt: Instant = Instant.now(),
 )
 
+@Table("project_member")
+data class ProjectMember(
+    @Id val id: Long? = null,
+    val objectId: UUID = UUID.randomUUID(),
+    val projectId: Long,
+    val memberId: Long,
+    val createdAt: Instant = Instant.now(),
+    val updatedAt: Instant = Instant.now(),
+)
+
 @Table("status")
 data class Status(
     @Id val id: Long? = null,

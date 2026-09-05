@@ -6,6 +6,7 @@ import yangzhou.persistence.Capability
 import yangzhou.persistence.Item
 import yangzhou.persistence.Member
 import yangzhou.persistence.Project
+import yangzhou.persistence.ProjectMember
 import yangzhou.persistence.Requirement
 import yangzhou.persistence.Status
 import yangzhou.persistence.Team
@@ -50,6 +51,13 @@ interface CapabilityRepository : CrudRepository<Capability, Long> {
 interface ProjectRepository : CrudRepository<Project, Long> {
     fun findByKey(key: String): Project?
     fun existsByKey(key: String): Boolean
+}
+
+interface ProjectMemberRepository : CrudRepository<ProjectMember, Long> {
+    fun findByProjectId(projectId: Long): List<ProjectMember>
+    fun findByProjectIdOrderByIdAsc(projectId: Long): List<ProjectMember>
+    fun existsByProjectIdAndMemberId(projectId: Long, memberId: Long): Boolean
+    fun findByProjectIdAndMemberId(projectId: Long, memberId: Long): ProjectMember?
 }
 
 interface StatusRepository : CrudRepository<Status, Long> {
