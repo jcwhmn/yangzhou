@@ -3,6 +3,7 @@ package yangzhou.persistence.repository
 import org.springframework.data.repository.CrudRepository
 import yangzhou.persistence.AttributeDefinition
 import yangzhou.persistence.Capability
+import yangzhou.persistence.ItemActivity
 import yangzhou.persistence.Item
 import yangzhou.persistence.Member
 import yangzhou.persistence.Project
@@ -33,6 +34,10 @@ interface TeamRepository : CrudRepository<Team, Long> {
 interface TeamMemberRepository : CrudRepository<TeamMember, Long> {
     fun findByTeamId(teamId: Long): List<TeamMember>
     fun existsByTeamIdAndMemberId(teamId: Long, memberId: Long): Boolean
+}
+
+interface ItemActivityRepository : CrudRepository<ItemActivity, Long> {
+    fun findByItemIdOrderByCreatedAtDesc(item_id: Long): List<ItemActivity>
 }
 
 interface AttributeDefinitionRepository : CrudRepository<AttributeDefinition, Long> {

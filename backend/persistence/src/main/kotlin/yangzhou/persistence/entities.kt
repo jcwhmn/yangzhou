@@ -46,6 +46,18 @@ data class TeamMember(
     val updatedAt: Instant = Instant.now(),
 )
 
+@Table("item_activity")
+data class ItemActivity(
+    @Id val id: Long? = null,
+    val objectId: UUID = UUID.randomUUID(),
+    val itemId: Long,
+    val kind: String,
+    val oldValue: String? = null,
+    val newValue: String? = null,
+    val actorMemberId: Long,
+    val createdAt: Instant = Instant.now(),
+)
+
 @Table("attribute_definition")
 data class AttributeDefinition(
     @Id val id: Long? = null,
