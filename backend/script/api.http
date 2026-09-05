@@ -1,0 +1,382 @@
+# yangzhou REST API 手测脚本(IntelliJ HTTP Client)
+#
+# 用法:
+#   1. 起后端(IDEA Run 面板 `api [bootRun]`,改过代码先重启它,避免跑旧构建)
+#   2. 打开本文件,右上角环境选 `local`
+#   3. 首次部署:手动跑一次下面的「Bootstrap」
+#   4. 从「登录」开始按顺序点 ▶。带响应处理器的请求自动回填 token / 成员 / item 等变量
+#
+# 可重复跑:登录时每轮生成唯一后缀(变量 run),新建一套项目/成员/团队,不与历史数据冲突 → 全绿。
+# 文件末尾「负例区」的红色(409)是预期行为,故意演示约束生效。
+# 注意:每跑一轮会新增一批数据(项目/成员/团队),dev 手测库无清理端点,属已知取舍。
+# 提示:注释里不写双花括号变量引用——IDEA 会对注释也做变量替换,未替换就报「请求无效」。
+
+# ============ 0. Bootstrap(仅首次部署跑一次;之后再跑会 409 已初始化,属预期) ============
+
+POST {{host}}/api/auth/bootstrap
+Content-Type: application/json
+
+{
+  "username": "me",
+  "password": "secret"
+}
+
+# ============ 1. 登录(生成 token 与本轮唯一后缀) ============
+
+### 登录
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "me",
+  "password": "secret"
+}
+
+> {%
+    client.global.set("token", response.body.token);
+    client.global.set("run", Date.now().toString().slice(-6)); // 每轮唯一后缀,保证可重复执行
+ %}
+
+# ============ 2. 项目(新 key = CHE + 后缀;后续 URL 用变量 pkey) ============
+
+### 建项目(handler 存变量 pkey)
+POST {{host}}/api/projects
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "key": "CHE{{run}}",
+  "name": "扬州演示 {{run}}"
+}
+
+> {%
+    client.global.set("pkey", response.body.key);
+ %}
+
+### 项目详情(默认工作流:第 1/2 个状态名存为变量 statusFrom / statusTo)
+GET {{host}}/api/projects/{{pkey}}
+Authorization: Bearer {{token}}
+
+> {%
+    client.global.set("statusFrom", response.body.statuses[0].name);
+    client.global.set("statusTo", response.body.statuses[1].name);
+ %}
+
+### 项目列表
+GET {{host}}/api/projects
+Authorization: Bearer {{token}}
+
+# ============ 3. 属性词表(名字带本轮后缀,防重名 409) ============
+
+### 建属性 A(handler 存变量 attrA)
+POST {{host}}/api/attributes
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Java{{run}}",
+  "kind": "skill",
+  "leveled": true
+}
+
+> {%
+    client.global.set("attrA", response.body.name);
+ %}
+
+### 建属性 B(handler 存变量 attrB)
+POST {{host}}/api/attributes
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "React{{run}}",
+  "kind": "skill",
+  "leveled": true
+}
+
+> {%
+    client.global.set("attrB", response.body.name);
+ %}
+
+### 属性列表
+GET {{host}}/api/attributes
+Authorization: Bearer {{token}}
+
+# ============ 4. 成员 ============
+
+### 建虚拟成员 小李(handler 存变量 memberId1)
+POST {{host}}/api/members
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "displayName": "小李{{run}}"
+}
+
+> {%
+    client.global.set("memberId1", response.body.memberId);
+ %}
+
+### 建虚拟成员 小王(handler 存变量 memberId2)
+POST {{host}}/api/members
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "displayName": "小王{{run}}"
+}
+
+> {%
+    client.global.set("memberId2", response.body.memberId);
+ %}
+
+### 成员列表
+GET {{host}}/api/members
+Authorization: Bearer {{token}}
+
+# ============ 5. 能力 ============
+
+### 我:属性A 等级 4
+PUT {{host}}/api/capabilities
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "attribute": "{{attrA}}",
+  "level": 4
+}
+
+### 小李:属性A 等级 3
+PUT {{host}}/api/members/{{memberId1}}/capabilities
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "attribute": "{{attrA}}",
+  "level": 3
+}
+
+### 小李:属性B 等级 3(全绿候选)
+PUT {{host}}/api/members/{{memberId1}}/capabilities
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "attribute": "{{attrB}}",
+  "level": 3
+}
+
+### 小王:属性B 等级 1(差候选)
+PUT {{host}}/api/members/{{memberId2}}/capabilities
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "attribute": "{{attrB}}",
+  "level": 1
+}
+
+### 我的能力列表
+GET {{host}}/api/capabilities
+Authorization: Bearer {{token}}
+
+### 小李的能力
+GET {{host}}/api/members/{{memberId1}}/capabilities
+Authorization: Bearer {{token}}
+
+# ============ 6. 项目成员池(V3.5-B) ============
+# 池语义:无行 = 全 workspace 可用;有行 = 仅池内可指派/进候选。
+# 主链只演示正常路径:加小李 + 加小王 → 列出 → 移出小王 → 池内剩小李。
+# 想体验「无池兼容」:跳过本区直接跑第 8 区。
+
+### 加入池:小李
+POST {{host}}/api/projects/{{pkey}}/members
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "memberId": "{{memberId1}}"
+}
+
+### 加入池:小王
+POST {{host}}/api/projects/{{pkey}}/members
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "memberId": "{{memberId2}}"
+}
+
+### 池列表(按加入顺序)
+GET {{host}}/api/projects/{{pkey}}/members
+Authorization: Bearer {{token}}
+
+### 移出池:小王 → 204
+DELETE {{host}}/api/projects/{{pkey}}/members/{{memberId2}}
+Authorization: Bearer {{token}}
+
+# ============ 7. Item ============
+
+### 建 item(要求属性B≥2;handler 存变量 itemId)
+POST {{host}}/api/projects/{{pkey}}/items
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "写前端看板",
+  "description": "演示用",
+  "requirements": [
+    { "attribute": "{{attrB}}", "minLevel": 2 }
+  ]
+}
+
+> {%
+    client.global.set("itemId", response.body.itemId);
+ %}
+
+### item 列表(key-N 编号)
+GET {{host}}/api/projects/{{pkey}}/items
+Authorization: Bearer {{token}}
+
+### item 详情
+GET {{host}}/api/items/{{itemId}}
+Authorization: Bearer {{token}}
+
+### 改标题
+PATCH {{host}}/api/items/{{itemId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "写前端看板(改)"
+}
+
+### 整体替换需求(含显式 null = 不设等级)
+PUT {{host}}/api/items/{{itemId}}/requirements
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "requirements": [
+    { "attribute": "{{attrB}}", "minLevel": 2 },
+    { "attribute": "{{attrA}}", "minLevel": null }
+  ]
+}
+
+# ============ 8. 指派 / 候选 / 可行性 ============
+
+### 指派小李(池内 → 200)
+PUT {{host}}/api/items/{{itemId}}/assignee
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "assigneeItemId": "{{memberId1}}"
+}
+
+### 取消指派
+PUT {{host}}/api/items/{{itemId}}/assignee
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "assigneeItemId": null
+}
+
+### 候选建议(配置池后仅池内;绿黄红判定逐条可解释)
+GET {{host}}/api/items/{{itemId}}/candidates
+Authorization: Bearer {{token}}
+
+### 单人可行性
+GET {{host}}/api/items/{{itemId}}/feasibility
+Authorization: Bearer {{token}}
+
+### 团队分配建议(项目级)
+GET {{host}}/api/projects/{{pkey}}/feasibility
+Authorization: Bearer {{token}}
+
+# ============ 9. 工作流(状态名动态取自项目详情,兼容任何默认工作流) ============
+
+### 加自定义状态(新项目内名字唯一,不冲突)
+POST {{host}}/api/projects/{{pkey}}/statuses
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "评审",
+  "position": 3
+}
+
+### 迁移规则列表(无行 = 自由迁移)
+GET {{host}}/api/projects/{{pkey}}/transitions
+Authorization: Bearer {{token}}
+
+### 配置迁移(用项目详情抓到的两个状态名)
+PUT {{host}}/api/projects/{{pkey}}/transitions
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "transitions": [
+    { "from": "{{statusFrom}}", "to": "{{statusTo}}" }
+  ]
+}
+
+# ============ 10. 团队(纯分组,不影响匹配) ============
+
+### 建团队(handler 存变量 teamId)
+POST {{host}}/api/teams
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "前端组{{run}}"
+}
+
+> {%
+    client.global.set("teamId", response.body.teamId);
+ %}
+
+### 小李入组
+POST {{host}}/api/teams/{{teamId}}/members
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "memberId": "{{memberId1}}"
+}
+
+### 团队列表
+GET {{host}}/api/teams
+Authorization: Bearer {{token}}
+
+# ============================================================
+# 负例区:以下请求「红色 = 预期」,演示约束生效,不要当 bug
+# ============================================================
+
+### [预期 409] 重复加入池
+POST {{host}}/api/projects/{{pkey}}/members
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "memberId": "{{memberId1}}"
+}
+
+### [预期 409] 指派池外成员(小王已被移出池;消息「该成员不在项目成员中」)
+PUT {{host}}/api/items/{{itemId}}/assignee
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "assigneeItemId": "{{memberId2}}"
+}
+
+### [预期 404] 未知成员入池
+POST {{host}}/api/projects/{{pkey}}/members
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "memberId": "00000000-0000-0000-0000-000000000000"
+}
