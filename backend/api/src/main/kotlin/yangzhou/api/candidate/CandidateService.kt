@@ -16,8 +16,8 @@ import yangzhou.persistence.repository.MemberRepository
 import java.util.UUID
 
 /**
- * 候选建议(Q6):rankCandidates 直出——全 workspace 成员池(含我,含虚拟成员),
- * 排序 = 缺门少 → 总差距小,无加权可解释。引擎给建议,人拍板(指派在 item 切片)。
+ * 候选建议(Q6):rankCandidates 直出——含我,含虚拟成员,排序 = 缺门少 → 总差距小,无加权可解释。
+ * 范围受项目成员池约束(V3.5-B):未配置池 = 全 workspace;配置后仅池内成员进候选。引擎给建议,人拍板(指派在 item 切片)。
  */
 @Service
 class CandidateService(
@@ -26,6 +26,7 @@ class CandidateService(
     private val memberService: MemberService,
     private val workspaceService: WorkspaceService,
     private val feasibility: FeasibilityService,
+    private val projectMembers: yangzhou.api.projectmember.ProjectMemberService,
 ) {
 
     data class VerdictDto(
@@ -51,10 +52,12 @@ class CandidateService(
         val item = items.findByObjectId(itemId) ?: throw NotFoundException("item 不存在")
         val domainItem = feasibility.itemToDomain(item)
         val workspaceMembers = members.findByWorkspaceId(workspaceService.required().id!!)
+        val pool = projectMembers.restrictedPool(item.projectId)
+        val scopedMembers = if (pool == null) workspaceMembers else workspaceMembers.filter { it.id in pool }
         memberService.current() // 确保已初始化(与可行性端点语义一致)
         // 预计算 持久层↔domain 配对(每成员一次装配;值相等的两成员视为同位,天然一致)
         val domainOf = LinkedHashMap<yangzhou.persistence.Member, yangzhou.domain.Member>()
-        workspaceMembers.forEach { domainOf[it] = feasibility.domainMemberOf(it) }
+        scopedMembers.forEach { domainOf[it] = feasibility.domainMemberOf(it) }
         val ranked = MatchingEngine.rankCandidates(domainItem, domainOf.values.toList())
         return ranked.mapIndexed { index, candidate ->
             val persistMember = domainOf.entries.first { it.value == candidate.member }.key

@@ -48,7 +48,7 @@ abstract class AbstractApiTest {
     @BeforeEach
     fun cleanDatabase() {
         listOf(
-            "requirement", "item", "status", "project",
+            "requirement", "item", "status", "project_member", "project",
             "capability", "attribute_definition", "team_member", "team", "member", "workspace",
         ).forEach { jdbc.execute("delete from $it") }
         rest = RestTestClient.bindToServer().baseUrl("http://localhost:$port").build()
