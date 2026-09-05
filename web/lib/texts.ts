@@ -92,6 +92,15 @@ export const t = {
     delta: (n: number) => `共差 ${n} 级`,
     unrated: (n: number) => `未评级 ${n}`,
   },
+  activity: {
+    created: "创建",
+    status_changed: "状态变更",
+    title_changed: "标题变更",
+    description_changed: "描述变更",
+    assigned: "指派",
+    unassigned: "取消指派",
+    requirement_changed: "需求变更",
+  },
   verdicts: {
     satisfied: (a: string) => `✓ 满足(${a})`,
     surplus: (a: string) => `✓ 有余(${a})`,
