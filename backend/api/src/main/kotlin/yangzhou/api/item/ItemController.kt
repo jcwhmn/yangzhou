@@ -1,6 +1,7 @@
 package yangzhou.api.item
 
 import jakarta.validation.Valid
+import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -57,9 +58,13 @@ class ItemController(private val service: ItemService) {
     @GetMapping("/items/{itemId}/activity")
     fun activity(@PathVariable itemId: UUID) = service.activity(itemId)
 
+    @DeleteMapping("/items/{itemId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun delete(@PathVariable itemId: UUID) = service.delete(itemId)
+
     @PatchMapping("/items/{itemId}")
     fun update(
         @PathVariable itemId: UUID,
         @RequestBody request: UpdateItemRequest,
-    ): ItemService.ItemDto = service.update(itemId, request.title, request.description, request.statusItemId, request.parentItemId)
+    ): ItemService.ItemDto = service.update(itemId, request.title, request.description, request.type, request.statusItemId, request.parentItemId)
 }

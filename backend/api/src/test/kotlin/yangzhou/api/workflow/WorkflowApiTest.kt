@@ -73,6 +73,14 @@ class WorkflowApiTest : AbstractApiTest() {
         val qa = project["statuses"][2]["statusId"].asText()
         val done = project["statuses"][3]["statusId"].asText()
         val item = createItem(authed, "CHE", "x") // To Do
+        // 指派"我"(虚拟成员不可,用登录账号)
+        val meId = json.readTree(
+            authed.get().uri("/api/members").exchange()
+                .expectStatus().isOk().expectBody(String::class.java).returnResult().responseBody!!,
+        ).first { !it["virtual"].asBoolean() }["memberId"].asText()
+        authed.put().uri("/api/items/${item["itemId"].asText()}/assignee")
+            .body(mapOf("assigneeItemId" to meId))
+            .exchange().expectStatus().isOk()
 
         // 空:To Do → Done 直跳自由通过
         authed.patch().uri("/api/items/${item["itemId"].asText()}")
