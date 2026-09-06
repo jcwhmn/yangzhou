@@ -138,6 +138,14 @@ export default function ItemDetailPage() {
     flashSaved();
   }
 
+  if (!item) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Typography color={error ? "error" : "text.secondary"}>{error || "加载中…"}</Typography>
+      </Box>
+    );
+  }
+
   return (
     <Box sx={{ maxWidth: 760, mx: "auto", p: 3 }}>
       <AppNav />
