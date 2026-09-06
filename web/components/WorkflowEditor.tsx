@@ -46,6 +46,7 @@ export function WorkflowEditor({
   onChanged: () => void;
 }) {
   const [statuses, setStatuses] = useState<Status[]>([]);
+  const [saved, setSaved] = useState<Status[]>([]); // 服务器已保存快照(onBlur 对比基准)
   const [transitions, setTransitions] = useState<Transition[]>([]);
   const [newName, setNewName] = useState("");
   const [newPos, setNewPos] = useState(""); // 空 = 排到最后
@@ -55,6 +56,7 @@ export function WorkflowEditor({
     try {
       const project = await api<{ statuses: Status[] }>(`/api/projects/${projectKey}`);
       setStatuses(project.statuses);
+      setSaved(project.statuses);
       setTransitions(await api<Transition[]>(`/api/projects/${projectKey}/transitions`));
     } catch (e) {
       setError(e instanceof Error ? e.message : "加载失败");
@@ -73,6 +75,7 @@ export function WorkflowEditor({
         body: JSON.stringify(changes),
       });
       setStatuses((prev) => prev.map((s) => (s.statusId === statusId ? updated : s)));
+      setSaved((prev) => prev.map((s) => (s.statusId === statusId ? updated : s)));
       onChanged();
     } catch (e) {
       setError(e instanceof Error ? e.message : "更新失败");
@@ -89,6 +92,7 @@ export function WorkflowEditor({
         body: JSON.stringify({ name: newName.trim(), ...(position !== null ? { position } : {}) }),
       });
       setStatuses((prev) => [...prev, created]);
+      setSaved((prev) => [...prev, created]);
       setNewName("");
       setNewPos("");
       onChanged();
@@ -149,7 +153,8 @@ export function WorkflowEditor({
                   )
                 }
                 onBlur={(e) => {
-                  if (e.target.value !== s.name) patch(s.statusId, { name: e.target.value });
+                  const base = saved.find((x) => x.statusId === s.statusId);
+                  if (e.target.value !== (base?.name ?? "")) patch(s.statusId, { name: e.target.value });
                 }}
                 sx={{ width: 170 }}
               />
@@ -163,7 +168,8 @@ export function WorkflowEditor({
                   )
                 }
                 onBlur={(e) => {
-                  if (e.target.value !== (s.icon ?? "")) patch(s.statusId, { icon: e.target.value });
+                  const base = saved.find((x) => x.statusId === s.statusId);
+                  if (e.target.value !== (base?.icon ?? "")) patch(s.statusId, { icon: e.target.value });
                 }}
                 sx={{ width: 90 }}
               />
@@ -198,7 +204,8 @@ export function WorkflowEditor({
                   )
                 }
                 onBlur={(e) => {
-                  if (Number(e.target.value) !== s.position) patch(s.statusId, { position: Number(e.target.value) });
+                  const base = saved.find((x) => x.statusId === s.statusId);
+                  if (Number(e.target.value) !== (base?.position ?? 0)) patch(s.statusId, { position: Number(e.target.value) });
                 }}
                 sx={{ width: 80 }}
               />
