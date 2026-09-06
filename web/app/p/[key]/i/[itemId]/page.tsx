@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Alert,
   Box,
   Button,
   Card,
@@ -14,7 +15,6 @@ import {
   Typography,
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
-import AddIcon from "@mui/icons-material/Add";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -34,7 +34,6 @@ type Item = {
   assignee: string | null;
   parentItemId: string | null;
   externalRef: string | null;
-  requirements: { attribute: string; minLevel: number | null }[];
 };
 type Attribute = { attributeId: string; name: string; kind: string; leveled: boolean };
 type Feasibility = {
@@ -56,11 +55,16 @@ type Candidate = {
   totalDelta: number;
   verdicts: Verdict[];
 };
-type Activity = { objectId: string; kind: string; oldValue: string | null; newValue: string | null; actor: string; createdAt: string };
+type Activity = {
+  objectId: string;
+  kind: string;
+  oldValue: string | null;
+  newValue: string | null;
+  actor: string;
+  createdAt: string;
+};
 
-type ReqRow = { attribute: string; minLevel: number | null };
-
-const activityKindLabel: Record<string, string> = {
+const activityLabel: Record<string, string> = {
   created: "创建",
   status_changed: "状态变更",
   title_changed: "标题变更",
@@ -81,16 +85,18 @@ export default function ItemDetailPage() {
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [reqs, setReqs] = useState<ReqRow[]>([]);
+  const [type, setType] = useState("task");
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [confirmCand, setConfirmCand] = useState<Candidate | null>(null);
 
   const load = useCallback(async () => {
     const it = await api<Item>(`/api/items/${itemId}`);
     setItem(it);
     setTitle(it.title);
     setDescription(it.description ?? "");
-    setReqs(it.requirements.map((r) => ({ ...r })));
+    setType(it.type);
     const project = await api<{ statuses: Status[] }>(`/api/projects/${key}`);
     setStatuses(project.statuses);
     setAttributes(await api<Attribute[]>("/api/attributes"));
@@ -111,7 +117,7 @@ export default function ItemDetailPage() {
   async function saveBasics() {
     await api(`/api/items/${itemId}`, {
       method: "PATCH",
-      body: JSON.stringify({ title, description: description || null }),
+      body: JSON.stringify({ title, description: description || null, type }),
     });
     await load();
     flashSaved();
@@ -126,16 +132,14 @@ export default function ItemDetailPage() {
 
   async function assign(memberId: string | null) {
     await api(`/api/items/${itemId}/assignee`, { method: "PUT", body: JSON.stringify({ assigneeItemId: memberId }) });
+    setConfirmCand(null);
     await load();
   }
 
-  async function saveRequirements() {
-    await api(`/api/items/${itemId}/requirements`, {
-      method: "PUT",
-      body: JSON.stringify({ requirements: reqs.filter((r) => r.attribute) }),
-    });
-    await load();
-    flashSaved();
+  async function tryAssign(c: Candidate) {
+    const unmet = c.verdicts.some((v) => v.kind === "gap" || v.kind === "missing" || v.kind === "unrated");
+    if (unmet) setConfirmCand(c);
+    else await assign(c.memberId);
   }
 
   if (!item) {
@@ -155,12 +159,12 @@ export default function ItemDetailPage() {
         </Typography>
       </Link>
       <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
-        <Chip label={item!.number} />
-        {feasibility && <SignalChip signal={feasibility!.signal} />}
-        {item!.assignee && <Chip size="small" label={`👤 ${item!.assignee}`} />}
+        <Chip label={item.number} />
+        {feasibility && <SignalChip signal={feasibility.signal} />}
+        {item.assignee && <Chip size="small" label={`👤 ${item.assignee}`} onDelete={() => assign(null)} />}
         <Select
           size="small"
-          value={item!.status}
+          value={item.status}
           onChange={(e) => moveStatus(String(e.target.value))}
           sx={{ ml: "auto", minWidth: 160 }}
         >
@@ -184,147 +188,145 @@ export default function ItemDetailPage() {
           minRows={2}
           fullWidth
         />
+        <TextField select label={t.item.type} value={type} onChange={(e) => setType(e.target.value)} sx={{ width: 200 }}>
+          {["task", "bug", "goal", "story"].map((tp) => (
+            <MenuItem key={tp} value={tp}>
+              {tp}
+            </MenuItem>
+          ))}
+        </TextField>
         <Stack direction="row" spacing={1} alignItems="center">
           <Button variant="contained" onClick={saveBasics}>
             {t.item.save}
           </Button>
           {saved && <Typography variant="body2" color="text.secondary">{t.item.saved}</Typography>}
+          <Button
+            size="small"
+            color="error"
+            onClick={() => {
+              if (confirm(`删除 item ${item.number}?`)) {
+                api(`/api/items/${itemId}`, { method: "DELETE" })
+                  .then(() => (window.location.href = `/p/${key}`))
+                  .catch((e) => setError(e.message));
+              }
+            }}
+          >
+            删除
+          </Button>
         </Stack>
       </Stack>
+
+      {feasibility && (
+        <Box sx={{ mt: 3 }}>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Typography variant="h6" gutterBottom sx={{ mb: 0 }}>
+              谁来做
+            </Typography>
+            {!assignOpen && (
+              <Button size="small" variant="outlined" onClick={() => setAssignOpen(true)}>
+                {item.assignee ? t.assign.reassign : t.assign.open}
+              </Button>
+            )}
+            {assignOpen && (
+              <Button
+                size="small"
+                variant="contained"
+                onClick={() => {
+                  const me = candidates.find((c) => !c.virtual);
+                  if (me) tryAssign(me);
+                }}
+              >
+                {t.assign.assignMe}
+              </Button>
+            )}
+          </Stack>
+          {confirmCand && (
+            <Alert
+              severity="warning"
+              sx={{ my: 1 }}
+              action={
+                <Button color="inherit" size="small" onClick={() => assign(confirmCand.memberId)}>
+                  {t.assign.confirmAnyway}
+                </Button>
+              }
+              onClose={() => setConfirmCand(null)}
+            >
+              {confirmCand.displayName}:{t.assignDialog.unmetWarning}
+            </Alert>
+          )}
+          {!assignOpen ? (
+            item.assignee ? (
+              <Chip size="small" label={`👤 ${item.assignee}`} sx={{ mt: 1 }} />
+            ) : (
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                {t.assign.none}
+              </Typography>
+            )
+          ) : (
+            <Stack spacing={1} sx={{ mt: 1 }}>
+              {candidates.length === 0 && (
+                <Typography color="text.secondary" variant="body2">
+                  (无候选——词表与成员就绪后可分配)
+                </Typography>
+              )}
+              {candidates.map((c) => {
+                const unmet = c.verdicts.filter((v) => v.kind === "gap" || v.kind === "missing" || v.kind === "unrated");
+                return (
+                  <Card
+                    key={c.memberId}
+                    variant="outlined"
+                    sx={{
+                      borderColor:
+                        c.signal === "RED" ? "error.main" : c.signal === "YELLOW" ? "warning.main" : "success.main",
+                    }}
+                  >
+                    <CardContent sx={{ py: 1, "&:last-child": { pb: 1 } }}>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <Chip size="small" label={`#${c.rank}`} />
+                        <Typography variant="body2">
+                          {c.displayName}
+                          {c.virtual ? "(虚拟)" : ""}
+                        </Typography>
+                        <Chip
+                          size="small"
+                          variant="outlined"
+                          color={c.signal === "RED" ? "error" : c.signal === "YELLOW" ? "warning" : "success"}
+                          label={`缺门${c.missingCount}·差${c.totalDelta}级`}
+                        />
+                        <Button
+                          size="small"
+                          variant="contained"
+                          sx={{ ml: "auto" }}
+                          onClick={() => tryAssign(c)}
+                        >
+                          {t.assign.assignTo}
+                        </Button>
+                      </Stack>
+                      {c.verdicts.map((v, i) => (
+                        <VerdictLine key={i} v={v} />
+                      ))}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </Stack>
+          )}
+        </Box>
+      )}
 
       <Typography variant="h6" sx={{ mt: 3, mb: 1 }}>
-        {t.item.requirements}
+        活动日志
       </Typography>
-      <Stack spacing={1}>
-        {reqs.map((r, idx) => (
-          <Stack key={idx} direction="row" spacing={1} alignItems="center">
-            <Select
-              size="small"
-              value={r.attribute}
-              onChange={(e) =>
-                setReqs((prev) =>
-                  prev.map((x, i) => (i === idx ? { ...x, attribute: String(e.target.value) } : x)),
-                )
-              }
-              sx={{ minWidth: 200 }}
-              displayEmpty
-            >
-              <MenuItem value="" disabled>
-                {t.item.attribute}
-              </MenuItem>
-              {attributes.map((a) => (
-                <MenuItem key={a.attributeId} value={a.name}>
-                  {a.name}
-                </MenuItem>
-              ))}
-            </Select>
-            <Select
-              size="small"
-              value={r.minLevel ?? ""}
-              onChange={(e) =>
-                setReqs((prev) =>
-                  prev.map((x, i) =>
-                    i === idx ? { ...x, minLevel: String(e.target.value) === "" ? null : Number(e.target.value) } : x,
-                  ),
-                )
-              }
-              sx={{ minWidth: 160 }}
-              displayEmpty
-            >
-              <MenuItem value="">{t.item.none}</MenuItem>
-              {[1, 2, 3, 4].map((l) => (
-                <MenuItem key={l} value={l}>
-                  ≥{l}
-                </MenuItem>
-              ))}
-            </Select>
-            <IconButton onClick={() => setReqs((prev) => prev.filter((_, i) => i !== idx))} aria-label="delete">
-              <DeleteIcon />
-            </IconButton>
-          </Stack>
+      <Stack spacing={0.5}>
+        {activity.length === 0 && <Typography variant="body2" color="text.secondary">(暂无)</Typography>}
+        {activity.map((a) => (
+          <Typography key={a.objectId} variant="caption" color="text.secondary">
+            {new Date(a.createdAt).toLocaleString("zh-CN")} · {a.actor} ·{" "}
+            {activityLabel[a.kind] ?? a.kind}
+            {a.oldValue || a.newValue ? `: ${a.oldValue ?? ""} → ${a.newValue ?? ""}` : ""}
+          </Typography>
         ))}
-        <Stack direction="row" spacing={1}>
-          <Button startIcon={<AddIcon />} onClick={() => setReqs((prev) => [...prev, { attribute: "", minLevel: null }])}>
-            {t.item.addRequirement}
-          </Button>
-          <Button variant="contained" onClick={saveRequirements}>
-            {t.item.save}
-          </Button>
-        </Stack>
       </Stack>
-
-      {feasibility && (
-        <Box sx={{ mt: 3 }}>
-          <Typography variant="h6" gutterBottom>
-            谁来做
-          </Typography>
-          {candidates.length === 0 && <Typography color="text.secondary" variant="body2">(无候选)</Typography>}
-          <Stack spacing={1}>
-            {candidates.map((c) => (
-              <Card key={c.memberId} variant="outlined">
-                <CardContent sx={{ py: 1, "&:last-child": { pb: 1 } }}>
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <Chip size="small" label={`#${c.rank}`} />
-                    <Typography variant="body2">
-                      {c.displayName}
-                      {c.virtual ? "(虚拟)" : ""}
-                    </Typography>
-                    <Chip
-                      size="small"
-                      variant="outlined"
-                      color={c.signal === "RED" ? "error" : c.signal === "YELLOW" ? "warning" : "success"}
-                      label={`缺门${c.missingCount}·差${c.totalDelta}级`}
-                    />
-                    <Button
-                      size="small"
-                      variant="contained"
-                      sx={{ ml: "auto" }}
-                      onClick={() => assign(c.memberId)}
-                    >
-                      指派
-                    </Button>
-                  </Stack>
-                  {c.verdicts.map((v, i) => (
-                    <VerdictLine key={i} v={v} />
-                  ))}
-                </CardContent>
-              </Card>
-            ))}
-          </Stack>
-        </Box>
-      )}
-
-      {feasibility && (
-        <Box sx={{ mt: 3 }}>
-          <Typography variant="h6" gutterBottom>
-            {t.item.verdicts}
-          </Typography>
-          {feasibility.verdicts.length === 0 && <Typography color="text.secondary">(无需求)</Typography>}
-          {feasibility.verdicts.map((v, i) => (
-            <VerdictLine key={i} v={v} />
-          ))}
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            缺门 {feasibility.missingCount} · 总差距 {feasibility.totalDelta} 级
-          </Typography>
-        </Box>
-      )}
-
-      {activity.length > 0 && (
-        <Box sx={{ mt: 3 }}>
-          <Typography variant="h6" gutterBottom>
-            活动日志
-          </Typography>
-          <Stack spacing={0.5}>
-            {activity.map((a) => (
-              <Typography key={a.objectId} variant="caption" color="text.secondary">
-                {new Date(a.createdAt).toLocaleString("zh-CN")} · {a.actor} ·{" "}
-                {t.activity[a.kind as keyof typeof t.activity] ?? a.kind}
-                {a.oldValue || a.newValue ? `: ${a.oldValue ?? ""} → ${a.newValue ?? ""}` : ""}
-              </Typography>
-            ))}
-          </Stack>
-        </Box>
-      )}
     </Box>
   );
 }
