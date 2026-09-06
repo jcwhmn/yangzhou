@@ -44,6 +44,14 @@ class ActivityApiTest : AbstractApiTest() {
     @Test
     fun `状态变更留痕并记录新旧状态名`() {
         val (authed, itemId) = seed()
+        // 指派"我"以满足开工须有主
+        val meId = json.readTree(
+            authed.get().uri("/api/members").exchange()
+                .expectStatus().isOk().expectBody(String::class.java).returnResult().responseBody!!,
+        ).first { !it["virtual"].asBoolean() }["memberId"].asText()
+        authed.put().uri("/api/items/$itemId/assignee")
+            .body(mapOf("assigneeItemId" to meId))
+            .exchange().expectStatus().isOk()
         val project = json.readTree(
             authed.get().uri("/api/projects/CHE").exchange()
                 .expectStatus().isOk().expectBody(String::class.java).returnResult().responseBody!!,

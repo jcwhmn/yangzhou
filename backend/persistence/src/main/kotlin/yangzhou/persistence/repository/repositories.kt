@@ -81,6 +81,7 @@ interface ItemRepository : CrudRepository<Item, Long> {
     fun findByObjectId(objectId: UUID): Item?
     fun findByProjectIdOrderByNumber(projectId: Long): List<Item>
     fun findByProjectIdAndExternalRef(projectId: Long, externalRef: String): Item?
+    fun existsByParentObjectId(parentObjectId: UUID): Boolean
 }
 
 interface RequirementRepository : CrudRepository<Requirement, Long> {

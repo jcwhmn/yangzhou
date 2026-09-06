@@ -137,6 +137,7 @@ class ItemService(
         itemId: UUID,
         title: String?,
         description: String?,
+        type: String?,
         statusItemId: UUID?,
         parentItemId: UUID?,
     ): ItemDto {
@@ -155,6 +156,10 @@ class ItemService(
             if (oldStatus != null) {
                 workflow.assertTransitionAllowed(projectId, oldStatus.id!!, status.id!!)
             }
+            // 开工须有主:离开起点状态前必须已指派(V4-S3)
+            if (current.assigneeObjectId == null && oldStatus?.isStart == true && !status.isStart) {
+                throw ConflictException("开工前请先指派负责人")
+            }
             current = itemRepo.save(current.copy(statusObjectId = status.objectId))
             logActivity(current.id!!, "status_changed", oldStatus?.name, status.name, actorId)
         }
@@ -166,6 +171,10 @@ class ItemService(
             current = itemRepo.save(current.copy(parentObjectId = parent.objectId))
         }
 
+        if (type != null && type != current.type) {
+            if (type !in setOf("task", "bug", "goal", "story")) throw BadRequestException("type 非法:$type")
+            current = itemRepo.save(current.copy(type = type))
+        }
         if (title != null && title != current.title) {
             logActivity(current.id!!, "title_changed", current.title, title, actorId)
             current = itemRepo.save(current.copy(title = title))
@@ -209,6 +218,17 @@ class ItemService(
             logActivity(item.id!!, "unassigned", oldName, null, actorId)
         }
         return get(item.objectId)
+    }
+
+    /** 删除 item:需求随删、活动随删(FK 级联);有子 item 拒绝(409)。 */
+    @Transactional
+    fun delete(itemId: UUID) {
+        val item = itemRepo.findByObjectId(itemId) ?: throw NotFoundException("item 不存在")
+        if (itemRepo.existsByParentObjectId(itemId)) {
+            throw ConflictException("请先处理子 item(删除或移出)")
+        }
+        requirementRepo.deleteByItemId(item.id!!)
+        itemRepo.delete(item)
     }
 
     private fun actorId(): Long = memberService.current().id!!
@@ -273,6 +293,7 @@ data class ReplaceRequirementsRequest(val requirements: List<RequirementInput> =
 data class UpdateItemRequest(
     val title: String? = null,
     val description: String? = null,
+    val type: String? = null,
     val statusItemId: UUID? = null,
     val parentItemId: UUID? = null,
 )

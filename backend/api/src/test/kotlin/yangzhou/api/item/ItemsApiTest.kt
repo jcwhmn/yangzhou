@@ -68,10 +68,18 @@ class ItemsApiTest : AbstractApiTest() {
     }
 
     @Test
-    fun `状态自由迁移(V1 无约束)`() {
+    fun `已指派 item 自由迁移(V4 起点须有主)`() {
         val authed = bootstrapAndAuth()
         val project = createProject(authed, "CHE")
         val item = createItem(authed, "CHE", "x")
+        // 指派"我"(登录成员),满足开工须有主
+        val meId = json.readTree(
+            authed.get().uri("/api/members").exchange()
+                .expectStatus().isOk().expectBody(String::class.java).returnResult().responseBody!!,
+        ).first { !it["virtual"].asBoolean() }["memberId"].asText()
+        authed.put().uri("/api/items/${item["itemId"].asText()}/assignee")
+            .body(mapOf("assigneeItemId" to meId))
+            .exchange().expectStatus().isOk()
         val done = project["statuses"].first { it["name"].asText() == "Done" }["statusId"].asText()
 
         authed.patch().uri("/api/items/${item["itemId"].asText()}")
@@ -139,6 +147,77 @@ class ItemsApiTest : AbstractApiTest() {
         createProject(authed, "CHE")
         authed.post().uri("/api/projects/CHE/items")
             .body(mapOf("title" to "x", "requirements" to listOf(mapOf("attribute" to "幽灵", "minLevel" to 1))))
+            .exchange().expectStatus().isBadRequest()
+    }
+
+    @Test
+    fun `开工须有主——未指派离开起点 409,已指派放行,起点内移动放行`() {
+        val authed = bootstrapAndAuth()
+        createProject(authed, "CHE")
+        val project = json.readTree(
+            authed.get().uri("/api/projects/CHE").exchange()
+                .expectStatus().isOk().expectBody(String::class.java).returnResult().responseBody!!,
+        )
+        val toDo = project["statuses"][0]["statusId"].asText()
+        val dev = project["statuses"][1]["statusId"].asText()
+        val item = createItem(authed, "CHE", "无主 item") // 未指派
+
+        authed.patch().uri("/api/items/${item["itemId"].asText()}")
+            .body(mapOf("statusItemId" to dev))
+            .exchange().expectStatus().isEqualTo(409)
+
+        // 指派后放行
+        authed.put().uri("/api/items/${item["itemId"].asText()}/assignee")
+            .body(mapOf("assigneeItemId" to json.readTree(
+                authed.get().uri("/api/members").exchange()
+                    .expectStatus().isOk().expectBody(String::class.java).returnResult().responseBody!!,
+            ).first { it["displayName"].asText() == "me" }["memberId"].asText()))
+            .exchange().expectStatus().isOk()
+        authed.patch().uri("/api/items/${item["itemId"].asText()}")
+            .body(mapOf("statusItemId" to dev))
+            .exchange().expectStatus().isOk()
+    }
+
+    @Test
+    fun `删除 item——204 后 404,有子 item 409,需求级联清`() {
+        val authed = bootstrapAndAuth()
+        createSkillAttribute(authed, "Java")
+        createProject(authed, "CHE")
+        val parent = createItem(authed, "CHE", "父")
+        val child = json.readTree(
+            authed.post().uri("/api/projects/CHE/items")
+                .body(mapOf("title" to "子", "parentItemId" to parent["itemId"].asText(),
+                    "requirements" to listOf(mapOf("attribute" to "Java", "minLevel" to null))))
+                .exchange().expectStatus().isCreated()
+                .expectBody(String::class.java).returnResult().responseBody!!,
+        )
+
+        // 有子 → 409
+        authed.delete().uri("/api/items/${parent["itemId"].asText()}")
+            .exchange().expectStatus().isEqualTo(409)
+
+        // 删子(无子 item)→ 204,需求随删(无活动残留由 FK 级联保证)
+        authed.delete().uri("/api/items/${child["itemId"].asText()}")
+            .exchange().expectStatus().isNoContent()
+        authed.get().uri("/api/items/${child["itemId"].asText()}")
+            .exchange().expectStatus().isNotFound()
+
+        // 删父(已无子)→ 204
+        authed.delete().uri("/api/items/${parent["itemId"].asText()}")
+            .exchange().expectStatus().isNoContent()
+    }
+
+    @Test
+    fun `PATCH type 修改生效,非法值 400`() {
+        val authed = bootstrapAndAuth()
+        createProject(authed, "CHE")
+        val item = createItem(authed, "CHE", "x")
+
+        authed.patch().uri("/api/items/${item["itemId"].asText()}")
+            .body(mapOf("type" to "bug"))
+            .exchange().expectStatus().isOk()
+        authed.patch().uri("/api/items/${item["itemId"].asText()}")
+            .body(mapOf("type" to "not-a-type"))
             .exchange().expectStatus().isBadRequest()
     }
 }
