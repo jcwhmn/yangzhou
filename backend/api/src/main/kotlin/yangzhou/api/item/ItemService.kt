@@ -8,6 +8,7 @@ import yangzhou.api.support.BadRequestException
 import yangzhou.api.support.ConflictException
 import yangzhou.api.support.NotFoundException
 import yangzhou.persistence.Item
+import yangzhou.persistence.ItemActivity
 import yangzhou.persistence.Requirement
 import yangzhou.persistence.repository.AttributeDefinitionRepository
 import yangzhou.persistence.repository.ItemNumberRepository
@@ -29,7 +30,9 @@ class ItemService(
     private val jdbc: JdbcOperations,
     private val workflow: yangzhou.api.workflow.WorkflowService,
     private val members: yangzhou.persistence.repository.MemberRepository,
+    private val memberService: yangzhou.api.member.MemberService,
     private val projectMembers: yangzhou.api.projectmember.ProjectMemberService,
+    private val activityRepo: yangzhou.persistence.repository.ItemActivityRepository,
 ) {
 
     data class RequirementDto(val attribute: String, val minLevel: Int?)
@@ -92,6 +95,7 @@ class ItemService(
         resolveRequirements(project.workspaceId, requirements).forEach { (defId, minLevel) ->
             requirementRepo.save(Requirement(itemId = itemId, attributeDefinitionId = defId, minLevel = minLevel))
         }
+        logActivity(itemId, "created", null, title, memberService.current().id!!)
         return get(item.objectId)
     }
 
@@ -142,6 +146,7 @@ class ItemService(
         var current = item
 
         val projectId = project.id ?: error("no id")
+        val actorId = memberService.current().id!!
         if (statusItemId != null) {
             val status = statuses.findByProjectIdAndObjectId(projectId, statusItemId)
                 ?: throw BadRequestException("状态不属于该项目")
@@ -151,6 +156,7 @@ class ItemService(
                 workflow.assertTransitionAllowed(projectId, oldStatus.id!!, status.id!!)
             }
             current = itemRepo.save(current.copy(statusObjectId = status.objectId))
+            logActivity(current.id!!, "status_changed", oldStatus?.name, status.name, actorId)
         }
 
         if (parentItemId != null) {
@@ -160,8 +166,13 @@ class ItemService(
             current = itemRepo.save(current.copy(parentObjectId = parent.objectId))
         }
 
-        if (title != null || description != null) {
-            current = itemRepo.save(current.copy(title = title ?: current.title, description = description ?: current.description))
+        if (title != null && title != current.title) {
+            logActivity(current.id!!, "title_changed", current.title, title, actorId)
+            current = itemRepo.save(current.copy(title = title))
+        }
+        if (description != null && description != current.description) {
+            logActivity(current.id!!, "description_changed", current.description, description, actorId)
+            current = itemRepo.save(current.copy(description = description))
         }
         return get(current.objectId)
     }
@@ -177,6 +188,8 @@ class ItemService(
         resolveRequirements(project.workspaceId, requirements).forEach { (defId, minLevel) ->
             requirementRepo.save(Requirement(itemId = rowId, attributeDefinitionId = defId, minLevel = minLevel))
         }
+        val summary = requirements.joinToString(";") { r -> r.attribute + (r.minLevel?.let { ">=" + it } ?: "") }
+        logActivity(rowId, "requirement_changed", null, summary.ifEmpty { "(清空)" }, actorId())
         return get(item.objectId)
     }
 
@@ -184,12 +197,29 @@ class ItemService(
     @Transactional
     fun assign(itemId: UUID, assigneeItemId: UUID?): ItemDto {
         val item = itemRepo.findByObjectId(itemId) ?: throw NotFoundException("item 不存在")
+        val actorId = memberService.current().id!!
+        val oldName = item.assigneeObjectId?.let { oid -> members.findByObjectId(oid)?.displayName }
         if (assigneeItemId != null) {
             val member = members.findByObjectId(assigneeItemId) ?: throw NotFoundException("成员不存在")
             projectMembers.assertAssignable(item.projectId, member.id!!)
+            itemRepo.save(item.copy(assigneeObjectId = assigneeItemId))
+            logActivity(item.id!!, "assigned", oldName, member.displayName, actorId)
+        } else {
+            itemRepo.save(item.copy(assigneeObjectId = null))
+            logActivity(item.id!!, "unassigned", oldName, null, actorId)
         }
-        itemRepo.save(item.copy(assigneeObjectId = assigneeItemId))
         return get(item.objectId)
+    }
+
+    private fun actorId(): Long = memberService.current().id!!
+
+    private fun logActivity(itemId: Long, kind: String, oldValue: String?, newValue: String?, actorId: Long) {
+        activityRepo.save(ItemActivity(itemId = itemId, kind = kind, oldValue = oldValue, newValue = newValue, actorMemberId = actorId))
+    }
+
+    fun activity(itemId: UUID): List<ItemActivity> {
+        val item = itemRepo.findByObjectId(itemId) ?: throw NotFoundException("item 不存在")
+        return activityRepo.findByItemIdOrderByCreatedAtDesc(item.id!!)
     }
 
     // ---------- 内部 ----------

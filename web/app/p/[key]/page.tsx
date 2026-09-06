@@ -16,6 +16,7 @@ type Item = {
   title: string;
   type: string;
   status: string;
+  assignee: string | null;
   parentItemId: string | null;
   requirements: { attribute: string; minLevel: number | null }[];
 };
@@ -154,6 +155,11 @@ export default function BoardPage() {
                           {it.title}
                         </Typography>
                       </Link>
+                      {it.assignee && (
+                        <Typography variant="caption" color="text.secondary">
+                          👤 {it.assignee}
+                        </Typography>
+                      )}
                     </Stack>
                   </CardContent>
                 </Card>

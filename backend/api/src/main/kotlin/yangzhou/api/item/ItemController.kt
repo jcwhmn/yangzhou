@@ -54,6 +54,9 @@ class ItemController(private val service: ItemService) {
         @RequestBody request: AssigneeRequest,
     ): ItemService.ItemDto = service.assign(itemId, request.assigneeItemId)
 
+    @GetMapping("/items/{itemId}/activity")
+    fun activity(@PathVariable itemId: UUID) = service.activity(itemId)
+
     @PatchMapping("/items/{itemId}")
     fun update(
         @PathVariable itemId: UUID,
