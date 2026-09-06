@@ -123,6 +123,15 @@ export const t = {
     delta: (n: number) => `共差 ${n} 级`,
     unrated: (n: number) => `未评级 ${n}`,
   },
+  assign: {
+    open: "分配",
+    reassign: "重新分配",
+    none: "未指派",
+    assignMe: "指派给我",
+    assignTo: "指派",
+    confirmAnyway: "仍然指派",
+    warningPrefix: "该候选存在未满足项——",
+  },
   activity: {
     created: "创建",
     status_changed: "状态变更",
