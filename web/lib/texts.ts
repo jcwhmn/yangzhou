@@ -132,6 +132,16 @@ export const t = {
     confirmAnyway: "仍然指派",
     warningPrefix: "该候选存在未满足项——",
   },
+  assignDialog: {
+    assignMe: "指派给我",
+    assignMember: "分配成员…",
+    pickMember: "选择成员",
+    assignBtn: "指派",
+    clear: "取消指派",
+    close: "关闭",
+    anyway: "仍然指派",
+    unmetWarning: "存在未满足项(缺能力/差距/未评级),指派后请关注。",
+  },
   activity: {
     created: "创建",
     status_changed: "状态变更",
