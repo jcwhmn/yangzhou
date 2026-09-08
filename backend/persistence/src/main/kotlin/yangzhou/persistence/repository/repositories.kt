@@ -3,6 +3,7 @@ package yangzhou.persistence.repository
 import org.springframework.data.repository.CrudRepository
 import yangzhou.persistence.AttributeDefinition
 import yangzhou.persistence.Capability
+import yangzhou.persistence.Comment
 import yangzhou.persistence.ItemActivity
 import yangzhou.persistence.Item
 import yangzhou.persistence.Member
@@ -65,6 +66,10 @@ interface ProjectMemberRepository : CrudRepository<ProjectMember, Long> {
     fun findByProjectIdAndMemberId(projectId: Long, memberId: Long): ProjectMember?
 }
 
+interface CommentRepository : CrudRepository<Comment, Long> {
+    fun findByItemIdOrderByCreatedAtDesc(itemId: Long): List<Comment>
+}
+
 interface StatusRepository : CrudRepository<Status, Long> {
     fun findByProjectIdOrderByPosition(projectId: Long): List<Status>
     fun findByProjectIdAndObjectId(projectId: Long, objectId: UUID): Status?
@@ -79,6 +84,7 @@ interface StatusTransitionRepository : CrudRepository<StatusTransition, Long> {
 
 interface ItemRepository : CrudRepository<Item, Long> {
     fun findByObjectId(objectId: UUID): Item?
+    fun findByProjectIdAndStatusObjectId(projectId: Long, statusObjectId: UUID): List<Item>
     fun findByProjectIdOrderByNumber(projectId: Long): List<Item>
     fun findByProjectIdAndExternalRef(projectId: Long, externalRef: String): Item?
     fun existsByParentObjectId(parentObjectId: UUID): Boolean
