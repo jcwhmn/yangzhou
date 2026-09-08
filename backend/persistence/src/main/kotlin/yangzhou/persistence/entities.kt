@@ -58,6 +58,17 @@ data class ItemActivity(
     val createdAt: Instant = Instant.now(),
 )
 
+@Table("comment")
+data class Comment(
+    @Id val id: Long? = null,
+    val objectId: UUID = UUID.randomUUID(),
+    val itemId: Long,
+    val authorMemberId: Long,
+    val body: String,
+    val createdAt: Instant = Instant.now(),
+    val updatedAt: Instant = Instant.now(),
+)
+
 @Table("attribute_definition")
 data class AttributeDefinition(
     @Id val id: Long? = null,
@@ -113,6 +124,7 @@ data class Status(
     val icon: String? = null,
     val isFinal: Boolean = false,
     val isStart: Boolean = false,
+    val wipLimit: Int? = null,
     val position: Int = 0,
     val createdAt: Instant = Instant.now(),
     val updatedAt: Instant = Instant.now(),

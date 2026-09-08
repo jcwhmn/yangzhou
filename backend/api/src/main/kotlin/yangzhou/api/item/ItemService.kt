@@ -160,6 +160,12 @@ class ItemService(
             if (current.assigneeObjectId == null && oldStatus?.isStart == true && !status.isStart) {
                 throw ConflictException("开工前请先指派负责人")
             }
+            // WIP 限制:目标列已有 item 数 >= 上限 → 409(V5-W1)
+            val limit = status.wipLimit
+            if (limit != null && limit > 0) {
+                val wipCount = itemRepo.findByProjectIdAndStatusObjectId(projectId, status.objectId).size
+                if (wipCount >= limit) throw ConflictException("该列 WIP 已满:$wipCount/$limit")
+            }
             current = itemRepo.save(current.copy(statusObjectId = status.objectId))
             logActivity(current.id!!, "status_changed", oldStatus?.name, status.name, actorId)
         }
