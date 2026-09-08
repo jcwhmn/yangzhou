@@ -54,16 +54,11 @@ export default function BoardPage() {
       setStatuses(project.statuses);
       const list = await api<Item[]>(`/api/projects/${key}/items`);
       setItems(list);
+      // V4:单次 list 调用替代 N+1 逐 item 可行性请求
+      const f = await api<{ items: { itemId: string; signal: Signal }[] }>(`/api/projects/${key}/feasibility`);
       const map: Record<string, Signal> = {};
-      await Promise.all(
-        list.map(async (it) => {
-          try {
-            map[it.itemId] = (await api<Feasibility>(`/api/items/${it.itemId}/feasibility`)).signal;
-          } catch {
-            /* 单项失败不拦看板 */
-          }
-        }),
-      );
+      f.items.forEach((it) => (map[it.itemId] = it.signal));
+      setFeas(map);
       setFeas(map);
     } catch (e) {
       setError(e instanceof Error ? e.message : "加载失败");

@@ -68,6 +68,7 @@ interface ProjectMemberRepository : CrudRepository<ProjectMember, Long> {
 
 interface CommentRepository : CrudRepository<Comment, Long> {
     fun findByItemIdOrderByCreatedAtDesc(itemId: Long): List<Comment>
+    fun findByObjectId(objectId: UUID): Comment?
 }
 
 interface StatusRepository : CrudRepository<Status, Long> {

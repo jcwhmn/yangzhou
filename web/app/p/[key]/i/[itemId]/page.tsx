@@ -7,6 +7,10 @@ import {
   Card,
   CardContent,
   Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   IconButton,
   MenuItem,
   Select,
@@ -15,6 +19,7 @@ import {
   Typography,
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
+import AddIcon from "@mui/icons-material/Add";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -34,6 +39,7 @@ type Item = {
   assignee: string | null;
   parentItemId: string | null;
   externalRef: string | null;
+  requirements: { attribute: string; minLevel: number | null }[];
 };
 type Attribute = { attributeId: string; name: string; kind: string; leveled: boolean };
 type Feasibility = {
@@ -64,6 +70,9 @@ type Activity = {
   createdAt: string;
 };
 
+type ReqRow = { attribute: string; minLevel: number | null };
+type CommentDto = { commentId: string; body: string; author: string; createdAt: string };
+
 const activityLabel: Record<string, string> = {
   created: "创建",
   status_changed: "状态变更",
@@ -90,6 +99,9 @@ export default function ItemDetailPage() {
   const [error, setError] = useState("");
   const [assignOpen, setAssignOpen] = useState(false);
   const [confirmCand, setConfirmCand] = useState<Candidate | null>(null);
+  const [reqOpen, setReqOpen] = useState(false);
+  const [comments, setComments] = useState<CommentDto[]>([]);
+  const [newComment, setNewComment] = useState("");
 
   const load = useCallback(async () => {
     const it = await api<Item>(`/api/items/${itemId}`);
@@ -103,6 +115,7 @@ export default function ItemDetailPage() {
     setFeasibility(await api<Feasibility>(`/api/items/${itemId}/feasibility`));
     setCandidates(await api<Candidate[]>(`/api/items/${itemId}/candidates`));
     setActivity(await api<Activity[]>(`/api/items/${itemId}/activity`));
+    setComments(await api<CommentDto[]>(`/api/items/${itemId}/comments`));
   }, [key, itemId]);
 
   useEffect(() => {
@@ -133,7 +146,29 @@ export default function ItemDetailPage() {
   async function assign(memberId: string | null) {
     await api(`/api/items/${itemId}/assignee`, { method: "PUT", body: JSON.stringify({ assigneeItemId: memberId }) });
     setConfirmCand(null);
+    setAssignOpen(false);
     await load();
+  }
+
+  async function saveRequirements(rows: ReqRow[]) {
+    await api(`/api/items/${itemId}/requirements`, {
+      method: "PUT",
+      body: JSON.stringify({ requirements: rows.filter((r) => r.attribute) }),
+    });
+    await load();
+    flashSaved();
+  }
+
+  async function addComment() {
+    if (!newComment.trim()) return;
+    await api(`/api/items/${itemId}/comments`, { method: "POST", body: JSON.stringify({ body: newComment.trim() }) });
+    setNewComment("");
+    setComments(await api<CommentDto[]>(`/api/items/${itemId}/comments`));
+  }
+
+  async function removeComment(commentId: string) {
+    await api(`/api/comments/${commentId}`, { method: "DELETE" });
+    setComments((prev) => prev.filter((c) => c.commentId !== commentId));
   }
 
   async function tryAssign(c: Candidate) {
@@ -216,36 +251,41 @@ export default function ItemDetailPage() {
         </Stack>
       </Stack>
 
-      {feasibility && (
-        <Box sx={{ mt: 3 }}>
+      <Typography variant="h6" sx={{ mt: 3, mb: 1 }}>
+        谁来做
+      </Typography>
+      {!assignOpen ? (
+        item.assignee ? (
           <Stack direction="row" spacing={1} alignItems="center">
-            <Typography variant="h6" gutterBottom sx={{ mb: 0 }}>
-              谁来做
-            </Typography>
-            {!assignOpen && (
-              <Button size="small" variant="outlined" onClick={() => setAssignOpen(true)}>
-                {item.assignee ? t.assign.reassign : t.assign.open}
-              </Button>
-            )}
-            {assignOpen && (
-              <Button
-                size="small"
-                variant="contained"
-                onClick={() => {
-                  const me = candidates.find((c) => !c.virtual);
-                  if (me) tryAssign(me);
-                }}
-              >
-                {t.assign.assignMe}
-              </Button>
-            )}
+            <Chip label={`👤 ${item.assignee}`} />
+            <Button size="small" onClick={() => setAssignOpen(true)}>
+              {t.assign.reassign}
+            </Button>
           </Stack>
+        ) : (
+          <Stack direction="row" spacing={1}>
+            <Button variant="contained" onClick={() => setAssignOpen(true)}>
+              {t.assign.assignMe}
+            </Button>
+            <Button variant="outlined" onClick={() => setAssignOpen(true)}>
+              {t.assign.assignMember}
+            </Button>
+          </Stack>
+        )
+      ) : (
+        <Stack spacing={1}>
           {confirmCand && (
             <Alert
               severity="warning"
-              sx={{ my: 1 }}
               action={
-                <Button color="inherit" size="small" onClick={() => assign(confirmCand.memberId)}>
+                <Button
+                  color="inherit"
+                  size="small"
+                  onClick={() => {
+                    assign(confirmCand.memberId);
+                    setAssignOpen(false);
+                  }}
+                >
                   {t.assign.confirmAnyway}
                 </Button>
               }
@@ -254,79 +294,214 @@ export default function ItemDetailPage() {
               {confirmCand.displayName}:{t.assignDialog.unmetWarning}
             </Alert>
           )}
-          {!assignOpen ? (
-            item.assignee ? (
-              <Chip size="small" label={`👤 ${item.assignee}`} sx={{ mt: 1 }} />
-            ) : (
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                {t.assign.none}
-              </Typography>
-            )
-          ) : (
-            <Stack spacing={1} sx={{ mt: 1 }}>
-              {candidates.length === 0 && (
-                <Typography color="text.secondary" variant="body2">
-                  (无候选——词表与成员就绪后可分配)
-                </Typography>
-              )}
-              {candidates.map((c) => {
-                const unmet = c.verdicts.filter((v) => v.kind === "gap" || v.kind === "missing" || v.kind === "unrated");
-                return (
-                  <Card
-                    key={c.memberId}
-                    variant="outlined"
-                    sx={{
-                      borderColor:
-                        c.signal === "RED" ? "error.main" : c.signal === "YELLOW" ? "warning.main" : "success.main",
-                    }}
-                  >
-                    <CardContent sx={{ py: 1, "&:last-child": { pb: 1 } }}>
-                      <Stack direction="row" spacing={1} alignItems="center">
-                        <Chip size="small" label={`#${c.rank}`} />
-                        <Typography variant="body2">
-                          {c.displayName}
-                          {c.virtual ? "(虚拟)" : ""}
-                        </Typography>
-                        <Chip
-                          size="small"
-                          variant="outlined"
-                          color={c.signal === "RED" ? "error" : c.signal === "YELLOW" ? "warning" : "success"}
-                          label={`缺门${c.missingCount}·差${c.totalDelta}级`}
-                        />
-                        <Button
-                          size="small"
-                          variant="contained"
-                          sx={{ ml: "auto" }}
-                          onClick={() => tryAssign(c)}
-                        >
-                          {t.assign.assignTo}
-                        </Button>
-                      </Stack>
-                      {c.verdicts.map((v, i) => (
-                        <VerdictLine key={i} v={v} />
-                      ))}
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </Stack>
+          {candidates.length === 0 && (
+            <Typography color="text.secondary" variant="body2">
+              (无候选——词表与成员就绪后可分配)
+            </Typography>
           )}
+          {candidates.map((c) => {
+            const unmet = c.verdicts.filter((v) => v.kind === "gap" || v.kind === "missing" || v.kind === "unrated");
+            return (
+              <Card
+                key={c.memberId}
+                variant="outlined"
+                sx={{
+                  borderColor:
+                    c.signal === "RED" ? "error.main" : c.signal === "YELLOW" ? "warning.main" : "success.main",
+                }}
+              >
+                <CardContent sx={{ py: 1, "&:last-child": { pb: 1 } }}>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <Chip size="small" label={`#${c.rank}`} />
+                    <Typography variant="body2">
+                      {c.displayName}
+                      {c.virtual ? "(虚拟)" : ""}
+                    </Typography>
+                    <Chip
+                      size="small"
+                      variant="outlined"
+                      color={c.signal === "RED" ? "error" : c.signal === "YELLOW" ? "warning" : "success"}
+                      label={`缺门${c.missingCount}·差${c.totalDelta}级`}
+                    />
+                    <Button
+                      size="small"
+                      variant="contained"
+                      sx={{ ml: "auto" }}
+                      onClick={() => {
+                        if (unmet.length > 0 || c.missingCount > 0) setConfirmCand(c);
+                        else assign(c.memberId);
+                      }}
+                    >
+                      {t.assign.assignBtn}
+                    </Button>
+                  </Stack>
+                  {c.verdicts.map((v, i) => (
+                    <VerdictLine key={i} v={v} />
+                  ))}
+                </CardContent>
+              </Card>
+            );
+          })}
+        </Stack>
+      )}
+
+      {feasibility && (
+        <Box sx={{ mt: 3 }}>
+          <Typography variant="h6" gutterBottom>
+            {t.item.verdicts}
+          </Typography>
+          {feasibility.verdicts.length === 0 && <Typography color="text.secondary">(无需求)</Typography>}
+          {feasibility.verdicts.map((v, i) => (
+            <VerdictLine key={i} v={v} />
+          ))}
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            缺门 {feasibility.missingCount} · 总差距 {feasibility.totalDelta} 级
+          </Typography>
         </Box>
       )}
 
+      <RequirementsDialog
+        open={reqOpen}
+        onClose={() => setReqOpen(false)}
+        onSave={saveRequirements}
+        attributes={attributes}
+      />
+
       <Typography variant="h6" sx={{ mt: 3, mb: 1 }}>
-        活动日志
+        评论
       </Typography>
-      <Stack spacing={0.5}>
-        {activity.length === 0 && <Typography variant="body2" color="text.secondary">(暂无)</Typography>}
-        {activity.map((a) => (
-          <Typography key={a.objectId} variant="caption" color="text.secondary">
-            {new Date(a.createdAt).toLocaleString("zh-CN")} · {a.actor} ·{" "}
-            {activityLabel[a.kind] ?? a.kind}
-            {a.oldValue || a.newValue ? `: ${a.oldValue ?? ""} → ${a.newValue ?? ""}` : ""}
-          </Typography>
+      <Stack spacing={1} sx={{ mb: 2 }}>
+        {comments.map((c) => (
+          <Box key={c.commentId} sx={{ p: 1.5, bgcolor: "background.paper", borderRadius: 1, border: "1px solid", borderColor: "divider" }}>
+            <Stack direction="row" justifyContent="space-between" alignItems="center">
+              <Typography variant="caption" color="text.secondary">
+                {c.author} · {new Date(c.createdAt).toLocaleString("zh-CN")}
+              </Typography>
+              <Button size="small" color="error" onClick={() => removeComment(c.commentId)}>
+                删除
+              </Button>
+            </Stack>
+            <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
+              {c.body}
+            </Typography>
+          </Box>
         ))}
       </Stack>
+      <Stack direction="row" spacing={1}>
+        <TextField
+          size="small"
+          placeholder="写评论…"
+          value={newComment}
+          onChange={(e) => setNewComment(e.target.value)}
+          fullWidth
+          multiline
+          maxRows={3}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey && newComment.trim()) {
+              e.preventDefault();
+              addComment();
+            }
+          }}
+        />
+        <Button variant="outlined" onClick={addComment} disabled={!newComment.trim()}>
+          发送
+        </Button>
+      </Stack>
+
+      {activity.length > 0 && (
+        <Box sx={{ mt: 3 }}>
+          <Typography variant="h6" gutterBottom>
+            活动日志
+          </Typography>
+          <Stack spacing={0.5}>
+            {activity.map((a) => (
+              <Typography key={a.objectId} variant="caption" color="text.secondary">
+                {new Date(a.createdAt).toLocaleString("zh-CN")} · {a.actor} ·{" "}
+                {activityLabel[a.kind] ?? a.kind}
+                {a.oldValue || a.newValue ? `: ${a.oldValue ?? ""} → ${a.newValue ?? ""}` : ""}
+              </Typography>
+            ))}
+          </Stack>
+        </Box>
+      )}
     </Box>
+  );
+}
+
+function RequirementsDialog({
+  open,
+  onClose,
+  onSave,
+  attributes,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSave: (rows: ReqRow[]) => void;
+  attributes: Attribute[];
+}) {
+  const [rows, setRows] = useState<ReqRow[]>([{ attribute: "", minLevel: null }]);
+
+  return (
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
+      <DialogTitle>{t.item.requirements}</DialogTitle>
+      <DialogContent>
+        <Stack spacing={1}>
+          {rows.map((r, idx) => (
+            <Stack key={idx} direction="row" spacing={1} alignItems="center">
+              <Select
+                size="small"
+                value={r.attribute}
+                onChange={(e) =>
+                  setRows((prev) => prev.map((x, i) => (i === idx ? { ...x, attribute: String(e.target.value) } : x)))
+                }
+                sx={{ minWidth: 200 }}
+                displayEmpty
+              >
+                <MenuItem value="" disabled>
+                  {t.item.attribute}
+                </MenuItem>
+                {attributes.map((a) => (
+                  <MenuItem key={a.attributeId} value={a.name}>
+                    {a.name}
+                  </MenuItem>
+                ))}
+              </Select>
+              <Select
+                size="small"
+                value={r.minLevel ?? ""}
+                onChange={(e) =>
+                  setRows((prev) =>
+                    prev.map((x, i) =>
+                      i === idx ? { ...x, minLevel: String(e.target.value) === "" ? null : Number(e.target.value) } : x,
+                    ),
+                  )
+                }
+                sx={{ minWidth: 160 }}
+                displayEmpty
+              >
+                <MenuItem value="">{t.item.none}</MenuItem>
+                {[1, 2, 3, 4].map((l) => (
+                  <MenuItem key={l} value={l}>
+                    ≥{l}
+                  </MenuItem>
+                ))}
+              </Select>
+              <IconButton onClick={() => setRows((prev) => prev.filter((_, i) => i !== idx))} aria-label="delete">
+                <DeleteIcon fontSize="small" />
+              </IconButton>
+            </Stack>
+          ))}
+          <Button startIcon={<AddIcon />} onClick={() => setRows((prev) => [...prev, { attribute: "", minLevel: null }])}>
+            {t.item.addRequirement}
+          </Button>
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>{t.assignDialog.close}</Button>
+        <Button variant="contained" onClick={() => onSave(rows.filter((r) => r.attribute))}>
+          {t.item.save}
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 }
