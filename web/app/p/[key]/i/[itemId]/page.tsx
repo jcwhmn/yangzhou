@@ -99,6 +99,7 @@ export default function ItemDetailPage() {
   const [error, setError] = useState("");
   const [assignOpen, setAssignOpen] = useState(false);
   const [confirmCand, setConfirmCand] = useState<Candidate | null>(null);
+  const [me, setMe] = useState<{ memberId: string; displayName: string } | null>(null);
   const [reqOpen, setReqOpen] = useState(false);
   const [comments, setComments] = useState<CommentDto[]>([]);
   const [newComment, setNewComment] = useState("");
@@ -115,6 +116,9 @@ export default function ItemDetailPage() {
     setFeasibility(await api<Feasibility>(`/api/items/${itemId}/feasibility`));
     setCandidates(await api<Candidate[]>(`/api/items/${itemId}/candidates`));
     setActivity(await api<Activity[]>(`/api/items/${itemId}/activity`));
+    const allMembers = await api<{ memberId: string; displayName: string; virtual: boolean }[]>("/api/members");
+    const current = allMembers.find((m) => !m.virtual);
+    if (current) setMe(current);
     setComments(await api<CommentDto[]>(`/api/items/${itemId}/comments`));
   }, [key, itemId]);
 
@@ -264,7 +268,11 @@ export default function ItemDetailPage() {
           </Stack>
         ) : (
           <Stack direction="row" spacing={1}>
-            <Button variant="contained" onClick={() => setAssignOpen(true)}>
+            <Button
+              variant="contained"
+              onClick={() => me && assign(me.memberId)}
+              disabled={!me}
+            >
               {t.assign.assignMe}
             </Button>
             <Button variant="outlined" onClick={() => setAssignOpen(true)}>
