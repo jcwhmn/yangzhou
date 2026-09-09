@@ -105,17 +105,17 @@ export default function ItemDetailPage() {
   const [newComment, setNewComment] = useState("");
 
   const load = useCallback(async () => {
-    const it = await api<Item>(`/api/items/${itemId}`);
-    setItem(it);
-    setTitle(it.title);
-    setDescription(it.description ?? "");
-    setType(it.type);
-    const project = await api<{ statuses: Status[] }>(`/api/projects/${key}`);
-    setStatuses(project.statuses);
-    setAttributes(await api<Attribute[]>("/api/attributes"));
-    setFeasibility(await api<Feasibility>(`/api/items/${itemId}/feasibility`));
-    setCandidates(await api<Candidate[]>(`/api/items/${itemId}/candidates`));
-    setActivity(await api<Activity[]>(`/api/items/${itemId}/activity`));
+    const [it, project, attrs, feas, cands, acts] = await Promise.all([
+      api<Item>(`/api/items/${itemId}`),
+      api<{ statuses: Status[] }>(`/api/projects/${key}`),
+      api<Attribute[]>("/api/attributes"),
+      api<Feasibility>(`/api/items/${itemId}/feasibility`),
+      api<Candidate[]>(`/api/items/${itemId}/candidates`),
+      api<Activity[]>(`/api/items/${itemId}/activity`),
+    ])
+    setItem(it); setTitle(it.title); setDescription(it.description ?? ""); setType(it.type)
+    setStatuses(project.statuses); setAttributes(attrs)
+    setFeasibility(feas); setCandidates(cands); setActivity(acts)
     const allMembers = await api<{ memberId: string; displayName: string; virtual: boolean }[]>("/api/members");
     const current = allMembers.find((m) => !m.virtual);
     if (current) setMe(current);
