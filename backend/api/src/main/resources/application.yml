@@ -16,3 +16,6 @@ yangzhou:
   jwt:
     secret: ${YANGZHOU_JWT_SECRET:yangzhou-dev-secret-0123456789abcdef0123456789abcdef}
     ttl-hours: 24
+  github:
+    poll-enabled: true
+    poll-interval-ms: 300000
