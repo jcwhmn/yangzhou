@@ -5,10 +5,13 @@ import yangzhou.persistence.AttributeDefinition
 import yangzhou.persistence.Capability
 import yangzhou.persistence.Comment
 import yangzhou.persistence.ItemActivity
+import yangzhou.persistence.ItemGitRef
 import yangzhou.persistence.Item
 import yangzhou.persistence.Member
 import yangzhou.persistence.Project
 import yangzhou.persistence.ProjectMember
+import yangzhou.persistence.ProjectRepo
+import yangzhou.persistence.ProjectWorkflowRule
 import yangzhou.persistence.Requirement
 import yangzhou.persistence.Status
 import yangzhou.persistence.Team
@@ -23,6 +26,7 @@ interface MemberRepository : CrudRepository<Member, Long> {
     fun findByUsername(username: String): Member?
     fun findByObjectId(objectId: UUID): Member?
     fun findByWorkspaceId(workspaceId: Long): List<Member>
+    fun findByWorkspaceIdAndGithubUsername(workspaceId: Long, githubUsername: String): Member?
 }
 
 interface TeamRepository : CrudRepository<Team, Long> {
@@ -89,6 +93,24 @@ interface ItemRepository : CrudRepository<Item, Long> {
     fun findByProjectIdOrderByNumber(projectId: Long): List<Item>
     fun findByProjectIdAndExternalRef(projectId: Long, externalRef: String): Item?
     fun existsByParentObjectId(parentObjectId: UUID): Boolean
+}
+
+interface ProjectRepoRepository : CrudRepository<ProjectRepo, Long> {
+    fun findByProjectId(projectId: Long): List<ProjectRepo>
+    fun findByProjectIdAndRepo(projectId: Long, repo: String): ProjectRepo?
+    fun findByObjectId(objectId: UUID): ProjectRepo?
+    fun existsByProjectIdAndRepo(projectId: Long, repo: String): Boolean
+}
+
+interface ItemGitRefRepository : CrudRepository<ItemGitRef, Long> {
+    fun findByItemId(itemId: Long): List<ItemGitRef>
+    fun findByRepoAndKindAndRef(repo: String, kind: String, ref: String): ItemGitRef?
+}
+
+interface ProjectWorkflowRuleRepository : CrudRepository<ProjectWorkflowRule, Long> {
+    fun findByProjectId(projectId: Long): List<ProjectWorkflowRule>
+    fun findByProjectIdAndEventType(projectId: Long, eventType: String): ProjectWorkflowRule?
+    fun deleteByProjectId(projectId: Long)
 }
 
 interface RequirementRepository : CrudRepository<Requirement, Long> {
