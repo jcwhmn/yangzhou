@@ -56,7 +56,7 @@ data class ItemActivity(
     val kind: String,
     val oldValue: String? = null,
     val newValue: String? = null,
-    val actorMemberId: Long,
+    val actorMemberId: Long? = null,
     val createdAt: Instant = Instant.now(),
 )
 
