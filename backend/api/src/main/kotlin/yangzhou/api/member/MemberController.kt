@@ -35,6 +35,12 @@ class MemberController(
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun delete(@PathVariable memberId: UUID) = memberService.delete(memberId)
 
+    @PutMapping("/members/{memberId}/github-username")
+    fun setGithubUsername(
+        @PathVariable memberId: UUID,
+        @Valid @RequestBody request: SetGithubUsernameRequest,
+    ): MemberService.MemberResponse = memberService.setGithubUsername(memberId, request.githubUsername)
+
     // ---------- 成员维度能力(虚拟成员/我 通用) ----------
 
     @GetMapping("/members/{memberId}/capabilities")
@@ -56,4 +62,8 @@ class MemberController(
 
 data class CreateMemberRequest(
     @field:NotBlank val displayName: String,
+)
+
+data class SetGithubUsernameRequest(
+    val githubUsername: String?,
 )

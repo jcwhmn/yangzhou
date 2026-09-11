@@ -48,6 +48,7 @@ abstract class AbstractApiTest {
     @BeforeEach
     fun cleanDatabase() {
         listOf(
+            "project_workflow_rule", "item_git_ref", "project_repo",
             "requirement", "item", "status", "project_member", "project",
             "capability", "attribute_definition", "team_member", "team", "member", "workspace",
         ).forEach { jdbc.execute("delete from $it") }

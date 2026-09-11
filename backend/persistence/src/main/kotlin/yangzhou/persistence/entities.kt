@@ -10,6 +10,7 @@ data class Workspace(
     @Id val id: Long? = null,
     val objectId: UUID = UUID.randomUUID(),
     val name: String = "default",
+    val githubToken: String? = null,
     val createdAt: Instant = Instant.now(),
     val updatedAt: Instant = Instant.now(),
 )
@@ -22,6 +23,7 @@ data class Member(
     val username: String?,
     val passwordHash: String?,
     val displayName: String,
+    val githubUsername: String? = null,
     val createdAt: Instant = Instant.now(),
     val updatedAt: Instant = Instant.now(),
 )
@@ -153,6 +155,44 @@ data class Item(
     val parentObjectId: UUID? = null,
     val assigneeObjectId: UUID? = null,
     val externalRef: String? = null,
+    val statusObjectId: UUID,
+    val createdAt: Instant = Instant.now(),
+    val updatedAt: Instant = Instant.now(),
+)
+
+/** V6:项目挂载的 GitHub 仓库(monorepo 1 个,前后端分离/微服务多个);无 default 标记。 */
+@Table("project_repo")
+data class ProjectRepo(
+    @Id val id: Long? = null,
+    val objectId: UUID = UUID.randomUUID(),
+    val projectId: Long,
+    val repo: String,
+    val createdAt: Instant = Instant.now(),
+    val updatedAt: Instant = Instant.now(),
+)
+
+/** V6:item↔GitHub 分支/PR 链接;uk(repo,kind,ref) 是轮询幂等锚点。 */
+@Table("item_git_ref")
+data class ItemGitRef(
+    @Id val id: Long? = null,
+    val objectId: UUID = UUID.randomUUID(),
+    val itemId: Long,
+    val kind: String,
+    val repo: String,
+    val ref: String,
+    val url: String? = null,
+    val state: String? = null,
+    val createdAt: Instant = Instant.now(),
+    val updatedAt: Instant = Instant.now(),
+)
+
+/** V6:每项目「GitHub 事件→目标状态」映射(Kaneo WorkflowRule 同款);GitHub 永不知道状态名。 */
+@Table("project_workflow_rule")
+data class ProjectWorkflowRule(
+    @Id val id: Long? = null,
+    val objectId: UUID = UUID.randomUUID(),
+    val projectId: Long,
+    val eventType: String,
     val statusObjectId: UUID,
     val createdAt: Instant = Instant.now(),
     val updatedAt: Instant = Instant.now(),
