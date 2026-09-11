@@ -11,6 +11,7 @@ import yangzhou.persistence.Item
 import yangzhou.persistence.ItemActivity
 import yangzhou.persistence.Requirement
 import yangzhou.persistence.repository.AttributeDefinitionRepository
+import yangzhou.persistence.repository.ItemGitRefRepository
 import yangzhou.persistence.repository.ItemNumberRepository
 import yangzhou.persistence.repository.ItemRepository
 import yangzhou.persistence.repository.ProjectRepository
@@ -33,9 +34,11 @@ class ItemService(
     private val memberService: yangzhou.api.member.MemberService,
     private val projectMembers: yangzhou.api.projectmember.ProjectMemberService,
     private val activityRepo: yangzhou.persistence.repository.ItemActivityRepository,
+    private val gitRefs: ItemGitRefRepository,
 ) {
 
     data class RequirementDto(val attribute: String, val minLevel: Int?)
+    data class GitRefDto(val kind: String, val repo: String, val ref: String, val url: String?, val state: String?)
     data class ItemDto(
         val itemId: UUID,
         val number: String,
@@ -47,6 +50,7 @@ class ItemService(
         val parentItemId: UUID?,
         val externalRef: String?,
         val requirements: List<RequirementDto>,
+        val gitRefs: List<GitRefDto> = emptyList(),
     )
 
     @Transactional
@@ -129,7 +133,12 @@ class ItemService(
         val item = itemRepo.findByObjectId(itemId) ?: throw NotFoundException("item 不存在")
         val project = projects.findAll().firstOrNull { it.id == item.projectId }
             ?: throw NotFoundException("项目不存在")
-        return list(project.key).first { it.itemId == itemId }
+        val dto = list(project.key).first { it.itemId == itemId }
+        return dto.copy(
+            gitRefs = gitRefs.findByItemId(item.id!!).map {
+                GitRefDto(it.kind, it.repo, it.ref, it.url, it.state)
+            },
+        )
     }
 
     @Transactional

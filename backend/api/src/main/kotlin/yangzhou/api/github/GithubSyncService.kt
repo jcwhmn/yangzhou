@@ -97,8 +97,8 @@ class GithubSyncService(
         else -> EVENT_PR_CLOSED_UNMERGED
     }
 
-    /** 防呆:未配映射忽略;当前 final 封口;只按 position 前进;WIP 超限跳过并留痕。 */
-    private fun applyEvent(project: Project, itemId: Long, event: String, detail: String) {
+    /** 防呆:未配映射忽略;当前 final 封口;只按 position 前进;WIP 超限跳过并留痕。S3 建分支后也走此管道。 */
+    fun applyEvent(project: Project, itemId: Long, event: String, detail: String) {
         val projectId = project.id ?: return
         val rule = rules.findByProjectIdAndEventType(projectId, event) ?: return
         val target = statuses.findByProjectIdAndObjectId(projectId, rule.statusObjectId) ?: return
@@ -118,7 +118,7 @@ class GithubSyncService(
         logActivity(itemId, current?.name, "${target.name}($event $detail)")
     }
 
-    private fun logActivity(itemId: Long, oldValue: String?, newValue: String?) {
-        activityRepo.save(ItemActivity(itemId = itemId, kind = ACT_GITHUB, oldValue = oldValue, newValue = newValue))
+    private fun logActivity(itemId: Long, oldValue: String?, newValue: String?, kind: String = ACT_GITHUB) {
+        activityRepo.save(ItemActivity(itemId = itemId, kind = kind, oldValue = oldValue, newValue = newValue))
     }
 }
