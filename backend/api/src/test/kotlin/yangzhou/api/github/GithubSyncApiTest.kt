@@ -17,6 +17,8 @@ class FakeGithubGateway : GithubGateway {
     var branches: MutableMap<String, List<String>> = mutableMapOf()
     var prs: MutableMap<String, List<GithubPr>> = mutableMapOf()
     var failWith: Exception? = null
+    var createError: GithubApiException? = null
+    val created = mutableListOf<Triple<String, String, String>>() // repo, branch, from
 
     override fun listBranches(repo: String, token: String): List<String> {
         failWith?.let { throw it }
@@ -26,6 +28,12 @@ class FakeGithubGateway : GithubGateway {
     override fun listPullRequests(repo: String, token: String): List<GithubPr> {
         failWith?.let { throw it }
         return prs[repo].orEmpty()
+    }
+
+    override fun createBranch(repo: String, branch: String, fromBranch: String, token: String) {
+        failWith?.let { throw it }
+        createError?.let { throw it }
+        created.add(Triple(repo, branch, fromBranch))
     }
 }
 
@@ -42,6 +50,11 @@ class GithubSyncApiTest : AbstractApiTest() {
 
     @Autowired
     lateinit var fake: FakeGithubGateway
+
+    @org.junit.jupiter.api.BeforeEach
+    fun resetFake() {
+        fake.branches = mutableMapOf(); fake.prs = mutableMapOf(); fake.failWith = null
+    }
 
     @Autowired
     lateinit var syncService: GithubSyncService

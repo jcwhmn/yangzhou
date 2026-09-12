@@ -44,4 +44,19 @@ class RealGithubGateway(private val mapper: ObjectMapper) : GithubGateway {
                     url = pr.path("html_url").asString(null),
                 )
             }
+
+    override fun createBranch(repo: String, branch: String, fromBranch: String, token: String) {
+        val sha = mapper.readTree(get(repo, "/git/ref/heads/$fromBranch", token))
+            .path("object").path("sha").asString()
+        val body = mapper.writeValueAsString(mapOf("ref" to "refs/heads/$branch", "sha" to sha))
+        val request = HttpRequest.newBuilder(URI.create("https://api.github.com/repos/$repo/git/refs"))
+            .header("Authorization", "Bearer $token")
+            .header("Accept", "application/vnd.github+json")
+            .header("X-GitHub-Api-Version", "2022-11-28")
+            .header("Content-Type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString(body))
+            .build()
+        val response = http.send(request, HttpResponse.BodyHandlers.ofString())
+        if (response.statusCode() >= 300) throw GithubApiException(response.statusCode(), "GitHub API ${response.statusCode()} on git/refs")
+    }
 }
