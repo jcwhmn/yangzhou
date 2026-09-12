@@ -32,18 +32,22 @@ class RealGithubGateway(private val mapper: ObjectMapper) : GithubGateway {
 
     override fun listPullRequests(repo: String, token: String): List<GithubPr> =
         mapper.readTree(get(repo, "/pulls?state=all&sort=updated&direction=desc&per_page=50", token))
-            .map { pr ->
-                GithubPr(
-                    number = pr.get("number").asInt(),
-                    headRef = pr.get("head").get("ref").asString(),
-                    state = when {
-                        pr.get("merged").asBoolean() -> "merged"
-                        pr.get("state").asString() == "open" -> "open"
-                        else -> "closed"
-                    },
-                    url = pr.path("html_url").asString(null),
-                )
-            }
+            .map { toGithubPr(it) }
+
+    companion object {
+        /** 列表载荷无 merged 布尔,只有 merged_at(dogfood JCW-113 抓到的 NPE):非空即已合并。 */
+        fun toGithubPr(pr: tools.jackson.databind.JsonNode): GithubPr =
+            GithubPr(
+                number = pr.get("number").asInt(),
+                headRef = pr.get("head").get("ref").asString(),
+                state = when {
+                    !pr.path("merged_at").isNull() -> "merged"
+                    pr.get("state").asString() == "open" -> "open"
+                    else -> "closed"
+                },
+                url = pr.path("html_url").asString(null),
+            )
+    }
 
     override fun createBranch(repo: String, branch: String, fromBranch: String, token: String) {
         val sha = mapper.readTree(get(repo, "/git/ref/heads/$fromBranch", token))

@@ -20,7 +20,14 @@ import { api } from "@/lib/api";
 import { AppNav } from "@/components/AppNav";
 import { t } from "@/lib/texts";
 
-type Member = { memberId: string; displayName: string; username: string | null; virtual: boolean };
+type Member = {
+  memberId: string;
+  displayName: string;
+  username: string | null;
+  virtual: boolean;
+  githubUsername: string | null;
+};
+type TokenStatus = { configured: boolean; tokenHint: string | null };
 type Team = { teamId: string; name: string; members: { memberId: string; displayName: string }[] };
 type Attribute = { attributeId: string; name: string; kind: string; leveled: boolean };
 type Capability = { attribute: string; level: number | null };
@@ -34,6 +41,9 @@ export default function MembersPage() {
   const [newName, setNewName] = useState("");
   const [teamName, setTeamName] = useState("");
   const [error, setError] = useState("");
+  const [pat, setPat] = useState<TokenStatus | null>(null);
+  const [patInput, setPatInput] = useState("");
+  const [ghUserDraft, setGhUserDraft] = useState<Map<string, string>>(new Map());
 
   const load = useCallback(async () => {
     const [ms, ts, attrs] = await Promise.all([
@@ -41,6 +51,7 @@ export default function MembersPage() {
       api<Team[]>("/api/teams"),
       api<Attribute[]>("/api/attributes"),
     ]);
+    api<TokenStatus>("/api/workspace/github-token").then(setPat).catch(() => {});
     setMembers(ms);
     setTeams(ts);
     setAttributes(attrs);
@@ -142,6 +153,62 @@ export default function MembersPage() {
       </Typography>
       {error && <Typography color="error" sx={{ mb: 1 }}>{error}</Typography>}
 
+      {/* GitHub PAT(workspace 级,V6-S4) */}
+      <Card variant="outlined" sx={{ mb: 3 }}>
+        <CardContent>
+          <Typography variant="subtitle2" gutterBottom>
+            {t.gh.patTitle}
+          </Typography>
+          <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
+            {pat?.configured ? t.gh.patConfigured(pat.tokenHint ?? "") : t.gh.patHint}
+          </Typography>
+          <Stack direction="row" spacing={1}>
+            <TextField
+              size="small"
+              placeholder={t.gh.patInput}
+              value={patInput}
+              onChange={(e) => setPatInput(e.target.value)}
+              type="password"
+              sx={{ width: 320 }}
+            />
+            <Button
+              variant="contained"
+              disabled={!patInput.trim()}
+              onClick={async () => {
+                setError("");
+                try {
+                  const res = await api<TokenStatus>("/api/workspace/github-token", {
+                    method: "PUT",
+                    body: JSON.stringify({ token: patInput.trim() }),
+                  });
+                  setPat(res);
+                  setPatInput("");
+                } catch (err) {
+                  setError(err instanceof Error ? err.message : "保存失败");
+                }
+              }}
+            >
+              {t.gh.patSave}
+            </Button>
+            {pat?.configured && (
+              <Button
+                onClick={async () => {
+                  setError("");
+                  try {
+                    await api("/api/workspace/github-token", { method: "DELETE" });
+                    setPat({ configured: false, tokenHint: null });
+                  } catch (err) {
+                    setError(err instanceof Error ? err.message : "清除失败");
+                  }
+                }}
+              >
+                {t.attrs.delete}
+              </Button>
+            )}
+          </Stack>
+        </CardContent>
+      </Card>
+
       {/* 建虚拟成员 */}
       <Stack component="form" direction="row" spacing={1} onSubmit={addMember} sx={{ mb: 3 }}>
         <TextField
@@ -169,6 +236,40 @@ export default function MembersPage() {
                     <DeleteIcon fontSize="small" />
                   </IconButton>
                 )}
+              </Stack>
+              <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                <TextField
+                  size="small"
+                  label={t.gh.ghUser}
+                  defaultValue={m.githubUsername ?? ""}
+                  onChange={(e) => setGhUserDraft((prev) => new Map(prev).set(m.memberId, e.target.value))}
+                  sx={{ width: 220 }}
+                />
+                <Button
+                  size="small"
+                  onClick={async () => {
+                    setError("");
+                    try {
+                      const value = ghUserDraft.get(m.memberId) ?? m.githubUsername ?? "";
+                      const updated = await api<Member>(`/api/members/${m.memberId}/github-username`, {
+                        method: "PUT",
+                        body: JSON.stringify({ githubUsername: value }),
+                      });
+                      setMembers((prev) =>
+                        prev.map((x) => (x.memberId === m.memberId ? { ...x, githubUsername: updated.githubUsername } : x)),
+                      );
+                      setGhUserDraft((prev) => {
+                        const next = new Map(prev);
+                        next.delete(m.memberId);
+                        return next;
+                      });
+                    } catch (err) {
+                      setError(err instanceof Error ? err.message : "保存失败");
+                    }
+                  }}
+                >
+                  {t.item.save}
+                </Button>
               </Stack>
               <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                 {attributes.map((a) => {

@@ -20,6 +20,7 @@ import { t } from "@/lib/texts";
 import { AppNav } from "@/components/AppNav";
 import { WorkflowEditor } from "@/components/WorkflowEditor";
 import { ProjectMembersPanel } from "@/components/ProjectMembersPanel";
+import { GithubSettingsPanel } from "@/components/GithubSettingsPanel";
 import type { Signal } from "@/components/Verdict";
 
 type Status = { statusId: string; name: string; icon: string | null; isStart: boolean; isFinal: boolean; position: number };
@@ -47,6 +48,7 @@ export default function BoardPage() {
   const [filter, setFilter] = useState<Filter>("all");
   const [wfOpen, setWfOpen] = useState(false);
   const [membersOpen, setMembersOpen] = useState(false);
+  const [ghOpen, setGhOpen] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -130,6 +132,9 @@ export default function BoardPage() {
           </Button>
           <Button size="small" onClick={() => setMembersOpen(true)}>
             {t.membersPanel.button}
+          </Button>
+          <Button size="small" onClick={() => setGhOpen(true)}>
+            {t.gh.button}
           </Button>
         </Box>
       </Stack>
@@ -259,6 +264,11 @@ export default function BoardPage() {
         open={membersOpen}
         onClose={() => setMembersOpen(false)}
         onChanged={load}
+      />
+      <GithubSettingsPanel
+        projectKey={String(key)}
+        open={ghOpen}
+        onClose={() => setGhOpen(false)}
       />
     </Box>
   );
