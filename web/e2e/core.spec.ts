@@ -11,13 +11,19 @@ const KEY = `E2E${Date.now() % 100000}`;
 test.describe.configure({ mode: "serial" });
 
 test.beforeAll(async ({ request }) => {
-  // 后端在场检查:不起就给出明确指引
+  // 后端在场检查 + 空库种子(CI 是全新库):bootstrap;已有用户则 409 → 登录确认
   let ok = false;
   try {
-    const res = await request.post("http://localhost:8080/api/auth/login", {
+    const boot = await request.post("http://localhost:8080/api/auth/bootstrap", {
       data: { username: "me", password: "secret" },
     });
-    ok = res.ok();
+    ok = boot.ok() || boot.status() === 409;
+    if (ok) {
+      const login = await request.post("http://localhost:8080/api/auth/login", {
+        data: { username: "me", password: "secret" },
+      });
+      ok = login.ok();
+    }
   } catch {
     ok = false;
   }
