@@ -1,0 +1,74 @@
+name: e2e
+
+on:
+  push:
+    paths: [web/**, backend/**, .github/workflows/e2e.yml]
+  pull_request:
+    paths: [web/**, backend/**, .github/workflows/e2e.yml]
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: yangzhou
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 25
+      - uses: gradle/actions/setup-gradle@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: 起后端(Flyway 空库自动建表)
+        working-directory: backend
+        run: gradle :api:bootRun --console=plain > ${{ github.workspace }}/api.log 2>&1 &
+
+      - name: 等就绪并种子用户(bootstrap;已有则 409)
+        run: |
+          code=000
+          for i in $(seq 1 60); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" -X POST http://localhost:8080/api/auth/bootstrap \
+              -H "Content-Type: application/json" \
+              -d '{"username":"me","password":"secret"}') || code=000
+            [ "$code" = "200" ] || [ "$code" = "409" ] && break
+            sleep 2
+          done
+          echo "bootstrap=$code"
+          [ "$code" = "200" ] || [ "$code" = "409" ] || { tail -50 "$GITHUB_WORKSPACE/api.log"; exit 1; }
+
+      - name: 前端依赖
+        working-directory: web
+        run: npm ci
+
+      - name: 装 Playwright chromium(含系统依赖)
+        working-directory: web
+        run: npx playwright install --with-deps chromium
+
+      - name: 跑 E2E
+        working-directory: web
+        run: npx playwright test
+
+      - name: 失败留证据
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-artifacts
+          path: web/test-results/
+          retention-days: 7
