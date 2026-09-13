@@ -19,6 +19,9 @@ class GithubConfigController(private val service: GithubConfigService) {
 
     // ---------- workspace PAT ----------
 
+    @GetMapping("/workspace/github-token")
+    fun tokenStatus(): GithubConfigService.TokenResponse = service.tokenStatus()
+
     @PutMapping("/workspace/github-token")
     fun setToken(@Valid @RequestBody request: SetTokenRequest): GithubConfigService.TokenResponse =
         service.setToken(request.token)

@@ -42,6 +42,11 @@ class GithubConfigService(
 
     data class TokenResponse(val configured: Boolean, val tokenHint: String?)
 
+    fun tokenStatus(): TokenResponse {
+        val token = workspaceService.required().githubToken ?: return TokenResponse(false, null)
+        return TokenResponse(true, hint(token))
+    }
+
     @Transactional
     fun setToken(token: String): TokenResponse {
         val trimmed = token.trim()

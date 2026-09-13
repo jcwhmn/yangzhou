@@ -40,7 +40,9 @@ type Item = {
   parentItemId: string | null;
   externalRef: string | null;
   requirements: { attribute: string; minLevel: number | null }[];
+  gitRefs: { kind: string; repo: string; ref: string; url: string | null; state: string | null }[];
 };
+type Repo = { repoId: string; repo: string };
 type Attribute = { attributeId: string; name: string; kind: string; leveled: boolean };
 type Feasibility = {
   itemId: string;
@@ -66,7 +68,7 @@ type Activity = {
   kind: string;
   oldValue: string | null;
   newValue: string | null;
-  actor: string;
+  actorMemberId: number | null;
   createdAt: string;
 };
 
@@ -81,6 +83,8 @@ const activityLabel: Record<string, string> = {
   assigned: "指派",
   unassigned: "取消指派",
   requirement_changed: "需求变更",
+  github_status_changed: "GitHub 流转",
+  github_branch_created: "GitHub 分支",
 };
 
 export default function ItemDetailPage() {
@@ -100,9 +104,11 @@ export default function ItemDetailPage() {
   const [assignOpen, setAssignOpen] = useState(false);
   const [confirmCand, setConfirmCand] = useState<Candidate | null>(null);
   const [me, setMe] = useState<{ memberId: string; displayName: string } | null>(null);
+  const [memberNames, setMemberNames] = useState<Map<string, string>>(new Map());
   const [reqOpen, setReqOpen] = useState(false);
   const [comments, setComments] = useState<CommentDto[]>([]);
   const [newComment, setNewComment] = useState("");
+  const [branchOpen, setBranchOpen] = useState(false);
 
   const load = useCallback(async () => {
     const [it, project, attrs, feas, cands, acts] = await Promise.all([
@@ -375,6 +381,59 @@ export default function ItemDetailPage() {
         attributes={attributes}
       />
 
+      <Box sx={{ mt: 3 }}>
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+          <Typography variant="h6">{t.gh.gitRefs}</Typography>
+          <Button size="small" variant="outlined" onClick={() => setBranchOpen(true)}>
+            {t.gh.branch}
+          </Button>
+        </Stack>
+        {(item.gitRefs?.length ?? 0) === 0 && (
+          <Typography color="text.secondary" variant="body2">
+            {t.gh.gitRefsEmpty}
+          </Typography>
+        )}
+        <Stack spacing={0.5}>
+          {(item.gitRefs ?? []).map((r) => (
+            <Stack key={`${r.kind}-${r.repo}-${r.ref}`} direction="row" spacing={1} alignItems="center">
+              <Chip
+                size="small"
+                variant="outlined"
+                label={r.kind === "pr" ? t.gh.statePr : t.gh.stateBranch}
+                color={r.kind === "pr" ? "secondary" : "default"}
+              />
+              {r.kind === "pr" && r.state && (
+                <Chip
+                  size="small"
+                  label={r.state === "merged" ? t.gh.stateMerged : r.state === "open" ? t.gh.stateOpen : t.gh.stateClosed}
+                  color={r.state === "merged" ? "success" : r.state === "open" ? "primary" : "default"}
+                />
+              )}
+              {r.url ? (
+                <a href={r.url} target="_blank" rel="noreferrer">
+                  <Typography variant="body2">{r.ref}</Typography>
+                </a>
+              ) : (
+                <Typography variant="body2">{r.ref}</Typography>
+              )}
+              <Typography variant="caption" color="text.secondary">
+                {r.repo}
+              </Typography>
+            </Stack>
+          ))}
+        </Stack>
+      </Box>
+
+      <CreateBranchDialog
+        open={branchOpen}
+        onClose={() => setBranchOpen(false)}
+        projectKey={String(key)}
+        itemNumber={item.number}
+        itemTitle={item.title}
+        itemId={String(itemId)}
+        onCreated={load}
+      />
+
       <Typography variant="h6" sx={{ mt: 3, mb: 1 }}>
         评论
       </Typography>
@@ -424,7 +483,8 @@ export default function ItemDetailPage() {
           <Stack spacing={0.5}>
             {activity.map((a) => (
               <Typography key={a.objectId} variant="caption" color="text.secondary">
-                {new Date(a.createdAt).toLocaleString("zh-CN")} · {a.actor} ·{" "}
+                {new Date(a.createdAt).toLocaleString("zh-CN")} ·{" "}
+                {a.actorMemberId == null ? "GitHub" : memberNames.get(String(a.actorMemberId)) ?? `#${a.actorMemberId}`} ·{" "}
                 {activityLabel[a.kind] ?? a.kind}
                 {a.oldValue || a.newValue ? `: ${a.oldValue ?? ""} → ${a.newValue ?? ""}` : ""}
               </Typography>
@@ -508,6 +568,103 @@ function RequirementsDialog({
         <Button onClick={onClose}>{t.assignDialog.close}</Button>
         <Button variant="contained" onClick={() => onSave(rows.filter((r) => r.attribute))}>
           {t.item.save}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+function CreateBranchDialog({
+  open,
+  onClose,
+  projectKey,
+  itemNumber,
+  itemTitle,
+  itemId,
+  onCreated,
+}: {
+  open: boolean;
+  onClose: () => void;
+  projectKey: string;
+  itemNumber: string;
+  itemTitle: string;
+  itemId: string;
+  onCreated: () => void;
+}) {
+  const [repos, setRepos] = useState<Repo[]>([]);
+  const [repoId, setRepoId] = useState("");
+  const [baseBranch, setBaseBranch] = useState("main");
+  const [name, setName] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setError("");
+    api<Repo[]>(`/api/projects/${projectKey}/repos`)
+      .then((rs) => {
+        setRepos(rs);
+        setRepoId(rs[0]?.repoId ?? "");
+      })
+      .catch((e) => setError(e.message));
+    // 预填 <KEY>-<number>-<slug>(可改);slug = 标题小写、非字母数字转 -
+    const keyPart = itemNumber.split("-")[0];
+    const numPart = itemNumber.split("-")[1] ?? "";
+    const slug = itemTitle
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 40);
+    setName([keyPart, numPart, slug].filter(Boolean).join("-"));
+  }, [open, projectKey, itemNumber, itemTitle]);
+
+  async function create() {
+    setError("");
+    setBusy(true);
+    try {
+      await api(`/api/items/${itemId}/branches`, {
+        method: "POST",
+        body: JSON.stringify({ repoId, baseBranch: baseBranch.trim(), name: name.trim() }),
+      });
+      onClose();
+      onCreated();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "创建失败");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
+      <DialogTitle>{t.gh.branchTitle}</DialogTitle>
+      <DialogContent>
+        {error && (
+          <Typography color="error" sx={{ mb: 1 }}>
+            {error}
+          </Typography>
+        )}
+        {repos.length === 0 && (
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+            {t.gh.repoEmpty}
+          </Typography>
+        )}
+        <Stack spacing={2} sx={{ mt: 1 }}>
+          <TextField select label={t.gh.branchRepo} value={repoId} onChange={(e) => setRepoId(e.target.value)}>
+            {repos.map((r) => (
+              <MenuItem key={r.repoId} value={r.repoId}>
+                {r.repo}
+              </MenuItem>
+            ))}
+          </TextField>
+          <TextField label={t.gh.branchBase} value={baseBranch} onChange={(e) => setBaseBranch(e.target.value)} />
+          <TextField label={t.gh.branchName} value={name} onChange={(e) => setName(e.target.value)} />
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>{t.assignDialog.close}</Button>
+        <Button variant="contained" onClick={create} disabled={busy || !repoId || !name.trim() || !baseBranch.trim()}>
+          {t.gh.branchCreate}
         </Button>
       </DialogActions>
     </Dialog>
