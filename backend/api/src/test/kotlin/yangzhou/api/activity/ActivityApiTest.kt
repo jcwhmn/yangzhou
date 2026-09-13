@@ -56,7 +56,7 @@ class ActivityApiTest : AbstractApiTest() {
             authed.get().uri("/api/projects/CHE").exchange()
                 .expectStatus().isOk().expectBody(String::class.java).returnResult().responseBody!!,
         )
-        val dev = project["statuses"].first { it["name"].asText() == "Development" }["statusId"].asText()
+        val dev = project["statuses"].first { it["name"].asText() == "In Progress" }["statusId"].asText()
         authed.patch().uri("/api/items/$itemId")
             .body(mapOf("statusItemId" to dev))
             .exchange().expectStatus().isOk()
@@ -67,7 +67,7 @@ class ActivityApiTest : AbstractApiTest() {
         )
         val sc = body.first { it["kind"].asText() == "status_changed" }
         assertEquals("To Do", sc["oldValue"].asText())
-        assertEquals("Development", sc["newValue"].asText())
+        assertEquals("In Progress", sc["newValue"].asText())
     }
 
     @Test

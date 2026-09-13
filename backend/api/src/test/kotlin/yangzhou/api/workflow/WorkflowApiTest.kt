@@ -95,8 +95,8 @@ class WorkflowApiTest : AbstractApiTest() {
             .body(
                 mapOf(
                     "transitions" to listOf(
-                        mapOf("from" to "To Do", "to" to "Development"),
-                        mapOf("from" to "Development", "to" to "QA"),
+                        mapOf("from" to "To Do", "to" to "In Progress"),
+                        mapOf("from" to "In Progress", "to" to "QA"),
                         mapOf("from" to "QA", "to" to "Done"),
                     ),
                 ),
@@ -156,10 +156,10 @@ class WorkflowApiTest : AbstractApiTest() {
     }
 
     @Test
-    fun `默认 workflow 仍为四列`() {
+    fun `默认 workflow 为五列(V7 加 In Review)`() {
         val authed = bootstrapAndAuth()
         val project = createProject(authed, "CHE")
         val names = project["statuses"].map { it["name"].asText() }
-        assertEquals(listOf("To Do", "Development", "QA", "Done"), names)
+        assertEquals(listOf("To Do", "In Progress", "In Review", "QA", "Done"), names)
     }
 }

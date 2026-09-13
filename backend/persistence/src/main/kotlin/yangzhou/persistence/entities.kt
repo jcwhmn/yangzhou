@@ -156,8 +156,24 @@ data class Item(
     val assigneeObjectId: UUID? = null,
     val externalRef: String? = null,
     val statusObjectId: UUID,
+    val createdBy: Long? = null,
     val createdAt: Instant = Instant.now(),
     val updatedAt: Instant = Instant.now(),
+)
+
+/** V7:站内通知(收件人维度;动作按钮读时现算,不落库)。 */
+@Table("notification")
+data class Notification(
+    @Id val id: Long? = null,
+    val objectId: UUID = UUID.randomUUID(),
+    val recipientMemberId: Long,
+    val itemId: Long,
+    val kind: String,
+    val actorMemberId: Long? = null,
+    val oldValue: String? = null,
+    val newValue: String? = null,
+    val readAt: Instant? = null,
+    val createdAt: Instant = Instant.now(),
 )
 
 /** V6:项目挂载的 GitHub 仓库(monorepo 1 个,前后端分离/微服务多个);无 default 标记。 */

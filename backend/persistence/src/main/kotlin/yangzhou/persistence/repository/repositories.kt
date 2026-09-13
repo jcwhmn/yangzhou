@@ -8,6 +8,7 @@ import yangzhou.persistence.ItemActivity
 import yangzhou.persistence.ItemGitRef
 import yangzhou.persistence.Item
 import yangzhou.persistence.Member
+import yangzhou.persistence.Notification
 import yangzhou.persistence.Project
 import yangzhou.persistence.ProjectMember
 import yangzhou.persistence.ProjectRepo
@@ -72,6 +73,7 @@ interface ProjectMemberRepository : CrudRepository<ProjectMember, Long> {
 
 interface CommentRepository : CrudRepository<Comment, Long> {
     fun findByItemIdOrderByCreatedAtDesc(itemId: Long): List<Comment>
+    fun findByItemId(itemId: Long): List<Comment>
     fun findByObjectId(objectId: UUID): Comment?
 }
 
@@ -112,6 +114,12 @@ interface ProjectWorkflowRuleRepository : CrudRepository<ProjectWorkflowRule, Lo
     fun findByProjectId(projectId: Long): List<ProjectWorkflowRule>
     fun findByProjectIdAndEventType(projectId: Long, eventType: String): ProjectWorkflowRule?
     fun deleteByProjectId(projectId: Long)
+}
+
+interface NotificationRepository : CrudRepository<Notification, Long> {
+    fun findByRecipientMemberId(recipientMemberId: Long): List<Notification>
+    fun findByObjectId(objectId: UUID): Notification?
+    fun countByRecipientMemberIdAndReadAtIsNull(recipientMemberId: Long): Long
 }
 
 interface RequirementRepository : CrudRepository<Requirement, Long> {

@@ -35,6 +35,7 @@ class ItemService(
     private val projectMembers: yangzhou.api.projectmember.ProjectMemberService,
     private val activityRepo: yangzhou.persistence.repository.ItemActivityRepository,
     private val gitRefs: ItemGitRefRepository,
+    private val notificationService: yangzhou.api.notification.NotificationService,
 ) {
 
     data class RequirementDto(val attribute: String, val minLevel: Int?)
@@ -93,6 +94,7 @@ class ItemService(
                 parentObjectId = parentItemId,
                 externalRef = externalRef,
                 statusObjectId = status.objectId,
+                createdBy = memberService.current().id!!,
             ),
         )
         val itemId = item.id!!
@@ -177,6 +179,7 @@ class ItemService(
             }
             current = itemRepo.save(current.copy(statusObjectId = status.objectId))
             logActivity(current.id!!, "status_changed", oldStatus?.name, status.name, actorId)
+            notificationService.notifyStatusChange(current, actorId, oldStatus?.name, status.name)
         }
 
         if (parentItemId != null) {
@@ -228,6 +231,7 @@ class ItemService(
             projectMembers.assertAssignable(item.projectId, member.id!!)
             itemRepo.save(item.copy(assigneeObjectId = assigneeItemId))
             logActivity(item.id!!, "assigned", oldName, member.displayName, actorId)
+            notificationService.notifyAssigned(item, actorId, member.id!!, member.displayName)
         } else {
             itemRepo.save(item.copy(assigneeObjectId = null))
             logActivity(item.id!!, "unassigned", oldName, null, actorId)
