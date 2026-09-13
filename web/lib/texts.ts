@@ -182,6 +182,15 @@ export const t = {
     loadFailed: "加载失败",
     saved: "已保存",
   },
+  notif: {
+    title: "通知",
+    empty: "暂无通知",
+    markAll: "全部已读",
+    advanceTo: (name: string) => `推进到 ${name}`,
+    advanceFailed: "推进失败",
+    bell: "通知",
+    kinds: { status_changed: "状态变更", assigned: "被指派", commented: "评论" } as Record<string, string>,
+  },
   activity: {
     created: "创建",
     status_changed: "状态变更",
