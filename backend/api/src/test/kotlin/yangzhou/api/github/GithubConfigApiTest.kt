@@ -133,7 +133,7 @@ class GithubConfigApiTest : AbstractApiTest() {
         )
         assertEquals(4, saved.size())
         assertEquals(che[1]["statusId"].asText(), saved.first { it["eventType"].asText() == "branch_created" }["statusId"].asText())
-        assertEquals("Development", saved.first { it["eventType"].asText() == "branch_created" }["statusName"].asText())
+        assertEquals("In Progress", saved.first { it["eventType"].asText() == "branch_created" }["statusName"].asText())
 
         // 跨项目状态 400
         authed.put().uri("/api/projects/CHE/workflow-rules")

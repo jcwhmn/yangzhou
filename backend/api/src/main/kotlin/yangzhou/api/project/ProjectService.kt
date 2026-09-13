@@ -51,11 +51,12 @@ class ProjectService(
         return ProjectDto(project.objectId, project.key, project.name, project.archivedAt != null, statusDtos)
     }
 
-    private fun defaultStatuses(projectId: Long) = listOf(
+    private fun defaultStatuses(projectId: Long) = listOf( // V7:5 列(评审环节天然有位置);存量项目不动
         Status(projectId = projectId, name = "To Do", isStart = true, position = 0),
-        Status(projectId = projectId, name = "Development", position = 1),
-        Status(projectId = projectId, name = "QA", position = 2),
-        Status(projectId = projectId, name = "Done", isFinal = true, position = 3),
+        Status(projectId = projectId, name = "In Progress", position = 1),
+        Status(projectId = projectId, name = "In Review", position = 2),
+        Status(projectId = projectId, name = "QA", position = 3),
+        Status(projectId = projectId, name = "Done", isFinal = true, position = 4),
     )
 }
 

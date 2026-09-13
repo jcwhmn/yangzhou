@@ -16,6 +16,7 @@ class CommentService(
     private val comments: CommentRepository,
     private val itemRepo: ItemRepository,
     private val memberService: MemberService,
+    private val notificationService: yangzhou.api.notification.NotificationService,
 ) {
 
     data class CommentDto(
@@ -37,6 +38,7 @@ class CommentService(
         val item = itemRepo.findByObjectId(itemId) ?: throw NotFoundException("item 不存在")
         val member = memberService.current()
         val saved = comments.save(Comment(itemId = item.id!!, authorMemberId = member.id!!, body = body.trim()))
+        notificationService.notifyComment(item, member.id!!, saved.body.take(200))
         return CommentDto(saved.objectId, saved.body, member.displayName, saved.createdAt.toString())
     }
 

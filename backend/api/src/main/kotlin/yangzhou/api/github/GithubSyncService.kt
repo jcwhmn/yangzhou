@@ -30,6 +30,7 @@ class GithubSyncService(
     private val rules: ProjectWorkflowRuleRepository,
     private val gitRefs: ItemGitRefRepository,
     private val activityRepo: ItemActivityRepository,
+    private val notificationService: yangzhou.api.notification.NotificationService,
     private val gateway: GithubGateway,
 ) {
     companion object {
@@ -114,8 +115,9 @@ class GithubSyncService(
             logActivity(itemId, current?.name, "WIP 满跳过:${target.name}($event $detail)")
             return
         }
-        items.save(item.copy(statusObjectId = target.objectId))
+        val saved = items.save(item.copy(statusObjectId = target.objectId))
         logActivity(itemId, current?.name, "${target.name}($event $detail)")
+        notificationService.notifyStatusChange(saved, null, current?.name, target.name)
     }
 
     private fun logActivity(itemId: Long, oldValue: String?, newValue: String?, kind: String = ACT_GITHUB) {

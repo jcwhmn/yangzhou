@@ -52,7 +52,7 @@ class GithubBranchApiTest : AbstractApiTest() {
     @Test
     fun `建分支成功——落链接留痕并走 branch_created 映射——详情带 gitRefs`() {
         val (authed, repoId, _) = setupProject()
-        // 映射:branch_created → Development
+        // 映射:branch_created → In Progress
         val statuses = json.readTree(
             authed.get().uri("/api/projects/CHE").exchange()
                 .expectStatus().isOk().expectBody(String::class.java).returnResult().responseBody!!,
@@ -77,7 +77,7 @@ class GithubBranchApiTest : AbstractApiTest() {
             authed.get().uri("/api/items/$itemId").exchange()
                 .expectStatus().isOk().expectBody(String::class.java).returnResult().responseBody!!,
         )
-        assertEquals("Development", detail["status"].asText())
+        assertEquals("In Progress", detail["status"].asText())
         val refs = detail["gitRefs"]
         assertEquals(1, refs.size())
         assertEquals("branch", refs[0]["kind"].asText())

@@ -64,7 +64,7 @@ class GithubSyncApiTest : AbstractApiTest() {
 
     private lateinit var authed: RestTestClient
 
-    /** workspace PAT + CHE 项目 + 挂载 octo/r + 四槽映射(branch→Development, pr_open→QA, pr_merged→Done, closed_unmerged→Development)+ item CHE-1。 */
+    /** workspace PAT + CHE 项目 + 挂载 octo/r + 四槽映射(branch→In Progress, pr_open→In Review, pr_merged→Done, closed_unmerged→In Progress)+ item CHE-1。 */
     private fun setup(): String {
         authed = bootstrapAndAuth()
         authed.put().uri("/api/workspace/github-token")
@@ -81,7 +81,7 @@ class GithubSyncApiTest : AbstractApiTest() {
                     "rules" to listOf(
                         mapOf("eventType" to "branch_created", "statusId" to statuses[1]["statusId"].asText()),
                         mapOf("eventType" to "pr_opened", "statusId" to statuses[2]["statusId"].asText()),
-                        mapOf("eventType" to "pr_merged", "statusId" to statuses[3]["statusId"].asText()),
+                        mapOf("eventType" to "pr_merged", "statusId" to statuses[4]["statusId"].asText()),
                         mapOf("eventType" to "pr_closed_unmerged", "statusId" to statuses[1]["statusId"].asText()),
                     ),
                 ),
@@ -115,7 +115,7 @@ class GithubSyncApiTest : AbstractApiTest() {
 
         syncService.syncAll()
 
-        assertEquals("Development", statusOf(itemId))
+        assertEquals("In Progress", statusOf(itemId))
         val acts = activities(itemId).filter { it["kind"].asText() == "github_status_changed" }
         assertEquals(1, acts.size) // 两分支同一 item:第二条到位时"只前进"已拦,不重复留痕
         assertTrue(acts[0]["actorMemberId"].isNull)
@@ -123,7 +123,7 @@ class GithubSyncApiTest : AbstractApiTest() {
         // 幂等:再轮询零新增
         syncService.syncAll()
         assertEquals(1, activities(itemId).filter { it["kind"].asText() == "github_status_changed" }.size)
-        assertEquals("Development", statusOf(itemId))
+        assertEquals("In Progress", statusOf(itemId))
     }
 
     @Test
@@ -132,7 +132,7 @@ class GithubSyncApiTest : AbstractApiTest() {
 
         fake.prs["octo/r"] = listOf(GithubPr(1, "CHE-1-x", "open", "https://github.com/octo/r/pull/1"))
         syncService.syncAll()
-        assertEquals("QA", statusOf(itemId))
+        assertEquals("In Review", statusOf(itemId))
 
         fake.prs["octo/r"] = listOf(GithubPr(1, "CHE-1-x", "merged", "https://github.com/octo/r/pull/1"))
         syncService.syncAll()
@@ -156,7 +156,7 @@ class GithubSyncApiTest : AbstractApiTest() {
     @Test
     fun `WIP 满跳过留痕——第二个 item 不动`() {
         setup()
-        jdbc.update("update status set wip_limit = 1 where name = 'Development'")
+        jdbc.update("update status set wip_limit = 1 where name = 'In Progress'")
         val item2 = createItem(authed, "CHE", "y") // CHE-2
         fake.branches["octo/r"] = listOf("CHE-1-a", "CHE-2-b")
 
@@ -164,7 +164,7 @@ class GithubSyncApiTest : AbstractApiTest() {
 
         val all = items()
         val byTitle = all.associate { it["title"].asText() to it["status"].asText() }
-        assertEquals("Development", byTitle["x"])
+        assertEquals("In Progress", byTitle["x"])
         assertEquals("To Do", byTitle["y"])
         val acts = activities(item2["itemId"].asText())
             .filter { it["kind"].asText() == "github_status_changed" }
@@ -186,6 +186,6 @@ class GithubSyncApiTest : AbstractApiTest() {
         fake.failWith = null
         fake.branches["octo/r"] = listOf("CHE-1-recover")
         syncService.syncAll()
-        assertEquals("Development", statusOf(itemId))
+        assertEquals("In Progress", statusOf(itemId))
     }
 }

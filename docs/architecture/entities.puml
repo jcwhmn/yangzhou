@@ -58,6 +58,12 @@ class Item {
   type: String
   children: List<Item>
 }
+class Notification {
+  kind: String
+  oldValue: String?
+  newValue: String?
+  readAt: Instant?
+}
 class Requirement {
   minLevel: Int?
 }
@@ -94,6 +100,9 @@ end note
 Item "父 0..1" o-- "children *" Item : 同质树(防环)
 
 Item "负责人 0..1" --> "1" Member : assignee(删人置空)
+Item "创建者 0..1" --> "1" Member : createdBy(V7)
+Notification "*" --> "1" Member : 收件人
+Notification "*" --> "1" Item
 Item "*" *-- "1" Status : 当前状态
 Item "1" *-- "*" Requirement
 Requirement "*" *-- "1" AttributeDefinition
@@ -120,6 +129,11 @@ note right of Member
   空 = 虚拟成员(只参与匹配,不登录)。
   Team 为纯分组(池),匹配/候选
   在全 workspace 成员池上算。
+end note
+note right of Notification
+  kind ∈ {status_changed, assigned,
+  commented};动作按钮不落库:
+  读时现算「下一列」(V7-Q3)。
 end note
 note right of Item
   number 为项目内递增编号,
