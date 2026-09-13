@@ -211,6 +211,7 @@ export default function ItemDetailPage() {
           size="small"
           value={item.status}
           onChange={(e) => moveStatus(String(e.target.value))}
+          inputProps={{ "aria-label": "item 状态" }}
           sx={{ ml: "auto", minWidth: 160 }}
         >
           {statuses.map((s) => (
