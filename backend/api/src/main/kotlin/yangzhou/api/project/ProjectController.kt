@@ -12,7 +12,10 @@ import org.springframework.http.HttpStatus
 
 @RestController
 @RequestMapping("/api")
-class ProjectController(private val service: ProjectService) {
+class ProjectController(
+    private val service: ProjectService,
+    private val excelExportService: ExcelExportService,
+) {
 
     @PostMapping("/projects")
     @ResponseStatus(HttpStatus.CREATED)
@@ -27,4 +30,12 @@ class ProjectController(private val service: ProjectService) {
 
     @GetMapping("/projects/{key}/gantt")
     fun gantt(@PathVariable key: String): ProjectService.GanttDto = service.gantt(key)
+
+    @GetMapping("/projects/{key}/export.xlsx")
+    fun exportXlsx(@PathVariable key: String, response: jakarta.servlet.http.HttpServletResponse) {
+        val file = excelExportService.export(key)
+        response.contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        response.setHeader("Content-Disposition", "attachment; filename=\"${file.filename}\"")
+        response.outputStream.write(file.bytes)
+    }
 }

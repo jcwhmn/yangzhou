@@ -17,6 +17,7 @@ dependencies {
     runtimeOnly("org.postgresql:postgresql")
 
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-scalar:2.8.13")
+    implementation("org.apache.poi:poi-ooxml:5.3.0")
 
     implementation("io.jsonwebtoken:jjwt-api:0.12.6")
     runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.6")
