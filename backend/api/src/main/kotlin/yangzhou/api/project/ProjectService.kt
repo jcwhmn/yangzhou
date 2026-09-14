@@ -11,6 +11,7 @@ import yangzhou.persistence.Project
 import yangzhou.persistence.Status
 import yangzhou.persistence.repository.ProjectRepository
 import yangzhou.persistence.repository.StatusRepository
+import java.time.LocalDate
 import java.util.UUID
 
 /** Project = 编号(key-N)+ workflow + 视图容器(ADR-0001)。 */
@@ -18,6 +19,7 @@ import java.util.UUID
 class ProjectService(
     private val projects: ProjectRepository,
     private val statuses: StatusRepository,
+    private val items: yangzhou.persistence.repository.ItemRepository,
     private val workspaceService: WorkspaceService,
 ) {
 
@@ -50,6 +52,59 @@ class ProjectService(
         }
         return ProjectDto(project.objectId, project.key, project.name, project.archivedAt != null, statusDtos)
     }
+
+    /** V8-S2 甘特数据:全量 item 按树序(父先子后,number 次序);日期可空;overdue 同看板语义。 */
+    fun gantt(key: String): GanttDto {
+        val project = projects.findByKey(key) ?: throw NotFoundException("项目不存在:$key")
+        val projectId = project.id ?: error("no id")
+        val all = items.findByProjectIdOrderByNumber(projectId)
+        val byParent = all.groupBy { it.parentObjectId }
+        val statusById = statuses.findByProjectIdOrderByPosition(projectId).associateBy { it.objectId }
+        val today = LocalDate.now()
+
+        fun depthOf(item: yangzhou.persistence.Item): Int {
+            var depth = 0
+            var cursor = item.parentObjectId
+            while (cursor != null) {
+                depth++
+                cursor = all.firstOrNull { it.objectId == cursor }?.parentObjectId
+            }
+            return depth
+        }
+
+        fun walk(parent: UUID?): List<GanttRow> =
+            (byParent[parent] ?: emptyList()).sortedBy { it.number }.flatMap { item ->
+                val status = statusById[item.statusObjectId]
+                val row = GanttRow(
+                    itemId = item.objectId,
+                    parentItemId = item.parentObjectId,
+                    number = "\${project.key}-\${item.number}",
+                    title = item.title,
+                    startDate = item.startDate?.toString(),
+                    dueDate = item.dueDate?.toString(),
+                    statusName = status?.name ?: "?",
+                    overdue = item.dueDate?.let { it < today } == true && status?.isFinal != true,
+                    depth = depthOf(item),
+                )
+                listOf(row) + walk(item.objectId)
+            }
+
+        return GanttDto(rows = walk(null))
+    }
+
+    data class GanttRow(
+        val itemId: UUID,
+        val parentItemId: UUID?,
+        val number: String,
+        val title: String,
+        val startDate: String?,
+        val dueDate: String?,
+        val statusName: String,
+        val overdue: Boolean,
+        val depth: Int,
+    )
+
+    data class GanttDto(val rows: List<GanttRow>)
 
     private fun defaultStatuses(projectId: Long) = listOf( // V7:5 列(评审环节天然有位置);存量项目不动
         Status(projectId = projectId, name = "To Do", isStart = true, position = 0),
