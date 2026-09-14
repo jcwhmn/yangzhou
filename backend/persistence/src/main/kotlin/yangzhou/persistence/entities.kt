@@ -3,6 +3,7 @@ package yangzhou.persistence
 import org.springframework.data.annotation.Id
 import org.springframework.data.relational.core.mapping.Table
 import java.time.Instant
+import java.time.LocalDate
 import java.util.UUID
 
 @Table("workspace")
@@ -156,6 +157,8 @@ data class Item(
     val assigneeObjectId: UUID? = null,
     val externalRef: String? = null,
     val statusObjectId: UUID,
+    val startDate: LocalDate? = null,
+    val dueDate: LocalDate? = null,
     val createdBy: Long? = null,
     val createdAt: Instant = Instant.now(),
     val updatedAt: Instant = Instant.now(),

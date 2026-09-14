@@ -56,6 +56,8 @@ class Item {
   title: String
   description: String?
   type: String
+  startDate: LocalDate?
+  dueDate: LocalDate?
   children: List<Item>
 }
 class Notification {

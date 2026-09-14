@@ -40,6 +40,8 @@ type Item = {
   parentItemId: string | null;
   externalRef: string | null;
   requirements: { attribute: string; minLevel: number | null }[];
+  startDate: string | null;
+  dueDate: string | null;
   gitRefs: { kind: string; repo: string; ref: string; url: string | null; state: string | null }[];
 };
 type Repo = { repoId: string; repo: string };
@@ -85,6 +87,7 @@ const activityLabel: Record<string, string> = {
   requirement_changed: "需求变更",
   github_status_changed: "GitHub 流转",
   github_branch_created: "GitHub 分支",
+  dates_changed: "日期变更",
 };
 
 export default function ItemDetailPage() {
@@ -98,6 +101,8 @@ export default function ItemDetailPage() {
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [dueDate, setDueDate] = useState("");
   const [type, setType] = useState("task");
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
@@ -120,6 +125,7 @@ export default function ItemDetailPage() {
       api<Activity[]>(`/api/items/${itemId}/activity`),
     ])
     setItem(it); setTitle(it.title); setDescription(it.description ?? ""); setType(it.type)
+    setStartDate(it.startDate ?? ""); setDueDate(it.dueDate ?? "")
     setStatuses(project.statuses); setAttributes(attrs)
     setFeasibility(feas); setCandidates(cands); setActivity(acts)
     const allMembers = await api<{ memberId: string; displayName: string; virtual: boolean }[]>("/api/members");
@@ -140,7 +146,7 @@ export default function ItemDetailPage() {
   async function saveBasics() {
     await api(`/api/items/${itemId}`, {
       method: "PATCH",
-      body: JSON.stringify({ title, description: description || null, type }),
+      body: JSON.stringify({ title, description: description || null, type, startDate, dueDate }),
     });
     await load();
     flashSaved();
@@ -234,6 +240,26 @@ export default function ItemDetailPage() {
           minRows={2}
           fullWidth
         />
+        <Stack direction="row" spacing={1}>
+          <TextField
+            label="开始日期"
+            type="date"
+            size="small"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            sx={{ width: 200 }}
+            slotProps={{ inputLabel: { shrink: true } }}
+          />
+          <TextField
+            label="截止日期"
+            type="date"
+            size="small"
+            value={dueDate}
+            onChange={(e) => setDueDate(e.target.value)}
+            sx={{ width: 200 }}
+            slotProps={{ inputLabel: { shrink: true } }}
+          />
+        </Stack>
         <TextField select label={t.item.type} value={type} onChange={(e) => setType(e.target.value)} sx={{ width: 200 }}>
           {["task", "bug", "goal", "story"].map((tp) => (
             <MenuItem key={tp} value={tp}>
