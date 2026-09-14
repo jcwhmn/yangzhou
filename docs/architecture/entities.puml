@@ -66,6 +66,12 @@ class Notification {
   newValue: String?
   readAt: Instant?
 }
+class TimeEntry {
+  startedAt: Instant
+  endedAt: Instant?
+  minutes: Int?
+  note: String?
+}
 class Requirement {
   minLevel: Int?
 }
@@ -105,6 +111,8 @@ Item "负责人 0..1" --> "1" Member : assignee(删人置空)
 Item "创建者 0..1" --> "1" Member : createdBy(V7)
 Notification "*" --> "1" Member : 收件人
 Notification "*" --> "1" Item
+TimeEntry "*" --> "1" Item : 工时
+TimeEntry "*" --> "1" Member : 记录人
 Item "*" *-- "1" Status : 当前状态
 Item "1" *-- "*" Requirement
 Requirement "*" *-- "1" AttributeDefinition

@@ -179,6 +179,20 @@ data class Notification(
     val createdAt: Instant = Instant.now(),
 )
 
+/** V8:工时(计时器 ended_at 空=计时中 + 手动补录 minutes)。 */
+@Table("time_entry")
+data class TimeEntry(
+    @Id val id: Long? = null,
+    val objectId: UUID = UUID.randomUUID(),
+    val itemId: Long,
+    val memberId: Long,
+    val startedAt: Instant,
+    val endedAt: Instant? = null,
+    val minutes: Int? = null,
+    val note: String? = null,
+    val createdAt: Instant = Instant.now(),
+)
+
 /** V6:项目挂载的 GitHub 仓库(monorepo 1 个,前后端分离/微服务多个);无 default 标记。 */
 @Table("project_repo")
 data class ProjectRepo(
