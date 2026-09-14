@@ -108,16 +108,17 @@ abstract class AbstractApiTest {
         projectKey: String,
         title: String,
         requirements: List<Map<String, Any?>> = emptyList(),
+        parentItemId: String? = null,
     ): JsonNode {
+        val body = mutableMapOf(
+            "title" to title,
+            "requirements" to requirements.map { req ->
+                mapOf("attribute" to req["attribute"], "minLevel" to req["minLevel"])
+            },
+        )
+        if (parentItemId != null) body["parentItemId"] = parentItemId
         val r = authed.post().uri("/api/projects/$projectKey/items")
-            .body(
-                mapOf(
-                    "title" to title,
-                    "requirements" to requirements.map { req ->
-                        mapOf("attribute" to req["attribute"], "minLevel" to req["minLevel"])
-                    },
-                ),
-            )
+            .body(body)
             .exchange()
             .expectBody(String::class.java)
             .returnResult()

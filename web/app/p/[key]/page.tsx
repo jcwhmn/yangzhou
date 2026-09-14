@@ -138,6 +138,9 @@ export default function BoardPage() {
           <Button size="small" onClick={() => setGhOpen(true)}>
             {t.gh.button}
           </Button>
+          <Button size="small" component={Link} href={`/p/${key}/gantt`}>
+            甘特
+          </Button>
         </Box>
       </Stack>
 

@@ -24,4 +24,7 @@ class ProjectController(private val service: ProjectService) {
 
     @GetMapping("/projects/{key}")
     fun get(@PathVariable key: String): ProjectService.ProjectDto = service.get(key)
+
+    @GetMapping("/projects/{key}/gantt")
+    fun gantt(@PathVariable key: String): ProjectService.GanttDto = service.gantt(key)
 }
