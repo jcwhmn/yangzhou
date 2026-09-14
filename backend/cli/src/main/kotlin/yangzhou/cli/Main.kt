@@ -278,7 +278,7 @@ private fun run(args: List<String>) {
         }
 
         "items move" -> {
-            val itemId = rest.getOrNull(0) ?: error("缺少 item ID")
+            val itemId = resolveItemId(api, rest.getOrNull(0) ?: error("缺少 item ID(支持 YPJ-58 或 UUID)"))
             val statusName = rest.getOrNull(1) ?: error("缺少目标状态名")
             // 状态名 → statusId:从 item 所属项目取状态表
             val item = api.json("GET", "/api/items/$itemId")
