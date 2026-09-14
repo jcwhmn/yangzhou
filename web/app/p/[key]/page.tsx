@@ -15,7 +15,7 @@ import {
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { api, API_BASE } from "@/lib/api";
 import { t } from "@/lib/texts";
 import { AppNav } from "@/components/AppNav";
 import { WorkflowEditor } from "@/components/WorkflowEditor";
@@ -87,6 +87,21 @@ export default function BoardPage() {
     }
   }
 
+  async function exportXlsx(projectKey: string) {
+    const token = localStorage.getItem("yz-token");
+    const res = await fetch(`${API_BASE}/api/projects/${projectKey}/export.xlsx`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) throw new Error("导出失败");
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${projectKey}-export.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   async function moveTo(itemId: string, status: Status) {
     const item = items.find((i) => i.itemId === itemId);
     if (!item || item.status === status.name) return;
@@ -143,6 +158,9 @@ export default function BoardPage() {
           </Button>
           <Button size="small" component={Link} href={`/p/${key}/time`}>
             工时
+          </Button>
+          <Button size="small" onClick={() => exportXlsx(String(key))}>
+            导出
           </Button>
         </Box>
       </Stack>

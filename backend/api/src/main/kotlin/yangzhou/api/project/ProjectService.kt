@@ -78,7 +78,7 @@ class ProjectService(
                 val row = GanttRow(
                     itemId = item.objectId,
                     parentItemId = item.parentObjectId,
-                    number = "\${project.key}-\${item.number}",
+                    number = "${project.key}-${item.number}",
                     title = item.title,
                     startDate = item.startDate?.toString(),
                     dueDate = item.dueDate?.toString(),
