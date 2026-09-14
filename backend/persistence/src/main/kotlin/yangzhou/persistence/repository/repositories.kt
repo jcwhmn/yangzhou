@@ -16,6 +16,7 @@ import yangzhou.persistence.ProjectWorkflowRule
 import yangzhou.persistence.Requirement
 import yangzhou.persistence.Status
 import yangzhou.persistence.Team
+import yangzhou.persistence.TimeEntry
 import yangzhou.persistence.TeamMember
 import yangzhou.persistence.StatusTransition
 import yangzhou.persistence.Workspace
@@ -120,6 +121,13 @@ interface NotificationRepository : CrudRepository<Notification, Long> {
     fun findByRecipientMemberId(recipientMemberId: Long): List<Notification>
     fun findByObjectId(objectId: UUID): Notification?
     fun countByRecipientMemberIdAndReadAtIsNull(recipientMemberId: Long): Long
+}
+
+interface TimeEntryRepository : CrudRepository<TimeEntry, Long> {
+    fun findByItemIdOrderByStartedAtDesc(itemId: Long): List<TimeEntry>
+    fun findByMemberIdAndEndedAtIsNull(memberId: Long): List<TimeEntry>
+    fun findByItemIdIn(itemIds: Collection<Long>): List<TimeEntry>
+    fun findByObjectId(objectId: UUID): TimeEntry?
 }
 
 interface RequirementRepository : CrudRepository<Requirement, Long> {
