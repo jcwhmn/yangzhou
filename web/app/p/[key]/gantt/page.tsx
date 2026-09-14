@@ -30,7 +30,8 @@ export default function GanttPage() {
   const [showUnscheduled, setShowUnscheduled] = useState(false);
 
   const load = useCallback(async () => {
-    setRows(await api<GanttRow[]>(`/api/projects/${key}/gantt`));
+    const data = await api<{ rows: GanttRow[] }>(`/api/projects/${key}/gantt`);
+    setRows(data.rows);
   }, [key]);
 
   useEffect(() => {
