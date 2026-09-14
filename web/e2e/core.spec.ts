@@ -91,6 +91,30 @@ test("建 item → 详情 → 评论 → 切状态 → 活动日志留痕", asyn
   await expect(page.getByText(/状态变更: To Do → QA/)).toBeVisible();
 });
 
+test("日期与超期标识——详情设置日期,看板红标,甘特可见", async ({ page }) => {
+  await login(page);
+  await page.goto(`/p/${KEY}`);
+  await page.getByPlaceholder("新建 item").fill("E2E 超期 item");
+  await page.getByRole("button", { name: "新建 ITEM" }).click();
+  await page.getByText("E2E 超期 item").first().waitFor();
+  await page.getByText("E2E 超期 item").first().click();
+
+  // 详情页设置过去日期
+  await page.getByLabel("开始日期").fill("2020-01-01");
+  await page.getByLabel("截止日期").fill("2020-01-15");
+  await page.getByRole("button", { name: "保存" }).click();
+  await expect(page.getByLabel("开始日期")).toHaveValue("2020-01-01");
+
+  // 看板红标
+  await page.goto(`/p/${KEY}`);
+  await expect(page.getByText("⚠ 超期 2020-01-15")).toBeVisible();
+
+  // 甘特:行可见 + 未排期组存在
+  await page.goto(`/p/${KEY}/gantt`);
+  await expect(page.getByText("E2E 超期 item")).toBeVisible();
+  await expect(page.getByText(/未排期\(/)).toBeVisible();
+});
+
 test("看板反映新状态;通知页可达", async ({ page }) => {
   await login(page);
   await page.goto(`/p/${KEY}`);
