@@ -76,6 +76,14 @@ type Activity = {
 
 type ReqRow = { attribute: string; minLevel: number | null };
 type CommentDto = { commentId: string; body: string; author: string; createdAt: string };
+type TimeEntry = {
+  timeEntryId: string;
+  member: string;
+  startedAt: string;
+  endedAt: string | null;
+  minutes: number;
+  note: string | null;
+};
 
 const activityLabel: Record<string, string> = {
   created: "创建",
@@ -114,6 +122,9 @@ export default function ItemDetailPage() {
   const [comments, setComments] = useState<CommentDto[]>([]);
   const [newComment, setNewComment] = useState("");
   const [branchOpen, setBranchOpen] = useState(false);
+  const [timeLog, setTimeLog] = useState<{ entries: TimeEntry[]; totalMinutes: number } | null>(null);
+  const [manualMinutes, setManualMinutes] = useState("");
+  const [manualNote, setManualNote] = useState("");
 
   const load = useCallback(async () => {
     const [it, project, attrs, feas, cands, acts] = await Promise.all([
@@ -132,6 +143,9 @@ export default function ItemDetailPage() {
     const current = allMembers.find((m) => !m.virtual);
     if (current) setMe(current);
     setComments(await api<CommentDto[]>(`/api/items/${itemId}/comments`));
+    api<{ entries: TimeEntry[]; totalMinutes: number }>(`/api/items/${itemId}/time-entries`)
+      .then(setTimeLog)
+      .catch(() => {});
   }, [key, itemId]);
 
   useEffect(() => {
@@ -186,6 +200,45 @@ export default function ItemDetailPage() {
     await api(`/api/comments/${commentId}`, { method: "DELETE" });
     setComments((prev) => prev.filter((c) => c.commentId !== commentId));
   }
+
+  async function startTimer() {
+    setError("");
+    try {
+      await api(`/api/items/${itemId}/time-entries`, { method: "POST", body: JSON.stringify({ minutes: null }) });
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t.time.failed);
+    }
+  }
+
+  async function stopTimer(entryId: string) {
+    setError("");
+    try {
+      await api(`/api/time-entries/${entryId}/stop`, { method: "POST" });
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t.time.failed);
+    }
+  }
+
+  async function addManual() {
+    const m = Number(manualMinutes);
+    if (!m || m <= 0) return;
+    setError("");
+    try {
+      await api(`/api/items/${itemId}/time-entries`, {
+        method: "POST",
+        body: JSON.stringify({ minutes: m, note: manualNote.trim() || null }),
+      });
+      setManualMinutes("");
+      setManualNote("");
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t.time.failed);
+    }
+  }
+
+  const runningEntry = timeLog?.entries.find((e) => e.endedAt === null) ?? null;
 
   async function tryAssign(c: Candidate) {
     const unmet = c.verdicts.some((v) => v.kind === "gap" || v.kind === "missing" || v.kind === "unrated");
@@ -407,6 +460,72 @@ export default function ItemDetailPage() {
         onSave={saveRequirements}
         attributes={attributes}
       />
+
+      <Box sx={{ mt: 3 }}>
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+          <Typography variant="h6">{t.time.section}</Typography>
+          {timeLog && timeLog.totalMinutes > 0 && (
+            <Typography variant="body2" color="text.secondary">
+              {t.time.fmt(timeLog.totalMinutes)}
+            </Typography>
+          )}
+          {runningEntry ? (
+            <Chip size="small" color="warning" label={`${t.time.running} ${t.time.fmt(timeLog!.entries.find((e) => e.endedAt === null)!.minutes)}`} />
+          ) : (
+            <Button size="small" variant="outlined" onClick={startTimer}>
+              {t.time.start}
+            </Button>
+          )}
+        </Stack>
+        {runningEntry && (
+          <Button size="small" color="error" variant="contained" onClick={() => stopTimer(runningEntry.timeEntryId)} sx={{ mb: 1 }}>
+            {t.time.stop}
+          </Button>
+        )}
+        {timeLog && timeLog.entries.length > 0 && (
+          <Stack spacing={0.5} sx={{ mb: 1 }}>
+            {timeLog.entries.map((e) => (
+              <Stack key={e.timeEntryId} direction="row" spacing={1} alignItems="center">
+                <Typography variant="caption" color="text.secondary">
+                  {e.member} · {new Date(e.startedAt).toLocaleString("zh-CN")}
+                  {e.endedAt ? ` → ${new Date(e.endedAt).toLocaleTimeString("zh-CN")}` : ` → ${t.time.running}`}
+                </Typography>
+                <Typography variant="caption">{t.time.fmt(e.minutes)}</Typography>
+                {e.note && (
+                  <Typography variant="caption" color="text.secondary">
+                    {e.note}
+                  </Typography>
+                )}
+                {e.endedAt === null && (
+                  <Button size="small" color="error" onClick={() => stopTimer(e.timeEntryId)}>
+                    {t.time.stop}
+                  </Button>
+                )}
+              </Stack>
+            ))}
+          </Stack>
+        )}
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
+          <TextField
+            size="small"
+            label={t.time.minutesLabel}
+            type="number"
+            value={manualMinutes}
+            onChange={(e) => setManualMinutes(e.target.value)}
+            sx={{ width: 140 }}
+          />
+          <TextField
+            size="small"
+            label={t.time.noteLabel}
+            value={manualNote}
+            onChange={(e) => setManualNote(e.target.value)}
+            sx={{ width: 220 }}
+          />
+          <Button size="small" variant="outlined" onClick={addManual} disabled={!manualMinutes}>
+            {t.time.addManual}
+          </Button>
+        </Stack>
+      </Box>
 
       <Box sx={{ mt: 3 }}>
         <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
