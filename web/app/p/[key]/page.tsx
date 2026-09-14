@@ -31,6 +31,8 @@ type Item = {
   status: string;
   assignee: string | null;
   requirements: { attribute: string; minLevel: number | null }[];
+  dueDate: string | null;
+  overdue: boolean;
 };
 type Feasibility = { signal: Signal };
 
@@ -235,6 +237,15 @@ export default function BoardPage() {
                               {it.title}
                             </Typography>
                           </Link>
+                          {(it.dueDate || it.overdue) && (
+                            <Typography
+                              variant="caption"
+                              sx={{ color: it.overdue ? "error.main" : "text.secondary", fontWeight: it.overdue ? 700 : 400 }}
+                            >
+                              {it.overdue ? "⚠ 超期 " : "📅 "}
+                              {it.dueDate}
+                            </Typography>
+                          )}
                           {it.requirements.length > 0 && (
                             <Typography variant="caption" color="text.secondary">
                               {it.requirements

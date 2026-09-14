@@ -17,6 +17,7 @@ import yangzhou.persistence.repository.ItemRepository
 import yangzhou.persistence.repository.ProjectRepository
 import yangzhou.persistence.repository.RequirementRepository
 import yangzhou.persistence.repository.StatusRepository
+import java.time.LocalDate
 import java.util.UUID
 
 /** Item:项目内递增编号(key-N)、type 属性、parentId 同质树、自由迁移(ADR-0002)。 */
@@ -52,6 +53,9 @@ class ItemService(
         val externalRef: String?,
         val requirements: List<RequirementDto>,
         val gitRefs: List<GitRefDto> = emptyList(),
+        val startDate: String? = null,
+        val dueDate: String? = null,
+        val overdue: Boolean = false,
     )
 
     @Transactional
@@ -108,7 +112,8 @@ class ItemService(
     fun list(projectKey: String): List<ItemDto> {
         val project = projects.findByKey(projectKey) ?: throw NotFoundException("项目不存在:$projectKey")
         val projectId = project.id!!
-        val statusNames = statuses.findByProjectIdOrderByPosition(projectId).associate { it.objectId to it.name }
+        val statusById = statuses.findByProjectIdOrderByPosition(projectId).associateBy { it.objectId }
+        val statusNames = statusById.mapValues { it.value.name }
         val attrNames = definitions.findByWorkspaceId(project.workspaceId).associate { it.id!! to it.name }
         val memberNames = members.findByWorkspaceId(project.workspaceId).associate { it.objectId to it.displayName }
         val projectItems = itemRepo.findByProjectIdOrderByNumber(projectId)
@@ -121,6 +126,10 @@ class ItemService(
                 description = item.description,
                 type = item.type,
                 status = statusNames[item.statusObjectId] ?: "?",
+                startDate = item.startDate?.toString(),
+                dueDate = item.dueDate?.toString(),
+                overdue = item.dueDate?.let { it < LocalDate.now() } == true
+                    && statusById[item.statusObjectId]?.isFinal != true,
                 assignee = item.assigneeObjectId?.let { memberNames[it] },
                 externalRef = item.externalRef,
                 parentItemId = item.parentObjectId,
@@ -151,6 +160,8 @@ class ItemService(
         type: String?,
         statusItemId: UUID?,
         parentItemId: UUID?,
+        startDateText: String? = null,
+        dueDateText: String? = null,
     ): ItemDto {
         val item = itemRepo.findByObjectId(itemId) ?: throw NotFoundException("item 不存在")
         val project = projects.findAll().firstOrNull { it.id == item.projectId }
@@ -200,6 +211,22 @@ class ItemService(
         if (description != null && description != current.description) {
             logActivity(current.id!!, "description_changed", current.description, description, actorId)
             current = itemRepo.save(current.copy(description = description))
+        }
+        // V8-S1 日期:参数 null = 不变;空串 = 清除;ISO 文本 = 设置。start<=due 由 DB CHECK + 此处双保险
+        if (startDateText != null || dueDateText != null) {
+            fun parse(text: String?, field: String): LocalDate? = text?.trim()?.ifEmpty { null }?.let {
+                runCatching { LocalDate.parse(it) }.getOrElse { throw BadRequestException("$field 格式应为 yyyy-MM-dd:$it") }
+            }
+            val newStart = parse(startDateText, "startDate")
+            val newDue = parse(dueDateText, "dueDate")
+            val start = newStart ?: current.startDate
+            val due = newDue ?: current.dueDate
+            if (start != null && due != null && start > due) throw BadRequestException("开始日期不能晚于截止日期")
+            if (newStart != current.startDate || newDue != current.dueDate) {
+                val old = "${current.startDate ?: "—"} ~ ${current.dueDate ?: "—"}"
+                current = itemRepo.save(current.copy(startDate = newStart, dueDate = newDue))
+                logActivity(current.id!!, "dates_changed", old, "${newStart ?: "—"} ~ ${newDue ?: "—"}", actorId)
+            }
         }
         return get(current.objectId)
     }
@@ -315,4 +342,6 @@ data class UpdateItemRequest(
     val type: String? = null,
     val statusItemId: UUID? = null,
     val parentItemId: UUID? = null,
+    val startDate: String? = null,
+    val dueDate: String? = null,
 )
