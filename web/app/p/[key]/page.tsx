@@ -141,6 +141,9 @@ export default function BoardPage() {
           <Button size="small" component={Link} href={`/p/${key}/gantt`}>
             甘特
           </Button>
+          <Button size="small" component={Link} href={`/p/${key}/time`}>
+            工时
+          </Button>
         </Box>
       </Stack>
 
