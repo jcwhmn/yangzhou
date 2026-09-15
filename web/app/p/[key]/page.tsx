@@ -13,7 +13,7 @@ import {
   Typography,
 } from "@mui/material";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { api, API_BASE } from "@/lib/api";
 import { t } from "@/lib/texts";
@@ -33,12 +33,14 @@ type Item = {
   feasSignal: Signal | null;
   dueDate: string | null;
   overdue: boolean;
+  blocked: boolean;
 };
 
-type Filter = "all" | "unassigned" | string; // string = memberId
+type Filter = "all" | "unassigned" | "blocked" | string; // string = memberId
 
 export default function BoardPage() {
   const { key } = useParams<{ key: string }>();
+  const router = useRouter();
   const [statuses, setStatuses] = useState<Status[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [newTitle, setNewTitle] = useState("");
@@ -114,7 +116,11 @@ export default function BoardPage() {
   }
 
   // S7:assignee 过滤(纯前端;"未指派" = assignee 为 null)
-  const filtered = filter === "all" ? items : filter === "unassigned" ? items.filter((i) => !i.assignee) : items.filter((i) => i.assignee === filter);
+  const filtered =
+    filter === "all" ? items
+    : filter === "unassigned" ? items.filter((i) => !i.assignee)
+    : filter === "blocked" ? items.filter((i) => i.blocked)
+    : items.filter((i) => i.assignee === filter);
   const memberOptions = [...new Set(items.map((i) => i.assignee).filter((a): a is string => !!a))];
 
   const byStatusName = new Map<string, Item[]>();
@@ -180,6 +186,12 @@ export default function BoardPage() {
           color={filter === "unassigned" ? "primary" : "default"}
           onClick={() => setFilter("unassigned")}
         />
+        <Chip
+          label="⛔ 被阻塞"
+          size="small"
+          color={filter === "blocked" ? "primary" : "default"}
+          onClick={() => setFilter("blocked")}
+        />
         {memberOptions.map((name) => (
           <Chip
             key={name}
@@ -241,7 +253,12 @@ export default function BoardPage() {
                       key={it.itemId}
                       draggable
                       onDragStart={(e) => e.dataTransfer.setData("text/plain", it.itemId)}
-                      sx={{ cursor: "grab" }}
+                      onClick={() => router.push(`/p/${key}/i/${it.itemId}`)}
+                      sx={{
+                        cursor: "pointer",
+                        transition: "box-shadow .15s, border-color .15s",
+                        "&:hover": { boxShadow: 6, borderColor: "primary.main" },
+                      }}
                     >
                       <CardContent sx={{ py: 1.5, "&:last-child": { pb: 1.5 } }}>
                         <Stack spacing={0.5}>
@@ -253,6 +270,9 @@ export default function BoardPage() {
                                 label={t.signal[it.feasSignal]}
                                 color={it.feasSignal === "RED" ? "error" : "warning"}
                               />
+                            )}
+                            {it.blocked && (
+                              <Chip size="small" color="error" variant="outlined" label="⛔ 被阻塞" />
                             )}
                             {it.assignee && (
                               <Typography variant="caption" color="text.secondary">
