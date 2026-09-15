@@ -37,6 +37,7 @@ class ItemService(
     private val activityRepo: yangzhou.persistence.repository.ItemActivityRepository,
     private val gitRefs: ItemGitRefRepository,
     private val feasibilityService: yangzhou.api.feasibility.FeasibilityService,
+    private val dependencyService: yangzhou.api.dependency.DependencyService,
     private val notificationService: yangzhou.api.notification.NotificationService,
 ) {
 
@@ -58,6 +59,7 @@ class ItemService(
         val dueDate: String? = null,
         val overdue: Boolean = false,
         val feasSignal: String? = null,
+        val blocked: Boolean = false,
     )
 
     @Transactional
@@ -117,6 +119,7 @@ class ItemService(
         val projectId = project.id!!
         val statusById = statuses.findByProjectIdOrderByPosition(projectId).associateBy { it.objectId }
         val statusNames = statusById.mapValues { it.value.name }
+        val blockedIds = dependencyService.blockedItemIds(projectId)
         val attrNames = definitions.findByWorkspaceId(project.workspaceId).associate { it.id!! to it.name }
         val memberNames = members.findByWorkspaceId(project.workspaceId).associate { it.objectId to it.displayName }
         val projectItems = itemRepo.findByProjectIdOrderByNumber(projectId)
@@ -134,6 +137,7 @@ class ItemService(
                 overdue = item.dueDate?.let { it < LocalDate.now() } == true
                     && statusById[item.statusObjectId]?.isFinal != true,
                 feasSignal = item.feasSignal,
+                blocked = item.id in blockedIds,
                 assignee = item.assigneeObjectId?.let { memberNames[it] },
                 externalRef = item.externalRef,
                 parentItemId = item.parentObjectId,

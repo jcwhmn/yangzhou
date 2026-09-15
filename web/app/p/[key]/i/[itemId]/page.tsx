@@ -75,6 +75,7 @@ type Activity = {
 
 type ReqRow = { attribute: string; minLevel: number | null };
 type CommentDto = { commentId: string; body: string; author: string; createdAt: string };
+type Dep = { dependencyItemId: string; itemId: string; number: string; title: string; statusName: string; final: boolean };
 type TimeEntry = {
   timeEntryId: string;
   member: string;
@@ -124,6 +125,10 @@ export default function ItemDetailPage() {
   const [timeLog, setTimeLog] = useState<{ entries: TimeEntry[]; totalMinutes: number } | null>(null);
   const [manualMinutes, setManualMinutes] = useState("");
   const [manualNote, setManualNote] = useState("");
+  const [deps, setDeps] = useState<Dep[] | null>(null);
+  const [depBlocked, setDepBlocked] = useState(false);
+  const [depAddOpen, setDepAddOpen] = useState(false);
+  const [depPick, setDepPick] = useState("");
 
   const load = useCallback(async () => {
     const [it, project, attrs, feas, cands, acts] = await Promise.all([
@@ -144,6 +149,9 @@ export default function ItemDetailPage() {
     setComments(await api<CommentDto[]>(`/api/items/${itemId}/comments`));
     api<{ entries: TimeEntry[]; totalMinutes: number }>(`/api/items/${itemId}/time-entries`)
       .then(setTimeLog)
+      .catch(() => {});
+    api<{ dependencies: Dep[]; blocked: boolean }>(`/api/items/${itemId}/dependencies`)
+      .then((d) => { setDeps(d.dependencies); setDepBlocked(d.blocked); })
       .catch(() => {});
   }, [key, itemId]);
 
@@ -235,6 +243,29 @@ export default function ItemDetailPage() {
     } catch (e) {
       setError(e instanceof Error ? e.message : t.time.failed);
     }
+  }
+
+  async function addDependency() {
+    if (!depPick) return;
+    setError("");
+    try {
+      await api(`/api/items/${itemId}/dependencies`, {
+        method: "POST",
+        body: JSON.stringify({ dependsOnItemId: depPick }),
+      });
+      setDepAddOpen(false);
+      setDepPick("");
+      const d = await api<{ dependencies: Dep[]; blocked: boolean }>(`/api/items/${itemId}/dependencies`);
+      setDeps(d.dependencies); setDepBlocked(d.blocked);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "添加失败");
+    }
+  }
+
+  async function removeDep(rowId: string) {
+    await api(`/api/dependencies/${rowId}`, { method: "DELETE" }).catch(() => {});
+    const d = await api<{ dependencies: Dep[]; blocked: boolean }>(`/api/items/${itemId}/dependencies`);
+    setDeps(d.dependencies); setDepBlocked(d.blocked);
   }
 
   const runningEntry = timeLog?.entries.find((e) => e.endedAt === null) ?? null;
@@ -461,6 +492,32 @@ export default function ItemDetailPage() {
         onSave={saveRequirements}
         attributes={attributes}
       />
+
+      <Box sx={{ mt: 3 }}>
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+          <Typography variant="h6">依赖</Typography>
+          {depBlocked && <Chip size="small" color="error" label="⛔ 被阻塞" />}
+          <Button size="small" variant="outlined" onClick={() => setDepAddOpen((v) => !v)}>
+            加依赖
+          </Button>
+        </Stack>
+        {depAddOpen && <DependencyAddForm projectKey={String(key)} selfId={String(itemId)} onAdd={addDependency} />}
+        {(deps ?? []).length === 0 ? (
+          <Typography variant="caption" color="text.secondary">(无依赖)</Typography>
+        ) : (
+          <Stack spacing={0.5}>
+            {(deps ?? []).map((d) => (
+              <Stack key={d.dependencyItemId} direction="row" spacing={1} alignItems="center">
+                <Chip size="small" variant="outlined" label={d.number} />
+                <Typography variant="caption" noWrap sx={{ maxWidth: 220 }}>{d.title}</Typography>
+                <Chip size="small" label={d.statusName} color={d.final ? "success" : "default"} />
+                {!d.final && <Chip size="small" color="error" label="阻塞中" />}
+                <Button size="small" color="error" onClick={() => removeDep(d.dependencyItemId)}>移除</Button>
+              </Stack>
+            ))}
+          </Stack>
+        )}
+      </Box>
 
       <Box sx={{ mt: 3 }}>
         <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
@@ -815,5 +872,45 @@ function CreateBranchDialog({
         </Button>
       </DialogActions>
     </Dialog>
+  );
+}
+
+
+function DependencyAddForm({
+  projectKey,
+  selfId,
+  onAdd,
+}: {
+  projectKey: string;
+  selfId: string;
+  onAdd: () => void;
+}) {
+  const [items, setItems] = useState<{ itemId: string; number: string; title: string }[]>([]);
+  const [pick, setPick] = useState("");
+
+  useEffect(() => {
+    api<{ itemId: string; number: string; title: string }[]>(`/api/projects/${projectKey}/items`)
+      .then((list) => setItems(list.filter((i) => i.itemId !== selfId)))
+      .catch(() => setItems([]));
+  }, [projectKey, selfId]);
+
+  return (
+    <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+      <select
+        value={pick}
+        onChange={(e) => setPick(e.target.value)}
+        style={{ padding: "6px", borderRadius: 4 }}
+      >
+        <option value="">选择被依赖 item…</option>
+        {items.map((i) => (
+          <option key={i.itemId} value={i.itemId}>
+            {i.number} {i.title}
+          </option>
+        ))}
+      </select>
+      <Button size="small" variant="contained" disabled={!pick} onClick={onAdd}>
+        添加
+      </Button>
+    </Stack>
   );
 }

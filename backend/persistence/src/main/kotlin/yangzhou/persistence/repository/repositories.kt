@@ -5,10 +5,12 @@ import yangzhou.persistence.AttributeDefinition
 import yangzhou.persistence.Capability
 import yangzhou.persistence.Comment
 import yangzhou.persistence.ItemActivity
+import yangzhou.persistence.ItemDependency
 import yangzhou.persistence.ItemGitRef
 import yangzhou.persistence.Item
 import yangzhou.persistence.Member
 import yangzhou.persistence.Notification
+import yangzhou.persistence.Favorite
 import yangzhou.persistence.Project
 import yangzhou.persistence.ProjectMember
 import yangzhou.persistence.ProjectRepo
@@ -128,6 +130,22 @@ interface TimeEntryRepository : CrudRepository<TimeEntry, Long> {
     fun findByMemberIdAndEndedAtIsNull(memberId: Long): List<TimeEntry>
     fun findByItemIdIn(itemIds: Collection<Long>): List<TimeEntry>
     fun findByObjectId(objectId: UUID): TimeEntry?
+}
+
+interface ItemDependencyRepository : CrudRepository<ItemDependency, Long> {
+    fun findByItemId(itemId: Long): List<ItemDependency>
+    fun findByItemIdIn(itemIds: Collection<Long>): List<ItemDependency>
+    fun findByDependsOnItemId(dependsOnItemId: Long): List<ItemDependency>
+    fun findByObjectId(objectId: UUID): ItemDependency?
+    fun existsByItemIdAndDependsOnItemId(itemId: Long, dependsOnItemId: Long): Boolean
+    fun deleteByObjectId(objectId: UUID)
+}
+
+interface FavoriteRepository : CrudRepository<Favorite, Long> {
+    fun findByMemberIdOrderByCreatedAtAsc(memberId: Long): List<Favorite>
+    fun findByMemberIdAndProjectId(memberId: Long, projectId: Long): Favorite?
+    fun existsByMemberIdAndProjectId(memberId: Long, projectId: Long): Boolean
+    fun deleteByMemberIdAndProjectId(memberId: Long, projectId: Long)
 }
 
 interface RequirementRepository : CrudRepository<Requirement, Long> {
