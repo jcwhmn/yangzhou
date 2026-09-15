@@ -22,6 +22,7 @@ class CapabilityService(
     private val definitions: AttributeDefinitionRepository,
     private val memberService: MemberService,
     private val workspaceService: WorkspaceService,
+    private val feasibilityService: yangzhou.api.feasibility.FeasibilityService,
 ) {
 
     data class CapabilityDto(val attribute: String, val level: Int?)
@@ -54,7 +55,9 @@ class CapabilityService(
         } catch (_: DataIntegrityViolationException) {
             throw ConflictException("能力写入冲突")
         }
-        return CapabilityDto(def.name, saved.level)
+        val dto = CapabilityDto(def.name, saved.level)
+        feasibilityService.recomputeWorkspace() // V9-S1:能力变更影响全 workspace 冗余
+        return dto
     }
 
     @Transactional
@@ -66,6 +69,7 @@ class CapabilityService(
             ?: throw NotFoundException("词表中没有属性:$attribute")
         capabilities.findByMemberIdAndAttributeDefinitionId(member.id!!, def.id!!)
             ?.let { capabilities.delete(it) }
+        feasibilityService.recomputeWorkspace() // V9-S1
     }
 
     private fun definitionNames(): Map<Long, String> =

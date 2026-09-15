@@ -31,6 +31,7 @@ type Item = {
   status: string;
   assignee: string | null;
   requirements: { attribute: string; minLevel: number | null }[];
+  feasSignal: Signal | null;
   dueDate: string | null;
   overdue: boolean;
 };
@@ -247,6 +248,13 @@ export default function BoardPage() {
                         <Stack spacing={0.5}>
                           <Stack direction="row" spacing={1} alignItems="center">
                             <Chip label={it.number} size="small" variant="outlined" />
+                            {it.feasSignal && it.feasSignal !== "GREEN" && (
+                              <Chip
+                                size="small"
+                                label={t.signal[it.feasSignal]}
+                                color={it.feasSignal === "RED" ? "error" : "warning"}
+                              />
+                            )}
                             {it.assignee && (
                               <Typography variant="caption" color="text.secondary">
                                 👤 {it.assignee}

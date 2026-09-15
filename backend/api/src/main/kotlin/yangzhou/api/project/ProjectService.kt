@@ -29,6 +29,7 @@ class ProjectService(
         val key: String,
         val name: String,
         val archived: Boolean,
+        val feasSignal: String?,
         val statuses: List<StatusDto>,
     )
 
@@ -50,7 +51,7 @@ class ProjectService(
         val statusDtos = statuses.findByProjectIdOrderByPosition(project.id!!).map {
             StatusDto(it.objectId, it.name, it.icon, it.isStart, it.isFinal, it.position)
         }
-        return ProjectDto(project.objectId, project.key, project.name, project.archivedAt != null, statusDtos)
+        return ProjectDto(project.objectId, project.key, project.name, project.archivedAt != null, project.feasSignal, statusDtos)
     }
 
     /** V8-S2 甘特数据:全量 item 按树序(父先子后,number 次序);日期可空;overdue 同看板语义。 */

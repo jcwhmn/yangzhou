@@ -36,6 +36,7 @@ class ItemService(
     private val projectMembers: yangzhou.api.projectmember.ProjectMemberService,
     private val activityRepo: yangzhou.persistence.repository.ItemActivityRepository,
     private val gitRefs: ItemGitRefRepository,
+    private val feasibilityService: yangzhou.api.feasibility.FeasibilityService,
     private val notificationService: yangzhou.api.notification.NotificationService,
 ) {
 
@@ -56,6 +57,7 @@ class ItemService(
         val startDate: String? = null,
         val dueDate: String? = null,
         val overdue: Boolean = false,
+        val feasSignal: String? = null,
     )
 
     @Transactional
@@ -106,6 +108,7 @@ class ItemService(
             requirementRepo.save(Requirement(itemId = itemId, attributeDefinitionId = defId, minLevel = minLevel))
         }
         logActivity(itemId, "created", null, title, memberService.current().id!!)
+        feasibilityService.recomputeProjectSignal(projectId) // V9-S1
         return get(item.objectId)
     }
 
@@ -130,6 +133,7 @@ class ItemService(
                 dueDate = item.dueDate?.toString(),
                 overdue = item.dueDate?.let { it < LocalDate.now() } == true
                     && statusById[item.statusObjectId]?.isFinal != true,
+                feasSignal = item.feasSignal,
                 assignee = item.assigneeObjectId?.let { memberNames[it] },
                 externalRef = item.externalRef,
                 parentItemId = item.parentObjectId,
@@ -244,6 +248,8 @@ class ItemService(
         }
         val summary = requirements.joinToString(";") { r -> r.attribute + (r.minLevel?.let { ">=" + it } ?: "") }
         logActivity(rowId, "requirement_changed", null, summary.ifEmpty { "(清空)" }, actorId())
+        feasibilityService.recomputeItemSignal(item)
+        feasibilityService.recomputeProjectSignal(project.id!!) // V9-S1
         return get(item.objectId)
     }
 
@@ -275,6 +281,7 @@ class ItemService(
         }
         requirementRepo.deleteByItemId(item.id!!)
         itemRepo.delete(item)
+        feasibilityService.recomputeProjectSignal(item.projectId) // V9-S1
     }
 
     private fun actorId(): Long = memberService.current().id!!

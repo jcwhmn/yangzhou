@@ -24,21 +24,8 @@ type ProjectDto = {
   key: string;
   name: string;
   archived: boolean;
+  feasSignal: Signal | null;
   statuses: { statusId: string; name: string; isFinal: boolean; position: number }[];
-};
-
-type Feasibility = {
-  projectKey: string;
-  signal: Signal;
-  missingCount: number;
-  totalDelta: number;
-  items: {
-    itemId: string;
-    number: string;
-    title: string;
-    signal: Signal;
-    verdicts: { kind: string; attribute: string; delta?: number | null }[];
-  }[];
 };
 
 type Shortfall = {
@@ -51,25 +38,13 @@ type Shortfall = {
 
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<ProjectDto[]>([]);
-  const [feas, setFeas] = useState<Record<string, Feasibility>>({});
+  const [shortfallList, setShortfallList] = useState<Shortfall[]>([]);
   const [key, setKey] = useState("");
   const [name, setName] = useState("");
   const [error, setError] = useState("");
 
   async function load() {
-    const list = await api<ProjectDto[]>("/api/projects");
-    setProjects(list);
-    const map: Record<string, Feasibility> = {};
-    await Promise.all(
-      list.map(async (p) => {
-        try {
-          map[p.key] = await api<Feasibility>(`/api/projects/${p.key}/feasibility`);
-        } catch {
-          /* 单项失败不拦列表 */
-        }
-      }),
-    );
-    setFeas(map);
+    setProjects(await api<ProjectDto[]>("/api/projects"));
   }
 
   useEffect(() => {
@@ -91,29 +66,6 @@ export default function ProjectsPage() {
       setError(err instanceof Error ? err.message : "创建失败");
     }
   }
-
-  // 短板聚合(客户端,瘦客户端原则):跨项目按属性汇缺口,回答"我该练什么"
-  const shortfalls = Object.values(feas)
-    .flatMap((f) => f.items.map((it) => ({ f, it })))
-    .flatMap(({ f, it }) =>
-      it.verdicts
-        .filter((v) => v.kind === "gap" || v.kind === "unrated" || v.kind === "missing")
-        .map((v) => ({ projectKey: f.projectKey, it, v })),
-    )
-    .reduce<Map<string, Shortfall>>((acc, { projectKey, it, v }) => {
-      const cur =
-        acc.get(v.attribute) ??
-        ({ attribute: v.attribute, deltaSum: 0, missingCount: 0, unratedCount: 0, items: [] } as Shortfall);
-      if (v.kind === "gap") cur.deltaSum += v.delta ?? 0;
-      if (v.kind === "missing") cur.missingCount += 1;
-      if (v.kind === "unrated") cur.unratedCount += 1;
-      cur.items.push({ projectKey, itemId: it.itemId, number: it.number, title: it.title });
-      acc.set(v.attribute, cur);
-      return acc;
-    }, new Map());
-  const shortfallList = [...shortfalls.values()].sort(
-    (a, b) => b.missingCount - a.missingCount || b.deltaSum - a.deltaSum,
-  );
 
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
@@ -138,12 +90,12 @@ export default function ProjectsPage() {
                 <Stack direction="row" spacing={1} alignItems="center">
                   <Chip label={p.key} size="small" />
                   <Typography variant="h6">{p.name}</Typography>
-                  {feas[p.key] && (
+                  {p.feasSignal && (
                     <Chip
-                      label={t.signal[feas[p.key]!.signal]}
+                      label={t.signal[p.feasSignal]}
                       size="small"
                       variant="outlined"
-                      color={feas[p.key].signal === "RED" ? "error" : feas[p.key].signal === "YELLOW" ? "warning" : "success"}
+                      color={p.feasSignal === "RED" ? "error" : p.feasSignal === "YELLOW" ? "warning" : "success"}
                     />
                   )}
                 </Stack>
