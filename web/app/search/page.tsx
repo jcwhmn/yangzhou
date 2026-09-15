@@ -4,7 +4,6 @@ import { Box, Card, CardContent, Chip, Container, Stack, TextField, Typography }
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { AppNav } from "@/components/AppNav";
 
 type SearchResult = {
   itemId: string;
@@ -30,7 +29,6 @@ export default function SearchPage() {
 
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
-      <AppNav />
       <Typography variant="h5" gutterBottom>
         搜索
       </Typography>

@@ -4,7 +4,7 @@ import { Alert, Box, Button, Chip, Container, Stack, Typography } from "@mui/mat
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { AppNav } from "@/components/AppNav";
+import { bumpUnread } from "@/lib/notifications-store";
 import { t } from "@/lib/texts";
 
 type Action = { statusItemId: string; statusName: string };
@@ -49,6 +49,7 @@ export default function NotificationsPage() {
     setError("");
     try {
       await api("/api/notifications/read-all", { method: "POST" });
+      bumpUnread();
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "操作失败");
@@ -65,6 +66,7 @@ export default function NotificationsPage() {
         body: JSON.stringify({ statusItemId: n.action.statusItemId }),
       });
       await markRead(n.notificationId);
+      bumpUnread();
       await load();
     } catch (e) {
       // 服务端复验失败(迁移表/WIP/开工须有主)原样冒出
@@ -76,7 +78,6 @@ export default function NotificationsPage() {
 
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
-      <AppNav />
       <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
         <Typography variant="h5">{t.notif.title}</Typography>
         <Button size="small" onClick={markAllRead} disabled={rows.every((r) => r.read)}>

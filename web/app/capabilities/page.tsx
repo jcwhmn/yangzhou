@@ -4,7 +4,6 @@ import { Button, Container, MenuItem, Select, Stack, Typography } from "@mui/mat
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { AppNav } from "@/components/AppNav";
 import { t } from "@/lib/texts";
 
 type Attribute = { attributeId: string; name: string; kind: string; leveled: boolean };
@@ -48,7 +47,6 @@ export default function CapabilitiesPage() {
 
   return (
     <Container maxWidth="sm" sx={{ py: 4 }}>
-      <AppNav />
       <Typography variant="h5" gutterBottom>
         {t.caps.title}
       </Typography>

@@ -4,7 +4,6 @@ import { Box, Card, CardContent, Container, Stack, Typography } from "@mui/mater
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { AppNav } from "@/components/AppNav";
 import { t } from "@/lib/texts";
 
 type MemberSummary = {
@@ -36,7 +35,6 @@ export default function TimeSummaryPage() {
 
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
-      <AppNav />
       <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
         <Typography variant="h5">{t.time.title(String(key))}</Typography>
         {projectTotal > 0 && (
