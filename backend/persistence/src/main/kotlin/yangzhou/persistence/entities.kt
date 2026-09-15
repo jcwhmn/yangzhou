@@ -181,6 +181,26 @@ data class Notification(
     val createdAt: Instant = Instant.now(),
 )
 
+/** V9:item 依赖(阻塞关系):本 item 依赖 depends_on_item;依赖未终态 → 本 item 被阻塞。 */
+@Table("item_dependency")
+data class ItemDependency(
+    @Id val id: Long? = null,
+    val objectId: UUID = UUID.randomUUID(),
+    val itemId: Long,
+    val dependsOnItemId: Long,
+    val createdAt: Instant = Instant.now(),
+)
+
+/** V9:成员收藏的项目(跨浏览器/重装持久)。 */
+@Table("favorite")
+data class Favorite(
+    @Id val id: Long? = null,
+    val objectId: UUID = UUID.randomUUID(),
+    val memberId: Long,
+    val projectId: Long,
+    val createdAt: Instant = Instant.now(),
+)
+
 /** V8:工时(计时器 ended_at 空=计时中 + 手动补录 minutes)。 */
 @Table("time_entry")
 data class TimeEntry(

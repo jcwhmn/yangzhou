@@ -72,6 +72,7 @@ class TimeEntry {
   minutes: Int?
   note: String?
 }
+class ItemDependency
 class Requirement {
   minLevel: Int?
 }
@@ -113,6 +114,8 @@ Notification "*" --> "1" Member : 收件人
 Notification "*" --> "1" Item
 TimeEntry "*" --> "1" Item : 工时
 TimeEntry "*" --> "1" Member : 记录人
+ItemDependency "*" --> "1" Item : 本 item(被阻塞方)
+ItemDependency "*" --> "1" Item : 依赖的 item
 Item "*" *-- "1" Status : 当前状态
 Item "1" *-- "*" Requirement
 Requirement "*" *-- "1" AttributeDefinition
@@ -144,6 +147,11 @@ note right of Notification
   kind ∈ {status_changed, assigned,
   commented};动作按钮不落库:
   读时现算「下一列」(V7-Q3)。
+end note
+note right of ItemDependency
+  阻塞语义:depends_on 未终态
+  → 本 item ⛔ 被阻塞(仅标识);
+  增依赖沿链查环。
 end note
 note right of Item
   number 为项目内递增编号,
