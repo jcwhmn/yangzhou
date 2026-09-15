@@ -102,6 +102,73 @@ class FeasibilityService(
         )
     }
 
+    // ---------- V9-S1 冗余重算(sync 写路径;signal = 当前登录成员视角) ----------
+
+    private val rank = mapOf("GREEN" to 0, "YELLOW" to 1, "RED" to 2)
+
+    /** 重算单 item 冗余并返回 signal。 */
+    fun recomputeItemSignal(item: yangzhou.persistence.Item): String {
+        val signal = item(item.objectId).signal
+
+        itemRepo.save(item.copy(feasSignal = signal))
+        return signal
+    }
+
+    /** 重算项目:全部 item 冗余 + 聚合到 project(RED>YELLOW>GREEN;无 item = null)。 */
+    fun recomputeProjectSignal(projectId: Long): String? {
+        val projectItems = itemRepo.findByProjectIdOrderByNumber(projectId)
+        var worst: String? = null
+        for (it in projectItems) {
+            val s = recomputeItemSignal(it)
+            worst = if (worst == null || rank.getValue(s) > rank.getValue(worst)) s else worst
+        }
+        val project = projects.findById(projectId).orElse(null) ?: return null
+        projects.save(project.copy(feasSignal = worst))
+        return worst
+    }
+
+    /** 兜底重算(V9-Q1):按 key,返回聚合 signal。 */
+    fun recomputeByKey(key: String): String? {
+        val project = projects.findByKey(key) ?: throw yangzhou.api.support.NotFoundException("项目不存在:\$key")
+        return recomputeProjectSignal(project.id!!)
+    }
+
+    /** capability 变更影响全 workspace:重算所有项目(V9-Q2)。 */
+    fun recomputeWorkspace() {
+        projects.findAll().forEach { recomputeProjectSignal(it.id!!) }
+    }
+
+    /** V9-S1 短板聚合(服务端算,替代首页 N 次调用+客户端聚合)。 */
+    fun workspaceShortfall(): List<ShortfallDto> {
+        val byAttr = LinkedHashMap<String, MutableList<Pair<ProjectResultDto, ItemResultDto>>>()
+        projects.findAll().map { it.key }.forEach { key ->
+            runCatching { project(key) }.getOrNull()?.let { proj ->
+                proj.items.forEach { item ->
+                    item.verdicts.filter { it.kind == "gap" || it.kind == "unrated" || it.kind == "missing" }
+                        .forEach { v -> byAttr.getOrPut(v.attribute) { mutableListOf() }.add(proj to item) }
+                }
+            }
+        }
+        return byAttr.map { (attr, list) ->
+            ShortfallDto(
+                attribute = attr,
+                deltaSum = list.sumOf { (p, i) -> 0 + i.verdicts.filter { v -> v.attribute == attr }.sumOf { it.delta ?: 0 } },
+                missingCount = list.count { (p, i) -> i.verdicts.any { it.attribute == attr && it.kind == "missing" } },
+                unratedCount = list.count { (p, i) -> i.verdicts.any { it.attribute == attr && it.kind == "unrated" } },
+                items = list.map { (p, i) -> ShortfallItemDto(p.projectKey, i.itemId, i.number, i.title) }.distinctBy { it.itemId },
+            )
+        }.sortedByDescending { it.missingCount * 100 + it.deltaSum }
+    }
+
+    data class ShortfallItemDto(val projectKey: String, val itemId: UUID, val number: String, val title: String)
+    data class ShortfallDto(
+        val attribute: String,
+        val deltaSum: Int,
+        val missingCount: Int,
+        val unratedCount: Int,
+        val items: List<ShortfallItemDto>,
+    )
+
     // ---------- 装配 ----------
 
     fun domainMember(): yangzhou.domain.Member = domainMemberOf(memberService.current())

@@ -15,6 +15,7 @@ import org.springframework.http.HttpStatus
 class ProjectController(
     private val service: ProjectService,
     private val excelExportService: ExcelExportService,
+    private val feasibilityService: yangzhou.api.feasibility.FeasibilityService,
 ) {
 
     @PostMapping("/projects")

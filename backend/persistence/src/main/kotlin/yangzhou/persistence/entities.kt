@@ -104,6 +104,7 @@ data class Project(
     val name: String,
     val lastItemNumber: Int = 0,
     val archivedAt: Instant? = null,
+    val feasSignal: String? = null,
     val createdAt: Instant = Instant.now(),
     val updatedAt: Instant = Instant.now(),
 )
@@ -159,6 +160,7 @@ data class Item(
     val statusObjectId: UUID,
     val startDate: LocalDate? = null,
     val dueDate: LocalDate? = null,
+    val feasSignal: String? = null,
     val createdBy: Long? = null,
     val createdAt: Instant = Instant.now(),
     val updatedAt: Instant = Instant.now(),
