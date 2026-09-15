@@ -25,7 +25,6 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { t } from "@/lib/texts";
-import { AppNav } from "@/components/AppNav";
 import { SignalChip, VerdictLine, type Signal, type Verdict } from "@/components/Verdict";
 
 type Status = { statusId: string; name: string; isFinal: boolean; position: number };
@@ -256,7 +255,6 @@ export default function ItemDetailPage() {
 
   return (
     <Box sx={{ maxWidth: 760, mx: "auto", p: 3 }}>
-      <AppNav />
       <Link href={`/p/${key}`} style={{ textDecoration: "none" }}>
         <Typography variant="body2" color="primary" gutterBottom>
           {t.item.back}
@@ -441,9 +439,12 @@ export default function ItemDetailPage() {
 
       {feasibility && (
         <Box sx={{ mt: 3 }}>
-          <Typography variant="h6" gutterBottom>
-            {t.item.verdicts}
-          </Typography>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Typography variant="h6">{t.item.verdicts}</Typography>
+            <Button size="small" variant="outlined" onClick={() => setReqOpen(true)}>
+              编辑需求
+            </Button>
+          </Stack>
           {feasibility.verdicts.length === 0 && <Typography color="text.secondary">(无需求)</Typography>}
           {feasibility.verdicts.map((v, i) => (
             <VerdictLine key={i} v={v} />

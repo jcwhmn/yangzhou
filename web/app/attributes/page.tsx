@@ -12,7 +12,6 @@ import {
 } from "@mui/material";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { AppNav } from "@/components/AppNav";
 import { t } from "@/lib/texts";
 
 type Attribute = { attributeId: string; name: string; kind: string; leveled: boolean };
@@ -70,7 +69,6 @@ export default function AttributesPage() {
 
   return (
     <Container maxWidth="sm" sx={{ py: 4 }}>
-      <AppNav />
       <Typography variant="h5" gutterBottom>
         {t.attrs.title}
       </Typography>

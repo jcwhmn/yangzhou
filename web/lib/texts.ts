@@ -6,6 +6,11 @@ export const t = {
     capabilities: "我的能力",
     attributes: "词表",
     members: "成员",
+    favorites: "⭐ 收藏",
+  },
+  fav: {
+    empty: "暂无收藏——在项目卡上点 ☆",
+    remove: "移除",
   },
   login: {
     title: "登录",
@@ -29,6 +34,7 @@ export const t = {
     dropHere: "拖到这里",
     moveFailed: "迁移失败",
     detail: "详情",
+    refresh: "刷新",
   },
   item: {
     title: "标题",

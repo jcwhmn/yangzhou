@@ -15,7 +15,6 @@ import {
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { AppNav } from "@/components/AppNav";
 import { t } from "@/lib/texts";
 import type { Signal } from "@/components/Verdict";
 
@@ -39,6 +38,7 @@ type Shortfall = {
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<ProjectDto[]>([]);
   const [shortfallList, setShortfallList] = useState<Shortfall[]>([]);
+  const [favKeys, setFavKeys] = useState<string[]>([]);
   const [key, setKey] = useState("");
   const [name, setName] = useState("");
   const [error, setError] = useState("");
@@ -67,9 +67,18 @@ export default function ProjectsPage() {
     }
   }
 
+  async function toggleFav(projectKey: string) {
+    const method = favKeys.includes(projectKey) ? "DELETE" : "PUT";
+    try {
+      await api(`/api/projects/${projectKey}/favorite`, { method });
+      setFavKeys((prev) => (method === "PUT" ? [...prev, projectKey] : prev.filter((k) => k !== projectKey)));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "收藏失败");
+    }
+  }
+
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
-      <AppNav />
       <Typography variant="h4" gutterBottom>
         {t.projects.title}
       </Typography>
@@ -84,7 +93,15 @@ export default function ProjectsPage() {
       {projects.length === 0 && <Typography color="text.secondary">{t.projects.empty}</Typography>}
       <Box sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 2, mb: 4 }}>
         {projects.map((p) => (
-          <Card key={p.key}>
+          <Card key={p.key} sx={{ position: "relative" }}>
+            <Button
+              size="small"
+              sx={{ position: "absolute", top: 2, right: 2, zIndex: 1, minWidth: 0 }}
+              onClick={() => toggleFav(p.key)}
+              aria-label="favorite"
+            >
+              {favKeys.includes(p.key) ? "★" : "☆"}
+            </Button>
             <CardActionArea LinkComponent={Link} href={`/p/${p.key}`}>
               <CardContent>
                 <Stack direction="row" spacing={1} alignItems="center">

@@ -17,7 +17,6 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { AppNav } from "@/components/AppNav";
 import { t } from "@/lib/texts";
 
 type Member = {
@@ -147,7 +146,6 @@ export default function MembersPage() {
 
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
-      <AppNav />
       <Typography variant="h5" gutterBottom>
         {t.members.title}
       </Typography>

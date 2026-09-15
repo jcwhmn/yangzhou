@@ -17,7 +17,6 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { api, API_BASE } from "@/lib/api";
 import { t } from "@/lib/texts";
-import { AppNav } from "@/components/AppNav";
 import { WorkflowEditor } from "@/components/WorkflowEditor";
 import { ProjectMembersPanel } from "@/components/ProjectMembersPanel";
 import { GithubSettingsPanel } from "@/components/GithubSettingsPanel";
@@ -35,7 +34,6 @@ type Item = {
   dueDate: string | null;
   overdue: boolean;
 };
-type Feasibility = { signal: Signal };
 
 type Filter = "all" | "unassigned" | string; // string = memberId
 
@@ -43,7 +41,6 @@ export default function BoardPage() {
   const { key } = useParams<{ key: string }>();
   const [statuses, setStatuses] = useState<Status[]>([]);
   const [items, setItems] = useState<Item[]>([]);
-  const [feas, setFeas] = useState<Record<string, Signal>>({});
   const [newTitle, setNewTitle] = useState("");
   const [dragOver, setDragOver] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -53,18 +50,18 @@ export default function BoardPage() {
   const [membersOpen, setMembersOpen] = useState(false);
   const [ghOpen, setGhOpen] = useState(false);
 
+  // V9-Q3:看板 30s 自动刷新(手刷按钮同函数)
+  useEffect(() => {
+    const t = setInterval(() => load(), 30000);
+    return () => clearInterval(t);
+  }, []);
+
   const load = useCallback(async () => {
     try {
       const project = await api<{ statuses: Status[] }>(`/api/projects/${key}`);
       setStatuses(project.statuses);
-      const list = await api<Item[]>(`/api/projects/${key}/items`);
-      setItems(list);
-      // V4:单次 list 调用替代 N+1 逐 item 可行性请求
-      const f = await api<{ items: { itemId: string; signal: Signal }[] }>(`/api/projects/${key}/feasibility`);
-      const map: Record<string, Signal> = {};
-      f.items.forEach((it) => (map[it.itemId] = it.signal));
-      setFeas(map);
-      setFeas(map);
+      // V9-S1:item 列表自带 feasSignal 冗余,不再单 feasibility 调用
+      setItems(await api<Item[]>(`/api/projects/${key}/items`));
     } catch (e) {
       setError(e instanceof Error ? e.message : "加载失败");
     } finally {
@@ -130,7 +127,6 @@ export default function BoardPage() {
 
   return (
     <Box sx={{ p: 3 }}>
-      <AppNav />
       <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
         <Typography variant="h5">{String(key).toUpperCase()} · 看板</Typography>
         <Stack component="form" direction="row" spacing={1} onSubmit={addItem}>
@@ -153,6 +149,9 @@ export default function BoardPage() {
           </Button>
           <Button size="small" onClick={() => setGhOpen(true)}>
             {t.gh.button}
+          </Button>
+          <Button size="small" onClick={() => load()}>
+            {t.board.refresh}
           </Button>
           <Button size="small" component={Link} href={`/p/${key}/gantt`}>
             甘特
