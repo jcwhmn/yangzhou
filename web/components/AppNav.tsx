@@ -51,6 +51,7 @@ export function AppNav() {
     { href: "/capabilities", label: t.nav.capabilities },
     { href: "/attributes", label: t.nav.attributes },
     { href: "/members", label: t.nav.members },
+    { href: "/standup", label: t.nav.standup },
   ];
 
   return (
