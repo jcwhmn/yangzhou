@@ -7,6 +7,7 @@ export const t = {
     attributes: "词表",
     members: "成员",
     favorites: "⭐ 收藏",
+    standup: "站会",
   },
   fav: {
     empty: "暂无收藏——在项目卡上点 ☆",

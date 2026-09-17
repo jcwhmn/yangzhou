@@ -47,6 +47,7 @@ interface TeamMemberRepository : CrudRepository<TeamMember, Long> {
 
 interface ItemActivityRepository : CrudRepository<ItemActivity, Long> {
     fun findByItemIdOrderByCreatedAtDesc(item_id: Long): List<ItemActivity>
+    fun findByKindAndCreatedAtBetween(kind: String, start: java.time.Instant, end: java.time.Instant): List<ItemActivity>
 }
 
 interface AttributeDefinitionRepository : CrudRepository<AttributeDefinition, Long> {
