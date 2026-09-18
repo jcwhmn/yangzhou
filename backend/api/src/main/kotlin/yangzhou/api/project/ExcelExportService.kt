@@ -32,7 +32,7 @@ class ExcelExportService(
         val project = projects.findByKey(key) ?: throw NotFoundException("项目不存在:$key")
         val projectId = project.id ?: error("no id")
         val gantt = projectService.gantt(key)
-        val allItems = items.findByProjectIdOrderByNumber(projectId)
+        val allItems = items.findByProjectIdAndDeletedAtIsNullOrderByNumber(projectId)
         val itemByObjectId = allItems.associateBy { it.objectId }
         val memberMap = members.findByWorkspaceId(project.workspaceId).associateBy { it.objectId }
 

@@ -17,6 +17,7 @@ import yangzhou.persistence.repository.ItemRepository
 import yangzhou.persistence.repository.ProjectRepository
 import yangzhou.persistence.repository.RequirementRepository
 import yangzhou.persistence.repository.StatusRepository
+import java.time.Instant
 import java.time.LocalDate
 import java.util.UUID
 
@@ -122,7 +123,7 @@ class ItemService(
         val blockedIds = dependencyService.blockedItemIds(projectId)
         val attrNames = definitions.findByWorkspaceId(project.workspaceId).associate { it.id!! to it.name }
         val memberNames = members.findByWorkspaceId(project.workspaceId).associate { it.objectId to it.displayName }
-        val projectItems = itemRepo.findByProjectIdOrderByNumber(projectId)
+        val projectItems = itemRepo.findByProjectIdAndDeletedAtIsNullOrderByNumber(projectId)
         val reqs = requirementRepo.findByItemIdIn(projectItems.mapNotNull { it.id })
         return projectItems.map { item ->
             ItemDto(
@@ -152,11 +153,31 @@ class ItemService(
         val item = itemRepo.findByObjectId(itemId) ?: throw NotFoundException("item 不存在")
         val project = projects.findAll().firstOrNull { it.id == item.projectId }
             ?: throw NotFoundException("项目不存在")
-        val dto = list(project.key).first { it.itemId == itemId }
-        return dto.copy(
-            gitRefs = gitRefs.findByItemId(item.id!!).map {
-                GitRefDto(it.kind, it.repo, it.ref, it.url, it.state)
-            },
+        // 已软删 item 不在 list()(回收站预览语义):单独组装
+        val fromList = list(project.key).firstOrNull { it.itemId == itemId }
+        if (fromList != null) {
+            return fromList.copy(
+                gitRefs = gitRefs.findByItemId(item.id!!).map {
+                    GitRefDto(it.kind, it.repo, it.ref, it.url, it.state)
+                },
+            )
+        }
+        val status = statuses.findByProjectIdOrderByPosition(project.id!!)
+            .firstOrNull { it.objectId == item.statusObjectId }
+        val assignee = item.assigneeObjectId?.let { members.findByObjectId(it) }
+        val attrNames = definitions.findByWorkspaceId(project.workspaceId).associate { it.id!! to it.name }
+        val reqs = requirementRepo.findByItemId(item.id!!)
+        return ItemDto(
+            itemId = item.objectId,
+            number = "${project.key}-${item.number}",
+            title = item.title,
+            description = item.description,
+            type = item.type,
+            status = "[已删除] ${status?.name ?: "?"}",
+            assignee = assignee?.displayName,
+            parentItemId = item.parentObjectId,
+            externalRef = item.externalRef,
+            requirements = reqs.map { RequirementDto(attrNames[it.attributeDefinitionId] ?: "?", it.minLevel) },
         )
     }
 
@@ -276,16 +297,90 @@ class ItemService(
         return get(item.objectId)
     }
 
-    /** 删除 item:需求随删、活动随删(FK 级联);有子 item 拒绝(409)。 */
+    /** 删除 item(V9-Q9 软删):置 deleted_at,连子树;全列表类查询自动过滤;回收站可恢复/物理删。 */
     @Transactional
     fun delete(itemId: UUID) {
         val item = itemRepo.findByObjectId(itemId) ?: throw NotFoundException("item 不存在")
-        if (itemRepo.existsByParentObjectId(itemId)) {
-            throw ConflictException("请先处理子 item(删除或移出)")
-        }
-        requirementRepo.deleteByItemId(item.id!!)
-        itemRepo.delete(item)
+        softDeleteSubtree(item.id!!, Instant.now().toString())
         feasibilityService.recomputeProjectSignal(item.projectId) // V9-S1
+    }
+
+    /** 递归 CTE:子树经 parent_object_id 链接。 */
+    private fun subtreeUpdate(rootId: Long, atSql: String?) {
+        val atClause = if (atSql == null) "null" else "'$atSql'"
+        jdbc.update(
+            """
+            WITH RECURSIVE subtree AS (
+                SELECT id, object_id FROM item WHERE id = $rootId
+                UNION ALL
+                SELECT i.id, i.object_id FROM item i JOIN subtree s ON i.parent_object_id = s.object_id
+            )
+            UPDATE item SET deleted_at = $atClause WHERE id IN (SELECT id FROM subtree)
+            """.trimIndent(),
+        )
+    }
+
+    private fun softDeleteSubtree(rootId: Long, atSql: String) = subtreeUpdate(rootId, atSql)
+
+    private fun restoreSubtree(rootId: Long) = subtreeUpdate(rootId, null)
+
+    /** 物理删(回收站彻底删除):需求无级联先手动清(子树全量),item 子树随后真删。 */
+    @Transactional
+    fun purgeSubtree(rootId: Long) {
+        val cte = """
+            WITH RECURSIVE subtree AS (
+                SELECT id, object_id FROM item WHERE id = $rootId
+                UNION ALL
+                SELECT i.id, i.object_id FROM item i JOIN subtree s ON i.parent_object_id = s.object_id
+            )
+        """
+        jdbc.update("$cte DELETE FROM requirement WHERE item_id IN (SELECT id FROM subtree)")
+        jdbc.update("$cte DELETE FROM item WHERE id IN (SELECT id FROM subtree)")
+    }
+
+    /** 回收站列表(已删 item 的子树根,删除时间倒序;子条目随父恢复,不单列)。 */
+    fun recycleBin(): List<RecycleItemDto> {
+        val rows = itemRepo.findByDeletedAtIsNotNullOrderByDeletedAtDesc()
+        val rowObjectIds = rows.map { it.objectId }.toSet()
+        // 只留子树根:父本身未删的才是根
+        val roots = rows.filter { r ->
+            val parent = r.parentObjectId?.let { itemRepo.findByObjectId(it) }
+            parent == null || parent.deletedAt == null
+        }
+        val projectMap = projects.findAll().associateBy { it.id }
+        return roots.map { item ->
+            val project = projectMap[item.projectId]
+            RecycleItemDto(
+                itemId = item.objectId,
+                number = "${project?.key ?: "?"}-${item.number}",
+                title = item.title,
+                projectName = project?.name ?: "?",
+                deletedAt = item.deletedAt?.toString(),
+            )
+        }
+    }
+
+    data class RecycleItemDto(
+        val itemId: UUID,
+        val number: String,
+        val title: String,
+        val projectName: String,
+        val deletedAt: String?,
+    )
+
+    @Transactional
+    fun restore(itemId: UUID) {
+        val item = itemRepo.findByObjectId(itemId) ?: throw NotFoundException("item 不存在")
+        if (item.deletedAt == null) throw ConflictException("该 item 不在回收站")
+        restoreSubtree(item.id!!)
+    }
+
+    @Transactional
+    fun purge(itemId: UUID) {
+        val item = itemRepo.findByObjectId(itemId) ?: throw NotFoundException("item 不存在")
+        if (item.deletedAt == null) throw ConflictException("该 item 不在回收站")
+        purgeSubtree(item.id!!)
+        feasibilityService.recomputeProjectSignal(item.projectId)
     }
 
     private fun actorId(): Long = memberService.current().id!!

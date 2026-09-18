@@ -161,6 +161,7 @@ data class Item(
     val startDate: LocalDate? = null,
     val dueDate: LocalDate? = null,
     val feasSignal: String? = null,
+    val deletedAt: Instant? = null,
     val createdBy: Long? = null,
     val createdAt: Instant = Instant.now(),
     val updatedAt: Instant = Instant.now(),

@@ -52,6 +52,7 @@ export function AppNav() {
     { href: "/attributes", label: t.nav.attributes },
     { href: "/members", label: t.nav.members },
     { href: "/standup", label: t.nav.standup },
+    { href: "/recycle-bin", label: t.nav.recycle_bin },
   ];
 
   return (

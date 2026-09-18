@@ -96,7 +96,7 @@ class DependencyService(
 
     /** 项目内被阻塞 item 的内部 id 集合(看板列表用;依赖未终态即阻塞,终态自身不算阻塞他人)。 */
     fun blockedItemIds(projectId: Long): Set<Long> {
-        val projectItems = items.findByProjectIdOrderByNumber(projectId)
+        val projectItems = items.findByProjectIdAndDeletedAtIsNullOrderByNumber(projectId)
         val itemById = projectItems.associateBy { it.id }
         val finalByObjectId = statuses.findByProjectIdOrderByPosition(projectId)
             .associate { it.objectId to it.isFinal }

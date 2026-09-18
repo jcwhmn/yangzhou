@@ -50,7 +50,7 @@ class StandupService(
             val pid = project.id!!
             val blockedIds = dependencyService.blockedItemIds(pid)
             val statusById = statuses.findByProjectIdOrderByPosition(pid).associateBy { it.objectId }
-            items.findByProjectIdOrderByNumber(pid).forEach { item ->
+            items.findByProjectIdAndDeletedAtIsNullOrderByNumber(pid).forEach { item ->
                 if (item.assigneeObjectId != member.objectId) return@forEach
                 val status = statusById[item.statusObjectId] ?: return@forEach
                 val dto = StandupItemDto(

@@ -110,7 +110,7 @@ class TimeEntryService(
 
     fun summary(projectKey: String): List<MemberSummary> {
         val project = projects.findByKey(projectKey) ?: throw NotFoundException("项目不存在:$projectKey")
-        val projectItems = items.findByProjectIdOrderByNumber(project.id!!)
+        val projectItems = items.findByProjectIdAndDeletedAtIsNullOrderByNumber(project.id!!)
         val rows = timeEntries.findByItemIdIn(projectItems.mapNotNull { it.id })
         val memberMap = members.findAllById(rows.map { it.memberId }.toSet()).associateBy { it.id }
         return rows.groupBy { it.memberId }
