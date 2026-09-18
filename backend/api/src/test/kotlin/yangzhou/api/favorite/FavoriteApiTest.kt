@@ -22,7 +22,8 @@ class FavoriteApiTest : AbstractApiTest() {
             authed.get().uri("/api/favorites").exchange()
                 .expectStatus().isOk().expectBody(String::class.java).returnResult().responseBody!!,
         )
-        assertEquals(2, favs.size())
+        println("DEBUG_FAVS=" + favs.toString())
+        assertEquals(2, favs.size(), "favs=\$favs")
         assertEquals("AAA", favs[0]["key"].asText())
 
         // 移除 AAA → 只剩 BBB
@@ -39,12 +40,18 @@ class FavoriteApiTest : AbstractApiTest() {
     @Test
     fun `未知项目 404——未收藏 DELETE 也 204(幂等)`() {
         val authed = bootstrapAndAuth()
-        authed.put().uri("/api/projects/NOPE/favorite").exchange().expectStatus().isNotFound()
-        authed.delete().uri("/api/projects/NOPE/favorite").exchange().expectStatus().isNotFound()
+        val nopePut = authed.put().uri("/api/projects/NOPE/favorite").exchange()
+        println("DEBUG_NOPE_PUT=" + String(nopePut.expectBody(ByteArray::class.java).returnResult().responseBody ?: ByteArray(0)))
+        nopePut.expectStatus().isNotFound()
+        val nopeDel = authed.delete().uri("/api/projects/NOPE/favorite").exchange()
+        println("DEBUG_NOPE_DEL=" + String(nopeDel.expectBody(ByteArray::class.java).returnResult().responseBody ?: ByteArray(0)))
+        nopeDel.expectStatus().isNotFound()
 
         createProject(authed, "CHE")
         authed.delete().uri("/api/projects/CHE/favorite")
             .exchange().expectStatus().isNoContent() // 未收藏时删除 = 幂等无操作
-        assertTrue(true)
+        val delChe = authed.delete().uri("/api/projects/CHE/favorite").exchange()
+        println("DEBUG_DEL_CHE=" + String(delChe.expectBody(ByteArray::class.java).returnResult().responseBody ?: ByteArray(0)))
+        delChe.expectStatus().isNoContent()
     }
 }
