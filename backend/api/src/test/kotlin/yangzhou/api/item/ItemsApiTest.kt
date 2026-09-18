@@ -179,7 +179,7 @@ class ItemsApiTest : AbstractApiTest() {
     }
 
     @Test
-    fun `删除 item——204 后 404,有子 item 409,需求级联清`() {
+    fun `删除 item——V9 软删连子树,回收站可恢复,物理删后 404`() {
         val authed = bootstrapAndAuth()
         createSkillAttribute(authed, "Java")
         createProject(authed, "CHE")
@@ -191,20 +191,41 @@ class ItemsApiTest : AbstractApiTest() {
                 .exchange().expectStatus().isCreated()
                 .expectBody(String::class.java).returnResult().responseBody!!,
         )
+        val parentId = parent["itemId"].asText()
+        val childId = child["itemId"].asText()
 
-        // 有子 → 409
-        authed.delete().uri("/api/items/${parent["itemId"].asText()}")
-            .exchange().expectStatus().isEqualTo(409)
+        // 删父 → 软删连子树:看板不含两者;详情仍可达(回收站预览语义)
+        val del = authed.delete().uri("/api/items/$parentId")
+            .exchange()
+        println("DEBUG_DEL=" + del.expectBody(String::class.java).returnResult().responseBody)
+        // 打印服务端日志中最近的约束错误
+        println("DEBUG_HINT=查看 bootRun 日志的 DataIntegrityViolation 详情")
+        del.expectStatus().isNoContent()
+        val board = authed.get().uri("/api/projects/CHE/items").exchange()
+            .expectStatus().isOk().expectBody(String::class.java).returnResult().responseBody!!
+        assertTrue(!board.contains("父"))
+        assertTrue(!board.contains("子"))
+        authed.get().uri("/api/items/$childId")
+            .exchange().expectStatus().isOk()
 
-        // 删子(无子 item)→ 204,需求随删(无活动残留由 FK 级联保证)
-        authed.delete().uri("/api/items/${child["itemId"].asText()}")
+        // 回收站列出父
+        val bin = json.readTree(
+            authed.get().uri("/api/recycle-bin").exchange()
+                .expectStatus().isOk().expectBody(String::class.java).returnResult().responseBody!!,
+        )
+        assertEquals(1, bin.size())
+        assertEquals("CHE-1", bin[0]["number"].asText())
+
+        // 恢复父 → 子树全恢复(看板重现)
+        authed.post().uri("/api/recycle-bin/$parentId/restore")
             .exchange().expectStatus().isNoContent()
-        authed.get().uri("/api/items/${child["itemId"].asText()}")
-            .exchange().expectStatus().isNotFound()
+        assertTrue(authed.get().uri("/api/projects/CHE/items").exchange()
+            .expectBody(String::class.java).returnResult().responseBody!!.contains("父"))
 
-        // 删父(已无子)→ 204
-        authed.delete().uri("/api/items/${parent["itemId"].asText()}")
-            .exchange().expectStatus().isNoContent()
+        // 再删 + 物理删 → 详情 404(真删,需求级联清)
+        authed.delete().uri("/api/items/$parentId").exchange().expectStatus().isNoContent()
+        authed.delete().uri("/api/recycle-bin/$parentId").exchange().expectStatus().isNoContent()
+        authed.get().uri("/api/items/$parentId").exchange().expectStatus().isNotFound()
     }
 
     @Test

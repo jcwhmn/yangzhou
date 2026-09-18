@@ -8,6 +8,7 @@ export const t = {
     members: "成员",
     favorites: "⭐ 收藏",
     standup: "站会",
+    recycle_bin: "回收站",
   },
   fav: {
     empty: "暂无收藏——在项目卡上点 ☆",

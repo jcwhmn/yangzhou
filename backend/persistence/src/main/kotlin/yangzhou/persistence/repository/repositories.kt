@@ -97,7 +97,8 @@ interface StatusTransitionRepository : CrudRepository<StatusTransition, Long> {
 interface ItemRepository : CrudRepository<Item, Long> {
     fun findByObjectId(objectId: UUID): Item?
     fun findByProjectIdAndStatusObjectId(projectId: Long, statusObjectId: UUID): List<Item>
-    fun findByProjectIdOrderByNumber(projectId: Long): List<Item>
+    fun findByProjectIdAndDeletedAtIsNullOrderByNumber(projectId: Long): List<Item>
+    fun findByDeletedAtIsNotNullOrderByDeletedAtDesc(): List<Item>
     fun findByProjectIdAndNumber(projectId: Long, number: Int): Item?
     fun findByProjectIdAndExternalRef(projectId: Long, externalRef: String): Item?
     fun existsByParentObjectId(parentObjectId: UUID): Boolean

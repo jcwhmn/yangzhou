@@ -35,8 +35,9 @@ class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException::class)
-    fun integrity(e: org.springframework.dao.DataIntegrityViolationException, req: HttpServletRequest) =
-        error(HttpStatus.CONFLICT, "CONFLICT", "数据约束冲突", req)
+    fun integrity(e: org.springframework.dao.DataIntegrityViolationException, req: HttpServletRequest): ResponseEntity<ApiError> {
+        return error(HttpStatus.CONFLICT, "CONFLICT", "数据约束冲突", req)
+    }
 
     @ExceptionHandler(BadRequestException::class, IllegalArgumentException::class)
     fun badRequest(e: Exception, req: HttpServletRequest) =

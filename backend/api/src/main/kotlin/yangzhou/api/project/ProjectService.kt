@@ -58,7 +58,7 @@ class ProjectService(
     fun gantt(key: String): GanttDto {
         val project = projects.findByKey(key) ?: throw NotFoundException("项目不存在:$key")
         val projectId = project.id ?: error("no id")
-        val all = items.findByProjectIdOrderByNumber(projectId)
+        val all = items.findByProjectIdAndDeletedAtIsNullOrderByNumber(projectId)
         val byParent = all.groupBy { it.parentObjectId }
         val statusById = statuses.findByProjectIdOrderByPosition(projectId).associateBy { it.objectId }
         val today = LocalDate.now()

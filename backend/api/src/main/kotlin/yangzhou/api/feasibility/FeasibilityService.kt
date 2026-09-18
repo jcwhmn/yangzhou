@@ -60,7 +60,7 @@ class FeasibilityService(
     fun project(projectKey: String): ProjectResultDto {
         val project = projects.findByKey(projectKey) ?: throw NotFoundException("项目不存在:$projectKey")
         val member = domainMember()
-        val projectItems = itemRepo.findByProjectIdOrderByNumber(project.id!!)
+        val projectItems = itemRepo.findByProjectIdAndDeletedAtIsNullOrderByNumber(project.id!!)
         val domainItems = projectItems.map { itemToDomain(it) }
         val rollup: RollupResult = MatchingEngine.rollupProject(
             yangzhou.domain.Project(project.key, domainItems),
@@ -116,7 +116,7 @@ class FeasibilityService(
 
     /** 重算项目:全部 item 冗余 + 聚合到 project(RED>YELLOW>GREEN;无 item = null)。 */
     fun recomputeProjectSignal(projectId: Long): String? {
-        val projectItems = itemRepo.findByProjectIdOrderByNumber(projectId)
+        val projectItems = itemRepo.findByProjectIdAndDeletedAtIsNullOrderByNumber(projectId)
         var worst: String? = null
         for (it in projectItems) {
             val s = recomputeItemSignal(it)
