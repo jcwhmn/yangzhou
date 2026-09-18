@@ -76,6 +76,8 @@ type Activity = {
 type ReqRow = { attribute: string; minLevel: number | null };
 type CommentDto = { commentId: string; body: string; author: string; createdAt: string };
 type Dep = { dependencyItemId: string; itemId: string; number: string; title: string; statusName: string; final: boolean };
+type ChecklistEntry = { checklistItemId: string; text: string; done: boolean };
+type Checklist = { entries: ChecklistEntry[]; doneCount: number; totalCount: number };
 type TimeEntry = {
   timeEntryId: string;
   member: string;
@@ -129,6 +131,8 @@ export default function ItemDetailPage() {
   const [depBlocked, setDepBlocked] = useState(false);
   const [depAddOpen, setDepAddOpen] = useState(false);
   const [depPick, setDepPick] = useState("");
+  const [checklist, setChecklist] = useState<Checklist | null>(null);
+  const [newCheckText, setNewCheckText] = useState("");
 
   const load = useCallback(async () => {
     const [it, project, attrs, feas, cands, acts] = await Promise.all([
@@ -266,6 +270,35 @@ export default function ItemDetailPage() {
     await api(`/api/dependencies/${rowId}`, { method: "DELETE" }).catch(() => {});
     const d = await api<{ dependencies: Dep[]; blocked: boolean }>(`/api/items/${itemId}/dependencies`);
     setDeps(d.dependencies); setDepBlocked(d.blocked);
+  }
+
+  async function reloadChecklist() {
+    setChecklist(await api<Checklist>(`/api/items/${itemId}/checklist`).catch(() => null));
+  }
+
+  async function addCheckEntry() {
+    if (!newCheckText.trim()) return;
+    setError("");
+    try {
+      await api(`/api/items/${itemId}/checklist`, {
+        method: "POST",
+        body: JSON.stringify({ text: newCheckText.trim() }),
+      });
+      setNewCheckText("");
+      await reloadChecklist();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "添加失败");
+    }
+  }
+
+  async function toggleCheckEntry(entryId: string, done: boolean) {
+    await api(`/api/checklist/${entryId}`, { method: "PATCH", body: JSON.stringify({ done }) }).catch(() => {});
+    await reloadChecklist();
+  }
+
+  async function removeCheckEntry(entryId: string) {
+    await api(`/api/checklist/${entryId}`, { method: "DELETE" }).catch(() => {});
+    await reloadChecklist();
   }
 
   const runningEntry = timeLog?.entries.find((e) => e.endedAt === null) ?? null;
@@ -492,6 +525,44 @@ export default function ItemDetailPage() {
         onSave={saveRequirements}
         attributes={attributes}
       />
+
+      <Box sx={{ mt: 3 }}>
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+          <Typography variant="h6">检查清单</Typography>
+          {checklist && checklist.totalCount > 0 && (
+            <Chip size="small" label={`${checklist.doneCount}/${checklist.totalCount}`} color={checklist.doneCount === checklist.totalCount ? "success" : "default"} />
+          )}
+        </Stack>
+        <Stack spacing={0.5}>
+          {(checklist?.entries ?? []).map((e) => (
+            <Stack key={e.checklistItemId} direction="row" spacing={1} alignItems="center">
+              <input
+                type="checkbox"
+                checked={e.done}
+                onChange={() => toggleCheckEntry(e.checklistItemId, !e.done)}
+              />
+              <Typography variant="body2" sx={{ textDecoration: e.done ? "line-through" : "none", color: e.done ? "text.secondary" : "inherit" }}>
+                {e.text}
+              </Typography>
+              <Button size="small" color="error" onClick={() => removeCheckEntry(e.checklistItemId)}>
+                删除
+              </Button>
+            </Stack>
+          ))}
+        </Stack>
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
+          <TextField
+            size="small"
+            placeholder="加一条检查项…"
+            value={newCheckText}
+            onChange={(e) => setNewCheckText(e.target.value)}
+            sx={{ width: 300 }}
+          />
+          <Button size="small" variant="outlined" onClick={addCheckEntry} disabled={!newCheckText.trim()}>
+            添加
+          </Button>
+        </Stack>
+      </Box>
 
       <Box sx={{ mt: 3 }}>
         <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>

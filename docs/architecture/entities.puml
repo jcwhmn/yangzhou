@@ -72,6 +72,11 @@ class TimeEntry {
   minutes: Int?
   note: String?
 }
+class ChecklistItem {
+  text: String
+  done: Boolean
+  position: Int
+}
 class ItemDependency
 class Requirement {
   minLevel: Int?
@@ -114,6 +119,7 @@ Notification "*" --> "1" Member : 收件人
 Notification "*" --> "1" Item
 TimeEntry "*" --> "1" Item : 工时
 TimeEntry "*" --> "1" Member : 记录人
+ChecklistItem "*" --> "1" Item : 检查清单
 ItemDependency "*" --> "1" Item : 本 item(被阻塞方)
 ItemDependency "*" --> "1" Item : 依赖的 item
 Item "*" *-- "1" Status : 当前状态

@@ -181,6 +181,19 @@ data class Notification(
     val createdAt: Instant = Instant.now(),
 )
 
+/** V9:item 检查清单条目(text + done,随 item 级联)。 */
+@Table("checklist_item")
+data class ChecklistItem(
+    @Id val id: Long? = null,
+    val objectId: UUID = UUID.randomUUID(),
+    val itemId: Long,
+    val text: String,
+    val done: Boolean = false,
+    val position: Int = 0,
+    val createdAt: Instant = Instant.now(),
+    val updatedAt: Instant = Instant.now(),
+)
+
 /** V9:item 依赖(阻塞关系):本 item 依赖 depends_on_item;依赖未终态 → 本 item 被阻塞。 */
 @Table("item_dependency")
 data class ItemDependency(

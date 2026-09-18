@@ -5,6 +5,7 @@ import yangzhou.persistence.AttributeDefinition
 import yangzhou.persistence.Capability
 import yangzhou.persistence.Comment
 import yangzhou.persistence.ItemActivity
+import yangzhou.persistence.ChecklistItem
 import yangzhou.persistence.ItemDependency
 import yangzhou.persistence.ItemGitRef
 import yangzhou.persistence.Item
@@ -131,6 +132,12 @@ interface TimeEntryRepository : CrudRepository<TimeEntry, Long> {
     fun findByMemberIdAndEndedAtIsNull(memberId: Long): List<TimeEntry>
     fun findByItemIdIn(itemIds: Collection<Long>): List<TimeEntry>
     fun findByObjectId(objectId: UUID): TimeEntry?
+}
+
+interface ChecklistItemRepository : CrudRepository<ChecklistItem, Long> {
+    fun findByItemIdOrderByPositionAscIdAsc(itemId: Long): List<ChecklistItem>
+    fun findByObjectId(objectId: UUID): ChecklistItem?
+    fun deleteByObjectId(objectId: UUID)
 }
 
 interface ItemDependencyRepository : CrudRepository<ItemDependency, Long> {
