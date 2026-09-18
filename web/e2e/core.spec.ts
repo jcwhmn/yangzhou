@@ -127,3 +127,65 @@ test("看板反映新状态;通知页可达", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "通知" })).toBeVisible();
   await expect(page.getByRole("button", { name: "全部已读" })).toBeVisible();
 });
+
+test("收藏——卡片☆切换与导航下拉直达", async ({ page }) => {
+  await login(page);
+  // 清理历史收藏(收藏随 DB 持久,跨运行会累积同名条目)
+  await page.evaluate(async () => {
+    const token = localStorage.getItem("yz-token");
+    const favs = await fetch("/api/favorites", { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json());
+    for (const f of favs) {
+      await fetch(`/api/projects/${f.key}/favorite`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+    }
+  });
+  await page.goto("/");
+  // KEY 项目卡上点 ☆ 收藏
+  const card = page.locator(".MuiCard-root", { hasText: KEY }).first();
+  await card.getByLabel("favorite").click();
+  await expect(card.getByText("★")).toBeVisible();
+
+  // 导航 ⭐ 下拉列出 KEY
+  await page.getByRole("button", { name: "⭐ 收藏" }).click();
+  await expect(page.getByRole("menu").getByRole("link", { name: "E2E 冒烟项目" })).toBeVisible();
+
+  // 取消收藏(下拉内移除)→ 菜单里消失
+  await page.getByRole("menu").getByRole("button", { name: "移除" }).first().click();
+  await expect(page.getByRole("menu").getByRole("link", { name: "E2E 冒烟项目" })).toHaveCount(0);
+});
+
+test("看板刷新按钮可用", async ({ page }) => {
+  await login(page);
+  await page.goto(`/p/${KEY}`);
+  await page.getByRole("button", { name: "刷新" }).click();
+  await expect(page.getByRole("heading", { name: "To Do", exact: false })).toBeVisible();
+});
+
+test("详情——编辑需求入口打开对话框", async ({ page }) => {
+  await login(page);
+  await page.goto(`/p/${KEY}`);
+  await page.getByText("E2E 冒烟 item").first().click();
+  await page.getByRole("button", { name: "编辑需求" }).click();
+  await expect(page.getByRole("heading", { name: "需求" })).toBeVisible();
+  await page.getByRole("button", { name: "关闭" }).click();
+});
+
+test("回收站——删除后可恢复", async ({ page }) => {
+  await login(page);
+  await page.goto(`/p/${KEY}`);
+  await page.getByPlaceholder("新建 item").fill("E2E 回收站 item");
+  await page.getByRole("button", { name: "新建 ITEM" }).click();
+  await page.getByText("E2E 回收站 item").first().waitFor();
+  await page.getByText("E2E 回收站 item").first().click();
+
+  // 详情删除(原生 confirm 对话框,自动接受)
+  page.once("dialog", (d) => d.accept());
+  await page.getByRole("button", { name: "删除", exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`/p/${KEY}$`));
+
+  // 回收站列出 → 恢复 → 看板重现
+  await page.goto("/recycle-bin");
+  await expect(page.getByText("E2E 回收站 item")).toBeVisible();
+  await page.getByRole("button", { name: "恢复" }).first().click();
+  await page.goto(`/p/${KEY}`);
+  await expect(page.getByText("E2E 回收站 item").first()).toBeVisible();
+});
