@@ -22,7 +22,9 @@ export async function api<T = unknown>(path: string, init: RequestInit = {}): Pr
     },
   });
   if (res.status === 401 && typeof window !== "undefined") {
-    window.location.href = "/login";
+    // 过期/无效 token:清掉,避免 login 页 401→跳转 死循环(V9-S2 铃铛后台请求引入)
+    localStorage.removeItem("yz-token");
+    if (window.location.pathname !== "/login") window.location.href = "/login";
     throw new ApiError(401, "未认证");
   }
   if (!res.ok) {
