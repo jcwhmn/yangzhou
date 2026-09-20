@@ -80,6 +80,7 @@ data class AttributeDefinition(
     val name: String,
     val kind: String = "skill",
     val leveled: Boolean = false,
+    val parentId: Long? = null,
     val createdAt: Instant = Instant.now(),
     val updatedAt: Instant = Instant.now(),
 )

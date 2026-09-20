@@ -26,7 +26,7 @@ private fun usage() {
         用法:yz <命令> [参数] [选项]
 
           login [-u 用户名] [-p 密码] [--server URL]      登录(默认 8080;全新服务器自动 bootstrap)
-          attrs create <属性> [--kind skill|label] [--leveled]   建词表属性
+          attrs create <属性> [--kind skill|label|category] [--leveled] [--parent <分类>]  建词表属性
           members add <显示名>                         建虚拟成员(无凭据,不登录)
           members list [--json]                        成员目录(含我与虚拟)
           members rm <成员名>                          删虚拟成员(登录账号不可删)
@@ -212,9 +212,20 @@ private fun run(args: List<String>) {
             val name = rest.getOrNull(0) ?: error("缺少属性名")
             val kind = flags["kind"] ?: "skill"
             val leveled = flags.containsKey("leveled") || flags["kind"] == null || flags["kind"] == "skill"
-            val body = api.json("POST", "/api/attributes", mapOf("name" to name, "kind" to kind, "leveled" to leveled))
+            // V10-S1:--category 建分类;--parent <分类名> 挂叶子
+            val parentName = flags["parent"]
+            var parentId: String? = null
+            if (parentName != null) {
+                val parent = api.json("GET", "/api/attributes")
+                    .firstOrNull { it["name"].asString() == parentName && it["kind"].asString() == "category" }
+                    ?: error("分类不存在:\$parentName")
+                parentId = parent["attributeId"].asString()
+            }
+            val bodyMap = mutableMapOf("name" to name, "kind" to kind, "leveled" to leveled)
+            if (parentId != null) bodyMap["parentId"] = parentId
+            val body = api.json("POST", "/api/attributes", bodyMap)
             printJson(body, flags)
-            println("属性 ${body["name"].asString()}(${body["kind"].asString()}${if (body["leveled"].asBoolean()) "/分级" else ""})已创建")
+            println("属性 " + body["name"].asString() + "(" + body["kind"].asString() + (if (body["leveled"].asBoolean()) "/分级" else "") + ")已创建")
         }
 
         "attrs list" -> {

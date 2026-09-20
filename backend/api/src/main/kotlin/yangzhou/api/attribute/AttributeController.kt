@@ -20,7 +20,7 @@ class AttributeController(private val service: AttributeService) {
     @PostMapping("/attributes")
     @ResponseStatus(HttpStatus.CREATED)
     fun create(@Valid @RequestBody request: CreateAttributeRequest): AttributeService.AttributeDto =
-        service.create(request.name.trim(), request.kind, request.leveled)
+        service.create(request.name.trim(), request.kind, request.leveled, request.parentId)
 
     @GetMapping("/attributes")
     fun list(): List<AttributeService.AttributeDto> = service.list()
@@ -29,7 +29,7 @@ class AttributeController(private val service: AttributeService) {
     fun update(
         @PathVariable attributeId: UUID,
         @RequestBody request: UpdateAttributeRequest,
-    ): AttributeService.AttributeDto = service.update(attributeId, request.kind, request.leveled)
+    ): AttributeService.AttributeDto = service.update(attributeId, request.kind, request.leveled, request.parentObjectId, request.unassign)
 
     @DeleteMapping("/attributes/{attributeId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
