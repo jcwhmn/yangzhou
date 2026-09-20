@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Box,
   Button,
   Card,
   CardContent,
@@ -28,7 +29,14 @@ type Member = {
 };
 type TokenStatus = { configured: boolean; tokenHint: string | null };
 type Team = { teamId: string; name: string; members: { memberId: string; displayName: string }[] };
-type Attribute = { attributeId: string; name: string; kind: string; leveled: boolean };
+type Attribute = {
+  attributeId: string;
+  name: string;
+  kind: string;
+  leveled: boolean;
+  parentId: number | null;
+  categoryName: string | null;
+};
 type Capability = { attribute: string; level: number | null };
 
 /** 成员管理页:虚拟成员增删 + 逐成员能力自评 + Team 分组(Q2 dogfood:UI 面向"我管理一群人")。 */
@@ -269,35 +277,51 @@ export default function MembersPage() {
                   {t.item.save}
                 </Button>
               </Stack>
-              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                {attributes.map((a) => {
-                  const has = caps.get(m.memberId)?.has(a.name) ?? false;
-                  const level = caps.get(m.memberId)?.get(a.name);
-                  const value = !has ? "none" : level === null || level === undefined ? "unrated" : String(level);
-                  return (
-                    <Stack key={a.attributeId} direction="row" spacing={0.5} alignItems="center">
-                      <Typography variant="caption" color="text.secondary">
-                        {a.name}
-                      </Typography>
-                      <Select
-                        size="small"
-                        value={value}
-                        onChange={(e) => setCap(m.memberId, a.name, String(e.target.value))}
-                        sx={{ minWidth: 110, fontSize: 13 }}
-                      >
-                        <MenuItem value="none">{t.caps.none}</MenuItem>
-                        <MenuItem value="unrated">{a.leveled ? t.caps.unrated : t.caps.has}</MenuItem>
-                        {a.leveled &&
-                          [1, 2, 3, 4].map((l) => (
-                            <MenuItem key={l} value={String(l)}>
-                              {t.caps.level(l)}
-                            </MenuItem>
-                          ))}
-                      </Select>
-                    </Stack>
-                  );
-                })}
-              </Stack>
+              <Stack spacing={1.5}>
+                  {(() => {
+                    const groups = new Map<string, typeof attributes>();
+                    attributes.forEach((a) => {
+                      const g = a.categoryName ?? "未分类";
+                      groups.set(g, [...(groups.get(g) ?? []), a]);
+                    });
+                    return [...groups.entries()].map(([cat, attrs]) => (
+                      <Box key={cat}>
+                        <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>
+                          {cat}
+                        </Typography>
+                        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                          {attrs.map((a) => {
+                            const has = caps.get(m.memberId)?.has(a.name) ?? false;
+                            const level = caps.get(m.memberId)?.get(a.name);
+                            const value = !has ? "none" : level === null || level === undefined ? "unrated" : String(level);
+                            return (
+                              <Stack key={a.attributeId} direction="row" spacing={0.5} alignItems="center">
+                                <Typography variant="caption" color="text.secondary">
+                                  {a.name}
+                                </Typography>
+                                <Select
+                                  size="small"
+                                  value={value}
+                                  onChange={(e) => setCap(m.memberId, a.name, String(e.target.value))}
+                                  sx={{ minWidth: 110, fontSize: 13 }}
+                                >
+                                  <MenuItem value="none">{t.caps.none}</MenuItem>
+                                  <MenuItem value="unrated">{a.leveled ? t.caps.unrated : t.caps.has}</MenuItem>
+                                  {a.leveled &&
+                                    [1, 2, 3, 4].map((l) => (
+                                      <MenuItem key={l} value={String(l)}>
+                                        {t.caps.level(l)}
+                                      </MenuItem>
+                                    ))}
+                                </Select>
+                              </Stack>
+                            );
+                          })}
+                        </Stack>
+                      </Box>
+                    ));
+                  })()}
+                </Stack>
             </CardContent>
           </Card>
         ))}

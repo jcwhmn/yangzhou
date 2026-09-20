@@ -56,6 +56,7 @@ interface AttributeDefinitionRepository : CrudRepository<AttributeDefinition, Lo
     fun findByWorkspaceIdAndName(workspaceId: Long, name: String): AttributeDefinition?
     fun findByWorkspaceIdAndObjectId(workspaceId: Long, objectId: UUID): AttributeDefinition?
     fun existsByWorkspaceIdAndName(workspaceId: Long, name: String): Boolean
+    fun findByWorkspaceIdAndParentIdIsNullOrderByKindAscIdAsc(workspaceId: Long): List<AttributeDefinition>
 }
 
 interface CapabilityRepository : CrudRepository<Capability, Long> {
