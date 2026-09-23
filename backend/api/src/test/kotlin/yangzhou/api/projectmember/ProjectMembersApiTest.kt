@@ -79,6 +79,7 @@ class ProjectMembersApiTest : AbstractApiTest() {
         val (authed, xiaoli, xiaowang) = seed()
         assertEquals(201, post(authed, "CHE", xiaoli).status.value())
         assertEquals(201, post(authed, "CHE", xiaowang).status.value())
+        // V10-Q9:xiaowang 无进行中 item,可直接删(此处 item 未指派给他)
 
         assertEquals(204, delete(authed, "CHE", xiaowang).status.value())
         assertEquals(404, delete(authed, "CHE", xiaowang).status.value())
@@ -115,12 +116,21 @@ class ProjectMembersApiTest : AbstractApiTest() {
     }
 
     @Test
-    fun `删除成员 - 项目成员行级联清 - assignee置空(V5语义不变)`() {
+    fun `删除成员 - V10 移除约束(有进行中 item 409)- 项目成员行级联清`() {
         val (authed, xiaoli, _) = seed()
         assertEquals(201, post(authed, "CHE", xiaoli).status.value())
         val item = createItem(authed, "CHE", "删人置空")
         val itemId = item["itemId"].asText()
         assertEquals(200, assign(authed, itemId, xiaoli).status.value())
+
+        // V10-Q9:先完成 item(终态)再删成员
+        val doneStatusId = json.readTree(
+            authed.get().uri("/api/projects/CHE").exchange()
+                .expectStatus().isOk().expectBody(String::class.java).returnResult().responseBody!!,
+        )["statuses"].last { it["isFinal"].asBoolean() }["statusId"].asText()
+        authed.patch().uri("/api/items/$itemId")
+            .body(mapOf("statusItemId" to doneStatusId))
+            .exchange().expectStatus().isOk()
 
         authed.delete().uri("/api/members/$xiaoli").exchange().expectStatus().isNoContent()
 
