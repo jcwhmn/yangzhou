@@ -21,6 +21,8 @@ class MemberService(
     private val members: MemberRepository,
     private val capabilities: CapabilityRepository,
     private val workspaceService: WorkspaceService,
+    private val items: yangzhou.persistence.repository.ItemRepository,
+    private val statuses: yangzhou.persistence.repository.StatusRepository,
 ) {
 
     data class MemberResponse(
@@ -57,11 +59,16 @@ class MemberService(
         return saved.toResponse()
     }
 
-    /** 删除成员:仅虚拟成员可删(我自己不可删);能力随删,team_member 由 FK 级联。 */
+    /** 删除成员:仅虚拟成员可删(我自己不可删);能力随删,team_member 由 FK 级联。V10-Q9:有非终态 assignee item → 409。 */
     @Transactional
     fun delete(memberId: UUID) {
         val member = members.findByObjectId(memberId) ?: throw NotFoundException("成员不存在")
         if (member.passwordHash != null) throw ConflictException("登录账号不可删除")
+        val activeItems = items.findByAssigneeObjectIdAndDeletedAtIsNull(member.objectId)
+            .filter { item -> statuses.findByObjectId(item.statusObjectId)?.isFinal != true }
+        if (activeItems.isNotEmpty()) {
+            throw ConflictException("该成员仍有进行中 item(\${activeItems.size} 个),请先改派或完成")
+        }
         capabilities.deleteByMemberId(member.id!!)
         members.delete(member)
     }

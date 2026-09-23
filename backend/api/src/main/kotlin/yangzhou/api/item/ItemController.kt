@@ -66,5 +66,5 @@ class ItemController(private val service: ItemService) {
     fun update(
         @PathVariable itemId: UUID,
         @RequestBody request: UpdateItemRequest,
-    ): ItemService.ItemDto = service.update(itemId, request.title, request.description, request.type, request.statusItemId, request.parentItemId, request.startDate, request.dueDate)
+    ): ItemService.ItemDto = service.update(itemId, request.title, request.description, request.type, request.statusItemId, request.parentItemId, request.startDate, request.dueDate, request.priority)
 }

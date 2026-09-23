@@ -61,6 +61,7 @@ class ItemService(
         val overdue: Boolean = false,
         val feasSignal: String? = null,
         val blocked: Boolean = false,
+        val priority: String? = null,
     )
 
     @Transactional
@@ -138,6 +139,7 @@ class ItemService(
                 overdue = item.dueDate?.let { it < LocalDate.now() } == true
                     && statusById[item.statusObjectId]?.isFinal != true,
                 feasSignal = item.feasSignal,
+                priority = item.priority,
                 blocked = item.id in blockedIds,
                 assignee = item.assigneeObjectId?.let { memberNames[it] },
                 externalRef = item.externalRef,
@@ -191,6 +193,7 @@ class ItemService(
         parentItemId: UUID?,
         startDateText: String? = null,
         dueDateText: String? = null,
+        priorityText: String? = null,
     ): ItemDto {
         val item = itemRepo.findByObjectId(itemId) ?: throw NotFoundException("item 不存在")
         val project = projects.findAll().firstOrNull { it.id == item.projectId }
@@ -241,6 +244,17 @@ class ItemService(
             logActivity(current.id!!, "description_changed", current.description, description, actorId)
             current = itemRepo.save(current.copy(description = description))
         }
+        // V10-S2 优先级:null = 不变;空串 = 清除;P0-P3 = 设置
+        if (priorityText != null) {
+            val p = priorityText.trim().ifEmpty { null }
+            if (p != null && p !in setOf("P0", "P1", "P2", "P3")) {
+                throw BadRequestException("priority 只能是 P0–P3:\$p")
+            }
+            if (p != current.priority) {
+                current = itemRepo.save(current.copy(priority = p))
+            }
+        }
+
         // V8-S1 日期:参数 null = 不变;空串 = 清除;ISO 文本 = 设置。start<=due 由 DB CHECK + 此处双保险
         if (startDateText != null || dueDateText != null) {
             fun parse(text: String?, field: String): LocalDate? = text?.trim()?.ifEmpty { null }?.let {
@@ -450,4 +464,5 @@ data class UpdateItemRequest(
     val parentItemId: UUID? = null,
     val startDate: String? = null,
     val dueDate: String? = null,
+    val priority: String? = null,
 )

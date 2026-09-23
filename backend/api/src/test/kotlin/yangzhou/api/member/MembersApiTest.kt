@@ -99,4 +99,38 @@ class MembersApiTest : AbstractApiTest() {
         )
         assertEquals("GREEN", body["signal"].asText()) // 我 Java=4 ≥3;虚拟成员不入算
     }
+
+
+    @Test
+    fun `V10 移除约束——assignee 有非终态 item 409,全终态后可删`() {
+        val authed = bootstrapAndAuth()
+        authed.post().uri("/api/members")
+            .body(mapOf("displayName" to "小李"))
+            .exchange().expectStatus().isCreated()
+        val li = json.readTree(
+            authed.get().uri("/api/members").exchange()
+                .expectStatus().isOk().expectBody(String::class.java).returnResult().responseBody!!,
+        ).first { it["displayName"].asText() == "小李" }["memberId"].asText()
+
+        createProject(authed, "CHE")
+        val item = createItem(authed, "CHE", "x")
+        authed.put().uri("/api/items/${item["itemId"].asText()}/assignee")
+            .body(mapOf("assigneeItemId" to li))
+            .exchange().expectStatus().isOk()
+
+        // 非终态 assignee → 409
+        authed.delete().uri("/api/members/$li")
+            .exchange().expectStatus().isEqualTo(409)
+
+        // item 完成到终态 → 可删
+        val done = json.readTree(
+            authed.get().uri("/api/projects/CHE").exchange()
+                .expectStatus().isOk().expectBody(String::class.java).returnResult().responseBody!!,
+        )["statuses"].last { it["isFinal"].asBoolean() }["statusId"].asText()
+        authed.patch().uri("/api/items/${item["itemId"].asText()}")
+            .body(mapOf("statusItemId" to done))
+            .exchange().expectStatus().isOk()
+        authed.delete().uri("/api/members/$li")
+            .exchange().expectStatus().isNoContent()
+    }
 }

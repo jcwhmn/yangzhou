@@ -115,6 +115,15 @@ class CandidatesApiTest : AbstractApiTest() {
             .body(mapOf("assigneeItemId" to xiaoli))
             .exchange().expectStatus().isOk()
 
+        // V10-Q9:成员有非终态 assignee item 时不可删,先完成 item 到终态
+        val doneStatusId = json.readTree(
+            authed.get().uri("/api/projects/CHE").exchange()
+                .expectStatus().isOk().expectBody(String::class.java).returnResult().responseBody!!,
+        )["statuses"].last { it["isFinal"].asBoolean() }["statusId"].asText()
+        authed.patch().uri("/api/items/$itemId")
+            .body(mapOf("statusItemId" to doneStatusId))
+            .exchange().expectStatus().isOk()
+
         authed.delete().uri("/api/members/$xiaoli")
             .exchange().expectStatus().isNoContent()
 
