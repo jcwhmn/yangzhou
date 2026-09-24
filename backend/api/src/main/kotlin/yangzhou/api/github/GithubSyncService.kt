@@ -30,6 +30,8 @@ class GithubSyncService(
     private val rules: ProjectWorkflowRuleRepository,
     private val gitRefs: ItemGitRefRepository,
     private val activityRepo: ItemActivityRepository,
+    private val members: yangzhou.persistence.repository.MemberRepository,
+    private val projectMembers: yangzhou.api.projectmember.ProjectMemberService,
     private val notificationService: yangzhou.api.notification.NotificationService,
     private val gateway: GithubGateway,
 ) {
@@ -82,6 +84,18 @@ class GithubSyncService(
                     gitRefs.save(
                         ItemGitRef(itemId = item.id!!, kind = KIND_PR, repo = repo, ref = pr.number.toString(), url = pr.url, state = pr.state),
                     )
+                    // V10-S5:PR author → github_username 映射成员 → 池内自动 assign(未配置池/找不到则留痕跳过)
+                    val wsId = projects.findById(project.id).orElse(null)?.workspaceId ?: 0L
+                    if (item.assigneeObjectId == null && pr.authorLogin != null) {
+                        val authorMember = members.findByWorkspaceIdAndGithubUsername(wsId, pr.authorLogin)
+                        if (authorMember != null && authorMember.id != null) {
+                            val authorId = authorMember.id
+                            runCatching { projectMembers.assertAssignable(project.id!!, authorId!!) }
+                                .onSuccess {
+                                    items.save(item.copy(assigneeObjectId = authorMember.objectId))
+                                }
+                        }
+                    }
                     applyEvent(project, item.id!!, eventForState(pr.state), "pr #${pr.number} ${pr.url.orEmpty()}")
                 }
                 existing.state != pr.state -> {
