@@ -1,6 +1,7 @@
 "use client";
 
-import { Box, Card, CardContent, Container, Stack, Typography } from "@mui/material";
+import { Box, Button, Card, CardContent, Container, Stack, Typography } from "@mui/material";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
@@ -36,6 +37,9 @@ export default function TimeSummaryPage() {
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
       <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
+        <Button size="small" component={Link} href={`/p/${key}`}>
+          ← 看板
+        </Button>
         <Typography variant="h5">{t.time.title(String(key))}</Typography>
         {projectTotal > 0 && (
           <Typography variant="h6" color="primary">

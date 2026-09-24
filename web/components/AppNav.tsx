@@ -93,6 +93,11 @@ export function AppNav() {
             {t.fav.empty}
           </Typography>
         )}
+        <Stack sx={{ px: 2, py: 1, borderTop: "1px solid", borderColor: "divider", mt: 1 }}>
+          <Link href="/" onClick={() => setFavAnchor(null)}>
+            <Typography variant="caption">浏览项目 →</Typography>
+          </Link>
+        </Stack>
         {favs.map((f) => (
           <Stack key={f.projectId} direction="row" spacing={1} alignItems="center" sx={{ px: 2, py: 0.5 }}>
             <Link href={`/p/${f.key}`} style={{ textDecoration: "none", color: "inherit" }}>

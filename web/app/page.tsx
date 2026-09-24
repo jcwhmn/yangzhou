@@ -39,6 +39,7 @@ export default function ProjectsPage() {
   const [projects, setProjects] = useState<ProjectDto[]>([]);
   const [shortfallList, setShortfallList] = useState<Shortfall[]>([]);
   const [favKeys, setFavKeys] = useState<string[]>([]);
+  const [favHint, setFavHint] = useState(false);
   const [key, setKey] = useState("");
   const [name, setName] = useState("");
   const [error, setError] = useState("");
@@ -89,7 +90,21 @@ export default function ProjectsPage() {
           创建项目
         </Button>
       </Stack>
-      {error && <Typography color="error">{error}</Typography>}
+      {favHint && (
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2, p: 1, bgcolor: "action.hover", borderRadius: 1 }}>
+          <Typography variant="body2">点项目卡右上角 ☆ 收藏常用项目,之后从导航 ⭐ 收藏直达。</Typography>
+          <Button
+            size="small"
+            onClick={() => {
+              localStorage.setItem("yz-fav-hint-dismissed", "1");
+              setFavHint(false);
+            }}
+          >
+            知道了
+          </Button>
+        </Stack>
+      )}
+      {error && <Typography color="error" sx={{ mb: 1 }}>{error}</Typography>}
       {projects.length === 0 && <Typography color="text.secondary">{t.projects.empty}</Typography>}
       <Box sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 2, mb: 4 }}>
         {projects.map((p) => (
