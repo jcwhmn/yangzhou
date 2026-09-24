@@ -29,10 +29,12 @@ type Item = {
   title: string;
   status: string;
   assignee: string | null;
+  assigneeColor: string | null;
   requirements: { attribute: string; minLevel: number | null }[];
   feasSignal: Signal | null;
   dueDate: string | null;
   overdue: boolean;
+  dueSoon: boolean;
   blocked: boolean;
 };
 
@@ -256,6 +258,7 @@ export default function BoardPage() {
                       onClick={() => router.push(`/p/${key}/i/${it.itemId}`)}
                       sx={{
                         cursor: "pointer",
+                        borderLeft: "4px solid " + (it.assigneeColor ?? "#9e9e9e"),
                         transition: "box-shadow .15s, border-color .15s",
                         "&:hover": { boxShadow: 6, borderColor: "primary.main" },
                       }}
@@ -288,12 +291,15 @@ export default function BoardPage() {
                               {it.title}
                             </Typography>
                           </Link>
-                          {(it.dueDate || it.overdue) && (
+                          {(it.dueDate || it.overdue || it.dueSoon) && (
                             <Typography
                               variant="caption"
-                              sx={{ color: it.overdue ? "error.main" : "text.secondary", fontWeight: it.overdue ? 700 : 400 }}
+                              sx={{
+                                color: it.overdue ? "error.main" : it.dueSoon ? "warning.main" : "text.secondary",
+                                fontWeight: it.overdue || it.dueSoon ? 700 : 400,
+                              }}
                             >
-                              {it.overdue ? "⚠ 超期 " : "📅 "}
+                              {it.overdue ? "⚠ 超期 " : it.dueSoon ? "⏳ 将到期 " : "📅 "}
                               {it.dueDate}
                             </Typography>
                           )}
