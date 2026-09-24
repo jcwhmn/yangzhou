@@ -31,7 +31,14 @@ class MemberService(
         val username: String?,
         val virtual: Boolean,
         val githubUsername: String? = null,
+        val color: String? = null,
     )
+
+    /** V10-S3 调色板轮转:按成员数取模,8 色循环。 */
+    private fun nextColor(): String {
+        val palette = listOf("#e57373", "#f06292", "#ba68c8", "#7986cb", "#64b5f6", "#4db6ac", "#ffd54f", "#a1887f")
+        return palette[members.findAll().count() % palette.size]
+    }
 
     /** 登录成员 = 唯一有凭据者(虚拟成员出现后,findAll().first() 不再可靠)。 */
     fun current(): Member =
@@ -50,10 +57,11 @@ class MemberService(
             ?.let { throw ConflictException("成员已存在:$displayName") }
         val saved = members.save(
             Member(
-                workspaceId = workspaceService.required().id!!,
+                workspaceId = workspaceId,
                 username = null,
                 passwordHash = null,
                 displayName = displayName,
+                color = nextColor(),
             ),
         )
         return saved.toResponse()
@@ -96,5 +104,5 @@ class MemberService(
     }
 
     private fun Member.toResponse() =
-        MemberResponse(objectId, displayName, username, virtual = passwordHash == null, githubUsername = githubUsername)
+        MemberResponse(objectId, displayName, username, virtual = passwordHash == null, githubUsername = githubUsername, color = color)
 }
