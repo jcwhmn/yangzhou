@@ -18,6 +18,7 @@ data class GithubPr(
     val headRef: String,
     val state: String,
     val url: String? = null,
+    val authorLogin: String? = null,
 )
 
 class GithubApiException(val status: Int, message: String) : RuntimeException(message)
