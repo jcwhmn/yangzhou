@@ -1,0 +1,30 @@
+ [2m271[0m | [35;1m|[0m                                 <Chip
+ [2m272[0m | [35;1m|[0m                                   size="small"
+ [2m273[0m | [35;1m|[0m                                   label={t.signal[it.feasSignal]}
+ [2m274[0m | [35;1m|[0m                                   color={it.feasSignal === "RED" ? "error" : "warning"}
+ [2m275[0m | [35;1m|[0m                                 />
+ [2m276[0m | [35;1m|[0m                               )}
+ [2m277[0m | [35;1m|[0m                               {it.blocked && (
+ [2m278[0m | [35;1m|[0m                                 <Chip size="small" color="error" variant="outlined" label="⛔ 被阻塞" />
+ [2m279[0m | [35;1m|[0m                               )}
+ [2m280[0m | [35;1m|[0m                               {it.assignee && (
+ [2m281[0m | [35;1m|[0m                                 <Typography variant="caption" color="text.secondary">
+ [2m282[0m | [35;1m|[0m                                   👤 {it.assignee}
+ [2m283[0m | [35;1m|[0m                                 </Typography>
+ [2m284[0m | [35;1m|[0m                               )}
+ [2m285[0m | [35;1m|[0m                             </Stack>
+ [2m286[0m | [35;1m|[0m                             <Link
+ [2m287[0m | [35;1m`[0m[35;1m-[0m[35;1m>[0m                             href={`/p/${key}/i/${it.itemId}`}
+ [2m288[0m |                                 style={{ textDecoration: "none", color: "inherit" }}
+ [2m289[0m |                               >
+ [2m289[0m |                                 <Typography variant="body2" sx={{ wordBreak: "break-word" }}>
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./app/p/[key]/page.tsx
+
+
+> Build failed because of webpack errors
