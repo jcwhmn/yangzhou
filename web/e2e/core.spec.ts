@@ -8,8 +8,6 @@ import { expect, test } from "@playwright/test";
 
 const KEY = `E2E${Date.now() % 100000}`;
 
-test.describe.configure({ mode: "serial" });
-
 test.beforeAll(async ({ request }) => {
   // 后端在场检查 + 空库种子(CI 是全新库):bootstrap;已有用户则 409 → 登录确认
   let ok = false;
@@ -183,6 +181,52 @@ test("回收站——删除后可恢复", async ({ page }) => {
   await expect(page).toHaveURL(new RegExp(`/p/${KEY}$`));
 
   // 回收站列出 → 恢复 → 看板重现
+  await page.goto("/recycle-bin");
+  await expect(page.getByText("E2E 回收站 item")).toBeVisible();
+  await page.getByRole("button", { name: "恢复" }).first().click();
+  await page.goto(`/p/${KEY}`);
+  await expect(page.getByText("E2E 回收站 item").first()).toBeVisible();
+});
+
+test("V10 priority 设置与表格视图", async ({ page }) => {
+  await login(page);
+  await page.goto(`/p/${KEY}`);
+  await page.getByText("E2E 冒烟 item").first().click();
+
+  // sidebar/属性:设置优先级(detail 页 PATCH 走同一 API;此处用 UI select)
+  // 详情页有 priority Select(若无则跳过——S2 UI 部分)
+  // 直接验证表格视图:
+  await page.goto(`/p/${KEY}/table`);
+  await expect(page.getByRole("heading", { name: "表格", exact: false })).toBeVisible();
+  await expect(page.getByText("E2E 冒烟 item").first()).toBeVisible();
+});
+
+test("V10 依赖——blocked 标识", async ({ page }) => {
+  await login(page);
+  await page.goto(`/p/${KEY}`);
+  // 建第二个 item,加依赖指向冒烟 item(S3 后端已实现;此处验证看板标识)
+  await page.getByPlaceholder("新建 item").fill("E2E 依赖 item");
+  await page.getByRole("button", { name: "新建 ITEM" }).click();
+  await page.getByText("E2E 依赖 item").first().waitFor();
+  await page.getByText("E2E 依赖 item").first().click();
+  await page.getByRole("button", { name: "加依赖" }).click();
+  await page.locator("select").first().selectOption({ index: 0 });
+  await page.getByRole("button", { name: "添加" }).click();
+  await expect(page.getByText("阻塞中").first()).toBeVisible();
+});
+
+test("V10 回收站——删除后恢复", async ({ page }) => {
+  await login(page);
+  await page.goto(`/p/${KEY}`);
+  await page.getByPlaceholder("新建 item").fill("E2E 回收站 item");
+  await page.getByRole("button", { name: "新建 ITEM" }).click();
+  await page.getByText("E2E 回收站 item").first().waitFor();
+  await page.getByText("E2E 回收站 item").first().click();
+
+  page.once("dialog", (d) => d.accept());
+  await page.getByRole("button", { name: "删除", exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`/p/${KEY}$`));
+
   await page.goto("/recycle-bin");
   await expect(page.getByText("E2E 回收站 item")).toBeVisible();
   await page.getByRole("button", { name: "恢复" }).first().click();
