@@ -7,6 +7,11 @@ const theme = createTheme({
   typography: {
     fontFamily: 'system-ui, "Segoe UI", "Microsoft YaHei", sans-serif',
   },
+  components: {
+    // V11-Q3:全局去边框(standard 无 outlined 边框,视觉干净)
+    MuiTextField: { defaultProps: { variant: "standard" } },
+    MuiFormControl: { defaultProps: { variant: "standard" } },
+  },
 });
 
 export function Providers({ children }: { children: React.ReactNode }) {
