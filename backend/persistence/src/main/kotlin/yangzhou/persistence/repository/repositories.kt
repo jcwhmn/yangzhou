@@ -101,6 +101,7 @@ interface ItemRepository : CrudRepository<Item, Long> {
     fun findByProjectIdAndDeletedAtIsNullOrderByNumber(projectId: Long): List<Item>
     fun findByDeletedAtIsNotNullOrderByDeletedAtDesc(): List<Item>
     fun findByProjectIdAndNumber(projectId: Long, number: Int): Item?
+    fun findByAssigneeObjectIdAndDeletedAtIsNull(assigneeObjectId: UUID): List<Item>
     fun findByProjectIdAndExternalRef(projectId: Long, externalRef: String): Item?
     fun existsByParentObjectId(parentObjectId: UUID): Boolean
 }

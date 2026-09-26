@@ -56,6 +56,8 @@ class ItemService(
         val externalRef: String?,
         val requirements: List<RequirementDto>,
         val gitRefs: List<GitRefDto> = emptyList(),
+        val assigneeColor: String? = null,
+        val dueSoon: Boolean = false,
         val startDate: String? = null,
         val dueDate: String? = null,
         val overdue: Boolean = false,
@@ -123,7 +125,8 @@ class ItemService(
         val statusNames = statusById.mapValues { it.value.name }
         val blockedIds = dependencyService.blockedItemIds(projectId)
         val attrNames = definitions.findByWorkspaceId(project.workspaceId).associate { it.id!! to it.name }
-        val memberNames = members.findByWorkspaceId(project.workspaceId).associate { it.objectId to it.displayName }
+        val memberMap = members.findByWorkspaceId(project.workspaceId).associateBy { it.objectId }
+        val memberNames = memberMap.mapValues { it.value.displayName }
         val projectItems = itemRepo.findByProjectIdAndDeletedAtIsNullOrderByNumber(projectId)
         val reqs = requirementRepo.findByItemIdIn(projectItems.mapNotNull { it.id })
         return projectItems.map { item ->
@@ -142,6 +145,8 @@ class ItemService(
                 priority = item.priority,
                 blocked = item.id in blockedIds,
                 assignee = item.assigneeObjectId?.let { memberNames[it] },
+                assigneeColor = item.assigneeObjectId?.let { memberMap[it]?.color },
+                dueSoon = item.dueDate?.let { it >= LocalDate.now() && it < LocalDate.now().plusDays(3) } == true,
                 externalRef = item.externalRef,
                 parentItemId = item.parentObjectId,
                 requirements = reqs.filter { it.itemId == item.id }.map {

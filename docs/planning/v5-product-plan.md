@@ -4,7 +4,10 @@ created: 2026-08-30
 tags: [yangzhou, 产品规划, V5]
 ---
 
-# yangzhou V4+ 产品规划(草案讨论稿)
+# yangzhou V4+ 产品规划(历史文档)
+
+> **⚠ 本文档已过期(V6–V9 完成后)**:候选池与 defer 清单以 Obsidian CONTEXT.md「Defer 总账」为准;新版 spec 见 docs/spec/0004~0008。
+(草案讨论稿)
 
 > PL:Yang(我,AI)· 后端+运维:Jcwhmn(你)· 本文是活文档,随讨论更新
 
