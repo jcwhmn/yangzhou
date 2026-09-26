@@ -6,14 +6,18 @@ import {
   Card,
   CardActionArea,
   CardContent,
+  Checkbox,
   Chip,
   Container,
+  FormControlLabel,
+  MenuItem,
+  Select,
   Stack,
   TextField,
   Typography,
 } from "@mui/material";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import { t } from "@/lib/texts";
 import type { Signal } from "@/components/Verdict";
@@ -39,9 +43,15 @@ export default function ProjectsPage() {
   const [projects, setProjects] = useState<ProjectDto[]>([]);
   const [shortfallList, setShortfallList] = useState<Shortfall[]>([]);
   const [favKeys, setFavKeys] = useState<string[]>([]);
+  const [search, setSearch] = useState("");
+  const [sortBy, setSortBy] = useState("key");
+  const [showArchived, setShowArchived] = useState(false);
   const [favHint, setFavHint] = useState(false);
   const [key, setKey] = useState("");
   const [name, setName] = useState("");
+  const [search, setSearch] = useState("");
+  const [sortBy, setSortBy] = useState("key");
+  const [showArchived, setShowArchived] = useState(false);
   const [error, setError] = useState("");
 
   async function load() {
@@ -78,6 +88,15 @@ export default function ProjectsPage() {
     }
   }
 
+  const visibleProjects = useMemo(() => {
+    let list = [...projects];
+    if (search) list = list.filter((p) => p.key.toLowerCase().includes(search.toLowerCase()) || p.name.toLowerCase().includes(search.toLowerCase()));
+    if (sortBy === "name") list.sort((a, b) => a.name.localeCompare(b.name));
+    else if (sortBy === "signal") { const rank = (s: string | null) => (s === "RED" ? 0 : s === "YELLOW" ? 1 : s === "GREEN" ? 2 : 3); list.sort((a, b) => rank(a.feasSignal) - rank(b.feasSignal)); }
+    else list.sort((a, b) => a.key.localeCompare(b.key));
+    if (!showArchived) list = list.filter((p) => !p.archived);
+    return list;
+  }, [projects, search, sortBy, showArchived]);
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
       <Typography variant="h4" gutterBottom>
@@ -107,7 +126,7 @@ export default function ProjectsPage() {
       {error && <Typography color="error" sx={{ mb: 1 }}>{error}</Typography>}
       {projects.length === 0 && <Typography color="text.secondary">{t.projects.empty}</Typography>}
       <Box sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 2, mb: 4 }}>
-        {projects.map((p) => (
+        {visibleProjects.map((p) => (
           <Card key={p.key} sx={{ position: "relative" }}>
             <Button
               size="small"
@@ -137,6 +156,18 @@ export default function ProjectsPage() {
         ))}
       </Box>
 
+      <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }} flexWrap="wrap" useFlexGap>
+        <TextField size="small" placeholder="搜索项目…" value={search} onChange={(e) => setSearch(e.target.value)} sx={{ width: 220 }} />
+        <Select size="small" value={sortBy} onChange={(e) => setSortBy(String(e.target.value))} sx={{ width: 140 }}>
+          <MenuItem value="key">按 KEY</MenuItem>
+          <MenuItem value="name">按名称</MenuItem>
+          <MenuItem value="signal">按可行性</MenuItem>
+        </Select>
+        <FormControlLabel
+          control={<Checkbox size="small" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />}
+          label={<Typography variant="caption">{t.projects.showArchived}</Typography>}
+        />
+      </Stack>
       <Typography variant="h5" gutterBottom>
         {t.shortfall.title}
       </Typography>

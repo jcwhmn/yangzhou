@@ -30,6 +30,7 @@ export const t = {
     empty: "还没有项目,建一个",
     enter: "打开看板",
     signalNow: "可行性",
+    showArchived: "显示已归档",
   },
   board: {
     addItem: "新建 item",
