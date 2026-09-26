@@ -35,6 +35,12 @@ class MemberController(
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun delete(@PathVariable memberId: UUID) = memberService.delete(memberId)
 
+    @PutMapping("/members/{memberId}/last-project")
+    fun setLastProject(
+        @PathVariable memberId: UUID,
+        @RequestBody request: SetLastProjectRequest,
+    ): MemberService.MemberResponse = memberService.setLastProjectKey(memberId, request.key)
+
     @PutMapping("/members/{memberId}/github-username")
     fun setGithubUsername(
         @PathVariable memberId: UUID,
@@ -62,6 +68,10 @@ class MemberController(
 
 data class CreateMemberRequest(
     @field:NotBlank val displayName: String,
+)
+
+data class SetLastProjectRequest(
+    val key: String?,
 )
 
 data class SetGithubUsernameRequest(

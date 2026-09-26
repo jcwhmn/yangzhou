@@ -19,6 +19,13 @@ export default function LoginPage() {
     setError("");
     try {
       setToken(await bootstrapOrLogin(username, password));
+      // V11-S1:登录后进入上次项目
+      try {
+        const token = localStorage.getItem("yz-token");
+        const me = await fetch("/api/members", { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json());
+        const last = Array.isArray(me) ? me.find((m: { virtual: boolean }) => !m.virtual)?.lastProjectKey : undefined;
+        if (last) { router.replace(`/p/${last}`); return; }
+      } catch {}
       router.replace("/");
     } catch (err) {
       setError(err instanceof Error ? err.message : t.login.failed);

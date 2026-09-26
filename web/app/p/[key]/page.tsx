@@ -56,6 +56,17 @@ export default function BoardPage() {
 
   // V9-Q3:看板 30s 自动刷新(手刷按钮同函数)
   useEffect(() => {
+    // V11-S1:记录最后访问的项目
+    const token = localStorage.getItem("yz-token");
+    if (token && key) {
+      fetch(`/api/members/me/last-project`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ key: String(key) }),
+      }).catch(() => {});
+    }
+  }, [key]);
+  useEffect(() => {
     const t = setInterval(() => load(), 30000);
     return () => clearInterval(t);
   }, []);
