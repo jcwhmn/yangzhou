@@ -32,6 +32,7 @@ class MemberService(
         val virtual: Boolean,
         val githubUsername: String? = null,
         val color: String? = null,
+        val lastProjectKey: String? = null,
     )
 
     /** V10-S3 调色板轮转:按成员数取模,8 色循环。 */
@@ -103,6 +104,15 @@ class MemberService(
         return saved.toResponse()
     }
 
+    /** V11-S1:记录最后访问的项目 key(看板页 mount 时调用);空串 = 清除。 */
+    @Transactional
+    fun setLastProjectKey(memberId: UUID, key: String?): MemberResponse {
+        val member = members.findByObjectId(memberId) ?: throw NotFoundException("成员不存在")
+        val cleaned = key?.trim()?.ifEmpty { null }
+        val saved = members.save(member.copy(lastProjectKey = cleaned, updatedAt = Instant.now()))
+        return saved.toResponse()
+    }
+
     private fun Member.toResponse() =
-        MemberResponse(objectId, displayName, username, virtual = passwordHash == null, githubUsername = githubUsername, color = color)
+        MemberResponse(objectId, displayName, username, virtual = passwordHash == null, githubUsername = githubUsername, color = color, lastProjectKey = lastProjectKey)
 }

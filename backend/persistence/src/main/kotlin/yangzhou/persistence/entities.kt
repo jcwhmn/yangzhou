@@ -25,6 +25,7 @@ data class Member(
     val passwordHash: String?,
     val displayName: String,
     val color: String? = null,
+    val lastProjectKey: String? = null,
     val githubUsername: String? = null,
     val createdAt: Instant = Instant.now(),
     val updatedAt: Instant = Instant.now(),
