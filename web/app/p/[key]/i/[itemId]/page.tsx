@@ -26,6 +26,8 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { t } from "@/lib/texts";
 import { SignalChip, VerdictLine, type Signal, type Verdict } from "@/components/Verdict";
+import Tab from "@mui/material/Tab";
+import Tabs from "@mui/material/Tabs";
 
 type Status = { statusId: string; name: string; isFinal: boolean; position: number };
 type Item = {
@@ -113,6 +115,7 @@ export default function ItemDetailPage() {
   const [description, setDescription] = useState("");
   const [startDate, setStartDate] = useState("");
   const [dueDate, setDueDate] = useState("");
+  const [priority, setPriority] = useState("");
   const [type, setType] = useState("task");
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
@@ -124,6 +127,7 @@ export default function ItemDetailPage() {
   const [comments, setComments] = useState<CommentDto[]>([]);
   const [newComment, setNewComment] = useState("");
   const [branchOpen, setBranchOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState(0);
   const [timeLog, setTimeLog] = useState<{ entries: TimeEntry[]; totalMinutes: number } | null>(null);
   const [manualMinutes, setManualMinutes] = useState("");
   const [manualNote, setManualNote] = useState("");
@@ -171,7 +175,7 @@ export default function ItemDetailPage() {
   async function saveBasics() {
     await api(`/api/items/${itemId}`, {
       method: "PATCH",
-      body: JSON.stringify({ title, description: description || null, type, startDate, dueDate }),
+      body: JSON.stringify({ title, description: description || null, type, startDate, dueDate, priority: priority || null }),
     });
     await load();
     flashSaved();
