@@ -1,0 +1,66 @@
+{
+  "folders": [
+    {
+      "name": "backend",
+      "path": "./backend"
+    },
+    {
+      "name": "web",
+      "path": "./web"
+    }
+  ],
+
+  "extensions": {
+    "recommendations": [
+      "JetBrains.kotlin",
+      "vscjava.vscode-gradle"
+    ]
+  },
+
+  "settings": {
+    "editor.formatOnSave": true,
+    "editor.formatOnPaste": true,
+
+    "editor.minimap.enabled": false,
+
+    "files.exclude": {
+      "**/.git": true,
+      "**/node_modules": true,
+      "**/.next": true,
+      "**/build": true,
+      "**/.gradle": true
+    },
+
+    "search.exclude": {
+      "**/node_modules": true,
+      "**/.next": true,
+      "**/build": true,
+      "**/.gradle": true
+    },
+
+    "[kotlin]": {
+      "editor.tabSize": 4,
+      "editor.insertSpaces": true
+    },
+
+    "[typescript]": {
+      "editor.tabSize": 2,
+      "editor.insertSpaces": true
+    },
+
+    "[typescriptreact]": {
+      "editor.tabSize": 2,
+      "editor.insertSpaces": true
+    },
+
+    "[javascript]": {
+      "editor.tabSize": 2,
+      "editor.insertSpaces": true
+    },
+
+    "[javascriptreact]": {
+      "editor.tabSize": 2,
+      "editor.insertSpaces": true
+    }
+  }
+}
