@@ -87,6 +87,7 @@ docs/      adr/ · spec/
 - `./gradlew` 同效;首次需下载发行包,国内网络慢属已知,用本地 gradle 即可。
 - CI(GitHub Actions):backend 路径变更时跑 `gradle build`(含 Testcontainers 集成测试,需 Docker)。
 - 本机开发库:`yangzhou`(共享 compose,已建);bootRun 用 `gradle :api:bootRun`。
+- **⚠ 前端命令必须在 `web/` 目录下执行**:`cd /d/code/yangzhou/web && npx next build` / `npm run dev` / `npx playwright test` 等。agent 的 shell CWD 每次重置到 repo 根,漏 cd 会在错误目录跑命令导致 `.next` 污染或路径找不到。
 
 ## 进程管理(本机实操)
 
