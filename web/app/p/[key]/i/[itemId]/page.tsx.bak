@@ -26,10 +26,6 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { t } from "@/lib/texts";
 import { SignalChip, VerdictLine, type Signal, type Verdict } from "@/components/Verdict";
-import Tab from "@mui/material/Tab";
-import Tabs from "@mui/material/Tabs";
-import Tab from "@mui/material/Tab";
-import Tabs from "@mui/material/Tabs";
 
 type Status = { statusId: string; name: string; isFinal: boolean; position: number };
 type Item = {
@@ -117,7 +113,6 @@ export default function ItemDetailPage() {
   const [description, setDescription] = useState("");
   const [startDate, setStartDate] = useState("");
   const [dueDate, setDueDate] = useState("");
-  const [priority, setPriority] = useState("");
   const [type, setType] = useState("task");
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
@@ -129,8 +124,6 @@ export default function ItemDetailPage() {
   const [comments, setComments] = useState<CommentDto[]>([]);
   const [newComment, setNewComment] = useState("");
   const [branchOpen, setBranchOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState(0);
-  const [activeTab, setActiveTab] = useState(0);
   const [timeLog, setTimeLog] = useState<{ entries: TimeEntry[]; totalMinutes: number } | null>(null);
   const [manualMinutes, setManualMinutes] = useState("");
   const [manualNote, setManualNote] = useState("");
@@ -151,7 +144,7 @@ export default function ItemDetailPage() {
       api<Activity[]>(`/api/items/${itemId}/activity`),
     ])
     setItem(it); setTitle(it.title); setDescription(it.description ?? ""); setType(it.type)
-    setStartDate(it.startDate ?? ""); setDueDate(it.dueDate ?? ""); setPriority((it as any).priority ?? "")
+    setStartDate(it.startDate ?? ""); setDueDate(it.dueDate ?? "")
     setStatuses(project.statuses); setAttributes(attrs)
     setFeasibility(feas); setCandidates(cands); setActivity(acts)
     const allMembers = await api<{ memberId: string; displayName: string; virtual: boolean }[]>("/api/members");
@@ -178,7 +171,7 @@ export default function ItemDetailPage() {
   async function saveBasics() {
     await api(`/api/items/${itemId}`, {
       method: "PATCH",
-      body: JSON.stringify({ title, description: description || null, type, startDate, dueDate, priority: priority || null }),
+      body: JSON.stringify({ title, description: description || null, type, startDate, dueDate }),
     });
     await load();
     flashSaved();
@@ -325,16 +318,15 @@ export default function ItemDetailPage() {
   }
 
   return (
-    <Box sx={{ maxWidth: 960, mx: "auto", p: 3 }}>
+    <Box sx={{ maxWidth: 760, mx: "auto", p: 3 }}>
       <Link href={`/p/${key}`} style={{ textDecoration: "none" }}>
         <Typography variant="body2" color="primary" gutterBottom>
           {t.item.back}
         </Typography>
       </Link>
-      <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }} flexWrap="wrap" useFlexGap>
+      <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
         <Chip label={item.number} />
         {feasibility && <SignalChip signal={feasibility.signal} />}
-        {priority && <Chip size="small" color="warning" label={priority} />}
         {item.assignee && <Chip size="small" label={`👤 ${item.assignee}`} onDelete={() => assign(null)} />}
         <Select
           size="small"
@@ -382,13 +374,6 @@ export default function ItemDetailPage() {
             sx={{ width: 200 }}
             slotProps={{ inputLabel: { shrink: true } }}
           />
-          <Select size="small" value={priority} onChange={(e) => setPriority(String(e.target.value))} displayEmpty sx={{ width: 120 }}>
-            <MenuItem value="">优先级</MenuItem>
-            <MenuItem value="P0">P0</MenuItem>
-            <MenuItem value="P1">P1</MenuItem>
-            <MenuItem value="P2">P2</MenuItem>
-            <MenuItem value="P3">P3</MenuItem>
-          </Select>
         </Stack>
         <TextField select label={t.item.type} value={type} onChange={(e) => setType(e.target.value)} sx={{ width: 200 }}>
           {["task", "bug", "goal", "story"].map((tp) => (
