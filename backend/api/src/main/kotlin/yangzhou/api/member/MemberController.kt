@@ -35,6 +35,10 @@ class MemberController(
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun delete(@PathVariable memberId: UUID) = memberService.delete(memberId)
 
+    @PutMapping("/members/me/last-project")
+    fun setMyLastProject(@RequestBody request: SetLastProjectRequest): MemberService.MemberResponse =
+        memberService.setLastProjectKey(memberService.current().objectId, request.key)
+
     @PutMapping("/members/{memberId}/last-project")
     fun setLastProject(
         @PathVariable memberId: UUID,

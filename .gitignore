@@ -21,3 +21,5 @@ bin/
 web/pnpm-lock.yaml
 web/pnpm-workspace.yaml
 *.log
+.screenshots/
+test-results/

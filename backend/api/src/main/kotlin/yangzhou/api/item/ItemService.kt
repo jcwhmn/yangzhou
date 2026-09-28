@@ -64,6 +64,7 @@ class ItemService(
         val feasSignal: String? = null,
         val blocked: Boolean = false,
         val priority: String? = null,
+        val createdAt: String? = null,
     )
 
     @Transactional
@@ -147,6 +148,7 @@ class ItemService(
                 assignee = item.assigneeObjectId?.let { memberNames[it] },
                 assigneeColor = item.assigneeObjectId?.let { memberMap[it]?.color },
                 dueSoon = item.dueDate?.let { it >= LocalDate.now() && it < LocalDate.now().plusDays(3) } == true,
+                createdAt = item.createdAt.toString(),
                 externalRef = item.externalRef,
                 parentItemId = item.parentObjectId,
                 requirements = reqs.filter { it.itemId == item.id }.map {

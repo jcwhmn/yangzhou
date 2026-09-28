@@ -11,7 +11,7 @@ V10 后端/API 已完备,但前端 UI 存在系统性缺口:项目列表无筛�
 1. **登录后进入上次项目**:`member.last_project_key` 后端持久;登录成功后自动跳转。
 2. **全局去边框**:MUI theme 覆写,TextField/Select 全局 standard(无边框)。
 3. **项目列表增强**:文本筛选/排序(名称/信号)/归档 checkbox 切换。
-4. **item detail tab 重构**:常驻区 + 5 tab + 右 sidebar + 评论独立 tab + priority Select 接通。
+4. **item detail tab 重构**:常驻区(标题/描述/日期/优先级/保存) + 5 tab(详情/需求/依赖+清单/工时/GitHub) + 右 sidebar(创建时间/超期/临期/阻塞) + 评论常驻底部(不做 tab) + priority Select 接通。
 5. **members 颜色状态**:池内成员颜色标记 item 状态(有进行中/已完成/未分配)。
 
 ## User Stories
@@ -27,12 +27,14 @@ V10 后端/API 已完备,但前端 UI 存在系统性缺口:项目列表无筛�
 - **V26 migration**:`member.last_project_key varchar(10)` 可空
 - **API**:`PUT /api/members/me/last-project {key}`;登录成功后前端读 member.lastProjectKey 自动跳转
 - **去边框**:MUI theme 覆写 `MuiTextField defaultProps.variant = "standard"`、`MuiSelect` 同理;全局一处改
+- **priority**:V24 `item.priority varchar(2)`(CHECK P0–P3 或空);PATCH 语义 不传=不变 / 空串=清除 / P0–P3=设置;detail 常驻区 Select 接通
+- **detail sidebar**:创建时间来自 ItemDto.createdAt;超期/临期/阻塞复用 list 读模型字段(overdue/dueSoon/blocked);更新时间不上(后端 update 路径不维护 updatedAt,展示会失真);item 级收藏不存在,不做
 - **members 表格**:MUI Table 两行表头(分类 colspan + 叶子名),body 行 = 成员;checkbox(presence)+ TextField number(等级 1–4)
 - **成员色点**:`🟢` 有非终态 assignee item / `⚪` 无;数据从 `GET /api/projects/{key}/items` 按成员聚合
 
 ## Out of Scope(→ Defer 总账)
 
-websocket 实时 · rich text(专门 sprint)· 到期提醒 · Excel 导入 · i18n · Linear 同步
+websocket 实时 · rich text(专门 sprint) · 到期提醒 · Excel 导入 · i18n · Linear 同步 · item 级收藏
 
 ## Further Notes
 
