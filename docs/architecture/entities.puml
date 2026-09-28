@@ -78,6 +78,14 @@ class ChecklistItem {
   position: Int
 }
 class ItemDependency
+class ItemGroup {
+  type: String
+  name: String
+  status: String
+  startDate: LocalDate?
+  endDate: LocalDate?
+}
+class ItemGroupMember
 class Requirement {
   minLevel: Int?
 }
@@ -99,6 +107,8 @@ Project "1" *-- "*" StatusTransition
 Project "1" *-- "*" ProjectMember : 成员池
 Project "1" *-- "*" ProjectRepo : GitHub 仓库
 Project "1" *-- "*" ProjectWorkflowRule
+Project "1" *-- "*" ItemGroup : Sprint(Phase 1)
+ItemGroup "1" *-- "*" ItemGroupMember
 ProjectWorkflowRule "*" --> "1" Status : 目标列
 Item "1" *-- "*" ItemGitRef : 分支/PR 链接
 ProjectMember "*" *-- "1" Member
@@ -153,6 +163,15 @@ note right of Notification
   kind ∈ {status_changed, assigned,
   commented};动作按钮不落库:
   读时现算「下一列」(V7-Q3)。
+end note
+note right of ItemGroup
+  item_group:V12 Sprint 平面(spec 0010)。
+  type v1 仅 sprint(Phase 3 +release);
+  status planned/active/completed;
+  同一 item 至多一个 planned/active
+  membership(应用层不变量);
+  completed 行即历史,不可变;
+  组不进匹配输入(领域规则)。
 end note
 note right of ItemDependency
   阻塞语义:depends_on 未终态

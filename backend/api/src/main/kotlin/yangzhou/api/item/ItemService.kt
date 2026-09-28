@@ -40,6 +40,8 @@ class ItemService(
     private val feasibilityService: yangzhou.api.feasibility.FeasibilityService,
     private val dependencyService: yangzhou.api.dependency.DependencyService,
     private val notificationService: yangzhou.api.notification.NotificationService,
+    private val groupRepo: yangzhou.persistence.repository.ItemGroupRepository,
+    private val groupMembers: yangzhou.persistence.repository.ItemGroupMemberRepository,
 ) {
 
     data class RequirementDto(val attribute: String, val minLevel: Int?)
@@ -65,6 +67,8 @@ class ItemService(
         val blocked: Boolean = false,
         val priority: String? = null,
         val createdAt: String? = null,
+        val sprintId: UUID? = null,
+        val sprintName: String? = null,
     )
 
     @Transactional
@@ -119,7 +123,7 @@ class ItemService(
         return get(item.objectId)
     }
 
-    fun list(projectKey: String): List<ItemDto> {
+    fun list(projectKey: String, backlogOnly: Boolean = false): List<ItemDto> {
         val project = projects.findByKey(projectKey) ?: throw NotFoundException("项目不存在:$projectKey")
         val projectId = project.id!!
         val statusById = statuses.findByProjectIdOrderByPosition(projectId).associateBy { it.objectId }
@@ -130,7 +134,14 @@ class ItemService(
         val memberNames = memberMap.mapValues { it.value.displayName }
         val projectItems = itemRepo.findByProjectIdAndDeletedAtIsNullOrderByNumber(projectId)
         val reqs = requirementRepo.findByItemIdIn(projectItems.mapNotNull { it.id })
-        return projectItems.map { item ->
+        val memberships = groupMembers.findByItemIdIn(projectItems.mapNotNull { it.id })
+        val groupById = if (memberships.isEmpty()) emptyMap() else groupRepo.findAllById(memberships.map { it.groupId }.toSet()).associateBy { it.id!! }
+        val currentSprint = memberships.mapNotNull { m ->
+            groupById[m.groupId]?.takeIf { it.status != "completed" }?.let { m.itemId to it }
+        }.toMap()
+        val finalIds = statusById.filterValues { it.isFinal }.keys
+        val visible = if (backlogOnly) projectItems.filter { it.statusObjectId !in finalIds && it.id !in currentSprint } else projectItems
+        return visible.map { item ->
             ItemDto(
                 itemId = item.objectId,
                 number = "${project.key}-${item.number}",
@@ -149,6 +160,8 @@ class ItemService(
                 assigneeColor = item.assigneeObjectId?.let { memberMap[it]?.color },
                 dueSoon = item.dueDate?.let { it >= LocalDate.now() && it < LocalDate.now().plusDays(3) } == true,
                 createdAt = item.createdAt.toString(),
+                sprintId = currentSprint[item.id]?.objectId,
+                sprintName = currentSprint[item.id]?.name,
                 externalRef = item.externalRef,
                 parentItemId = item.parentObjectId,
                 requirements = reqs.filter { it.itemId == item.id }.map {

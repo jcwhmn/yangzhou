@@ -12,11 +12,12 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.http.HttpStatus
+import yangzhou.api.sprint.SprintService
 import java.util.UUID
 
 @RestController
 @RequestMapping("/api")
-class ItemController(private val service: ItemService) {
+class ItemController(private val service: ItemService, private val sprintService: SprintService) {
 
     @PostMapping("/projects/{key}/items")
     @ResponseStatus(HttpStatus.CREATED)
@@ -54,6 +55,13 @@ class ItemController(private val service: ItemService) {
         @PathVariable itemId: UUID,
         @RequestBody request: AssigneeRequest,
     ): ItemService.ItemDto = service.assign(itemId, request.assigneeItemId)
+
+    /** 指派/移出当前 sprint(值=指派,null=移出;spec 0010 裁决 2)。 */
+    @PutMapping("/items/{itemId}/sprint")
+    fun assignSprint(
+        @PathVariable itemId: UUID,
+        @RequestBody request: SprintService.AssignSprintRequest,
+    ): ItemService.ItemDto = sprintService.assignItem(itemId, request.sprintId)
 
     @GetMapping("/items/{itemId}/activity")
     fun activity(@PathVariable itemId: UUID) = service.activity(itemId)
