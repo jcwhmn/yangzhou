@@ -16,6 +16,8 @@ import { t } from "@/lib/texts";
 
 type Member = { memberId: string; displayName: string; username: string | null; virtual: boolean };
 type PoolMember = { memberId: string; displayName: string; virtual: boolean };
+type StatusLite = { name: string; isFinal: boolean };
+type ItemLite = { assignee: string | null; status: string };
 
 /**
  * 项目成员池管理面板(V4-S2):池 = "合法指派范围"。
@@ -34,16 +36,22 @@ export function ProjectMembersPanel({
 }) {
   const [pool, setPool] = useState<PoolMember[]>([]);
   const [all, setAll] = useState<Member[]>([]);
+  const [busy, setBusy] = useState<Set<string>>(new Set());
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
     try {
-      const [p, a] = await Promise.all([
+      const [p, a, proj, items] = await Promise.all([
         api<PoolMember[]>(`/api/projects/${projectKey}/members`),
         api<Member[]>("/api/members"),
+        api<{ statuses: StatusLite[] }>(`/api/projects/${projectKey}`),
+        api<ItemLite[]>(`/api/projects/${projectKey}/items`),
       ]);
       setPool(p);
       setAll(a);
+      // V11-S5 成员色点:🟢 有非终态 assignee item / ⚪ 无(按 displayName 聚合,workspace 内唯一)
+      const finalNames = new Set(proj.statuses.filter((s) => s.isFinal).map((s) => s.name));
+      setBusy(new Set(items.filter((i) => i.assignee && !finalNames.has(i.status)).map((i) => i.assignee!)));
     } catch (e) {
       setError(e instanceof Error ? e.message : "加载失败");
     }
@@ -97,9 +105,15 @@ export function ProjectMembersPanel({
         )}
 
         <Stack spacing={0.5} sx={{ mb: 2 }}>
+          <Typography variant="caption" color="text.secondary">
+            {t.membersPanel.busyLegend}
+          </Typography>
           {pool.map((m) => (
             <Stack key={m.memberId} direction="row" spacing={1} alignItems="center" justifyContent="space-between">
               <Stack direction="row" spacing={1} alignItems="center">
+                <span aria-label={busy.has(m.displayName) ? "进行中" : "空闲"}>
+                  {busy.has(m.displayName) ? "🟢" : "⚪"}
+                </span>
                 <Typography variant="body2">{m.displayName}</Typography>
                 {m.virtual && <Chip size="small" label="虚拟" variant="outlined" />}
               </Stack>

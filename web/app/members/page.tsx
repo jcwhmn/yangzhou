@@ -1,21 +1,28 @@
 "use client";
 
 import {
-  Box,
   Button,
   Card,
   CardContent,
+  Checkbox,
   Chip,
   Container,
   IconButton,
   MenuItem,
   Select,
   Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
   TextField,
   Typography,
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
+import SaveIcon from "@mui/icons-material/Save";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { t } from "@/lib/texts";
@@ -51,6 +58,7 @@ export default function MembersPage() {
   const [pat, setPat] = useState<TokenStatus | null>(null);
   const [patInput, setPatInput] = useState("");
   const [ghUserDraft, setGhUserDraft] = useState<Map<string, string>>(new Map());
+  const [levelDraft, setLevelDraft] = useState<Map<string, string>>(new Map()); // "memberId|attr" → 输入中
 
   const load = useCallback(async () => {
     const [ms, ts, attrs] = await Promise.all([
@@ -99,17 +107,30 @@ export default function MembersPage() {
     }
   }
 
-  async function setCap(memberId: string, attribute: string, value: string) {
+  async function toggleCap(memberId: string, attribute: string, current: boolean) {
     setError("");
     try {
-      if (value === "none") {
+      if (current) {
         await api(`/api/members/${memberId}/capabilities/${encodeURIComponent(attribute)}`, { method: "DELETE" });
       } else {
         await api(`/api/members/${memberId}/capabilities`, {
           method: "PUT",
-          body: JSON.stringify({ attribute, level: value === "unrated" ? null : Number(value) }),
+          body: JSON.stringify({ attribute, level: null }),
         });
       }
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "保存失败");
+    }
+  }
+
+  async function saveCapLevel(memberId: string, attribute: string, value: string) {
+    setError("");
+    try {
+      await api(`/api/members/${memberId}/capabilities`, {
+        method: "PUT",
+        body: JSON.stringify({ attribute, level: value === "" ? null : Number(value) }),
+      });
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "保存失败");
@@ -151,6 +172,15 @@ export default function MembersPage() {
       setError(err instanceof Error ? err.message : "操作失败");
     }
   }
+
+  // V11-S5:分类 → 叶子属性(保持词表顺序),驱动两行表头
+  const categories: [string, Attribute[]][] = [];
+  attributes.forEach((a) => {
+    const g = a.categoryName ?? "未分类";
+    const found = categories.find(([c]) => c === g);
+    if (found) found[1].push(a);
+    else categories.push([g, [a]]);
+  });
 
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
@@ -229,103 +259,132 @@ export default function MembersPage() {
         </Button>
       </Stack>
 
-      {/* 成员卡片:能力自评 + 删除(登录账号不可删) */}
-      <Stack spacing={1.5} sx={{ mb: 4 }}>
-        {members.map((m) => (
-          <Card key={m.memberId} variant="outlined">
-            <CardContent>
-              <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
-                <Typography variant="subtitle1">{m.displayName}</Typography>
-                <Chip size="small" label={m.virtual ? t.members.virtual : t.members.real} variant="outlined" />
-                {m.virtual && (
-                  <IconButton size="small" onClick={() => deleteMember(m)} aria-label="delete">
-                    <DeleteIcon fontSize="small" />
-                  </IconButton>
-                )}
-              </Stack>
-              <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
-                <TextField
-                  size="small"
-                  label={t.gh.ghUser}
-                  defaultValue={m.githubUsername ?? ""}
-                  onChange={(e) => setGhUserDraft((prev) => new Map(prev).set(m.memberId, e.target.value))}
-                  sx={{ width: 220 }}
-                />
-                <Button
-                  size="small"
-                  onClick={async () => {
-                    setError("");
-                    try {
-                      const value = ghUserDraft.get(m.memberId) ?? m.githubUsername ?? "";
-                      const updated = await api<Member>(`/api/members/${m.memberId}/github-username`, {
-                        method: "PUT",
-                        body: JSON.stringify({ githubUsername: value }),
-                      });
-                      setMembers((prev) =>
-                        prev.map((x) => (x.memberId === m.memberId ? { ...x, githubUsername: updated.githubUsername } : x)),
-                      );
-                      setGhUserDraft((prev) => {
-                        const next = new Map(prev);
-                        next.delete(m.memberId);
-                        return next;
-                      });
-                    } catch (err) {
-                      setError(err instanceof Error ? err.message : "保存失败");
-                    }
-                  }}
-                >
-                  {t.item.save}
-                </Button>
-              </Stack>
-              <Stack spacing={1.5}>
-                  {(() => {
-                    const groups = new Map<string, typeof attributes>();
-                    attributes.forEach((a) => {
-                      const g = a.categoryName ?? "未分类";
-                      groups.set(g, [...(groups.get(g) ?? []), a]);
-                    });
-                    return [...groups.entries()].map(([cat, attrs]) => (
-                      <Box key={cat}>
-                        <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>
-                          {cat}
-                        </Typography>
-                        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                          {attrs.map((a) => {
-                            const has = caps.get(m.memberId)?.has(a.name) ?? false;
-                            const level = caps.get(m.memberId)?.get(a.name);
-                            const value = !has ? "none" : level === null || level === undefined ? "unrated" : String(level);
-                            return (
-                              <Stack key={a.attributeId} direction="row" spacing={0.5} alignItems="center">
-                                <Typography variant="caption" color="text.secondary">
-                                  {a.name}
-                                </Typography>
-                                <Select
-                                  size="small"
-                                  value={value}
-                                  onChange={(e) => setCap(m.memberId, a.name, String(e.target.value))}
-                                  sx={{ minWidth: 110, fontSize: 13 }}
-                                >
-                                  <MenuItem value="none">{t.caps.none}</MenuItem>
-                                  <MenuItem value="unrated">{a.leveled ? t.caps.unrated : t.caps.has}</MenuItem>
-                                  {a.leveled &&
-                                    [1, 2, 3, 4].map((l) => (
-                                      <MenuItem key={l} value={String(l)}>
-                                        {t.caps.level(l)}
-                                      </MenuItem>
-                                    ))}
-                                </Select>
-                              </Stack>
-                            );
-                          })}
+      {/* 成员表格:身份 + GitHub + 能力两行表头(分类 colspan + 叶子名;V11-S5) */}
+      <TableContainer sx={{ mb: 4, overflowX: "auto" }}>
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell rowSpan={2} sx={{ verticalAlign: "bottom" }}>
+                {t.members.member}
+              </TableCell>
+              <TableCell rowSpan={2} sx={{ verticalAlign: "bottom" }}>
+                {t.gh.ghUser}
+              </TableCell>
+              {categories.map(([cat, attrs]) => (
+                <TableCell key={cat} colSpan={attrs.length} align="center">
+                  {cat}
+                </TableCell>
+              ))}
+            </TableRow>
+            <TableRow>
+              {categories.flatMap(([, attrs]) =>
+                attrs.map((a) => (
+                  <TableCell key={a.attributeId} sx={{ whiteSpace: "nowrap" }}>
+                    {a.name}
+                  </TableCell>
+                )),
+              )}
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {members.map((m) => (
+              <TableRow key={m.memberId}>
+                <TableCell>
+                  <Stack direction="row" spacing={0.5} alignItems="center">
+                    <Typography variant="body2" sx={{ whiteSpace: "nowrap" }}>
+                      {m.displayName}
+                    </Typography>
+                    <Chip size="small" label={m.virtual ? t.members.virtual : t.members.real} variant="outlined" />
+                    {m.virtual && (
+                      <IconButton size="small" onClick={() => deleteMember(m)} aria-label="delete">
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    )}
+                  </Stack>
+                </TableCell>
+                <TableCell>
+                  <Stack direction="row" spacing={0.5} alignItems="center">
+                    <TextField
+                      size="small"
+                      defaultValue={m.githubUsername ?? ""}
+                      onChange={(e) => setGhUserDraft((prev) => new Map(prev).set(m.memberId, e.target.value))}
+                      sx={{ width: 150 }}
+                    />
+                    <IconButton
+                      size="small"
+                      aria-label={`save-github-${m.displayName}`}
+                      onClick={async () => {
+                        setError("");
+                        try {
+                          const value = ghUserDraft.get(m.memberId) ?? m.githubUsername ?? "";
+                          const updated = await api<Member>(`/api/members/${m.memberId}/github-username`, {
+                            method: "PUT",
+                            body: JSON.stringify({ githubUsername: value }),
+                          });
+                          setMembers((prev) =>
+                            prev.map((x) => (x.memberId === m.memberId ? { ...x, githubUsername: updated.githubUsername } : x)),
+                          );
+                          setGhUserDraft((prev) => {
+                            const next = new Map(prev);
+                            next.delete(m.memberId);
+                            return next;
+                          });
+                        } catch (err) {
+                          setError(err instanceof Error ? err.message : "保存失败");
+                        }
+                      }}
+                    >
+                      <SaveIcon fontSize="small" />
+                    </IconButton>
+                  </Stack>
+                </TableCell>
+                {categories.flatMap(([, attrs]) =>
+                  attrs.map((a) => {
+                    const has = caps.get(m.memberId)?.has(a.name) ?? false;
+                    const level = caps.get(m.memberId)?.get(a.name);
+                    const draftKey = `${m.memberId}|${a.name}`;
+                    const shown = levelDraft.get(draftKey) ?? (level === null || level === undefined ? "" : String(level));
+                    return (
+                      <TableCell key={a.attributeId}>
+                        <Stack direction="row" spacing={0.5} alignItems="center">
+                          <Checkbox
+                            size="small"
+                            checked={has}
+                            onChange={() => toggleCap(m.memberId, a.name, has)}
+                            sx={{ p: 0.5 }}
+                          />
+                          {a.leveled && has && (
+                            <TextField
+                              type="number"
+                              size="small"
+                              value={shown}
+                              onChange={(e) => setLevelDraft((prev) => new Map(prev).set(draftKey, e.target.value))}
+                              onBlur={() => {
+                                const v = levelDraft.get(draftKey);
+                                if (v !== undefined) {
+                                  saveCapLevel(m.memberId, a.name, v);
+                                  setLevelDraft((prev) => {
+                                    const next = new Map(prev);
+                                    next.delete(draftKey);
+                                    return next;
+                                  });
+                                }
+                              }}
+                              onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+                              slotProps={{ htmlInput: { min: 1, max: 4 } }}
+                              sx={{ width: 54 }}
+                            />
+                          )}
                         </Stack>
-                      </Box>
-                    ));
-                  })()}
-                </Stack>
-            </CardContent>
-          </Card>
-        ))}
-      </Stack>
+                      </TableCell>
+                    );
+                  }),
+                )}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
 
       {/* Team 分组 */}
       <Typography variant="h5" gutterBottom>
