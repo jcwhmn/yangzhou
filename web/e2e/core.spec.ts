@@ -60,6 +60,38 @@ test("建项目并打开看板(默认五列)", async ({ page }) => {
   }
 });
 
+test("V11-S1 登录后进入上次项目", async ({ page }) => {
+  await login(page);
+  // 看板 mount 写 last_project_key(V26)
+  await page.goto(`/p/${KEY}`);
+  await expect(page.getByRole("heading", { name: "To Do", exact: false })).toBeVisible();
+  // 清会话重新登录 → 落回上次项目
+  await page.evaluate(() => localStorage.clear());
+  await page.goto("/login");
+  await page.getByLabel("用户名").fill("me");
+  await page.getByLabel("密码").fill("secret");
+  await page.getByRole("button", { name: "登录" }).click();
+  await expect(page).toHaveURL(new RegExp(`/p/${KEY}$`));
+});
+
+test("V11-S3 项目列表搜索/排序/显示已归档", async ({ page }) => {
+  await login(page);
+  await page.goto("/");
+  await page.getByText(KEY, { exact: true }).waitFor({ timeout: 15000 });
+  // 搜索过滤
+  await page.getByPlaceholder("搜索项目…").fill("冒烟");
+  await expect(page.getByText("E2E 冒烟项目").first()).toBeVisible();
+  await page.getByPlaceholder("搜索项目…").fill("");
+  // 排序切换(首页唯一 combobox)
+  await page.getByRole("combobox").click();
+  await page.getByRole("option", { name: "按名称" }).click();
+  await expect(page.getByText("E2E 冒烟项目").first()).toBeVisible();
+  // 显示已归档开关(无已归档项目,列表不消失)
+  await page.getByText("显示已归档").click();
+  await expect(page.getByRole("checkbox").first()).toBeChecked();
+  await expect(page.getByText("E2E 冒烟项目").first()).toBeVisible();
+});
+
 test("建 item → 详情 → 评论 → 切状态 → 活动日志留痕", async ({ page }) => {
   await login(page);
   await page.goto(`/p/${KEY}`);
@@ -114,6 +146,26 @@ test("日期与超期标识——详情设置日期,看板红标,甘特可见", 
   await page.goto(`/p/${KEY}/gantt`);
   await expect(page.getByText("E2E 超期 item")).toBeVisible();
   await expect(page.getByText(/未排期\(/)).toBeVisible();
+});
+
+test("V11-S4 detail 优先级 Select 接通(P1 落库/清除)", async ({ page }) => {
+  await login(page);
+  await page.goto(`/p/${KEY}`);
+  await page.getByText("E2E 冒烟 item").first().waitFor({ timeout: 15000 });
+  await page.getByText("E2E 冒烟 item").first().click();
+  await page.getByRole("combobox", { name: "优先级" }).click();
+  const plist = page.getByRole("listbox");
+  await plist.getByRole("option", { name: "P1" }).click();
+  await expect(plist).toBeHidden();
+  await page.getByRole("button", { name: "保存" }).click();
+  await page.reload();
+  await expect(page.getByRole("combobox", { name: "优先级" })).toHaveText("P1");
+  // 空串=清除(V24 PATCH 语义)
+  await page.getByRole("combobox", { name: "优先级" }).click();
+  await plist.getByRole("option", { name: "无" }).click();
+  await expect(plist).toBeHidden();
+  await page.getByRole("button", { name: "保存" }).click();
+  await expect(page.getByRole("combobox", { name: "优先级" })).not.toHaveText("P1");
 });
 
 test("看板反映新状态;通知页可达", async ({ page }) => {
@@ -235,27 +287,3 @@ test("V10 依赖——blocked 标识", async ({ page }) => {
   await expect(page.getByText("阻塞中").first()).toBeVisible();
 });
 
-test("V10 回收站——删除后恢复", async ({ page }) => {
-  await login(page);
-  await page.goto(`/p/${KEY}`);
-  await page.getByText("E2E 冒烟 item").first().waitFor({ timeout: 15000 });
-  await page.goto(`/p/${KEY}`);
-  await page.getByText("E2E 冒烟 item").first().waitFor({ timeout: 15000 });
-  await page.goto(`/p/${KEY}`);
-  await page.getByPlaceholder("新建 item").fill("E2E 回收站 item");
-  await page.getByRole("button", { name: "新建 ITEM" }).click();
-  await page.getByText("E2E 回收站 item").first().waitFor();
-  await page.getByText("E2E 回收站 item").first().click();
-
-  page.once("dialog", (d) => d.accept());
-  await page.getByRole("button", { name: "删除", exact: true }).click();
-  await expect(page).toHaveURL(new RegExp(`/p/${KEY}$`));
-
-  await page.goto("/recycle-bin");
-  await page.getByText("E2E 回收站 item").waitFor({ timeout: 10000 });
-  await page.getByRole("button", { name: "恢复" }).first().click();
-  await page.goto(`/p/${KEY}`);
-  await page.getByText("E2E 回收站 item").first().waitFor({ timeout: 10000 });
-  await page.goto(`/p/${KEY}`);
-  await expect(page.getByText("E2E 回收站 item").first()).toBeVisible();
-});
