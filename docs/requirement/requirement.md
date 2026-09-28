@@ -95,3 +95,73 @@ Item o-- Capability
 - 我看到了收藏 按钮，但在哪里收藏项目
 - 未分配item使用特定颜色显示，每个 item member分配一个颜色，分配给该member的item使用该颜色。问题：是否不同状态也需要不同颜色？已超期或快超期 item是否需要用颜色标记
 - github集成很重要，但我还没有亲自测试过。你再仔细分析还有哪些gap
+
+2026-09-26
+- 删除项目。我们在上个sprint里是否已经有筛选和排序项目的能力？这个在项目里看不见
+- 登录后，进入上次退出的项目。这个功能比较重要。问题：在多个页面中访问多个项目，下次登录进入哪个？
+- 项目加入 收藏 功能实现了没？
+- 所有控件都隐藏边框，不要在页面中显示任何边框
+- item detail页面布局没有改变
+- 项目成员池中的项目成员，可以使用不同的颜色标记是否有item在做？已完成，未分配任务等？
+- 使用颜色标记项目中item临期状态的功能实现了没有？
+
+- sprint，backlog的概念还是要有。这样item会看起来比较清爽.
+- sprint, epic, 这是不作为固定对象，而是作为item group （也许也是某种item？）
+```plantuml
+@startuml
+hide empty members
+
+class project
+class backlog
+class item
+class itemGroup
+object epic
+object sprint
+
+project o-- backlog
+project o-- itemGroup
+itemGroup o-- item
+item o-- item
+backlog o-- item
+@enduml
+```
+- backlog是否是一种item？不，应该是某种itemGroup
+Sprint 更像是一个时间/计划容器，而 Epic 是业务目标容器
+
+一个可能的左侧边栏：
+```
+Project: Payment Platform
+
+Overview
+All items
+My items
+────────────────────
+
+PLAN
+  Epics
+    Payment
+    Account
+    Notification
+
+  Releases
+    v1.0
+    v2.0
+
+WORK
+  Sprints
+    Sprint 42
+    Sprint 43
+    Sprint 44
+Milestone
+    completed
+    completed
+    current       ← 通常一个
+    future
+    future
+    future
+────────────────────
+Views
+  Board
+  Backlog
+  Timeline
+```
