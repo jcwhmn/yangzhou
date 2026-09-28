@@ -1,5 +1,8 @@
 # ItemGroup PRD
 
+> 📐 **实施规划(2026-09-28 评审后补)**:本设计共需 **3 个 Phase** 实现,预计 **V12 冲刺** spec 化并实现 Phase 1,详见 §28。
+> 此处的 Phase 指工程实施阶段,**不等于** §6 ItemGroupType 示例中的「Phase」(产品分组类型),也**不等于**产品 Sprint 实体——见 §28.4。
+
 ## 1. 产品概述
 
 本产品是一套类似 Jira 的项目管理软件，但核心目标不是固定提供 `Epic / Sprint / Story / Task` 等预定义类型，而是建立一个**运行时可配置的项目管理元模型**。
@@ -1223,3 +1226,39 @@ View
 > **View 不属于某一种固定 Group，而是可以由运行时配置，将不同 ItemGroupType 与不同 ViewType 组合起来。**
 
 最终形成一个可配置的项目管理平台，而不是固定流程的 Jira Clone。
+
+---
+
+# 28. 实施规划(评审后补,2026-09-28)
+
+> 本节为评审结论,不改动 §1–27 设计内容;与 P0/P1 清单冲突处,以本节为准。
+
+## 28.1 评审结论
+
+- §1–27 概念划分**采纳**:ItemGroup 不进 Item 树(不是「某种 item」);Epic/Sprint/Release 三维正交(§26.2);Milestone 独立于 ItemGroup(§9);Release 可事后补建(§8)。
+- **裁剪**(相对 §24 P0 / §25 P1):
+  - **Epic 不建 ItemGroup 平面**——用现有 item 树表达(type `goal` + parentId),侧边栏 Epics 段 = 树查询,零新表;§7.1 的 Epic 语义由树承担
+  - ItemType / ItemGroupType / ViewType 的**运行时 CRUD → defer**(§2 可配置立场后移):数据模型保持通用(类型判别列),但类型集合 v1 封闭枚举,零配置 UI;真有用户需求再加
+  - View 配置持久化(§25 View Configuration)→ defer;v1 复用现有看板/表格组件渲染「组的 item 集」,一个路由参数,零持久化
+  - §26.1 组可配层级 → 不做(v1 一层);§26.4 Milestone 关联 item → v1 不做
+- **补遗**:Sprint 必须有 start/end 日期(时间盒的定义性属性,§24 Sprint 部分遗漏);约束:item 同时最多在一个进行中 Sprint。
+
+## 28.2 Phase 划分(共 3 个)
+
+| Phase | 内容 | 承接原文章节 |
+|---|---|---|
+| **Phase 1** | item_group + item_group_member(unique 约束);Sprint CRUD(含日期/状态);组内看板/表格复用现有组件;侧边栏 Sprints 段 + backlog 派生桶(未进任何 sprint 的非终态 item,零建模);item 卡片/详情显示所属 sprint | §5–7(Sprint)、§14–18(View 最小集)、§19–21(导航)、§24 Sprint |
+| **Phase 2** | Milestone 独立表(PLANNED/IN_PROGRESS/COMPLETED/CANCELLED + 目标日,0..1 current);侧边栏 Milestones 段;侧边栏 Epics 段(树查询);组级可行性信号 rollup(沿用红黄红聚合规则) | §7.1(Epic)、§9–12(Milestone)、§24 Milestone |
+| **Phase 3** | Release(planned/historical,支持事后补建);侧边栏 Releases 段;release.milestone_id 可空 N:1(§26.3 的裁决) | §7.3、§8(Release)、§24 Release |
+
+**Defer until asked**:类型运行时 CRUD(§4/§6)、View 配置持久化(§25)、navigationVisible/order/icon(§20)、Calendar/Roadmap 等 ViewType(§15)。
+
+## 28.3 预计实现时间
+
+- 设计预计 **V12 冲刺**(下一个 version sprint)spec 化(docs/spec/0010)并实现 **Phase 1**;Phase 2/3 顺延 V13+,按 Phase 1 上手后的真实反馈排期。
+
+## 28.4 术语澄清:实施 Phase ≠ 产品 Phase ≠ Sprint
+
+- 本节的 **Phase** 是**工程实施阶段**——yangzhou 开发冲刺内的切票单元(对应 Linear S1/S2/…),产品运行时不存在此概念;
+- §6 ItemGroupType 示例中的 **Phase** 是**产品概念**——用户自定义的阶段分组容器:与 Sprint 同属 ItemGroupType,但 Sprint 是系统内建的固定节奏时间盒(循环、有起止),Phase 是自由划分的项目阶段(无固定节奏);
+- 因此实施 Phase **不对应**产品里的任何实体(包括 Sprint);它的时长尺度 ≈ yangzhou 一个 version sprint(V12/V13/…)或其中几张票,但那是开发节奏,不是领域模型。
