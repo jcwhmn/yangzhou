@@ -53,6 +53,7 @@ export const t = {
     saved: "已保存",
     verdicts: "判定",
     signal: "聚合信号",
+    priority: "优先级",
     back: "← 返回看板",
   },
   caps: {

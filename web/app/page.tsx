@@ -49,9 +49,6 @@ export default function ProjectsPage() {
   const [favHint, setFavHint] = useState(false);
   const [key, setKey] = useState("");
   const [name, setName] = useState("");
-  const [search, setSearch] = useState("");
-  const [sortBy, setSortBy] = useState("key");
-  const [showArchived, setShowArchived] = useState(false);
   const [error, setError] = useState("");
 
   async function load() {

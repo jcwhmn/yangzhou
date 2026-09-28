@@ -35,11 +35,14 @@ async function login(page: import("@playwright/test").Page) {
   await page.getByLabel("用户名").fill("me");
   await page.getByLabel("密码").fill("secret");
   await page.getByRole("button", { name: "登录" }).click();
-  await expect(page).toHaveURL("/");
+  // V11-S1:登录后可能落在 / 或上次项目 /p/<key>,两者都算登录成功
+  await expect(page).toHaveURL(/:\d+\/(p\/[^/]+)?$/);
 }
 
 test("登录进首页", async ({ page }) => {
   await login(page);
+  // V11-S1 登录后可能落在上次项目,主动回首页验证项目列表可达
+  await page.goto("/");
   await expect(page.getByRole("heading", { name: "项目", exact: true })).toBeVisible();
 });
 
@@ -190,7 +193,6 @@ test("回收站——删除后可恢复", async ({ page }) => {
   await page.getByRole("button", { name: "恢复" }).first().click();
   await page.goto(`/p/${KEY}`);
   await page.getByText("E2E 回收站 item").first().waitFor({ timeout: 10000 });
-  await page.getByRole("button", { name: "恢复" }).first().click();
   await page.goto(`/p/${KEY}`);
   await expect(page.getByText("E2E 回收站 item").first()).toBeVisible();
 });
@@ -213,9 +215,12 @@ test("V10 依赖——blocked 标识", async ({ page }) => {
   await page.getByRole("button", { name: "新建 ITEM" }).click();
   await page.getByText("E2E 依赖 item").first().waitFor();
   await page.getByText("E2E 依赖 item").first().click();
+  // 依赖区块在「依赖+清单」tab(S4 detail 重构)
+  await page.getByRole("tab", { name: "依赖+清单" }).click();
   await page.getByRole("button", { name: "加依赖" }).click();
-  await page.locator("select").first().selectOption({ index: 0 });
-  await page.getByRole("button", { name: "添加" }).first().click();
+  // 页面里有多个 select(MUI 隐藏原生 select)和多个「添加」按钮,用 aria-label 精确定位
+  await page.getByRole("combobox", { name: "被依赖 item" }).selectOption({ index: 1 });
+  await page.getByRole("button", { name: "确认添加依赖" }).click();
   await expect(page.getByText("阻塞中").first()).toBeVisible();
 });
 
@@ -240,7 +245,6 @@ test("V10 回收站——删除后恢复", async ({ page }) => {
   await page.getByRole("button", { name: "恢复" }).first().click();
   await page.goto(`/p/${KEY}`);
   await page.getByText("E2E 回收站 item").first().waitFor({ timeout: 10000 });
-  await page.getByRole("button", { name: "恢复" }).first().click();
   await page.goto(`/p/${KEY}`);
   await expect(page.getByText("E2E 回收站 item").first()).toBeVisible();
 });

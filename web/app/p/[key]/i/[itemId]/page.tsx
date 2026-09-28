@@ -26,6 +26,8 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { t } from "@/lib/texts";
 import { SignalChip, VerdictLine, type Signal, type Verdict } from "@/components/Verdict";
+import Tab from "@mui/material/Tab";
+import Tabs from "@mui/material/Tabs";
 
 type Status = { statusId: string; name: string; isFinal: boolean; position: number };
 type Item = {
@@ -42,6 +44,11 @@ type Item = {
   startDate: string | null;
   dueDate: string | null;
   gitRefs: { kind: string; repo: string; ref: string; url: string | null; state: string | null }[];
+  priority: string | null;
+  overdue: boolean;
+  dueSoon: boolean;
+  blocked: boolean;
+  createdAt: string | null;
 };
 type Repo = { repoId: string; repo: string };
 type Attribute = { attributeId: string; name: string; kind: string; leveled: boolean };
@@ -113,6 +120,7 @@ export default function ItemDetailPage() {
   const [description, setDescription] = useState("");
   const [startDate, setStartDate] = useState("");
   const [dueDate, setDueDate] = useState("");
+  const [priority, setPriority] = useState("");
   const [type, setType] = useState("task");
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
@@ -124,13 +132,13 @@ export default function ItemDetailPage() {
   const [comments, setComments] = useState<CommentDto[]>([]);
   const [newComment, setNewComment] = useState("");
   const [branchOpen, setBranchOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState(0);
   const [timeLog, setTimeLog] = useState<{ entries: TimeEntry[]; totalMinutes: number } | null>(null);
   const [manualMinutes, setManualMinutes] = useState("");
   const [manualNote, setManualNote] = useState("");
   const [deps, setDeps] = useState<Dep[] | null>(null);
   const [depBlocked, setDepBlocked] = useState(false);
   const [depAddOpen, setDepAddOpen] = useState(false);
-  const [depPick, setDepPick] = useState("");
   const [checklist, setChecklist] = useState<Checklist | null>(null);
   const [newCheckText, setNewCheckText] = useState("");
 
@@ -144,7 +152,7 @@ export default function ItemDetailPage() {
       api<Activity[]>(`/api/items/${itemId}/activity`),
     ])
     setItem(it); setTitle(it.title); setDescription(it.description ?? ""); setType(it.type)
-    setStartDate(it.startDate ?? ""); setDueDate(it.dueDate ?? "")
+    setStartDate(it.startDate ?? ""); setDueDate(it.dueDate ?? ""); setPriority(it.priority ?? "")
     setStatuses(project.statuses); setAttributes(attrs)
     setFeasibility(feas); setCandidates(cands); setActivity(acts)
     const allMembers = await api<{ memberId: string; displayName: string; virtual: boolean }[]>("/api/members");
@@ -171,7 +179,7 @@ export default function ItemDetailPage() {
   async function saveBasics() {
     await api(`/api/items/${itemId}`, {
       method: "PATCH",
-      body: JSON.stringify({ title, description: description || null, type, startDate, dueDate }),
+      body: JSON.stringify({ title, description: description || null, type, startDate, dueDate, priority }),
     });
     await load();
     flashSaved();
@@ -249,16 +257,15 @@ export default function ItemDetailPage() {
     }
   }
 
-  async function addDependency() {
-    if (!depPick) return;
+  async function addDependency(dependsOnItemId: string) {
+    if (!dependsOnItemId) return;
     setError("");
     try {
       await api(`/api/items/${itemId}/dependencies`, {
         method: "POST",
-        body: JSON.stringify({ dependsOnItemId: depPick }),
+        body: JSON.stringify({ dependsOnItemId }),
       });
       setDepAddOpen(false);
-      setDepPick("");
       const d = await api<{ dependencies: Dep[]; blocked: boolean }>(`/api/items/${itemId}/dependencies`);
       setDeps(d.dependencies); setDepBlocked(d.blocked);
     } catch (e) {
@@ -318,7 +325,7 @@ export default function ItemDetailPage() {
   }
 
   return (
-    <Box sx={{ maxWidth: 760, mx: "auto", p: 3 }}>
+    <Box sx={{ maxWidth: 1100, mx: "auto", p: 3 }}>
       <Link href={`/p/${key}`} style={{ textDecoration: "none" }}>
         <Typography variant="body2" color="primary" gutterBottom>
           {t.item.back}
@@ -345,6 +352,8 @@ export default function ItemDetailPage() {
 
       {error && <Typography color="error" sx={{ mb: 1 }}>{error}</Typography>}
 
+      <Box sx={{ display: "flex", gap: 4, alignItems: "flex-start" }}>
+      <Box sx={{ flex: 1, minWidth: 0 }}>
       <Stack spacing={2} component="section">
         <TextField label={t.item.title} value={title} onChange={(e) => setTitle(e.target.value)} fullWidth />
         <TextField
@@ -362,7 +371,7 @@ export default function ItemDetailPage() {
             size="small"
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
-            sx={{ width: 200 }}
+            sx={{ width: 180 }}
             slotProps={{ inputLabel: { shrink: true } }}
           />
           <TextField
@@ -371,9 +380,24 @@ export default function ItemDetailPage() {
             size="small"
             value={dueDate}
             onChange={(e) => setDueDate(e.target.value)}
-            sx={{ width: 200 }}
+            sx={{ width: 180 }}
             slotProps={{ inputLabel: { shrink: true } }}
           />
+          <TextField
+            select
+            label={t.item.priority}
+            size="small"
+            value={priority}
+            onChange={(e) => setPriority(e.target.value)}
+            sx={{ width: 110 }}
+          >
+            <MenuItem value="">无</MenuItem>
+            {["P0", "P1", "P2", "P3"].map((p) => (
+              <MenuItem key={p} value={p}>
+                {p}
+              </MenuItem>
+            ))}
+          </TextField>
         </Stack>
         <TextField select label={t.item.type} value={type} onChange={(e) => setType(e.target.value)} sx={{ width: 200 }}>
           {["task", "bug", "goal", "story"].map((tp) => (
@@ -403,7 +427,17 @@ export default function ItemDetailPage() {
         </Stack>
       </Stack>
 
-      <Typography variant="h6" sx={{ mt: 3, mb: 1 }}>
+      <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} sx={{ mt: 3, mb: 2 }}>
+        <Tab label="详情" />
+        <Tab label="需求" />
+        <Tab label="依赖+清单" />
+        <Tab label="工时" />
+        <Tab label="GitHub" />
+      </Tabs>
+
+      {activeTab === 0 && (
+        <>
+      <Typography variant="h6" sx={{ mb: 1 }}>
         谁来做
       </Typography>
       {!assignOpen ? (
@@ -518,6 +552,30 @@ export default function ItemDetailPage() {
           </Typography>
         </Box>
       )}
+        </>
+      )}
+
+      {activeTab === 1 && (
+        <Box>
+          {(item.requirements ?? []).length === 0 ? (
+            <Typography color="text.secondary" variant="body2">
+              (无需求——可在「详情」页看判定聚合)
+            </Typography>
+          ) : (
+            <Stack spacing={0.5}>
+              {item.requirements.map((r, i) => (
+                <Stack key={i} direction="row" spacing={1} alignItems="center">
+                  <Chip size="small" variant="outlined" label={r.attribute} />
+                  <Typography variant="body2">{r.minLevel ? `≥${r.minLevel}` : "在场即可"}</Typography>
+                </Stack>
+              ))}
+            </Stack>
+          )}
+          <Button size="small" variant="outlined" onClick={() => setReqOpen(true)} sx={{ mt: 2 }}>
+            编辑需求
+          </Button>
+        </Box>
+      )}
 
       <RequirementsDialog
         open={reqOpen}
@@ -526,7 +584,9 @@ export default function ItemDetailPage() {
         attributes={attributes}
       />
 
-      <Box sx={{ mt: 3 }}>
+      {activeTab === 2 && (
+        <>
+      <Box>
         <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
           <Typography variant="h6">检查清单</Typography>
           {checklist && checklist.totalCount > 0 && (
@@ -589,8 +649,12 @@ export default function ItemDetailPage() {
           </Stack>
         )}
       </Box>
+        </>
+      )}
 
-      <Box sx={{ mt: 3 }}>
+      {activeTab === 3 && (
+        <>
+      <Box>
         <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
           <Typography variant="h6">{t.time.section}</Typography>
           {timeLog && timeLog.totalMinutes > 0 && (
@@ -655,8 +719,12 @@ export default function ItemDetailPage() {
           </Button>
         </Stack>
       </Box>
+        </>
+      )}
 
-      <Box sx={{ mt: 3 }}>
+      {activeTab === 4 && (
+        <>
+      <Box>
         <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
           <Typography variant="h6">{t.gh.gitRefs}</Typography>
           <Button size="small" variant="outlined" onClick={() => setBranchOpen(true)}>
@@ -698,6 +766,8 @@ export default function ItemDetailPage() {
           ))}
         </Stack>
       </Box>
+        </>
+      )}
 
       <CreateBranchDialog
         open={branchOpen}
@@ -767,6 +837,22 @@ export default function ItemDetailPage() {
           </Stack>
         </Box>
       )}
+      </Box>
+
+      <Box sx={{ width: 240, flexShrink: 0 }}>
+        <Typography variant="caption" color="text.secondary">
+          创建
+        </Typography>
+        <Typography variant="body2" sx={{ mb: 2 }}>
+          {item.createdAt ? new Date(item.createdAt).toLocaleString("zh-CN") : "—"}
+        </Typography>
+        <Stack spacing={1} alignItems="flex-start">
+          {item.overdue && <Chip size="small" color="error" label="已超期" />}
+          {item.dueSoon && !item.overdue && <Chip size="small" color="warning" label="临期(3 天内)" />}
+          {item.blocked && <Chip size="small" color="error" label="被阻塞" />}
+        </Stack>
+      </Box>
+      </Box>
     </Box>
   );
 }
@@ -954,7 +1040,7 @@ function DependencyAddForm({
 }: {
   projectKey: string;
   selfId: string;
-  onAdd: () => void;
+  onAdd: (itemId: string) => void;
 }) {
   const [items, setItems] = useState<{ itemId: string; number: string; title: string }[]>([]);
   const [pick, setPick] = useState("");
@@ -964,10 +1050,10 @@ function DependencyAddForm({
       .then((list) => setItems(list.filter((i) => i.itemId !== selfId)))
       .catch(() => setItems([]));
   }, [projectKey, selfId]);
-
   return (
     <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
       <select
+        aria-label="被依赖 item"
         value={pick}
         onChange={(e) => setPick(e.target.value)}
         style={{ padding: "6px", borderRadius: 4 }}
@@ -979,7 +1065,7 @@ function DependencyAddForm({
           </option>
         ))}
       </select>
-      <Button size="small" variant="contained" disabled={!pick} onClick={onAdd}>
+      <Button size="small" variant="contained" disabled={!pick} onClick={() => onAdd(pick)} aria-label="确认添加依赖">
         添加
       </Button>
     </Stack>

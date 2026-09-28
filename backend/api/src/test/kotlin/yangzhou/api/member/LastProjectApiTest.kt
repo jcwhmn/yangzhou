@@ -36,4 +36,27 @@ class LastProjectApiTest : AbstractApiTest() {
                 .expectStatus().isOk().expectBody(String::class.java).returnResult().responseBody!!,
         ).first { it["memberId"].asText() == meId }["lastProjectKey"].isNull)
     }
+
+    @Test
+    fun `me 别名路由——设置与清空(V11-S4 前端对齐)`() {
+        val authed = bootstrapAndAuth()
+        createProject(authed, "CHE")
+
+        authed.put().uri("/api/members/me/last-project")
+            .body(mapOf("key" to "CHE"))
+            .exchange().expectStatus().isOk()
+        val after = json.readTree(
+            authed.get().uri("/api/members").exchange()
+                .expectStatus().isOk().expectBody(String::class.java).returnResult().responseBody!!,
+        ).first { !it["virtual"].asBoolean() }
+        assertEquals("CHE", after["lastProjectKey"].asText())
+
+        authed.put().uri("/api/members/me/last-project")
+            .body(mapOf("key" to ""))
+            .exchange().expectStatus().isOk()
+        assertTrue(json.readTree(
+            authed.get().uri("/api/members").exchange()
+                .expectStatus().isOk().expectBody(String::class.java).returnResult().responseBody!!,
+        ).first { !it["virtual"].asBoolean() }["lastProjectKey"].isNull)
+    }
 }
