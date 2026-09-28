@@ -78,6 +78,7 @@ export const t = {
     teamName: "组名",
     addTeam: "建分组",
     deleteTeam: "删组",
+    member: "成员",
   },
   wf: {
     button: "工作流",
@@ -100,6 +101,7 @@ export const t = {
     poolConfigured: "已配置池:仅池内成员可被指派/进候选。",
     poolEmpty: "未配置池:全 workspace 成员可被指派。添加成员后,仅池内成员可被指派/进候选。",
     addable: "可添加的成员",
+    busyLegend: "🟢 有进行中 item · ⚪ 空闲",
     allInPool: "(全员已在池中)",
     remove: "移除",
     addFailed: "添加失败",

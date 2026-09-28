@@ -156,6 +156,17 @@ test("收藏——卡片☆切换与导航下拉直达", async ({ page }) => {
   await expect(page.getByRole("menu").getByRole("link", { name: "E2E 冒烟项目" })).toHaveCount(0);
 });
 
+test("V11 成员池色点——有非终态 item 🟢,无 ⚪", async ({ page }) => {
+  await login(page);
+  await page.goto(`/p/${KEY}`);
+  await page.getByRole("button", { name: "成员池" }).click();
+  // 池为空 → 加 me(冒烟 item 在 QA,非终态)与小王(无 item)
+  await page.getByText("+ me").click();
+  await page.getByText("+ 小王").click();
+  await expect(page.getByLabel("进行中")).toHaveCount(1);
+  await expect(page.getByLabel("空闲")).toHaveCount(1);
+});
+
 test("看板刷新按钮可用", async ({ page }) => {
   await login(page);
   await page.goto(`/p/${KEY}`);
