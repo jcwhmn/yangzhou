@@ -350,6 +350,86 @@ Content-Type: application/json
 GET {{host}}/api/teams
 Authorization: Bearer {{token}}
 
+# ============ 11. Sprint(V12-S1,spec 0010) ============
+# 语义:同一 item 至多属于一个 planned/active sprint(替换式写入);
+# 完成 sprint 的成员关系是历史,不可变;组不进匹配输入。
+
+### 建 Sprint(handler 存变量 sprintId;日期可选,格式 yyyy-MM-dd)
+POST {{host}}/api/projects/{{pkey}}/sprints
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Sprint 42",
+  "startDate": "2026-10-01",
+  "endDate": "2026-10-15"
+}
+
+> {%
+    client.global.set("sprintId", response.body.sprintId);
+ %}
+
+### Sprint 列表
+GET {{host}}/api/projects/{{pkey}}/sprints
+Authorization: Bearer {{token}}
+
+### Sprint 详情
+GET {{host}}/api/projects/{{pkey}}/sprints/{{sprintId}}
+Authorization: Bearer {{token}}
+
+### 改 Sprint(状态 planned → active;日期传空串 = 清除)
+PATCH {{host}}/api/projects/{{pkey}}/sprints/{{sprintId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "status": "active"
+}
+
+### 指派 item 到 Sprint
+PUT {{host}}/api/items/{{itemId}}/sprint
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "sprintId": "{{sprintId}}"
+}
+
+### Sprint 内 items(完成后仍含历史行)
+GET {{host}}/api/projects/{{pkey}}/sprints/{{sprintId}}/items
+Authorization: Bearer {{token}}
+
+### backlog 派生桶(非终态且未进任何 planned/active sprint;此刻不含已指派的 item)
+GET {{host}}/api/projects/{{pkey}}/backlog
+Authorization: Bearer {{token}}
+
+### 移出 item 的 Sprint(null = 移出,item 回 backlog)
+PUT {{host}}/api/items/{{itemId}}/sprint
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "sprintId": null
+}
+
+### 再指派(完成后留历史行,负例区要用)
+PUT {{host}}/api/items/{{itemId}}/sprint
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "sprintId": "{{sprintId}}"
+}
+
+### 完成 Sprint
+PATCH {{host}}/api/projects/{{pkey}}/sprints/{{sprintId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "status": "completed"
+}
+
 # ============================================================
 # 负例区:以下请求「红色 = 预期」,演示约束生效,不要当 bug
 # ============================================================
@@ -380,3 +460,16 @@ Content-Type: application/json
 {
   "memberId": "00000000-0000-0000-0000-000000000000"
 }
+
+### [预期 409] 指派到已完成 Sprint
+PUT {{host}}/api/items/{{itemId}}/sprint
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "sprintId": "{{sprintId}}"
+}
+
+### [预期 409] 删除非空 Sprint(成员关系即历史,先空才能删)
+DELETE {{host}}/api/projects/{{pkey}}/sprints/{{sprintId}}
+Authorization: Bearer {{token}}

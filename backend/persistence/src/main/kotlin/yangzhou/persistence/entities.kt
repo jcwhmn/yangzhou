@@ -281,3 +281,27 @@ data class Requirement(
     val createdAt: Instant = Instant.now(),
     val updatedAt: Instant = Instant.now(),
 )
+
+@Table("item_group")
+data class ItemGroup(
+    @Id val id: Long? = null,
+    val objectId: UUID = UUID.randomUUID(),
+    val projectId: Long,
+    val type: String = "sprint",
+    val name: String,
+    val status: String = "planned",
+    val startDate: LocalDate? = null,
+    val endDate: LocalDate? = null,
+    val createdAt: Instant = Instant.now(),
+    val updatedAt: Instant = Instant.now(),
+)
+
+/** item × group 多对多;不变量「至多一个 planned/active」在 SprintService 保证(见 spec 0010 裁决 2)。 */
+@Table("item_group_member")
+data class ItemGroupMember(
+    @Id val id: Long? = null,
+    val objectId: UUID = UUID.randomUUID(),
+    val groupId: Long,
+    val itemId: Long,
+    val createdAt: Instant = Instant.now(),
+)

@@ -15,6 +15,8 @@ import yangzhou.persistence.Favorite
 import yangzhou.persistence.Project
 import yangzhou.persistence.ProjectMember
 import yangzhou.persistence.ProjectRepo
+import yangzhou.persistence.ItemGroup
+import yangzhou.persistence.ItemGroupMember
 import yangzhou.persistence.ProjectWorkflowRule
 import yangzhou.persistence.Requirement
 import yangzhou.persistence.Status
@@ -163,4 +165,15 @@ interface RequirementRepository : CrudRepository<Requirement, Long> {
     fun findByItemId(itemId: Long): List<Requirement>
     fun findByItemIdIn(itemIds: Collection<Long>): List<Requirement>
     fun deleteByItemId(itemId: Long)
+}
+
+interface ItemGroupRepository : CrudRepository<ItemGroup, Long> {
+    fun findByProjectIdOrderByCreatedAt(projectId: Long): List<ItemGroup>
+    fun findByProjectIdAndObjectId(projectId: Long, objectId: UUID): ItemGroup?
+}
+
+interface ItemGroupMemberRepository : CrudRepository<ItemGroupMember, Long> {
+    fun findByGroupId(groupId: Long): List<ItemGroupMember>
+    fun existsByGroupId(groupId: Long): Boolean
+    fun findByItemIdIn(itemIds: Collection<Long>): List<ItemGroupMember>
 }
