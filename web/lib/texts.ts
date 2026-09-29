@@ -244,4 +244,15 @@ export const t = {
     YELLOW: "△ 有差距",
     RED: "✗ 有缺门",
   },
+  projectNav: {
+    board: "看板",
+    sprints: "Sprint",
+    backlog: "Backlog",
+    empty: "暂无 Sprint",
+    sprintStatus: {
+      planned: "规划中",
+      active: "进行中",
+      completed: "已完成",
+    },
+  },
 };
