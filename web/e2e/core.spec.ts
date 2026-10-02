@@ -21,6 +21,14 @@ test.beforeAll(async ({ request }) => {
         data: { username: "me", password: "secret" },
       });
       ok = login.ok();
+      if (ok) {
+        // 成员池用例依赖工作区成员「小王」(CI 全新库也要有;已存在 409 忽略)
+        const token = (await login.json()).token;
+        await request.post("http://localhost:8080/api/members", {
+          data: { displayName: "小王" },
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      }
     }
   } catch {
     ok = false;
@@ -213,8 +221,8 @@ test("V11 成员池色点——有非终态 item 🟢,无 ⚪", async ({ page })
   await page.goto(`/p/${KEY}`);
   await page.getByRole("button", { name: "成员池" }).click();
   // 池为空 → 加 me(冒烟 item 在 QA,非终态)与小王(无 item)
-  await page.getByText("+ me").click();
-  await page.getByText("+ 小王").click();
+  await page.getByText("+ me", { exact: true }).click();
+  await page.getByText("+ 小王", { exact: true }).click();
   await expect(page.getByLabel("进行中")).toHaveCount(1);
   await expect(page.getByLabel("空闲")).toHaveCount(1);
 });
@@ -287,3 +295,61 @@ test("V10 依赖——blocked 标识", async ({ page }) => {
   await expect(page.getByText("阻塞中").first()).toBeVisible();
 });
 
+test("V12-S3 Sprint 全链路——新建/指派/看板/backlog/完成历史", async ({ page }) => {
+  await login(page);
+  await page.goto(`/p/${KEY}`);
+  // 侧边栏新建 Sprint
+  await page.getByRole("button", { name: "新建 Sprint" }).click();
+  await page.getByLabel("名称").fill("Sprint 42");
+  await page.getByRole("button", { name: "创建", exact: true }).click();
+  await expect(page.getByRole("link", { name: /Sprint 42/ })).toBeVisible();
+
+  // 详情指派(item 详情常驻区 Sprint 下拉)
+  await page.getByText("E2E 冒烟 item").first().waitFor({ timeout: 15000 });
+  await page.getByText("E2E 冒烟 item").first().click();
+  await page.getByRole("combobox", { name: "Sprint" }).click();
+  await page.getByRole("option", { name: "Sprint 42" }).click();
+  await expect(page.getByRole("combobox", { name: "Sprint" })).toHaveText("Sprint 42");
+
+  // sprint 看板:冒烟 item 在列
+  await page.getByRole("link", { name: /Sprint 42/ }).first().click();
+  await expect(page.getByText("E2E 冒烟 item")).toBeVisible();
+
+  // backlog 不含已指派 item
+  await page.goto(`/p/${KEY}/backlog`);
+  await expect(page.getByText("E2E 冒烟 item")).toHaveCount(0);
+
+  // 详情清除 → 回 backlog
+  await page.goto(`/p/${KEY}`);
+  await page.getByText("E2E 冒烟 item").first().click();
+  await page.getByRole("combobox", { name: "Sprint" }).click();
+  await page.getByRole("option", { name: "无" }).click();
+  await expect(page.getByRole("combobox", { name: "Sprint" })).toHaveText("");
+  await page.goto(`/p/${KEY}/backlog`);
+  await expect(page.getByText("E2E 冒烟 item").first()).toBeVisible();
+
+  // 再指派 → 完成 sprint → 历史在 sprint 页回看;详情只显示当前 sprint(裁决 2):已完成 sprint 不回填下拉也不在选项中
+  await page.goto(`/p/${KEY}`);
+  await page.getByText("E2E 冒烟 item").first().click();
+  await page.getByRole("combobox", { name: "Sprint" }).click();
+  await page.getByRole("option", { name: "Sprint 42" }).click();
+  await page.getByRole("link", { name: /Sprint 42/ }).first().click();
+  await page.getByRole("combobox", { name: "sprint 状态" }).click();
+  await page.getByRole("option", { name: "已完成" }).click();
+  await expect(page.getByText(/此 Sprint 已完成/)).toBeVisible();
+  await expect(page.getByText("E2E 冒烟 item")).toBeVisible();
+  await page.goto(`/p/${KEY}`);
+  await page.getByText("E2E 冒烟 item").first().click();
+  await expect(page.getByRole("combobox", { name: "Sprint" })).not.toHaveText("Sprint 42");
+  await page.getByRole("combobox", { name: "Sprint" }).click();
+  await expect(page.getByRole("option", { name: "Sprint 42" })).toHaveCount(0);
+});
+
+test("V12 未知 Sprint id 显示错误态并可返回上一页", async ({ page }) => {
+  await login(page);
+  await page.goto(`/p/${KEY}`);
+  await page.goto(`/p/${KEY}/sprint/00000000-0000-0000-0000-000000000000`);
+  await expect(page.getByText("Sprint 不存在或已被删除")).toBeVisible();
+  await page.getByRole("button", { name: "← 返回上一页" }).click();
+  await expect(page).toHaveURL(new RegExp(`/p/${KEY}$`));
+});

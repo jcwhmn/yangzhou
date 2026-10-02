@@ -36,6 +36,7 @@ type Item = {
   overdue: boolean;
   dueSoon: boolean;
   blocked: boolean;
+  sprintName: string | null;
 };
 
 type Filter = "all" | "unassigned" | "blocked" | string; // string = memberId
@@ -290,6 +291,9 @@ export default function BoardPage() {
                             )}
                             {it.blocked && (
                               <Chip size="small" color="error" variant="outlined" label="⛔ 被阻塞" />
+                            )}
+                            {it.sprintName && (
+                              <Chip size="small" variant="outlined" label={it.sprintName} />
                             )}
                             {it.assignee && (
                               <Typography variant="caption" color="text.secondary">
