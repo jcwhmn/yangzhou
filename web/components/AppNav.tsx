@@ -2,7 +2,7 @@
 
 import { Badge, Button, Menu, Stack, Typography } from "@mui/material";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { subscribeUnread } from "@/lib/notifications-store";
@@ -13,6 +13,7 @@ type Fav = { projectId: string; key: string; name: string };
 /** 全站导航(V9-S2:根 layout 持久挂载;铃铛订阅单例 store;⭐ 收藏下拉)。 */
 export function AppNav() {
   const pathname = usePathname();
+  const router = useRouter();
   const [unread, setUnread] = useState(0);
   const [favAnchor, setFavAnchor] = useState<HTMLElement | null>(null);
   const [favs, setFavs] = useState<Fav[]>([]);
@@ -42,6 +43,11 @@ export function AppNav() {
     } catch {
       /* 静默 */
     }
+  }
+
+  function logout() {
+    localStorage.removeItem("yz-token");
+    router.push("/login");
   }
 
   if (pathname === "/login") return null;
@@ -86,6 +92,9 @@ export function AppNav() {
           🔔
         </Badge>
       </Typography>
+      <Button color="inherit" size="small" onClick={logout}>
+        {t.nav.logout}
+      </Button>
 
       <Menu anchorEl={favAnchor} open={favAnchor !== null} onClose={() => setFavAnchor(null)}>
         {favs.length === 0 && (
