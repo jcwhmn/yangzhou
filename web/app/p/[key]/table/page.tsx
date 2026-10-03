@@ -38,6 +38,7 @@ type Item = {
   dueSoon: boolean;
   priority: string | null;
   blocked: boolean;
+  sprintName: string | null;
 };
 type Signal = "GREEN" | "YELLOW" | "RED";
 
@@ -89,6 +90,7 @@ export default function TableViewPage() {
     { id: "overdue", label: "超期", visible: cols.overdue ?? true },
     { id: "feasSignal", label: "可行性", visible: cols.feasSignal ?? true },
     { id: "blocked", label: "阻塞", visible: cols.blocked ?? false },
+    { id: "sprint", label: "Sprint", visible: cols.sprint ?? true },
   ];
 
   const sorted = [...(items ?? [])].sort((a, b) => {
@@ -179,6 +181,8 @@ export default function TableViewPage() {
                           it.overdue ? "是" : "否"
                         ) : c.id === "feasSignal" ? (
                           it.feasSignal ? t.signal[it.feasSignal] : "—"
+                        ) : c.id === "sprint" ? (
+                          it.sprintName ?? "—"
                         ) : c.id === "blocked" ? (
                           it.blocked ? "⛔" : "—"
                         ) : (

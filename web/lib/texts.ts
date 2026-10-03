@@ -54,6 +54,7 @@ export const t = {
     verdicts: "判定",
     signal: "聚合信号",
     priority: "优先级",
+    sprint: "Sprint",
     back: "← 返回看板",
   },
   caps: {
@@ -249,6 +250,10 @@ export const t = {
     sprints: "Sprint",
     backlog: "Backlog",
     empty: "暂无 Sprint",
+    create: "新建 Sprint",
+    createName: "名称",
+    createOk: "创建",
+    cancel: "取消",
     sprintStatus: {
       planned: "规划中",
       active: "进行中",

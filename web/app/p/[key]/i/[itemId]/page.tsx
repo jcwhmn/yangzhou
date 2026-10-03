@@ -45,11 +45,14 @@ type Item = {
   dueDate: string | null;
   gitRefs: { kind: string; repo: string; ref: string; url: string | null; state: string | null }[];
   priority: string | null;
+  sprintId: string | null;
+  sprintName: string | null;
   overdue: boolean;
   dueSoon: boolean;
   blocked: boolean;
   createdAt: string | null;
 };
+type SprintLite = { sprintId: string; name: string; status: string };
 type Repo = { repoId: string; repo: string };
 type Attribute = { attributeId: string; name: string; kind: string; leveled: boolean };
 type Feasibility = {
@@ -122,6 +125,7 @@ export default function ItemDetailPage() {
   const [dueDate, setDueDate] = useState("");
   const [priority, setPriority] = useState("");
   const [type, setType] = useState("task");
+  const [sprints, setSprints] = useState<SprintLite[]>([]);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
   const [assignOpen, setAssignOpen] = useState(false);
@@ -154,6 +158,7 @@ export default function ItemDetailPage() {
     setItem(it); setTitle(it.title); setDescription(it.description ?? ""); setType(it.type)
     setStartDate(it.startDate ?? ""); setDueDate(it.dueDate ?? ""); setPriority(it.priority ?? "")
     setStatuses(project.statuses); setAttributes(attrs)
+    api<SprintLite[]>(`/api/projects/${key}/sprints`).then(setSprints).catch(() => {})
     setFeasibility(feas); setCandidates(cands); setActivity(acts)
     const allMembers = await api<{ memberId: string; displayName: string; virtual: boolean }[]>("/api/members");
     const current = allMembers.find((m) => !m.virtual);
@@ -197,6 +202,19 @@ export default function ItemDetailPage() {
     setConfirmCand(null);
     setAssignOpen(false);
     await load();
+  }
+
+  // V12-S3:指派/移出当前 sprint(值 = 指派,null = 移出;completed sprint 不在选项中)
+  async function assignSprint(sprintId: string | null) {
+    try {
+      const it = await api<Item>(`/api/items/${itemId}/sprint`, {
+        method: "PUT",
+        body: JSON.stringify({ sprintId }),
+      });
+      setItem(it);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "指派失败");
+    }
   }
 
   async function saveRequirements(rows: ReqRow[]) {
@@ -397,6 +415,23 @@ export default function ItemDetailPage() {
                 {p}
               </MenuItem>
             ))}
+          </TextField>
+          <TextField
+            select
+            label={t.item.sprint}
+            size="small"
+            value={item.sprintId ?? ""}
+            onChange={(e) => assignSprint(e.target.value || null)}
+            sx={{ width: 170 }}
+          >
+            <MenuItem value="">无</MenuItem>
+            {sprints
+              .filter((s) => s.status !== "completed" || s.sprintId === item.sprintId)
+              .map((s) => (
+                <MenuItem key={s.sprintId} value={s.sprintId} disabled={s.status === "completed"}>
+                  {s.name}
+                </MenuItem>
+              ))}
           </TextField>
         </Stack>
         <TextField select label={t.item.type} value={type} onChange={(e) => setType(e.target.value)} sx={{ width: 200 }}>

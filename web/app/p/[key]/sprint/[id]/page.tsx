@@ -1,0 +1,231 @@
+"use client";
+
+import {
+  Button,
+  Chip,
+  Container,
+  MenuItem,
+  Select,
+  Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  ToggleButton,
+  ToggleButtonGroup,
+  Typography,
+} from "@mui/material";
+import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { api, ApiError } from "@/lib/api";
+import { AppNav } from "@/components/AppNav";
+import { t } from "@/lib/texts";
+
+type Sprint = { sprintId: string; name: string; status: string; startDate: string | null; endDate: string | null };
+type Item = {
+  itemId: string;
+  number: string;
+  title: string;
+  status: string;
+  assignee: string | null;
+  priority: string | null;
+  dueDate: string | null;
+};
+type Status = { statusId: string; name: string; isFinal: boolean; position: number };
+
+/**
+ * V12-S3 Sprint 落地页(spec 0010,grill 裁决 1/2):
+ * 头部 = 名称/日期/状态切换(planned→active→completed);看板(只读列视图,状态迁移去主看板或详情页)/ 表格;
+ * 空 sprint 给出指派路径提示;未知 sprint id → 页内错误态 + 返回上一页(用户反馈 2026-09-29)。
+ * 完成的 sprint 即历史回看:items 为完成时仍在其列的成员关系。
+ */
+export default function SprintPage() {
+  const { key, id } = useParams<{ key: string; id: string }>();
+  const router = useRouter();
+  const [sprint, setSprint] = useState<Sprint | null>(null);
+  const [items, setItems] = useState<Item[] | null>(null);
+  const [statuses, setStatuses] = useState<Status[]>([]);
+  const [view, setView] = useState("board");
+  const [error, setError] = useState("");
+  const [gone, setGone] = useState(false);
+
+  useEffect(() => {
+    Promise.all([
+      api<Sprint>(`/api/projects/${key}/sprints/${id}`),
+      api<Item[]>(`/api/projects/${key}/sprints/${id}/items`),
+      api<{ statuses: Status[] }>(`/api/projects/${key}`),
+    ])
+      .then(([s, its, p]) => {
+        setSprint(s);
+        setItems(its);
+        setStatuses(p.statuses);
+      })
+      .catch((e) => {
+        if (e instanceof ApiError && e.status === 404) setGone(true);
+        else setError(e instanceof Error ? e.message : "加载失败");
+      });
+  }, [key, id]);
+
+  async function changeStatus(status: string) {
+    if (!sprint) return;
+    try {
+      const s = await api<Sprint>(`/api/projects/${key}/sprints/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status }),
+      });
+      setSprint(s);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "更新失败");
+    }
+  }
+
+  // 页内错误态:未知 sprint id 等;给返回按钮,不依赖浏览器后退(用户反馈)
+  if (gone) {
+    return (
+      <Container maxWidth="sm" sx={{ py: 10 }}>
+        <Stack spacing={2} alignItems="center">
+          <Typography variant="h5">Sprint 不存在或已被删除</Typography>
+          <Button variant="contained" onClick={() => router.back()}>
+            ← 返回上一页
+          </Button>
+        </Stack>
+      </Container>
+    );
+  }
+
+  return (
+    <Container maxWidth="lg" sx={{ py: 4 }}>
+      <AppNav />
+      <Button size="small" onClick={() => router.back()} sx={{ mb: 1 }}>
+        ← 返回
+      </Button>
+      {error && <Typography color="error" sx={{ mb: 1 }}>{error}</Typography>}
+      {!sprint && !gone && <Typography color="text.secondary">加载中…</Typography>}
+      {sprint && (
+        <>
+          <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 1 }} flexWrap="wrap" useFlexGap>
+            <Typography variant="h5">{sprint.name}</Typography>
+            <Chip
+              size="small"
+              label={t.projectNav.sprintStatus[sprint.status as keyof typeof t.projectNav.sprintStatus] ?? sprint.status}
+              color={sprint.status === "active" ? "primary" : sprint.status === "completed" ? "default" : "warning"}
+            />
+            <Typography color="text.secondary" variant="body2">
+              {sprint.startDate ?? "—"} ~ {sprint.endDate ?? "—"}
+            </Typography>
+            <Select
+              size="small"
+              value={sprint.status}
+              onChange={(e) => changeStatus(String(e.target.value))}
+              inputProps={{ "aria-label": "sprint 状态" }}
+              sx={{ ml: "auto", minWidth: 130 }}
+            >
+              <MenuItem value="planned">规划中</MenuItem>
+              <MenuItem value="active">进行中</MenuItem>
+              <MenuItem value="completed">已完成</MenuItem>
+            </Select>
+            <ToggleButtonGroup size="small" value={view} exclusive onChange={(_, v) => v && setView(v)}>
+              <ToggleButton value="board">看板</ToggleButton>
+              <ToggleButton value="table">表格</ToggleButton>
+            </ToggleButtonGroup>
+          </Stack>
+          {sprint.status === "completed" && (
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 2 }}>
+              此 Sprint 已完成,以下为历史 items(成员关系不可再变)。
+            </Typography>
+          )}
+
+          {items !== null && items.length === 0 && (
+            <Typography color="text.secondary" sx={{ mt: 4 }}>
+              此 Sprint 还没有 item。去 item 详情页用「Sprint」下拉指派,或先到 Backlog 页看看有哪些未规划的 item。
+            </Typography>
+          )}
+
+          {items !== null && items.length > 0 && view === "board" && (
+            <Stack direction="row" spacing={2} sx={{ overflowX: "auto", pb: 2 }}>
+              {statuses.map((s) => {
+                const list = items.filter((it) => it.status === s.name);
+                return (
+                  <Stack key={s.statusId} spacing={1} sx={{ minWidth: 260, flexShrink: 0 }}>
+                    <Typography variant="subtitle2">
+                      {s.name}({list.length})
+                      {s.isFinal && " [终态]"}
+                    </Typography>
+                    {list.length === 0 && (
+                      <Typography variant="caption" color="text.secondary">
+                        (空)
+                      </Typography>
+                    )}
+                    {list.map((it) => (
+                      <Link key={it.itemId} href={`/p/${key}/i/${it.itemId}`} style={{ textDecoration: "none", color: "inherit" }}>
+                        <Stack
+                          sx={{
+                            p: 1,
+                            borderRadius: 2,
+                            bgcolor: "background.paper",
+                            "&:hover": { boxShadow: 6 },
+                            cursor: "pointer",
+                          }}
+                        >
+                          <Stack direction="row" spacing={1} alignItems="center">
+                            <Chip label={it.number} size="small" variant="outlined" />
+                            {it.priority && <Chip size="small" label={it.priority} variant="outlined" />}
+                            {it.assignee && (
+                              <Typography variant="caption" color="text.secondary">
+                                👤 {it.assignee}
+                              </Typography>
+                            )}
+                          </Stack>
+                          <Typography variant="body2" sx={{ mt: 0.5, wordBreak: "break-word" }}>
+                            {it.title}
+                          </Typography>
+                        </Stack>
+                      </Link>
+                    ))}
+                  </Stack>
+                );
+              })}
+            </Stack>
+          )}
+
+          {items !== null && items.length > 0 && view === "table" && (
+            <TableContainer>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    {["编号", "标题", "优先级", "状态", "负责人", "截止"].map((c) => (
+                      <TableCell key={c}>{c}</TableCell>
+                    ))}
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {items.map((it) => (
+                    <TableRow key={it.itemId} hover>
+                      <TableCell>
+                        <Link href={`/p/${key}/i/${it.itemId}`}>
+                          <Typography variant="body2">{it.number}</Typography>
+                        </Link>
+                      </TableCell>
+                      <TableCell>
+                        <Link href={`/p/${key}/i/${it.itemId}`}>
+                          <Typography variant="body2">{it.title}</Typography>
+                        </Link>
+                      </TableCell>
+                      <TableCell>{it.priority ?? "—"}</TableCell>
+                      <TableCell>{it.status}</TableCell>
+                      <TableCell>{it.assignee ?? "—"}</TableCell>
+                      <TableCell>{it.dueDate ?? "—"}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+        </>
+      )}
+    </Container>
+  );
+}
