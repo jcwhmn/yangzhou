@@ -433,6 +433,13 @@ export default function ItemDetailPage() {
                 </MenuItem>
               ))}
           </TextField>
+          {item.sprintId && (
+            <Link href={`/p/${key}/sprint/${item.sprintId}`} style={{ textDecoration: "none", alignSelf: "center" }}>
+              <Typography variant="caption" color="primary">
+                {item.sprintName} ↗
+              </Typography>
+            </Link>
+          )}
         </Stack>
         <TextField select label={t.item.type} value={type} onChange={(e) => setType(e.target.value)} sx={{ width: 200 }}>
           {["task", "bug", "goal", "story"].map((tp) => (

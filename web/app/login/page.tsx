@@ -24,7 +24,11 @@ export default function LoginPage() {
         const token = localStorage.getItem("yz-token");
         const me = await fetch("/api/members", { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json());
         const last = Array.isArray(me) ? me.find((m: { virtual: boolean }) => !m.virtual)?.lastProjectKey : undefined;
-        if (last) { router.replace(`/p/${last}`); return; }
+        // V13-S2(b):回放前验项目存在——悬空 key(项目被删/E2E 冲写)停留首页
+        if (last && (await fetch(`/api/projects/${last}`, { headers: { Authorization: `Bearer ${token}` } })).ok) {
+          router.replace(`/p/${last}`);
+          return;
+        }
       } catch {}
       router.replace("/");
     } catch (err) {

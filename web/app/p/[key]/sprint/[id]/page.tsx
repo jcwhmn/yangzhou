@@ -4,6 +4,14 @@ import {
   Button,
   Chip,
   Container,
+  Checkbox,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  List,
+  ListItem,
+  ListItemText,
   MenuItem,
   Select,
   Stack,
@@ -21,7 +29,6 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api, ApiError } from "@/lib/api";
-import { AppNav } from "@/components/AppNav";
 import { t } from "@/lib/texts";
 
 type Sprint = { sprintId: string; name: string; status: string; startDate: string | null; endDate: string | null };
@@ -35,6 +42,7 @@ type Item = {
   dueDate: string | null;
 };
 type Status = { statusId: string; name: string; isFinal: boolean; position: number };
+type Candidate = { itemId: string; number: string; title: string; status: string; assignee: string | null; sprintName: string | null };
 
 /**
  * V12-S3 Sprint 落地页(spec 0010,grill 裁决 1/2):
@@ -51,6 +59,10 @@ export default function SprintPage() {
   const [view, setView] = useState("board");
   const [error, setError] = useState("");
   const [gone, setGone] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -82,6 +94,37 @@ export default function SprintPage() {
     }
   }
 
+  // V13-S3:拉入/移出同一对话框——列出非终态 item 多选,确认后逐条走既有 PUT /items/{id}/sprint
+  async function openAdd() {
+    try {
+      const all = await api<Candidate[]>(`/api/projects/${key}/items`);
+      const finalNames = new Set(statuses.filter((s) => s.isFinal).map((s) => s.name));
+      setCandidates(all.filter((it) => !finalNames.has(it.status)));
+      setSelected(new Set((items ?? []).map((i) => i.itemId)));
+      setAddOpen(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "加载失败");
+    }
+  }
+
+  async function applyMembership() {
+    setBusy(true);
+    try {
+      const prev = new Set((items ?? []).map((i) => i.itemId));
+      for (const c of candidates) {
+        const now = selected.has(c.itemId);
+        if (prev.has(c.itemId) === now) continue;
+        await api(`/api/items/${c.itemId}/sprint`, { method: "PUT", body: JSON.stringify({ sprintId: now ? id : null }) });
+      }
+      setAddOpen(false);
+      setItems(await api<Item[]>(`/api/projects/${key}/sprints/${id}/items`));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "更新失败");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   // 页内错误态:未知 sprint id 等;给返回按钮,不依赖浏览器后退(用户反馈)
   if (gone) {
     return (
@@ -98,7 +141,6 @@ export default function SprintPage() {
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
-      <AppNav />
       <Button size="small" onClick={() => router.back()} sx={{ mb: 1 }}>
         ← 返回
       </Button>
@@ -131,6 +173,11 @@ export default function SprintPage() {
               <ToggleButton value="board">看板</ToggleButton>
               <ToggleButton value="table">表格</ToggleButton>
             </ToggleButtonGroup>
+            {sprint.status !== "completed" && (
+              <Button size="small" variant="outlined" onClick={openAdd}>
+                拉入 item
+              </Button>
+            )}
           </Stack>
           {sprint.status === "completed" && (
             <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 2 }}>
@@ -140,7 +187,7 @@ export default function SprintPage() {
 
           {items !== null && items.length === 0 && (
             <Typography color="text.secondary" sx={{ mt: 4 }}>
-              此 Sprint 还没有 item。去 item 详情页用「Sprint」下拉指派,或先到 Backlog 页看看有哪些未规划的 item。
+              此 Sprint 还没有 item——点右上「拉入 item」批量勾选,或在 item 详情用「Sprint」下拉指派。
             </Typography>
           )}
 
@@ -224,6 +271,46 @@ export default function SprintPage() {
               </Table>
             </TableContainer>
           )}
+          <Dialog open={addOpen} onClose={() => setAddOpen(false)} maxWidth="sm" fullWidth>
+            <DialogTitle>拉入 item</DialogTitle>
+            <DialogContent dividers sx={{ maxHeight: 480 }}>
+              <List dense disablePadding>
+                {candidates.map((it) => (
+                  <ListItem key={it.itemId} dense disableGutters>
+                    <Checkbox
+                      size="small"
+                      checked={selected.has(it.itemId)}
+                      onChange={() =>
+                        setSelected((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(it.itemId)) next.delete(it.itemId);
+                          else next.add(it.itemId);
+                          return next;
+                        })
+                      }
+                    />
+                    <ListItemText
+                      primary={`${it.number} · ${it.title}`}
+                      secondary={[it.status, it.assignee ? `👤 ${it.assignee}` : null, it.sprintName && it.sprintName !== sprint.name ? `当前:${it.sprintName}` : null]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    />
+                  </ListItem>
+                ))}
+                {candidates.length === 0 && (
+                  <Typography variant="caption" color="text.secondary">
+                    项目里没有可拉入的非终态 item。
+                  </Typography>
+                )}
+              </List>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setAddOpen(false)}>取消</Button>
+              <Button variant="contained" onClick={applyMembership} disabled={busy}>
+                完成
+              </Button>
+            </DialogActions>
+          </Dialog>
         </>
       )}
     </Container>

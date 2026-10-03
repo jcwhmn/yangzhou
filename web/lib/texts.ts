@@ -9,6 +9,7 @@ export const t = {
     favorites: "⭐ 收藏",
     standup: "站会",
     recycle_bin: "回收站",
+    logout: "退出登录",
   },
   fav: {
     empty: "暂无收藏——在项目卡上点 ☆",

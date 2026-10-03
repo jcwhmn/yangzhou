@@ -7,6 +7,8 @@ import { expect, test } from "@playwright/test";
  */
 
 const KEY = `E2E${Date.now() % 100000}`;
+let e2eToken = "";
+let originalLastProject = "";
 
 test.beforeAll(async ({ request }) => {
   // 后端在场检查 + 空库种子(CI 是全新库):bootstrap;已有用户则 409 → 登录确认
@@ -24,6 +26,13 @@ test.beforeAll(async ({ request }) => {
       if (ok) {
         // 成员池用例依赖工作区成员「小王」(CI 全新库也要有;已存在 409 忽略)
         const token = (await login.json()).token;
+        e2eToken = token;
+        // V13-S2(d):记录人类 member 的 last-project,套件结束后恢复
+        const members = (await (await request.get("http://localhost:8080/api/members", { headers: { Authorization: `Bearer ${token}` } })).json()) as {
+          virtual: boolean;
+          lastProjectKey?: string;
+        }[];
+        originalLastProject = members.find((m) => !m.virtual)?.lastProjectKey ?? "";
         await request.post("http://localhost:8080/api/members", {
           data: { displayName: "小王" },
           headers: { Authorization: `Bearer ${token}` },
@@ -35,6 +44,16 @@ test.beforeAll(async ({ request }) => {
   }
   if (!ok) {
     throw new Error("后端未就绪:请先起本机 Postgres 并运行 `gradle :api:bootRun`(8080),再跑 npm run e2e");
+  }
+});
+
+test.afterAll(async ({ request }) => {
+  // V13-S2(d):恢复套件开始前的 last-project,防 E2E 冲掉人类记录
+  if (e2eToken) {
+    await request.put("http://localhost:8080/api/members/me/last-project", {
+      data: { key: originalLastProject },
+      headers: { Authorization: `Bearer ${e2eToken}` },
+    });
   }
 });
 
@@ -352,4 +371,62 @@ test("V12 未知 Sprint id 显示错误态并可返回上一页", async ({ page 
   await expect(page.getByText("Sprint 不存在或已被删除")).toBeVisible();
   await page.getByRole("button", { name: "← 返回上一页" }).click();
   await expect(page).toHaveURL(new RegExp(`/p/${KEY}$`));
+});
+
+test("V13-S2 登录修复——悬空 last-project 不跳转 + 退出登录", async ({ page }) => {
+  await login(page);
+  await page.goto("/");
+  // 把 last-project 写成不存在的项目(模拟被删/E2E 冲写)
+  await page.evaluate(async () => {
+    const token = localStorage.getItem("yz-token");
+    await fetch("/api/members/me/last-project", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ key: "GONE9" }),
+    });
+  });
+  // 退出登录:token 清掉,回 /login
+  await page.getByRole("button", { name: "退出登录" }).click();
+  await expect(page).toHaveURL(/\/login$/);
+  expect(await page.evaluate(() => localStorage.getItem("yz-token"))).toBeNull();
+  // 重新登录:悬空 key 不回放,停留首页
+  await login(page);
+  await expect(page).not.toHaveURL(/p\/GONE9/);
+  await expect(page.getByRole("heading", { name: "项目", exact: true })).toBeVisible();
+});
+
+test("V13-S3 Sprint 拉入对话框——多选勾入/移出 + 详情回链", async ({ page }) => {
+  await login(page);
+  await page.goto(`/p/${KEY}`);
+  // 全链路里 Sprint 42 已完成;新建 Sprint 43 测拉入
+  await page.getByRole("button", { name: "新建 Sprint" }).click();
+  await page.getByLabel("名称").fill("Sprint 43");
+  await page.getByRole("button", { name: "创建", exact: true }).click();
+  await expect(page.getByRole("link", { name: /Sprint 43/ })).toBeVisible();
+  await page.getByRole("link", { name: /Sprint 43/ }).first().click();
+  await expect(page.getByText("此 Sprint 还没有 item")).toBeVisible();
+
+  // 拉入:对话框多选勾入冒烟 item
+  await page.getByRole("button", { name: "拉入 item" }).click();
+  await page.getByRole("dialog").locator("li", { hasText: "E2E 冒烟 item" }).getByRole("checkbox").check();
+  await page.getByRole("button", { name: "完成", exact: true }).click();
+  await expect(page.getByText("E2E 冒烟 item")).toBeVisible();
+
+  // 详情回链:点 sprint 名跳回 sprint 页
+  // 详情指派前等对话框淡出卸载(aria-hidden 退出中会吞掉对看板卡片的点击)
+  await expect(page.getByRole("dialog")).toBeHidden();
+  await page.getByText("E2E 冒烟 item").first().click();
+  await page.getByRole("link", { name: "Sprint 43 ↗" }).click();
+  await expect(page).toHaveURL(/\/sprint\/[0-9a-f-]{36}/);
+
+  // 移出:同一对话框去勾
+  await page.getByRole("button", { name: "拉入 item" }).click();
+  await page.getByRole("dialog").locator("li", { hasText: "E2E 冒烟 item" }).getByRole("checkbox").uncheck();
+  await page.getByRole("button", { name: "完成", exact: true }).click();
+  await expect(page.getByRole("dialog")).toBeHidden();
+  await expect(page.getByText("此 Sprint 还没有 item")).toBeVisible();
+
+  // completed sprint 无拉入入口(成员关系冻结)
+  await page.getByRole("link", { name: /Sprint 42/ }).first().click();
+  await expect(page.getByRole("button", { name: "拉入 item" })).toHaveCount(0);
 });
