@@ -1,7 +1,7 @@
 // 看板与 item 详情:建项/评论/状态/日期/优先级/依赖/回收站/过滤/错误浮出
 import { expect } from "./support/fixtures";
 import { test } from "./support/fixtures";
-import { apiAssignMe, apiCreateItem, apiCreateProject } from "./support/helpers";
+import { apiAssignMe, apiCreateItem } from "./support/helpers";
 
 test("建 item → 详情 → 评论 → 指派 → 状态 QA → 活动日志", async ({ page, projectKey }) => {
   await page.goto(`/p/${projectKey}`);
@@ -33,7 +33,9 @@ test("日期与超期标识——详情设置日期,看板红标,甘特可见", 
   await page.getByText("E2E 超期 item").first().click();
   await page.getByLabel("开始日期").fill("2020-01-01");
   await page.getByLabel("截止日期").fill("2020-01-15");
+  const saveResp = page.waitForResponse((r) => r.url().includes("/api/items/") && r.request().method() === "PATCH");
   await page.getByRole("button", { name: "保存" }).click();
+  await saveResp; // 等 PATCH 落库再导航,否则请求被打断
   await expect(page.getByLabel("开始日期")).toHaveValue("2020-01-01");
   // 看板红标
   await page.goto(`/p/${projectKey}`);
@@ -50,13 +52,17 @@ test("V11-S4 detail 优先级 Select 接通(P1 落库/清除)", async ({ page, p
   await page.getByRole("combobox", { name: "优先级" }).click();
   const plist = page.getByRole("listbox");
   await plist.getByRole("option", { name: "P1" }).click();
+  let saveResp = page.waitForResponse((r) => r.url().includes("/api/items/") && r.request().method() === "PATCH");
   await page.getByRole("button", { name: "保存" }).click();
+  await saveResp;
   await page.reload();
   await expect(page.getByRole("combobox", { name: "优先级" })).toHaveText("P1");
   // 清除
   await page.getByRole("combobox", { name: "优先级" }).click();
   await plist.getByRole("option", { name: "无" }).click();
+  saveResp = page.waitForResponse((r) => r.url().includes("/api/items/") && r.request().method() === "PATCH");
   await page.getByRole("button", { name: "保存" }).click();
+  await saveResp;
   await page.reload();
   await expect(page.getByRole("combobox", { name: "优先级" })).not.toHaveText("P1");
 });
@@ -66,7 +72,9 @@ test("V10 priority 设置与表格视图", async ({ page, projectKey }) => {
   await page.goto(`/p/${projectKey}/i/${itemId}`);
   await page.getByRole("combobox", { name: "优先级" }).click();
   await page.getByRole("listbox").getByRole("option", { name: "P1" }).click();
+  const saveResp = page.waitForResponse((r) => r.url().includes("/api/items/") && r.request().method() === "PATCH");
   await page.getByRole("button", { name: "保存" }).click();
+  await saveResp;
   // 表格视图页可达且 P1 可见
   await page.goto(`/p/${projectKey}/table`);
   await expect(page.getByText("E2E 表格 item").first()).toBeVisible();
@@ -74,7 +82,7 @@ test("V10 priority 设置与表格视图", async ({ page, projectKey }) => {
 });
 
 test("V10 依赖——blocked 标识", async ({ page, projectKey }) => {
-  const blocker = await apiCreateItem(projectKey, "E2E 依赖 item");
+  await apiCreateItem(projectKey, "E2E 依赖 item");
   await apiCreateItem(projectKey, "E2E 被卡 item");
   await page.goto(`/p/${projectKey}`);
   // 打开被卡 item 详情,把依赖 item 设为它的前置
@@ -85,7 +93,6 @@ test("V10 依赖——blocked 标识", async ({ page, projectKey }) => {
   await page.getByRole("combobox", { name: "被依赖 item" }).selectOption({ index: 1 });
   await page.getByRole("button", { name: "确认添加依赖" }).click();
   await expect(page.getByText("阻塞中").first()).toBeVisible();
-  void blocker;
 });
 
 test("回收站——删除后可恢复", async ({ page, projectKey }) => {
@@ -121,11 +128,10 @@ test("V13-S4 详情切状态 409——错误浮出且状态不变", async ({ pag
   await expect(page.getByRole("combobox", { name: "item 状态" })).toHaveText("To Do");
 });
 
-test("V13-S4 看板 Sprint 过滤——未规划/指定 sprint", async ({ page, projectKey }) => {
-  const itemId = await apiCreateItem(projectKey, "E2E 过滤 item");
+test("V13-S4 看板 Sprint 过滤——未规划视图", async ({ page, projectKey }) => {
+  await apiCreateItem(projectKey, "E2E 过滤 item");
   await page.goto(`/p/${projectKey}`);
   await page.getByLabel("sprint 过滤").click();
   await page.getByRole("option", { name: "未规划" }).click();
   await expect(page.getByText("E2E 过滤 item").first()).toBeVisible();
-  void itemId;
 });

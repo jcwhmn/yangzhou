@@ -1,0 +1,19 @@
+
+test("V11-S4 detail 优先级 Select 接通(P1 落库/清除)", async ({ page, projectKey }) => {
+  const itemId = await apiCreateItem(projectKey, "E2E 优先级 item");
+  await page.goto(`/p/${projectKey}/i/${itemId}`);
+  await page.getByRole("combobox", { name: "优先级" }).click();
+  const plist = page.getByRole("listbox");
+  await plist.getByRole("option", { name: "P1" }).click();
+  await page.getByRole("button", { name: "保存" }).click();
+  await page.reload();
+  await expect(page.getByRole("combobox", { name: "优先级" })).toHaveText("P1");
+  // 清除
+  await page.getByRole("combobox", { name: "优先级" }).click();
+  await plist.getByRole("option", { name: "无" }).click();
+  await page.getByRole("button", { name: "保存" }).click();
+  await page.reload();
+  await expect(page.getByRole("combobox", { name: "优先级" })).not.toHaveText("P1");
+});
+
+test("V10 priority 设置与表格视图", async ({ page, projectKey }) => {

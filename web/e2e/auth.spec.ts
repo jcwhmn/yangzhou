@@ -27,6 +27,7 @@ test("V11-S1 登录后进入上次项目", async ({ page }) => {
   const token = await apiToken();
   // 看板 mount 写 last-project;API 再兜底写一次,压掉并行用例的干扰写
   await page.goto(`/p/${key}`);
+  await page.waitForLoadState("load");
   await fetch(`${config.apiURL}/api/members/me/last-project`, {
     method: "PUT",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
