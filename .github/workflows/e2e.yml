@@ -79,8 +79,8 @@ jobs:
           for route in "/p/WARMUP1" "/p/WARMUP1/backlog" "/p/WARMUP1/gantt" "/p/WARMUP1/table" "/p/WARMUP1/i/$ITEM" "/p/WARMUP1/sprint/00000000-0000-0000-0000-000000000000"; do
             curl -s -o /dev/null -H "Authorization: Bearer $TOKEN" "http://localhost:3000$route"
           done
-          kill $(cat /tmp/dev.pid) 2>/dev/null || true
-          sleep 3
+          fuser -k 3000/tcp || true
+          sleep 2
 
       - name: 跑 E2E
         working-directory: web
