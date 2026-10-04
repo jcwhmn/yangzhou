@@ -26,7 +26,11 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
   const [error, setError] = useState("");
 
   const loadSprints = () => {
-    api<Sprint[]>(`/api/projects/${key}/sprints`).then(setSprints).catch(() => setSprints([]));
+    // CI 冷 JVM 偶发连接重置(status -1):失败隔 1s 重试一次
+    api<Sprint[]>(`/api/projects/${key}/sprints`)
+      .catch(() => new Promise<Sprint[]>((res) => setTimeout(() => res(api<Sprint[]>(`/api/projects/${key}/sprints`)), 1000)))
+      .then(setSprints)
+      .catch(() => setSprints([]));
   };
 
   useEffect(() => {
