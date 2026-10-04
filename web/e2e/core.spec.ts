@@ -353,8 +353,12 @@ test("V12-S3 Sprint 全链路——新建/指派/看板/backlog/完成历史", a
   await page.getByRole("combobox", { name: "Sprint" }).click();
   await page.getByRole("option", { name: "Sprint 42" }).click();
   await page.getByRole("link", { name: /Sprint 42/ }).first().click();
-  await page.getByRole("combobox", { name: "sprint 状态" }).click();
-  await page.getByRole("option", { name: "已完成" }).click();
+  // V13-S4:状态单向按钮——开始(无其它进行中,直接生效)→ 完成(确认框明示后果)
+  await page.getByRole("button", { name: "▶ 开始 Sprint" }).click();
+  await expect(page.getByRole("button", { name: "✓ 完成 Sprint" })).toBeVisible();
+  await page.getByRole("button", { name: "✓ 完成 Sprint" }).click();
+  await expect(page.getByText(/回到 Backlog/)).toBeVisible();
+  await page.getByRole("button", { name: "确认完成" }).click();
   await expect(page.getByText(/此 Sprint 已完成/)).toBeVisible();
   await expect(page.getByText("E2E 冒烟 item")).toBeVisible();
   await page.goto(`/p/${KEY}`);
@@ -431,4 +435,37 @@ test("V13-S3 Sprint 拉入对话框——多选勾入/移出 + 详情回链", as
   // completed sprint 无拉入入口(成员关系冻结)
   await page.getByRole("link", { name: /Sprint 42/ }).first().click();
   await expect(page.getByRole("button", { name: "拉入 item" })).toHaveCount(0);
+});
+
+test("V13-S4 状态单向按钮 + backlog 建项 + 409 浮出 + 看板 sprint 过滤", async ({ page }) => {
+  await login(page);
+  // backlog 页就地建项
+  await page.goto(`/p/${KEY}/backlog`);
+  await page.getByPlaceholder("新建 item").fill("E2E backlog item");
+  await page.getByRole("button", { name: "新建 item" }).click();
+  await expect(page.getByText("E2E backlog item").first()).toBeVisible();
+  // 详情:无负责人切 Done → 409 浮出,状态回显不变
+  await page.getByText("E2E backlog item").first().click();
+  await page.getByRole("combobox", { name: "item 状态" }).click();
+  await page.getByRole("option", { name: "Done" }).click();
+  await expect(page.getByText("开工前请先指派负责人")).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "item 状态" })).toHaveText("To Do");
+  // sprint 状态单向按钮:开始(无其它进行中,无确认)→ 完成确认框
+  await page.goto(`/p/${KEY}`);
+  await page.getByRole("button", { name: "新建 Sprint" }).click();
+  await page.getByLabel("名称").fill("Sprint 44");
+  await page.getByRole("button", { name: "创建", exact: true }).click();
+  await expect(page.getByRole("link", { name: /Sprint 44/ })).toBeVisible();
+  await page.getByRole("link", { name: /Sprint 44/ }).first().click();
+  await page.getByRole("button", { name: "▶ 开始 Sprint" }).click();
+  await expect(page.getByRole("button", { name: "✓ 完成 Sprint" })).toBeVisible();
+  await page.getByRole("button", { name: "✓ 完成 Sprint" }).click();
+  await expect(page.getByText(/回到 Backlog/)).toBeVisible();
+  await page.getByRole("button", { name: "确认完成" }).click();
+  await expect(page.getByText(/此 Sprint 已完成/)).toBeVisible();
+  // 看板 sprint 过滤:未规划视图含新建 item
+  await page.goto(`/p/${KEY}`);
+  await page.getByLabel("sprint 过滤").click();
+  await page.getByRole("option", { name: "未规划" }).click();
+  await expect(page.getByText("E2E backlog item").first()).toBeVisible();
 });

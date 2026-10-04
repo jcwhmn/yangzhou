@@ -182,19 +182,28 @@ export default function ItemDetailPage() {
   };
 
   async function saveBasics() {
-    await api(`/api/items/${itemId}`, {
-      method: "PATCH",
-      body: JSON.stringify({ title, description: description || null, type, startDate, dueDate, priority }),
-    });
-    await load();
-    flashSaved();
+    try {
+      await api(`/api/items/${itemId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ title, description: description || null, type, startDate, dueDate, priority }),
+      });
+      await load();
+      flashSaved();
+    } catch (e) {
+      // V13-S4:409 等业务错误浮出(如「开工前请先指派负责人」)
+      setError(e instanceof Error ? e.message : "保存失败");
+    }
   }
 
   async function moveStatus(statusName: string) {
     const target = statuses.find((s) => s.name === statusName);
     if (!target) return;
-    await api(`/api/items/${itemId}`, { method: "PATCH", body: JSON.stringify({ statusItemId: target.statusId }) });
-    await load();
+    try {
+      await api(`/api/items/${itemId}`, { method: "PATCH", body: JSON.stringify({ statusItemId: target.statusId }) });
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "更新失败");
+    }
   }
 
   async function assign(memberId: string | null) {
