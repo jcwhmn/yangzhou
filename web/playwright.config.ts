@@ -13,6 +13,7 @@ export default defineConfig({
   timeout: 30_000,
   retries: process.env.CI ? 1 : 0,
   fullyParallel: true,
+  workers: process.env.CI ? 2 : undefined,
   use: {
     baseURL: config.baseURL,
     locale: "zh-CN",
