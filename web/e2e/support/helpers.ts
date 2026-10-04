@@ -1,4 +1,5 @@
 // API 预置/清理 helpers:数据准备全走 API,用例本体只测 UI 行为
+import { randomUUID } from "node:crypto";
 import type { Page } from "@playwright/test";
 import { config } from "../config";
 
@@ -25,9 +26,9 @@ export async function apiToken(): Promise<string> {
 
 let seq = 0;
 
-/** 并行安全的唯一项目 key(2–10 位大写字母数字) */
+/** 并行安全的唯一项目 key(9 位:随机 hex6 + 进程内序号2;≤10 留 1 位给表单用例的「P」后缀) */
 export function uniqueKey(): string {
-  return `K${process.pid.toString(36).slice(-1).toUpperCase()}${Date.now().toString(36).toUpperCase()}${(seq++).toString(36).toUpperCase()}`.slice(0, 10);
+  return ("K" + randomUUID().replace(/-/g, "").slice(0, 6).toUpperCase() + (seq++).toString(36).toUpperCase().padStart(2, "0")).slice(0, 9);
 }
 
 export async function apiCreateProject(key: string): Promise<void> {
