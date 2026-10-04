@@ -27,6 +27,8 @@ test("建 item → 详情 → 评论 → 指派 → 状态 QA → 活动日志",
 });
 
 test("日期与超期标识——详情设置日期,看板红标,甘特可见", async ({ page, projectKey }) => {
+  // 另造一个无日期 item:甘特「未排期」桶 length>0 才渲染,只有带日期 item 时桶不出现
+  await apiCreateItem(projectKey, "E2E 未排期 item");
   await page.goto(`/p/${projectKey}`);
   await page.getByPlaceholder("新建 item").fill("E2E 超期 item");
   await page.getByRole("button", { name: "新建 ITEM" }).click();
@@ -75,8 +77,9 @@ test("V10 priority 设置与表格视图", async ({ page, projectKey }) => {
   const saveResp = page.waitForResponse((r) => r.url().includes("/api/items/") && r.request().method() === "PATCH");
   await page.getByRole("button", { name: "保存" }).click();
   await saveResp;
-  // 表格视图页可达且 P1 可见
+  // 表格视图页可达且 P1 可见(优先级列默认隐藏,先开列)
   await page.goto(`/p/${projectKey}/table`);
+  await page.getByText("优先级", { exact: true }).click();
   await expect(page.getByText("E2E 表格 item").first()).toBeVisible();
   await expect(page.getByText("P1").first()).toBeVisible();
 });

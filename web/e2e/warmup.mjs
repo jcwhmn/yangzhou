@@ -36,6 +36,12 @@ if (!(await up())) {
   }
 }
 
+// 用户可能不存在(清库后):先 bootstrap(409=已存在),再登录
+await fetch(`${api}/api/auth/bootstrap`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ username: process.env.E2E_USERNAME, password: process.env.E2E_PASSWORD }),
+}).catch(() => {});
 const login = await fetch(`${api}/api/auth/login`, {
   method: "POST",
   headers: { "Content-Type": "application/json" },

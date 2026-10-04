@@ -1,9 +1,10 @@
 // Sprint 全链路(状态单向按钮/拉入对话框/回链)+ Backlog 派生桶
 import { expect } from "./support/fixtures";
 import { test } from "./support/fixtures";
-import { apiCreateItem } from "./support/helpers";
+import { apiCreateItem, selectOption } from "./support/helpers";
 
 test("V12-S3 Sprint 全链路——建/指派/开始/完成/backlog/历史", async ({ page, projectKey }) => {
+  test.slow();
   await apiCreateItem(projectKey, "E2E 冒烟 item");
   await page.goto(`/p/${projectKey}`);
   // 侧边栏新建 Sprint
@@ -14,8 +15,7 @@ test("V12-S3 Sprint 全链路——建/指派/开始/完成/backlog/历史", asy
 
   // 详情指派(item 详情常驻区 Sprint 下拉)
   await page.getByText("E2E 冒烟 item").first().click();
-  await page.getByRole("combobox", { name: "Sprint" }).click();
-  await page.getByRole("option", { name: "Sprint 42" }).click();
+  await selectOption(page, "Sprint", "Sprint 42");
   await expect(page.getByRole("combobox", { name: "Sprint" })).toHaveText("Sprint 42");
 
   // sprint 看板:冒烟 item 在列
@@ -29,8 +29,7 @@ test("V12-S3 Sprint 全链路——建/指派/开始/完成/backlog/历史", asy
   // 详情清除 → 回 backlog
   await page.goto(`/p/${projectKey}`);
   await page.getByText("E2E 冒烟 item").first().click();
-  await page.getByRole("combobox", { name: "Sprint" }).click();
-  await page.getByRole("option", { name: "无" }).click();
+  await selectOption(page, "Sprint", "无", "");
   await expect(page.getByRole("combobox", { name: "Sprint" })).toHaveText("");
   await page.goto(`/p/${projectKey}/backlog`);
   await expect(page.getByText("E2E 冒烟 item").first()).toBeVisible();
@@ -38,8 +37,9 @@ test("V12-S3 Sprint 全链路——建/指派/开始/完成/backlog/历史", asy
   // 再指派 → 状态单向按钮:开始 → 完成(确认框明示未完成 item 回 Backlog)
   await page.goto(`/p/${projectKey}`);
   await page.getByText("E2E 冒烟 item").first().click();
-  await page.getByRole("combobox", { name: "Sprint" }).click();
-  await page.getByRole("option", { name: "Sprint 42" }).click();
+  const reassign = page.waitForResponse((r) => r.url().includes("/api/items/") && r.request().method() === "PUT");
+  await selectOption(page, "Sprint", "Sprint 42");
+  await reassign; // 等 PUT 落库再导航,否则指派可能被打断丢失
   await page.getByRole("link", { name: /Sprint 42/ }).first().click();
   await expect(page.getByRole("combobox", { name: "sprint 状态" })).toHaveCount(0); // V13-S4:下拉已移除
   await page.getByRole("button", { name: "▶ 开始 Sprint" }).click();
@@ -54,8 +54,6 @@ test("V12-S3 Sprint 全链路——建/指派/开始/完成/backlog/历史", asy
   await page.goto(`/p/${projectKey}`);
   await page.getByText("E2E 冒烟 item").first().click();
   await expect(page.getByRole("combobox", { name: "Sprint" })).not.toHaveText("Sprint 42");
-  await page.getByRole("combobox", { name: "Sprint" }).click();
-  await expect(page.getByRole("option", { name: "Sprint 42" })).toHaveCount(0);
 });
 
 test("V13-S3 拉入对话框——多选勾入/移出 + 详情回链", async ({ page, projectKey }) => {

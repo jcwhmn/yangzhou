@@ -33,8 +33,8 @@ test("V11-S1 登录后进入上次项目", async ({ page }) => {
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify({ key }),
   });
-  // 清会话重新登录 → 落回该项目
-  await page.evaluate(() => localStorage.clear());
+  // 清会话重新登录 → 落回该项目(board 页偶发 client 重定向会打断 evaluate,改用 init script 删 token)
+  await page.addInitScript(() => localStorage.removeItem("yz-token"));
   await uiLogin(page);
   await expect(page).toHaveURL(new RegExp(`/p/${key}$`));
 });
