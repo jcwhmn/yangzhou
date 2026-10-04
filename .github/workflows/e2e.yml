@@ -23,6 +23,8 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+        volumes:
+          - ${{ github.workspace }}/.github/initdb:/docker-entrypoint-initdb.d
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v5
@@ -36,9 +38,9 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
 
-      - name: 起后端(Flyway 空库自动建表)
+      - name: 起后端(test profile,Flyway 空库自动建表)
         working-directory: backend
-        run: gradle :api:bootRun --console=plain > ${{ github.workspace }}/api.log 2>&1 &
+        run: gradle :api:bootRun --args='--spring.profiles.active=test' --console=plain > ${{ github.workspace }}/api.log 2>&1 &
 
       - name: 等就绪并种子用户(bootstrap;已有则 409)
         run: |

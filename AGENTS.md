@@ -72,6 +72,13 @@ docs/      adr/ · spec/
 - 单元测试:类级并行安全——无共享可变全局态、不碰真 DB/网络,不起 Spring;CI 跑。
 - 集成测试:`@SpringBootTest(RANDOM_PORT)` + `RestTestClient`;不用 MockMvc / @WebMvcTest / TestRestTemplate;不用 @Transactional 回滚——每测试自清自建、只造自己要的数据,断言响应体与库内状态。
 - 敏感值(密码/token)永不进日志;登录失败消息保持笼统。
+- **不要猜前端或后端是否已运行,需要运行环境的,告知需要的运行环境,命令,从我这里确认**。
+
+### E2E(web/;Playwright,并行按用例隔离)
+
+- 后端跑 **test profile**(库 yangzhou_test):`gradle :api:bootRun --args='--spring.profiles.active=test'`;前端 `npm run dev`(webServer 自动拉起/复用);凭证与地址在 `web/e2e/.env`(模板 `.env.example`),不硬编码不提交。
+- 用例按模块分文件(auth/projects/board/member/sprint/backlog),`fullyParallel`;每用例经 fixture 独享唯一 key 项目(API 预置),**不依赖其它用例留下的状态,可单跑**。
+- 用例内只对被测行为走 UI;数据准备走 API helpers(`e2e/support/helpers.ts`)。MUI 对话框淡出期(~200ms)会吞下层点击,断言/点下层前先 `expect(dialog).toBeHidden()`。
 
 ## 错误与契约
 
