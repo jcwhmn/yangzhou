@@ -29,6 +29,7 @@ test.beforeAll(async ({ request }) => {
         e2eToken = token;
         // V13-S2(d):记录人类 member 的 last-project,套件结束后恢复
         const members = (await (await request.get("http://localhost:8080/api/members", { headers: { Authorization: `Bearer ${token}` } })).json()) as {
+          memberId?: string;
           virtual: boolean;
           lastProjectKey?: string;
         }[];
@@ -37,6 +38,40 @@ test.beforeAll(async ({ request }) => {
           data: { displayName: "小王" },
           headers: { Authorization: `Bearer ${token}` },
         });
+        // V13-S4:串行链改 API 幂等预置——worker 重生(模块重新求值,KEY 换新)或单跑后,项目+冒烟 item 仍在
+        const AH = { Authorization: `Bearer ${token}` };
+        await request.post("http://localhost:8080/api/projects", {
+          data: { key: KEY, name: "E2E 冒烟项目" },
+          headers: AH,
+        }); // 409 = 已存在,幂等
+        const me = members.find((m) => !m.virtual);
+        const listItems = (await (await request.get(`http://localhost:8080/api/projects/${KEY}/items`, { headers: AH })).json()) as {
+          itemId: string;
+          title: string;
+        }[];
+        if (!listItems.some((i) => i.title === "E2E 冒烟 item")) {
+          await request.post(`http://localhost:8080/api/projects/${KEY}/items`, {
+            data: { title: "E2E 冒烟 item" },
+            headers: AH,
+          });
+          const smoke = (await (await request.get(`http://localhost:8080/api/projects/${KEY}/items`, { headers: AH })).json()) as { itemId: string; title: string }[];
+          const smokeId = smoke.find((i) => i.title === "E2E 冒烟 item")!.itemId;
+          // 复刻旧 test 5 终态:指派 me + 切 QA(下游用例依赖 QA 列与 👤 me);成员列表字段是 memberId
+          const meId = me?.memberId;
+        if (meId) {
+            const r1 = await request.put(`http://localhost:8080/api/items/${smokeId}/assignee`, { data: { assigneeItemId: meId }, headers: AH });
+            if (!r1.ok()) throw new Error(`预置失败:指派 ${r1.status()}`);
+          }
+          const proj = (await (await request.get(`http://localhost:8080/api/projects/${KEY}`, { headers: AH })).json()) as { statuses: { statusId: string; name: string }[] };
+        const qa = proj.statuses.find((s) => s.name === "QA");
+        if (!qa) throw new Error(`预置失败:QA 状态缺失,KEY=${KEY}`);
+        const r2 = await request.patch(`http://localhost:8080/api/items/${smokeId}`, { data: { statusItemId: qa.statusId }, headers: AH });
+        if (!r2.ok()) throw new Error(`预置失败:切 QA ${r2.status()}`);
+        const smokeNow = (await (await request.get(`http://localhost:8080/api/projects/${KEY}/items`, { headers: AH })).json()) as { itemId: string; title: string }[];
+        const smokeRow = smokeNow.find((i) => i.title === "E2E 冒烟 item");
+        if (!smokeRow) throw new Error(`预置失败:冒烟 item 缺失,KEY=${KEY}`);
+        console.log(`[beforeAll] KEY=${KEY} 预置完成 item=${smokeRow.itemId}`);
+        }
       }
     }
   } catch {
@@ -76,11 +111,12 @@ test("登录进首页", async ({ page }) => {
 test("建项目并打开看板(默认五列)", async ({ page }) => {
   await login(page);
   await page.goto("/");
-  await page.getByLabel("KEY(如 CHE)").fill(KEY);
-  await page.getByLabel("名称").fill("E2E 冒烟项目");
+  const uiKey = `${KEY}P`; // beforeAll 已 API 预置 KEY,UI 建项用独立 key 验表单流
+  await page.getByLabel("KEY(如 CHE)").fill(uiKey);
+  await page.getByLabel("名称").fill("E2E UI 建的项目");
   await page.getByRole("button", { name: "创建项目" }).click();
-  await expect(page.getByText(KEY, { exact: true })).toBeVisible();
-  await page.goto(`/p/${KEY}`);
+  await expect(page.getByText(uiKey, { exact: true })).toBeVisible();
+  await page.goto(`/p/${uiKey}`);
   await expect(page.getByRole("heading", { name: "To Do(0)" })).toBeVisible();
   for (const col of ["In Progress(0)", "In Review(0)", "QA(0)", "Done(0)"]) {
     await expect(page.getByRole("heading", { name: col })).toBeVisible();
@@ -122,17 +158,17 @@ test("V11-S3 项目列表搜索/排序/显示已归档", async ({ page }) => {
 test("建 item → 详情 → 评论 → 切状态 → 活动日志留痕", async ({ page }) => {
   await login(page);
   await page.goto(`/p/${KEY}`);
-  await page.getByPlaceholder("新建 item").fill("E2E 冒烟 item");
+  await page.getByPlaceholder("新建 item").fill("E2E UI item");
   await page.getByRole("button", { name: "新建 ITEM" }).click();
-  await page.getByText("E2E 冒烟 item").first().waitFor();
-  await page.getByText("E2E 冒烟 item").first().click();
+  await page.getByText("E2E UI item").first().waitFor();
+  await page.getByText("E2E UI item").first().click();
 
   await expect(page.getByRole("heading", { name: "谁来做" })).toBeVisible();
 
   // 评论
-  await page.getByPlaceholder("写评论…").fill("E2E 冒烟评论");
+  await page.getByPlaceholder("写评论…").fill("E2E UI 评论");
   await page.getByRole("button", { name: "发送" }).click();
-  await expect(page.getByText("E2E 冒烟评论")).toBeVisible();
+  await expect(page.getByText("E2E UI 评论")).toBeVisible();
 
   // 指派给我(V4-S3:离开起点须有主)
   await page.getByRole("button", { name: "指派给我" }).click();

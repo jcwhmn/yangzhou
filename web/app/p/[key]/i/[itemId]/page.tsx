@@ -158,7 +158,15 @@ export default function ItemDetailPage() {
     setItem(it); setTitle(it.title); setDescription(it.description ?? ""); setType(it.type)
     setStartDate(it.startDate ?? ""); setDueDate(it.dueDate ?? ""); setPriority(it.priority ?? "")
     setStatuses(project.statuses); setAttributes(attrs)
-    api<SprintLite[]>(`/api/projects/${key}/sprints`).then(setSprints).catch(() => {})
+    api<SprintLite[]>(`/api/projects/${key}/sprints`)
+      .catch(
+        () =>
+          new Promise<SprintLite[]>((res) =>
+            setTimeout(() => res(api<SprintLite[]>(`/api/projects/${key}/sprints`)), 1000),
+          ),
+      ) // CI 冷 JVM 偶发连接重置(status -1),延迟重试,否则静默成空选项
+      .then(setSprints)
+      .catch(() => {});
     setFeasibility(feas); setCandidates(cands); setActivity(acts)
     const allMembers = await api<{ memberId: string; displayName: string; virtual: boolean }[]>("/api/members");
     const current = allMembers.find((m) => !m.virtual);
