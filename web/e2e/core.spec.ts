@@ -410,6 +410,8 @@ test("V13-S3 Sprint 拉入对话框——多选勾入/移出 + 详情回链", as
   await page.getByRole("button", { name: "拉入 item" }).click();
   await page.getByRole("dialog").locator("li", { hasText: "E2E 冒烟 item" }).getByRole("checkbox").check();
   await page.getByRole("button", { name: "完成", exact: true }).click();
+  // 等对话框淡出卸载后再断言:否则同文案在隐形对话框里还有一份,strict mode 炸
+  await expect(page.getByRole("dialog")).toBeHidden();
   await expect(page.getByText("E2E 冒烟 item")).toBeVisible();
 
   // 详情回链:点 sprint 名跳回 sprint 页
