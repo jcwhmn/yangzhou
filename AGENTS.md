@@ -6,7 +6,7 @@
 
 - **命名实体或写用户可见文案前** → 词汇表 `D:\obsidian\projects\yangzhou\CONTEXT.md`(**Item** 不是 Task;Workspace/Project/Team/Member/Attribute/**Requirement**/**Capability**)
 - **实现引擎、实体关系或输出形态前** → `D:\obsidian\projects\yangzhou\DOMAIN.md`(判定 5 形态、绿黄红聚合规则、领域规则 6 条)
-- **实现某张票时** → Linear 该票 + 其父票(票自带验收清单;版本 spec 对应 `docs/spec/00NN`;V1 父票 JCW-77 = spec 0001 为历史锚点)
+- **实现某张票时** → YPJ item(票自带验收清单;版本 spec 对应 `docs/spec/00NN`;历史 Linear 票号 JCW-* 仅作 spec 内引用锚点,Linear 已冻结只读)
 - **做 ItemGroup/视图/导航类功能前** → `docs/requirement/ItemGroup PRD.md`(§28.2 Phase 划分;原 requirement.md 随笔已迁 Obsidian Thoughts.md)
 - **动 schema 或架构前** → `docs/adr/`(0001 三层容器 / 0002 Item 同质树 / 0003 统一属性 / 0004 monorepo 与工具链)
 
@@ -32,7 +32,7 @@ docs/      adr/ · spec/ · architecture/(puml 类图) · requirement/(PRD) · p
 
 ## 过程(chess 实战约定平移)
 
-- 票即计划:实现前读 Linear 票 + spec 对应故事,不凭记忆。
+- 票即计划:实现前读 YPJ 票 + spec 对应故事,不凭记忆。
 - 切票边界自查(结论 ≤2 行):本票收尾干净?下一步依赖本会话推理?handoff 会不会复述 AGENTS/Linear 已有内容?→ clear / compact / handoff 三选一,自包含默认 clear。
 - sprint 收口(全部票 Done)时,主动提醒用户做 handoff(由用户执行)。
 - 外科手术式改动,不顺手重构无关代码。
@@ -42,13 +42,13 @@ docs/      adr/ · spec/ · architecture/(puml 类图) · requirement/(PRD) · p
 - 大输出/多命令优先 context-mode 批处理工具,Bash 仅琐碎命令。
 - `api` 模块内部按垂直切片组织(project / item / attribute / …):实体+DTO+service+controller 同包;技术配置归 `config.*`。
 
-## Issue 工作流(PR 模式)
+## Issue 工作流(PR 模式;票在 YPJ 项目,2026-10-06 起 Linear 冻结只读)
 
-1. 开工:`git checkout main && git pull --ff-only && git checkout -b cwjiang/JCW-{N}-{short}`
+1. 开工:`git checkout main && git pull --ff-only && git checkout -b cwjiang/YPJ-{N}-{short}`;同时 `yz assign YPJ-{N} me && yz items move YPJ-{N} "In Progress"`(开工须有主,未 assign 会被 move 409 拒)
 2. 实现带测试,跑全相关验证
-3. PR:`gh pr create --base main --title "JCW-{N}: ..."`
+3. PR:`gh pr create --base main --title "YPJ-{N}: ..."`;开出后 `yz items move YPJ-{N} "In Review"`
 4. **停**,等用户审阅合并
-5. 合并后同回合完成:`git checkout main && git pull --ff-only` → 删分支 → **Linear 移 Done**(非可选)→ 扫父票:子票全 Done 则父票 Done,否则 In Progress。PR 已合而 issue 停在 In Progress = 流程破损态。
+5. 合并后同回合完成:`git checkout main && git pull --ff-only` → 删分支 → **YPJ 移 Done**(`yz items move YPJ-{N} "Done"`,非可选)→ 扫父 item:子票全 Done 则父票 Done,否则 In Progress。PR 已合而 item 停在 In Progress = 流程破损态。
 
 ## Kotlin 风格
 
@@ -98,6 +98,8 @@ docs/      adr/ · spec/ · architecture/(puml 类图) · requirement/(PRD) · p
 - `./gradlew` 同效;首次需下载发行包,国内网络慢属已知,用本地 gradle 即可。
 - CI(GitHub Actions):`backend.yml` — backend 变更跑 `gradle build`(含 Testcontainers,需 Docker);`e2e.yml` — web/backend 变更起 bootRun + Playwright 整跑 E2E。
 - 本机开发库:`yangzhou`(共享 compose,已建);bootRun 用 `gradle :api:bootRun`。
+- **双 profile 并存**(2026-10-06 起):8080 常跑 **test profile**(库 `yangzhou_test`,E2E 用);**PM 日常实例 = default profile**(库 `yangzhou`,dogfood 项目 YPJ),约定端口 **8081**:`gradle :api:bootRun --args='--server.port=8081'`。CLI `yz` 的 session(`~/.yangzhou/session.json`)指向谁就写谁的库——动 PM 数据前确认 server 指向 default 实例。
+- PM 实例部署形态(已拍板):本机常驻即可;Postgres 备份手工期(`pg_dump`),自动化另票。
 - **⚠ 前端命令必须在 `web/` 目录下执行**:`cd /d/code/yangzhou/web && npx next build` / `npm run dev` / `npx playwright test` 等。agent 的 shell CWD 每次重置到 repo 根,漏 cd 会在错误目录跑命令导致 `.next` 污染或路径找不到。
 
 ## 进程管理(本机实操)
@@ -105,7 +107,8 @@ docs/      adr/ · spec/ · architecture/(puml 类图) · requirement/(PRD) · p
 - **严禁 `taskkill /IM node.exe`**——pi 本体就是 node 进程,按进程名杀会自杀;也慎杀全部 java.exe(gradle daemon 可杀,但用完再起更省)。停开发服务一律**按端口找 PID**:`netstat -ano | findstr :3000` → `taskkill /PID <pid> /F`。
 - context-mode 批处理工具实际跑 PowerShell——`&&`、`find`、`/dev/null` 语法会挂;简单命令直接用 Bash。
 - headroom 压缩开启时:被压缩的读取输出不可当编辑锚点(原文会被搅坏);大文件读改一律 python 原地处理。
+- CLI/脚本中文输出在 PowerShell 显示乱码(UTF-8 被按 GBK 解码):先 `chcp 65001` 或改用 Git Bash。
 
 ## 工作流
 
-main 干线开发;原型留 `prototype/*` 分支;每张票 = 一个 Linear issue,验收清单全绿才关票。
+main 干线开发;原型留 `prototype/*` 分支;每张票 = 一个 YPJ item(dogfood),验收清单全绿才关票。Linear 已冻结只读(历史存档),不再开新票。

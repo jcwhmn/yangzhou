@@ -23,3 +23,4 @@ web/pnpm-workspace.yaml
 *.log
 .screenshots/
 test-results/
+.scratch/

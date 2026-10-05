@@ -14,4 +14,4 @@ backend/script/yz members list      # Linux/macOS
 backend/script/yz feasibility CHE  # 示例:项目可行性/技能差距
 ```
 
-全部命令:`script/yz`(无参数)看用法;详见 `backend/cli/README.md`。文档:`docs/`;开发票:Linear `JCW-77`。
+全部命令:`script/yz`(无参数)看用法;详见 `backend/cli/README.md`。文档:`docs/`;开发票:YPJ 项目(自 2026-10-06 dogfood,Linear 已冻结只读)。
