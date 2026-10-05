@@ -305,3 +305,16 @@ data class ItemGroupMember(
     val itemId: Long,
     val createdAt: Instant = Instant.now(),
 )
+
+/** V14 Milestone:项目时间轴目标节点(PRD §9);非 ItemGroup;0..1 in_progress 由 ux_milestone_project_current 硬约束。 */
+@Table("milestone")
+data class Milestone(
+    @Id val id: Long? = null,
+    val objectId: UUID = UUID.randomUUID(),
+    val projectId: Long,
+    val name: String,
+    val status: String = "planned",
+    val targetDate: LocalDate? = null,
+    val createdAt: Instant = Instant.now(),
+    val updatedAt: Instant = Instant.now(),
+)
