@@ -6,7 +6,8 @@
 
 - **命名实体或写用户可见文案前** → 词汇表 `D:\obsidian\projects\yangzhou\CONTEXT.md`(**Item** 不是 Task;Workspace/Project/Team/Member/Attribute/**Requirement**/**Capability**)
 - **实现引擎、实体关系或输出形态前** → `D:\obsidian\projects\yangzhou\DOMAIN.md`(判定 5 形态、绿黄红聚合规则、领域规则 6 条)
-- **实现某张票时** → Linear JCW-78~84(每票自带验收清单;父票 JCW-77 = spec 全文 `docs/spec/0001-v1-core-and-matching.md`)
+- **实现某张票时** → Linear 该票 + 其父票(票自带验收清单;版本 spec 对应 `docs/spec/00NN`;V1 父票 JCW-77 = spec 0001 为历史锚点)
+- **做 ItemGroup/视图/导航类功能前** → `docs/requirement/ItemGroup PRD.md`(§28.2 Phase 划分;原 requirement.md 随笔已迁 Obsidian Thoughts.md)
 - **动 schema 或架构前** → `docs/adr/`(0001 三层容器 / 0002 Item 同质树 / 0003 统一属性 / 0004 monorepo 与工具链)
 
 ## 布局(ADR-0004)
@@ -14,7 +15,7 @@
 ```
 backend/   Gradle 多模块:domain(纯 Kotlin,零 Spring)· api(REST 薄层)· persistence(Postgres)· cli(fat-jar)
 web/       Next.js + MUI + TS,瘦客户端
-docs/      adr/ · spec/
+docs/      adr/ · spec/ · architecture/(puml 类图) · requirement/(PRD) · planning/
 ```
 
 ## 领域硬规则
@@ -79,7 +80,7 @@ docs/      adr/ · spec/
 ### E2E(web/;Playwright,并行按用例隔离)
 
 - 后端跑 **test profile**(库 yangzhou_test):`gradle :api:bootRun --args='--spring.profiles.active=test'`;前端 `npm run dev`(webServer 自动拉起/复用);凭证与地址在 `web/e2e/.env`(模板 `.env.example`),不硬编码不提交。
-- 用例按模块分文件(auth/projects/board/member/sprint/backlog),`fullyParallel`;每用例经 fixture 独享唯一 key 项目(API 预置),**不依赖其它用例留下的状态,可单跑**。
+- 用例按模块分文件(一个功能域一个 `*.spec.ts`),`fullyParallel`;每用例经 fixture 独享唯一 key 项目(API 预置),**不依赖其它用例留下的状态,可单跑**。
 - 用例内只对被测行为走 UI;数据准备走 API helpers(`e2e/support/helpers.ts`)。MUI 对话框淡出期(~200ms)会吞下层点击,断言/点下层前先 `expect(dialog).toBeHidden()`。
 
 ## 错误与契约
@@ -95,13 +96,15 @@ docs/      adr/ · spec/
 
 - JDK 25(LTS)。后端在 `backend/`:`gradle build`(含测试)/ `gradle :domain:run`(引擎 Demo,输出与 prototype S1–S7 可比对)。
 - `./gradlew` 同效;首次需下载发行包,国内网络慢属已知,用本地 gradle 即可。
-- CI(GitHub Actions):backend 路径变更时跑 `gradle build`(含 Testcontainers 集成测试,需 Docker)。
+- CI(GitHub Actions):`backend.yml` — backend 变更跑 `gradle build`(含 Testcontainers,需 Docker);`e2e.yml` — web/backend 变更起 bootRun + Playwright 整跑 E2E。
 - 本机开发库:`yangzhou`(共享 compose,已建);bootRun 用 `gradle :api:bootRun`。
 - **⚠ 前端命令必须在 `web/` 目录下执行**:`cd /d/code/yangzhou/web && npx next build` / `npm run dev` / `npx playwright test` 等。agent 的 shell CWD 每次重置到 repo 根,漏 cd 会在错误目录跑命令导致 `.next` 污染或路径找不到。
 
 ## 进程管理(本机实操)
 
 - **严禁 `taskkill /IM node.exe`**——pi 本体就是 node 进程,按进程名杀会自杀;也慎杀全部 java.exe(gradle daemon 可杀,但用完再起更省)。停开发服务一律**按端口找 PID**:`netstat -ano | findstr :3000` → `taskkill /PID <pid> /F`。
+- context-mode 批处理工具实际跑 PowerShell——`&&`、`find`、`/dev/null` 语法会挂;简单命令直接用 Bash。
+- headroom 压缩开启时:被压缩的读取输出不可当编辑锚点(原文会被搅坏);大文件读改一律 python 原地处理。
 
 ## 工作流
 
