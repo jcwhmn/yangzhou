@@ -24,6 +24,17 @@ export async function apiToken(): Promise<string> {
   return cachedToken;
 }
 
+/** 通用 API 调用:预置小操作直接内联,不再逐个包 helper */
+export async function apiCall<T = unknown>(method: string, path: string, body?: unknown): Promise<T> {
+  const res = await fetch(`${config.apiURL}${path}`, {
+    method,
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${await apiToken()}` },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`${method} ${path}: ${res.status}`);
+  return res.status === 204 ? (undefined as T) : ((await res.json()) as T);
+}
+
 let seq = 0;
 
 /** 并行安全的唯一项目 key(9 位:随机 hex6 + 进程内序号2;≤10 留 1 位给表单用例的「P」后缀) */
@@ -61,12 +72,23 @@ export async function apiCreateItem(key: string, title: string): Promise<string>
   return ((await res.json()) as { itemId: string }).itemId;
 }
 
+export async function apiMeId(): Promise<string> {
+  const members = await apiCall<{ memberId: string; virtual: boolean }[]>("GET", "/api/members");
+  return members.find((m) => !m.virtual)!.memberId;
+}
+
+export async function apiCreateSprint(key: string, name: string): Promise<string> {
+  const res = await fetch(`${config.apiURL}/api/projects/${key}/sprints`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${await apiToken()}` },
+    body: JSON.stringify({ name, startDate: null, endDate: null }),
+  });
+  if (!res.ok) throw new Error(`创建 sprint: ${res.status}`);
+  return ((await res.json()) as { sprintId: string }).sprintId;
+}
+
 export async function apiAssignMe(itemId: string): Promise<void> {
-  const members = (await (await fetch(`${config.apiURL}/api/members`, { headers: { Authorization: `Bearer ${await apiToken()}` } })).json()) as {
-    memberId: string;
-    virtual: boolean;
-  }[];
-  const meId = members.find((m) => !m.virtual)!.memberId;
+  const meId = await apiMeId();
   const res = await fetch(`${config.apiURL}/api/items/${itemId}/assignee`, {
     method: "PUT",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${await apiToken()}` },
