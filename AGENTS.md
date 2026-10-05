@@ -32,6 +32,8 @@ docs/      adr/ · spec/
 ## 过程(chess 实战约定平移)
 
 - 票即计划:实现前读 Linear 票 + spec 对应故事,不凭记忆。
+- 切票边界自查(结论 ≤2 行):本票收尾干净?下一步依赖本会话推理?handoff 会不会复述 AGENTS/Linear 已有内容?→ clear / compact / handoff 三选一,自包含默认 clear。
+- sprint 收口(全部票 Done)时,主动提醒用户做 handoff(由用户执行)。
 - 外科手术式改动,不顺手重构无关代码。
 - 最简可行实现,不加投机抽象。
 - 非平凡行为变更必须带测试。
