@@ -41,7 +41,7 @@ export function VerdictLine({ v }: { v: Verdict }) {
 
 export type Signal = "GREEN" | "YELLOW" | "RED";
 
-const signalColor: Record<Signal, "success" | "warning" | "error"> = {
+export const signalColor: Record<Signal, "success" | "warning" | "error"> = {
   GREEN: "success",
   YELLOW: "warning",
   RED: "error",

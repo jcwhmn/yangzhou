@@ -55,13 +55,16 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
   const rank = { active: 0, planned: 1, completed: 2 } as const;
   const sorted = [...(sprints ?? [])].sort((a, b) => (rank[a.status as keyof typeof rank] ?? 9) - (rank[b.status as keyof typeof rank] ?? 9));
 
-  const itemSx = (selected: boolean) => ({ selected, py: 0.5 });
+  const itemSx = { py: 0.5 };
 
   return (
     <Box sx={{ display: "flex", minHeight: "100vh" }}>
       <Box component="nav" sx={{ width: 210, flexShrink: 0, bgcolor: "grey.50" }}>
         <List dense disablePadding sx={{ py: 2 }}>
-          <ListItemButton component={Link} href={`/p/${key}`} sx={itemSx(pathname === `/p/${key}`)}>
+          <ListItemButton component={Link} href={`/p/${key}/overview`} selected={pathname === `/p/${key}/overview`} sx={itemSx}>
+            <ListItemText primary={t.projectNav.overview} />
+          </ListItemButton>
+          <ListItemButton component={Link} href={`/p/${key}`} selected={pathname === `/p/${key}`} sx={itemSx}>
             <ListItemText primary={t.projectNav.board} />
           </ListItemButton>
           <Divider sx={{ my: 1 }} />
@@ -75,7 +78,7 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
               <AddIcon fontSize="small" />
             </IconButton>
           </ListSubheader>
-          <ListItemButton component={Link} href={`/p/${key}/backlog`} sx={itemSx(pathname === `/p/${key}/backlog`)}>
+          <ListItemButton component={Link} href={`/p/${key}/backlog`} selected={pathname === `/p/${key}/backlog`} sx={itemSx}>
             <ListItemText primary={t.projectNav.backlog} />
           </ListItemButton>
           {(sprints ?? []).length === 0 && sprints !== null && (
@@ -91,7 +94,8 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
               key={s.sprintId}
               component={Link}
               href={`/p/${key}/sprint/${s.sprintId}`}
-              sx={itemSx(pathname === `/p/${key}/sprint/${s.sprintId}`)}
+              selected={pathname === `/p/${key}/sprint/${s.sprintId}`}
+              sx={itemSx}
             >
               <ListItemText
                 primary={s.name}
