@@ -20,12 +20,13 @@ test("Epic 段——goal 显示 + rollup 色点 + 点击进详情,非 goal 不�
   await page.goto(`/p/${projectKey}`);
   await page.getByRole("link", { name: "Overview" }).click(); // 触发一次完整导航,观察侧边栏
 
-  // Epic 段:goal 在,普通 task 不在
-  const epicItem = page.getByRole("link", { name: /EP Epic 大目标/ });
+  // Epic 段:goal 在(作用域收窄到侧边栏 nav,避开看板 main 里的同名卡片链接),普通 task 不在
+  const nav = page.getByRole("navigation");
+  const epicItem = nav.getByRole("link", { name: /EP Epic 大目标/ });
   await expect(epicItem).toBeVisible();
-  await expect(page.getByRole("link", { name: /EP 普通任务/ })).toHaveCount(0);
-  // rollup 色点:子任务 GREEN(能力 3 ≥ 需求 2)→ 祖先点绿
+  // rollup 色点:子任务 GREEN(能力 3 ≥ 需求 2)→ 祖先点绿(色点 aria-label 即信号文案)
   await expect(epicItem.getByLabel("✔ 全满足")).toBeVisible();
+  await expect(nav.getByRole("link", { name: /EP 普通任务/ })).toHaveCount(0);
 
   // 点击进详情
   await epicItem.click();

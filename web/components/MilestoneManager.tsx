@@ -132,6 +132,7 @@ export function MilestoneManager({
             return (
               <Box
                 key={m.milestoneId}
+                data-testid="milestone-row"
                 sx={{ display: "flex", alignItems: "center", gap: 1, py: 0.5, borderBottom: "1px solid", borderColor: "grey.100" }}
               >
                 <Typography variant="body2" sx={{ width: 16, textAlign: "center" }}>
