@@ -1,6 +1,6 @@
 # Spec — yangzhou V11:产品可用性冲刺
 
-> 来源:V10 收尾后用户测试反馈(2026-09-19/26 requirement.md)+ V10 未完成前端缺口;决策记录见 Obsidian CONTEXT.md「V11 已定」。词汇表/ADR 同 V1–V10。
+> 来源:V10 收尾后用户测试反馈(2026-09-19/26,原 repo requirement.md,已迁 Obsidian projects/yangzhou/Thoughts.md「来自 repo requirement.md」)+ V10 未完成前端缺口;决策记录见 Obsidian CONTEXT.md「V11 已定」。词汇表/ADR 同 V1–V10。
 
 ## Problem Statement
 
