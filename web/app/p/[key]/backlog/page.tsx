@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Button,
   Container,
   Stack,
   Table,
@@ -9,13 +10,13 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TextField,
   Typography,
 } from "@mui/material";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { AppNav } from "@/components/AppNav";
 import { t } from "@/lib/texts";
 
 type Item = {
@@ -37,6 +38,7 @@ export default function BacklogPage() {
   const { key } = useParams<{ key: string }>();
   const [items, setItems] = useState<Item[] | null>(null);
   const [error, setError] = useState("");
+  const [newTitle, setNewTitle] = useState("");
 
   useEffect(() => {
     api<Item[]>(`/api/projects/${key}/backlog`)
@@ -44,16 +46,39 @@ export default function BacklogPage() {
       .catch((e) => setError(e instanceof Error ? e.message : "加载失败"));
   }, [key]);
 
+  // V13-S4:Backlog 就地建项(零成员关系,天然入池)
+  async function addItem(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newTitle.trim()) return;
+    try {
+      await api(`/api/projects/${key}/items`, { method: "POST", body: JSON.stringify({ title: newTitle.trim() }) });
+      setNewTitle("");
+      setItems(await api<Item[]>(`/api/projects/${key}/backlog`));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "创建失败");
+    }
+  }
+
   const columns = ["编号", "标题", "优先级", "状态", "负责人", "开始", "截止", "可行性"];
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
-      <AppNav />
       <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
         <Typography variant="h5">{`${String(key)} · ${t.projectNav.backlog}`}</Typography>
         {items !== null && (
           <Typography color="text.secondary">{`${items.length} item`}</Typography>
         )}
+        <Stack component="form" direction="row" spacing={1} sx={{ ml: "auto" }} onSubmit={addItem}>
+          <TextField
+            size="small"
+            placeholder={t.board.addItem}
+            value={newTitle}
+            onChange={(e) => setNewTitle(e.target.value)}
+          />
+          <Button type="submit" variant="outlined">
+            {t.board.addItem}
+          </Button>
+        </Stack>
       </Stack>
       {error && <Typography color="error">{error}</Typography>}
       {items !== null && items.length === 0 && (

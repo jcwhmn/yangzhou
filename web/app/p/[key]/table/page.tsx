@@ -64,7 +64,8 @@ export default function TableViewPage() {
   }, [cols]);
 
   function toggleCol(c: string) {
-    setCols((prev) => ({ ...prev, [c]: !(prev[c] ?? true) }));
+    // 默认值须与 chip 颜色一致(columns[].visible),否则首次点击与视觉状态相反、看似无效
+    setCols((prev) => ({ ...prev, [c]: !(prev[c] ?? (columns.find((x) => x.id === c)?.visible ?? true)) }));
   }
 
   const load = useCallback(async () => {

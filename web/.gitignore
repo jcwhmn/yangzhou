@@ -2,3 +2,7 @@ test-results/
 .screenshots/
 playwright-report/
 tsconfig.tsbuildinfo
+
+# E2E 凭证与环境
+e2e/.env
+.scratch-n2.txt

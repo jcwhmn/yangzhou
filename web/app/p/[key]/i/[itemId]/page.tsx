@@ -147,18 +147,26 @@ export default function ItemDetailPage() {
   const [newCheckText, setNewCheckText] = useState("");
 
   const load = useCallback(async () => {
-    const [it, project, attrs, feas, cands, acts] = await Promise.all([
+    const [it, project, attrs, feas, cands, acts, spr] = await Promise.all([
       api<Item>(`/api/items/${itemId}`),
       api<{ statuses: Status[] }>(`/api/projects/${key}`),
       api<Attribute[]>("/api/attributes"),
       api<Feasibility>(`/api/items/${itemId}/feasibility`),
       api<Candidate[]>(`/api/items/${itemId}/candidates`),
       api<Activity[]>(`/api/items/${itemId}/activity`),
+      // sprints 并入首屏:选项一次性到位,避免下拉打开后 children 变化把 MUI 菜单关掉
+      api<SprintLite[]>(`/api/projects/${key}/sprints`)
+        .catch(
+          () =>
+            new Promise<SprintLite[]>((res) =>
+              setTimeout(() => res(api<SprintLite[]>(`/api/projects/${key}/sprints`)), 1000),
+            ),
+        ) // CI 冷 JVM 偶发连接重置(status -1),延迟重试,否则静默成空选项
+        .catch(() => [] as SprintLite[]),
     ])
     setItem(it); setTitle(it.title); setDescription(it.description ?? ""); setType(it.type)
     setStartDate(it.startDate ?? ""); setDueDate(it.dueDate ?? ""); setPriority(it.priority ?? "")
-    setStatuses(project.statuses); setAttributes(attrs)
-    api<SprintLite[]>(`/api/projects/${key}/sprints`).then(setSprints).catch(() => {})
+    setStatuses(project.statuses); setAttributes(attrs); setSprints(spr)
     setFeasibility(feas); setCandidates(cands); setActivity(acts)
     const allMembers = await api<{ memberId: string; displayName: string; virtual: boolean }[]>("/api/members");
     const current = allMembers.find((m) => !m.virtual);
@@ -182,19 +190,28 @@ export default function ItemDetailPage() {
   };
 
   async function saveBasics() {
-    await api(`/api/items/${itemId}`, {
-      method: "PATCH",
-      body: JSON.stringify({ title, description: description || null, type, startDate, dueDate, priority }),
-    });
-    await load();
-    flashSaved();
+    try {
+      await api(`/api/items/${itemId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ title, description: description || null, type, startDate, dueDate, priority }),
+      });
+      await load();
+      flashSaved();
+    } catch (e) {
+      // V13-S4:409 等业务错误浮出(如「开工前请先指派负责人」)
+      setError(e instanceof Error ? e.message : "保存失败");
+    }
   }
 
   async function moveStatus(statusName: string) {
     const target = statuses.find((s) => s.name === statusName);
     if (!target) return;
-    await api(`/api/items/${itemId}`, { method: "PATCH", body: JSON.stringify({ statusItemId: target.statusId }) });
-    await load();
+    try {
+      await api(`/api/items/${itemId}`, { method: "PATCH", body: JSON.stringify({ statusItemId: target.statusId }) });
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "更新失败");
+    }
   }
 
   async function assign(memberId: string | null) {

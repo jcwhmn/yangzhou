@@ -1,27 +1,29 @@
 import { defineConfig } from "@playwright/test";
+import { config } from "./e2e/config";
 
 /**
- * E2E 核心链路(V7 后安全网)。
- * 前置:本机 Postgres(共享 compose)+ 后端 `gradle :api:bootRun`(8080)。
- * Next dev 由 webServer 拉起(已在跑则复用)。
+ * E2E:并行、按用例隔离(project fixture 唯一 key,数据走 API 预置)。
+ * 前置:本机 Postgres(共享 compose)+ 后端 test profile:
+ *   gradle :api:bootRun --args='--spring.profiles.active=test'
+ * 前端 dev server 由 webServer 拉起(已在跑则复用)。
+ * 凭证/地址见 e2e/.env(模板 .env.example)。
  */
 export default defineConfig({
   testDir: "./e2e",
   timeout: 30_000,
-  retries: 0,
-  workers: 1,
-  fullyParallel: false,
-  reporter: [["list"]],
+  retries: process.env.CI ? 1 : 0,
+  fullyParallel: true,
+  workers: process.env.CI ? 2 : undefined,
   use: {
-    baseURL: "http://localhost:3000",
+    baseURL: config.baseURL,
     locale: "zh-CN",
     screenshot: "only-on-failure",
     trace: "retain-on-failure",
   },
   webServer: {
     command: "npm run dev",
-    url: "http://localhost:3000",
-    reuseExistingServer: true,
+    url: config.baseURL,
+    reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },
 });

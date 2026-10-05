@@ -12,8 +12,6 @@ import {
   List,
   ListItem,
   ListItemText,
-  MenuItem,
-  Select,
   Stack,
   Table,
   TableBody,
@@ -42,7 +40,7 @@ type Item = {
   dueDate: string | null;
 };
 type Status = { statusId: string; name: string; isFinal: boolean; position: number };
-type Candidate = { itemId: string; number: string; title: string; status: string; assignee: string | null; sprintName: string | null };
+type Candidate = { itemId: string; number: string; title: string; status: string; assignee: string | null };
 
 /**
  * V12-S3 Sprint 落地页(spec 0010,grill 裁决 1/2):
@@ -63,17 +61,21 @@ export default function SprintPage() {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
+  const [allSprints, setAllSprints] = useState<Sprint[]>([]);
+  const [confirmFlow, setConfirmFlow] = useState<null | "start" | "complete">(null);
 
   useEffect(() => {
     Promise.all([
       api<Sprint>(`/api/projects/${key}/sprints/${id}`),
       api<Item[]>(`/api/projects/${key}/sprints/${id}/items`),
       api<{ statuses: Status[] }>(`/api/projects/${key}`),
+      api<Sprint[]>(`/api/projects/${key}/sprints`),
     ])
-      .then(([s, its, p]) => {
+      .then(([s, its, p, all]) => {
         setSprint(s);
         setItems(its);
         setStatuses(p.statuses);
+        setAllSprints(all);
       })
       .catch((e) => {
         if (e instanceof ApiError && e.status === 404) setGone(true);
@@ -94,13 +96,32 @@ export default function SprintPage() {
     }
   }
 
+  // V13-S4:状态单向——开始/完成各一步;开始时若已有进行中 sprint 则提示(不禁止并存)
+  function startSprint() {
+    if (allSprints.some((s) => s.status === "active" && s.sprintId !== id)) setConfirmFlow("start");
+    else void doStart();
+  }
+  async function doStart() {
+    await changeStatus("active");
+    setConfirmFlow(null);
+  }
+  function completeSprint() {
+    setConfirmFlow("complete");
+  }
+  async function doComplete() {
+    await changeStatus("completed");
+    setConfirmFlow(null);
+  }
+
   // V13-S3:拉入/移出同一对话框——列出非终态 item 多选,确认后逐条走既有 PUT /items/{id}/sprint
   async function openAdd() {
     try {
-      const all = await api<Candidate[]>(`/api/projects/${key}/items`);
-      const finalNames = new Set(statuses.filter((s) => s.isFinal).map((s) => s.name));
-      setCandidates(all.filter((it) => !finalNames.has(it.status)));
-      setSelected(new Set((items ?? []).map((i) => i.itemId)));
+      // V13-S4:范围 = Backlog + 本 sprint 成员(其它 sprint 的 item 不列,挪动走详情下拉)
+      const backlogItems = await api<Candidate[]>(`/api/projects/${key}/backlog`);
+      const members = (items ?? []).map((i) => ({ itemId: i.itemId, number: i.number, title: i.title, status: i.status, assignee: i.assignee }));
+      const memberIds = new Set(members.map((m) => m.itemId));
+      setCandidates([...members, ...backlogItems.filter((b) => !memberIds.has(b.itemId))]);
+      setSelected(new Set(members.map((m) => m.itemId)));
       setAddOpen(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : "加载失败");
@@ -158,17 +179,18 @@ export default function SprintPage() {
             <Typography color="text.secondary" variant="body2">
               {sprint.startDate ?? "—"} ~ {sprint.endDate ?? "—"}
             </Typography>
-            <Select
-              size="small"
-              value={sprint.status}
-              onChange={(e) => changeStatus(String(e.target.value))}
-              inputProps={{ "aria-label": "sprint 状态" }}
-              sx={{ ml: "auto", minWidth: 130 }}
-            >
-              <MenuItem value="planned">规划中</MenuItem>
-              <MenuItem value="active">进行中</MenuItem>
-              <MenuItem value="completed">已完成</MenuItem>
-            </Select>
+            <Stack direction="row" spacing={1} alignItems="center" sx={{ ml: "auto" }}>
+              {sprint.status === "planned" && (
+                <Button size="small" variant="contained" onClick={startSprint}>
+                  ▶ 开始 Sprint
+                </Button>
+              )}
+              {sprint.status === "active" && (
+                <Button size="small" variant="contained" onClick={completeSprint}>
+                  ✓ 完成 Sprint
+                </Button>
+              )}
+            </Stack>
             <ToggleButtonGroup size="small" value={view} exclusive onChange={(_, v) => v && setView(v)}>
               <ToggleButton value="board">看板</ToggleButton>
               <ToggleButton value="table">表格</ToggleButton>
@@ -291,9 +313,7 @@ export default function SprintPage() {
                     />
                     <ListItemText
                       primary={`${it.number} · ${it.title}`}
-                      secondary={[it.status, it.assignee ? `👤 ${it.assignee}` : null, it.sprintName && it.sprintName !== sprint.name ? `当前:${it.sprintName}` : null]
-                        .filter(Boolean)
-                        .join(" · ")}
+                      secondary={[it.status, it.assignee ? `👤 ${it.assignee}` : null].filter(Boolean).join(" · ")}
                     />
                   </ListItem>
                 ))}
@@ -308,6 +328,22 @@ export default function SprintPage() {
               <Button onClick={() => setAddOpen(false)}>取消</Button>
               <Button variant="contained" onClick={applyMembership} disabled={busy}>
                 完成
+              </Button>
+            </DialogActions>
+          </Dialog>
+          <Dialog open={confirmFlow !== null} onClose={() => setConfirmFlow(null)} maxWidth="xs" fullWidth>
+            <DialogTitle>{confirmFlow === "start" ? "开始 Sprint" : "完成 Sprint"}</DialogTitle>
+            <DialogContent>
+              <Typography>
+                {confirmFlow === "start"
+                  ? `项目已有进行中的 Sprint「${allSprints.find((s) => s.status === "active" && s.sprintId !== id)?.name ?? ""}」,允许同时存在多个进行中。仍要开始本 Sprint?`
+                  : `未完成的 ${(items ?? []).filter((it) => !statuses.find((st) => st.name === it.status)?.isFinal).length} 个 item 将回到 Backlog 供重新规划;已完成 item 保留在本页历史。`}
+              </Typography>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setConfirmFlow(null)}>取消</Button>
+              <Button variant="contained" onClick={confirmFlow === "start" ? doStart : doComplete}>
+                {confirmFlow === "start" ? "仍要开始" : "确认完成"}
               </Button>
             </DialogActions>
           </Dialog>

@@ -7,6 +7,8 @@ import {
   Card,
   CardContent,
   Chip,
+  MenuItem,
+  Select,
   Skeleton,
   Stack,
   TextField,
@@ -40,6 +42,7 @@ type Item = {
 };
 
 type Filter = "all" | "unassigned" | "blocked" | string; // string = memberId
+type SprintLite = { sprintId: string; name: string; status: string };
 
 export default function BoardPage() {
   const { key } = useParams<{ key: string }>();
@@ -51,6 +54,8 @@ export default function BoardPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<Filter>("all");
+  const [sprintFilter, setSprintFilter] = useState("all");
+  const [sprints, setSprints] = useState<SprintLite[]>([]);
   const [wfOpen, setWfOpen] = useState(false);
   const [membersOpen, setMembersOpen] = useState(false);
   const [ghOpen, setGhOpen] = useState(false);
@@ -78,6 +83,7 @@ export default function BoardPage() {
       setStatuses(project.statuses);
       // V9-S1:item 列表自带 feasSignal 冗余,不再单 feasibility 调用
       setItems(await api<Item[]>(`/api/projects/${key}/items`));
+      setSprints(await api<SprintLite[]>(`/api/projects/${key}/sprints`));
     } catch (e) {
       setError(e instanceof Error ? e.message : "加载失败");
     } finally {
@@ -129,12 +135,16 @@ export default function BoardPage() {
     }
   }
 
-  // S7:assignee 过滤(纯前端;"未指派" = assignee 为 null)
+  // S7:assignee 过滤(纯前端;"未指派" = assignee 为 null);V13-S4:增加 Sprint 维度过滤
+  const bySprint =
+    sprintFilter === "all" ? items
+    : sprintFilter === "none" ? items.filter((i) => !i.sprintName)
+    : items.filter((i) => i.sprintName === sprints.find((s) => s.sprintId === sprintFilter)?.name);
   const filtered =
-    filter === "all" ? items
-    : filter === "unassigned" ? items.filter((i) => !i.assignee)
-    : filter === "blocked" ? items.filter((i) => i.blocked)
-    : items.filter((i) => i.assignee === filter);
+    filter === "all" ? bySprint
+    : filter === "unassigned" ? bySprint.filter((i) => !i.assignee)
+    : filter === "blocked" ? bySprint.filter((i) => i.blocked)
+    : bySprint.filter((i) => i.assignee === filter);
   const memberOptions = [...new Set(items.map((i) => i.assignee).filter((a): a is string => !!a))];
 
   const byStatusName = new Map<string, Item[]>();
@@ -194,8 +204,23 @@ export default function BoardPage() {
         </Alert>
       )}
 
-      {/* S7:assignee 过滤 chips */}
+      {/* S7:assignee 过滤 chips;V13-S4:Sprint 维度过滤(模型 A:看板=全部,可筛) */}
       <Stack direction="row" spacing={1} sx={{ mb: 2 }} flexWrap="wrap" useFlexGap>
+        <Select
+          size="small"
+          value={sprintFilter}
+          onChange={(e) => setSprintFilter(String(e.target.value))}
+          sx={{ minWidth: 150 }}
+          inputProps={{ "aria-label": "sprint 过滤" }}
+        >
+          <MenuItem value="all">Sprint:全部</MenuItem>
+          <MenuItem value="none">未规划</MenuItem>
+          {sprints.filter((s) => s.status !== "completed").map((s) => (
+            <MenuItem key={s.sprintId} value={s.sprintId}>
+              {s.name}
+            </MenuItem>
+          ))}
+        </Select>
         <Chip label={t.filter.all} size="small" color={filter === "all" ? "primary" : "default"} onClick={() => setFilter("all")} />
         <Chip
           label={t.filter.unassigned}
