@@ -28,6 +28,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { t } from "@/lib/texts";
+import { SignalChip, type Signal } from "@/components/Verdict";
 
 type Sprint = { sprintId: string; name: string; status: string; startDate: string | null; endDate: string | null };
 type Item = {
@@ -38,6 +39,7 @@ type Item = {
   assignee: string | null;
   priority: string | null;
   dueDate: string | null;
+  feasSignal: Signal | null;
 };
 type Status = { statusId: string; name: string; isFinal: boolean; position: number };
 type Candidate = { itemId: string; number: string; title: string; status: string; assignee: string | null };
@@ -179,6 +181,13 @@ export default function SprintPage() {
             <Typography color="text.secondary" variant="body2">
               {sprint.startDate ?? "—"} ~ {sprint.endDate ?? "—"}
             </Typography>
+            {/* V14 组级 rollup:组内 items feasSignal 取最差(红>黄>绿;无信号不显示) */}
+            {(() => {
+              if (!items || items.length === 0) return null;
+              const rank: Record<Signal, number> = { RED: 0, YELLOW: 1, GREEN: 2 };
+              const sigs = items.map((i) => i.feasSignal).filter((s): s is Signal => s !== null);
+              return sigs.length > 0 ? <SignalChip signal={sigs.reduce((a, b) => (rank[a] <= rank[b] ? a : b))} size="small" /> : null;
+            })()}
             <Stack direction="row" spacing={1} alignItems="center" sx={{ ml: "auto" }}>
               {sprint.status === "planned" && (
                 <Button size="small" variant="contained" onClick={startSprint}>

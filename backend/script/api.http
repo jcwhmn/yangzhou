@@ -403,6 +403,51 @@ Authorization: Bearer {{token}}
 GET {{host}}/api/projects/{{pkey}}/backlog
 Authorization: Bearer {{token}}
 
+### backlog 派生桶(非终态且未进任何 planned/active sprint;此刻不含已指派的 item)
+GET {{host}}/api/projects/{{pkey}}/backlog
+Authorization: Bearer {{token}}
+
+### 建 Milestone(handler 存变量 milestoneId;targetDate 可选,格式 yyyy-MM-dd)
+POST {{host}}/api/projects/{{pkey}}/milestones
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "MVP",
+  "targetDate": "2026-12-01"
+}
+
+> {%
+    client.global.set("milestoneId", response.body.milestoneId);
+ %}
+
+### Milestone 列表(in_progress 优先,终态末尾,target_date 升序)
+GET {{host}}/api/projects/{{pkey}}/milestones
+Authorization: Bearer {{token}}
+
+### 推进 Milestone(planned → in_progress;in_progress → completed 同形)
+PATCH {{host}}/api/projects/{{pkey}}/milestones/{{milestoneId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "status": "in_progress"
+}
+
+### 改 Milestone(名称/目标日期;日期传空串 = 清除)
+PATCH {{host}}/api/projects/{{pkey}}/milestones/{{milestoneId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "MVP 改",
+  "targetDate": "2026-12-15"
+}
+
+### 删除 Milestone
+DELETE {{host}}/api/projects/{{pkey}}/milestones/{{milestoneId}}
+Authorization: Bearer {{token}}
+
 ### 移出 item 的 Sprint(null = 移出,item 回 backlog)
 PUT {{host}}/api/items/{{itemId}}/sprint
 Authorization: Bearer {{token}}
@@ -473,3 +518,21 @@ Content-Type: application/json
 ### [预期 409] 删除非空 Sprint(成员关系即历史,先空才能删)
 DELETE {{host}}/api/projects/{{pkey}}/sprints/{{sprintId}}
 Authorization: Bearer {{token}}
+
+### [预期 409] 开第二个 in_progress Milestone(0..1 current,先完成或取消)
+PATCH {{host}}/api/projects/{{pkey}}/milestones/{{milestoneId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "status": "in_progress"
+}
+
+### [预期 409] 终态 Milestone 再迁移/改名(历史保留)
+PATCH {{host}}/api/projects/{{pkey}}/milestones/{{milestoneId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "改历史"
+}

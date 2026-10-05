@@ -7,8 +7,12 @@ import { usePathname, useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { t } from "@/lib/texts";
+import { MilestoneManager, type Milestone } from "@/components/MilestoneManager";
+import { Tune as TuneIcon } from "@mui/icons-material";
+import type { Signal } from "@/components/Verdict";
 
 type Sprint = { sprintId: string; name: string; status: string };
+type NavItem = { itemId: string; number: string; title: string; type: string; parentItemId: string | null; feasSignal: Signal | null };
 
 /**
  * V12-S2 项目侧边栏壳(spec 0010,裁决 3 最小 IA):
@@ -19,6 +23,9 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
   const { key } = useParams<{ key: string }>();
   const pathname = usePathname();
   const [sprints, setSprints] = useState<Sprint[] | null>(null);
+  const [items, setItems] = useState<NavItem[]>([]);
+  const [milestones, setMilestones] = useState<Milestone[]>([]);
+  const [msOpen, setMsOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [name, setName] = useState("");
   const [startDate, setStartDate] = useState("");
@@ -33,8 +40,14 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
       .catch(() => setSprints([]));
   };
 
+  const loadSide = () => {
+    api<NavItem[]>(`/api/projects/${key}/items`).then(setItems).catch(() => setItems([]));
+    api<Milestone[]>(`/api/projects/${key}/milestones`).then(setMilestones).catch(() => setMilestones([]));
+  };
+
   useEffect(() => {
     loadSprints();
+    loadSide();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
 
@@ -56,6 +69,30 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
   const sorted = [...(sprints ?? [])].sort((a, b) => (rank[a.status as keyof typeof rank] ?? 9) - (rank[b.status as keyof typeof rank] ?? 9));
 
   const itemSx = { py: 0.5 };
+
+  // V14 Epic 段:顶层 type='goal' 的 item;rollup = 自身+子孙 feasSignal 取最差(红>黄>绿,DOMAIN 聚合规则)
+  const epics = items.filter((i) => i.type === "goal" && !i.parentItemId);
+  const childrenOf = new Map<string, NavItem[]>();
+  for (const i of items) {
+    if (!i.parentItemId) continue;
+    const list = childrenOf.get(i.parentItemId) ?? [];
+    list.push(i);
+    childrenOf.set(i.parentItemId, list);
+  }
+  const sigRank: Record<Signal, number> = { RED: 0, YELLOW: 1, GREEN: 2 };
+  const worstSignal = (id: string, seen = new Set<string>()): Signal | null => {
+    if (seen.has(id)) return null; // 树环兕底
+    seen.add(id);
+    const self = items.find((i) => i.itemId === id);
+    const signals: Signal[] = [];
+    if (self?.feasSignal) signals.push(self.feasSignal);
+    for (const c of childrenOf.get(id) ?? []) {
+      const s = worstSignal(c.itemId, seen);
+      if (s) signals.push(s);
+    }
+    return signals.length ? signals.reduce((a, b) => (sigRank[a] <= sigRank[b] ? a : b)) : null;
+  };
+  const dotColor: Record<Signal, string> = { GREEN: "success.main", YELLOW: "warning.main", RED: "error.main" };
 
   return (
     <Box sx={{ display: "flex", minHeight: "100vh" }}>
@@ -103,6 +140,70 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
               />
             </ListItemButton>
           ))}
+          <Divider sx={{ my: 1 }} />
+          <ListSubheader disableSticky sx={{ bgcolor: "transparent" }}>{t.projectNav.epics}</ListSubheader>
+          {epics.length === 0 && (
+            <ListItemButton disabled sx={{ py: 0.25 }}>
+              <ListItemText
+                primary={t.projectNav.noEpics}
+                primaryTypographyProps={{ variant: "caption", color: "text.secondary" }}
+              />
+            </ListItemButton>
+          )}
+          {epics.map((e) => {
+            const sig = worstSignal(e.itemId);
+            return (
+              <ListItemButton
+                key={e.itemId}
+                component={Link}
+                href={`/p/${key}/i/${e.itemId}`}
+                sx={itemSx}
+              >
+                <Box component="span" sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: 0 }}>
+                  <Box
+                    component="span"
+                    aria-label={sig ? t.signal[sig] : undefined}
+                    sx={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: "50%",
+                      flexShrink: 0,
+                      bgcolor: sig ? dotColor[sig] : "transparent",
+                      border: sig ? "none" : "1px solid",
+                      borderColor: "grey.300",
+                    }}
+                  />
+                  <Typography variant="body2" noWrap>{e.title}</Typography>
+                </Box>
+              </ListItemButton>
+            );
+          })}
+          <Divider sx={{ my: 1 }} />
+          <ListSubheader disableSticky sx={{ bgcolor: "transparent", display: "flex", alignItems: "center" }}>
+            <span style={{ flex: 1 }}>{t.projectNav.milestones}</span>
+            <IconButton size="small" aria-label={t.projectNav.manage} onClick={() => setMsOpen(true)}>
+              <TuneIcon fontSize="small" />
+            </IconButton>
+          </ListSubheader>
+          {milestones.length === 0 && (
+            <ListItemButton disabled sx={{ py: 0.25 }}>
+              <ListItemText
+                primary={t.projectNav.noMilestones}
+                primaryTypographyProps={{ variant: "caption", color: "text.secondary" }}
+              />
+            </ListItemButton>
+          )}
+          {milestones.map((m) => (
+            <ListItemButton key={m.milestoneId} disabled sx={{ py: 0.25 }}>
+              <ListItemText
+                primary={m.name}
+                secondary={[
+                  t.milestone.status[m.status as keyof typeof t.milestone.status],
+                  m.targetDate,
+                ].filter(Boolean).join(" · ")}
+              />
+            </ListItemButton>
+          ))}
         </List>
       </Box>
       <Box component="main" sx={{ flex: 1, minWidth: 0 }}>
@@ -125,6 +226,13 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
           </Button>
         </DialogActions>
       </Dialog>
+      <MilestoneManager
+        open={msOpen}
+        onClose={() => setMsOpen(false)}
+        projectKey={String(key)}
+        milestones={milestones}
+        onChanged={loadSide}
+      />
     </Box>
   );
 }
