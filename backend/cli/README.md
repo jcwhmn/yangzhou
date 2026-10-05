@@ -50,7 +50,9 @@ java -jar yz.jar feasibility CHE
 - [ ] `yz assign CHE-1 --clear` → `已取消指派:CHE-1`
 - [ ] KEY-N 解析:`CHE-1` 等项目编号自动换 itemId
 
-## Linear 联邦(V3)
+## Linear 联邦(V3)——已退役(2026-10-06)
+
+> 方向已反转:yangzhou 是唯一真相源,Linear 冻结只读。以下仅作历史记录,勿再用于日常流程。
 
 - [ ] Linear 网页导出 CSV(workspace → Settings → Import/Export),保存为 linear.csv
 - [ ] `yz sync-linear YPJ linear.csv` → 首跑:新建 N(编号自动分配,external_ref = linear:<identifier>)

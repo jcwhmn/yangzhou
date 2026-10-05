@@ -45,7 +45,7 @@ private fun usage() {
           candidates <KEY-N|itemId> [--json]          候选建议(谁来做:排序+理由)
           assign <KEY-N|itemId> <成员名|--clear>      指派/取消(引擎建议,人拍板)
           export <KEY> [--csv] [--file <路径>]          导出(JSON 全保真/CSV 扁平)
-          sync-linear <KEY> <linear.csv>                Linear 导出 CSV 幂等同步(首跑导入,重跑更新)
+          sync-linear <KEY> <linear.csv>                (退役)方向已反转:yangzhou 为唯一真相源;仅作历史导入
           import <KEY> <文件>                           导入(JSON 按扩展名或 .csv;Linear CSV 可直接灌)
 
         会话文件:${ApiClient.sessionFile().absolutePath}
