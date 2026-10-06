@@ -53,7 +53,7 @@ export function AppNav() {
   if (pathname === "/login") return null;
 
   const links = [
-    { href: "/", label: t.nav.projects },
+    { href: "/", label: t.nav.home },
     { href: "/capabilities", label: t.nav.capabilities },
     { href: "/attributes", label: t.nav.attributes },
     { href: "/members", label: t.nav.members },

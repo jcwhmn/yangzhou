@@ -2,6 +2,7 @@
 export const t = {
   appName: "扬州 yangzhou",
   nav: {
+    home: "主页",
     projects: "项目",
     capabilities: "我的能力",
     attributes: "词表",
@@ -32,6 +33,18 @@ export const t = {
     enter: "打开看板",
     signalNow: "可行性",
     showArchived: "显示已归档",
+  },
+  dashboard: {
+    title: "驾驶舱",
+    today: "今日名下",
+    blocked: "阻塞中",
+    doneYesterday: "昨日完成",
+    none: "空",
+    inProgress: "进行中",
+    sprint: "冲刺",
+    milestone: "里程碑",
+    recent: "最近动态",
+    viewAll: "全部 →",
   },
   board: {
     addItem: "新建 item",

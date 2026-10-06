@@ -475,6 +475,10 @@ Content-Type: application/json
   "status": "completed"
 }
 
+### 全局驾驶舱(跨项目聚合:我的三桶 + 活跃 sprint/进行中 milestone;响应存 dashboard)
+GET {{host}}/api/dashboard
+Authorization: Bearer {{token}}
+
 # ============================================================
 # 负例区:以下请求「红色 = 预期」,演示约束生效,不要当 bug
 # ============================================================

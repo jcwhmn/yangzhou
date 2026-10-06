@@ -39,6 +39,14 @@ type Shortfall = {
   items: { projectKey: string; itemId: string; number: string; title: string }[];
 };
 
+type StandupItem = { itemId: string; number: string; projectKey: string; title: string; statusName: string };
+type Standup = { doneYesterday: StandupItem[]; today: StandupItem[]; blocked: StandupItem[] };
+type NotifDto = { notificationId: string; itemId: string; number: string; projectKey: string; title: string };
+type LiveSprint = { sprintId: string; name: string; endDate: string | null };
+type LiveMilestone = { milestoneId: string; name: string; targetDate: string | null };
+type LiveGroup = { projectKey: string; sprints: LiveSprint[]; milestones: LiveMilestone[] };
+type DashboardDto = { standup: Standup; live: LiveGroup[] };
+
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<ProjectDto[]>([]);
   const [shortfallList, setShortfallList] = useState<Shortfall[]>([]);
@@ -50,13 +58,25 @@ export default function ProjectsPage() {
   const [key, setKey] = useState("");
   const [name, setName] = useState("");
   const [error, setError] = useState("");
+  const [standup, setStandup] = useState<Standup | null>(null);
+  const [live, setLive] = useState<LiveGroup[]>([]);
+  const [recent, setRecent] = useState<NotifDto[]>([]);
 
   async function load() {
     setProjects(await api<ProjectDto[]>("/api/projects"));
   }
 
+  // 全局驾驶舱:后端一次聚合(我的三桶 + 各项目活跃 sprint/进行中 milestone),通知另取
+  async function loadDashboard() {
+    const [d, ns] = await Promise.all([api<DashboardDto>("/api/dashboard"), api<NotifDto[]>("/api/notifications")]);
+    setStandup(d.standup);
+    setLive(d.live);
+    setRecent(ns.slice(0, 5));
+  }
+
   useEffect(() => {
     load().catch(() => undefined);
+    loadDashboard().catch(() => undefined);
   }, []);
 
   async function create(e: React.FormEvent) {
@@ -97,6 +117,89 @@ export default function ProjectsPage() {
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
       <Typography variant="h4" gutterBottom>
+        {t.dashboard.title}
+      </Typography>
+      {standup && (
+        <Stack direction="row" spacing={2} sx={{ mb: 4 }} useFlexGap flexWrap="wrap">
+          {([
+            { title: t.dashboard.today, items: standup.today, muted: false },
+            { title: t.dashboard.blocked, items: standup.blocked, muted: false },
+            { title: t.dashboard.doneYesterday, items: standup.doneYesterday, muted: true },
+          ] as const).map((col) => (
+            <Card key={col.title} variant="outlined" sx={{ flex: "1 1 240px", minWidth: 240 }}>
+              <CardContent>
+                <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                  {col.title}({col.items.length})
+                </Typography>
+                {col.items.length === 0 ? (
+                  <Typography variant="body2" color="text.secondary">{t.dashboard.none}</Typography>
+                ) : (
+                  col.items.map((it) => (
+                    <Typography
+                      key={it.itemId}
+                      variant="body2"
+                      component={Link}
+                      href={`/p/${it.projectKey}/i/${it.itemId}`}
+                      sx={{
+                        display: "block",
+                        mb: 0.5,
+                        textDecoration: "none",
+                        color: col.muted ? "text.secondary" : "text.primary",
+                      }}
+                    >
+                      <Box component="span" sx={{ color: "primary.main", mr: 1 }}>{it.number}</Box>
+                      {it.title}
+                    </Typography>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+          ))}
+        </Stack>
+      )}
+      {live.some((g) => g.sprints.length > 0 || g.milestones.length > 0) && (
+        <Box sx={{ mb: 4 }}>
+          <Typography variant="h6" gutterBottom>{t.dashboard.inProgress}</Typography>
+          <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+            {live
+              .flatMap((g) => [
+                ...g.sprints.map((s) => ({ id: `s-${g.projectKey}-${s.sprintId}`, key: g.projectKey, label: t.dashboard.sprint, name: s.name, date: s.endDate })),
+                ...g.milestones.map((m) => ({ id: `m-${g.projectKey}-${m.milestoneId}`, key: g.projectKey, label: t.dashboard.milestone, name: m.name, date: m.targetDate })),
+              ])
+              .map((x) => (
+                <Card key={x.id} variant="outlined" sx={{ py: 1, px: 1.5 }}>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <Chip label={x.key} size="small" />
+                    <Chip label={x.label} size="small" variant="outlined" />
+                    <Typography variant="body2">{x.name}</Typography>
+                    {x.date && <Typography variant="caption" color="text.secondary">{x.date}</Typography>}
+                  </Stack>
+                </Card>
+              ))}
+          </Stack>
+        </Box>
+      )}
+      {recent.length > 0 && (
+        <Box sx={{ mb: 4 }}>
+          <Stack direction="row" spacing={2} alignItems="baseline" sx={{ mb: 0.5 }}>
+            <Typography variant="h6">{t.dashboard.recent}</Typography>
+            <Typography variant="body2" component={Link} href="/notifications">{t.dashboard.viewAll}</Typography>
+          </Stack>
+          {recent.map((n) => (
+            <Typography
+              key={n.notificationId}
+              variant="body2"
+              component={Link}
+              href={`/p/${n.projectKey}/i/${n.itemId}`}
+              sx={{ display: "block", textDecoration: "none", color: "text.primary" }}
+            >
+              <Box component="span" sx={{ color: "primary.main", mr: 1 }}>{n.number}</Box>
+              {n.title}
+            </Typography>
+          ))}
+        </Box>
+      )}
+      <Typography variant="h5" gutterBottom>
         {t.projects.title}
       </Typography>
       <Stack component="form" direction="row" spacing={1} onSubmit={create} sx={{ mb: 3 }}>
