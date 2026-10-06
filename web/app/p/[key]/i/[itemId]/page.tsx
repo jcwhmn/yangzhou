@@ -510,16 +510,6 @@ export default function ItemDetailPage() {
         </Stack>
       </Stack>
 
-      <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} sx={{ mt: 3, mb: 2 }}>
-        <Tab label="详情" />
-        <Tab label="需求" />
-        <Tab label="依赖+清单" />
-        <Tab label="工时" />
-        <Tab label="GitHub" />
-      </Tabs>
-
-      {activeTab === 0 && (
-        <>
       {feasibility && (
         <Box sx={{ mt: 3 }}>
           <Stack direction="row" spacing={1} alignItems="center">
@@ -537,14 +527,20 @@ export default function ItemDetailPage() {
           </Typography>
         </Box>
       )}
-        </>
-      )}
 
-      {activeTab === 1 && (
+      {/* 需求/依赖/工时/GitHub 保留页签;判定/评论/活动日志正文直出(YPJ-6 反馈:无详情栏) */}
+      <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} sx={{ my: 2 }}>
+        <Tab label="需求" />
+        <Tab label="依赖+清单" />
+        <Tab label="工时" />
+        <Tab label="GitHub" />
+      </Tabs>
+
+      {activeTab === 0 && (
         <Box>
           {(item.requirements ?? []).length === 0 ? (
             <Typography color="text.secondary" variant="body2">
-              (无需求——可在「详情」页看判定聚合)
+              (无需求——判定聚合在上方)
             </Typography>
           ) : (
             <Stack spacing={0.5}>
@@ -569,7 +565,7 @@ export default function ItemDetailPage() {
         attributes={attributes}
       />
 
-      {activeTab === 2 && (
+      {activeTab === 1 && (
         <>
       <Box>
         <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
@@ -637,7 +633,7 @@ export default function ItemDetailPage() {
         </>
       )}
 
-      {activeTab === 3 && (
+      {activeTab === 2 && (
         <>
       <Box>
         <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
@@ -707,7 +703,7 @@ export default function ItemDetailPage() {
         </>
       )}
 
-      {activeTab === 4 && (
+      {activeTab === 3 && (
         <>
       <Box>
         <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
