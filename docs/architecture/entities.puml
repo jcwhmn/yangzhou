@@ -84,6 +84,8 @@ class ItemGroup {
   status: String
   startDate: LocalDate?
   endDate: LocalDate?
+  releasedDate: LocalDate?
+  milestoneId: Long?
 }
 class ItemGroupMember
 class Milestone {
@@ -114,6 +116,7 @@ Project "1" *-- "*" ProjectRepo : GitHub 仓库
 Project "1" *-- "*" ProjectWorkflowRule
 Project "1" *-- "*" ItemGroup : Sprint(Phase 1)
 Project "1" *-- "*" Milestone : 时间轴节点(V14;0..1 in_progress)
+ItemGroup "*" --> "0..1" Milestone : release 关联(可空 N:1)
 ItemGroup "1" *-- "*" ItemGroupMember
 ProjectWorkflowRule "*" --> "1" Status : 目标列
 Item "1" *-- "*" ItemGitRef : 分支/PR 链接

@@ -292,11 +292,13 @@ data class ItemGroup(
     val status: String = "planned",
     val startDate: LocalDate? = null,
     val endDate: LocalDate? = null,
+    val releasedDate: LocalDate? = null,
+    val milestoneId: Long? = null,
     val createdAt: Instant = Instant.now(),
     val updatedAt: Instant = Instant.now(),
 )
 
-/** item × group 多对多;不变量「至多一个 planned/active」在 SprintService 保证(见 spec 0010 裁决 2)。 */
+/** item × group 多对多;不变量「至多一个 planned/active sprint」在 SprintService 保证(见 spec 0010 裁决 2);release 归属同理单选(release 端点语义,spec 0012)。 */
 @Table("item_group_member")
 data class ItemGroupMember(
     @Id val id: Long? = null,

@@ -17,7 +17,11 @@ import java.util.UUID
 
 @RestController
 @RequestMapping("/api")
-class ItemController(private val service: ItemService, private val sprintService: SprintService) {
+class ItemController(
+    private val service: ItemService,
+    private val sprintService: SprintService,
+    private val releaseService: yangzhou.api.release.ReleaseService,
+) {
 
     @PostMapping("/projects/{key}/items")
     @ResponseStatus(HttpStatus.CREATED)
@@ -62,6 +66,13 @@ class ItemController(private val service: ItemService, private val sprintService
         @PathVariable itemId: UUID,
         @RequestBody request: SprintService.AssignSprintRequest,
     ): ItemService.ItemDto = sprintService.assignItem(itemId, request.sprintId)
+
+    /** 拉入/移出 release(值=指派,null=移出;spec 0012)。 */
+    @PutMapping("/items/{itemId}/release")
+    fun assignRelease(
+        @PathVariable itemId: UUID,
+        @RequestBody request: yangzhou.api.release.ReleaseService.AssignReleaseRequest,
+    ): ItemService.ItemDto = releaseService.assignItem(itemId, request.releaseId)
 
     @GetMapping("/items/{itemId}/activity")
     fun activity(@PathVariable itemId: UUID) = service.activity(itemId)

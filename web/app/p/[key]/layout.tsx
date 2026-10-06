@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { t } from "@/lib/texts";
 import { MilestoneManager, type Milestone } from "@/components/MilestoneManager";
+import { ReleaseManager, type Release } from "@/components/ReleaseManager";
 import { Tune as TuneIcon } from "@mui/icons-material";
 import type { Signal } from "@/components/Verdict";
 
@@ -26,6 +27,8 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
   const [items, setItems] = useState<NavItem[]>([]);
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [msOpen, setMsOpen] = useState(false);
+  const [releases, setReleases] = useState<Release[]>([]);
+  const [relOpen, setRelOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [name, setName] = useState("");
   const [startDate, setStartDate] = useState("");
@@ -43,6 +46,7 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
   const loadSide = () => {
     api<NavItem[]>(`/api/projects/${key}/items`).then(setItems).catch(() => setItems([]));
     api<Milestone[]>(`/api/projects/${key}/milestones`).then(setMilestones).catch(() => setMilestones([]));
+    api<Release[]>(`/api/projects/${key}/releases`).then(setReleases).catch(() => setReleases([]));
   };
 
   useEffect(() => {
@@ -204,6 +208,33 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
               />
             </ListItemButton>
           ))}
+          <Divider sx={{ my: 1 }} />
+          <ListSubheader disableSticky sx={{ bgcolor: "transparent", display: "flex", alignItems: "center" }}>
+            <span style={{ flex: 1 }}>{t.projectNav.releases}</span>
+            <IconButton size="small" aria-label={t.projectNav.manageRelease} onClick={() => setRelOpen(true)}>
+              <TuneIcon fontSize="small" />
+            </IconButton>
+          </ListSubheader>
+          {releases.length === 0 && (
+            <ListItemButton disabled sx={{ py: 0.25 }}>
+              <ListItemText
+                primary={t.projectNav.noReleases}
+                primaryTypographyProps={{ variant: "caption", color: "text.secondary" }}
+              />
+            </ListItemButton>
+          )}
+          {releases.map((r) => (
+            <ListItemButton key={r.releaseId} disabled sx={{ py: 0.25 }}>
+              <ListItemText
+                primary={`${r.name} (${r.memberCount})`}
+                secondary={[
+                  t.release.status[r.status as keyof typeof t.release.status],
+                  r.targetDate ? `${t.release.targetDate} ${r.targetDate}` : null,
+                  r.releasedDate ? `${t.release.releasedDate} ${r.releasedDate}` : null,
+                ].filter(Boolean).join(" · ")}
+              />
+            </ListItemButton>
+          ))}
         </List>
       </Box>
       <Box component="main" sx={{ flex: 1, minWidth: 0 }}>
@@ -231,6 +262,13 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
         onClose={() => setMsOpen(false)}
         projectKey={String(key)}
         milestones={milestones}
+        onChanged={loadSide}
+      />
+      <ReleaseManager
+        open={relOpen}
+        onClose={() => setRelOpen(false)}
+        projectKey={String(key)}
+        releases={releases}
         onChanged={loadSide}
       />
     </Box>

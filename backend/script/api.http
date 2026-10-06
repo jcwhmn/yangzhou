@@ -479,6 +479,40 @@ Content-Type: application/json
 GET {{host}}/api/dashboard
 Authorization: Bearer {{token}}
 
+### 建 Release(handler 存变量 releaseId;status 缺省 planned;补建传 status=released+releasedDate)
+POST {{host}}/api/projects/{{pkey}}/releases
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "R2.0",
+  "targetDate": "2026-12-01"
+}
+
+### Release 列表(planned 先 target 升序;released 按发布日降序;含 memberCount)
+GET {{host}}/api/projects/{{pkey}}/releases
+
+### 改 Release(名称/目标日;日期空串=清除;milestoneId 空串=清除)
+PATCH {{host}}/api/projects/{{pkey}}/releases/{{releaseId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "targetDate": "2026-12-15"
+}
+
+### item 拉入 Release(值=指派,null=移出;released 亦可补录)
+PUT {{host}}/api/items/{{itemId}}/release
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "releaseId": "{{releaseId}}"
+}
+
+### 删除 Release(非空 409,见负例区)
+DELETE {{host}}/api/projects/{{pkey}}/releases/{{releaseId}}
+
 # ============================================================
 # 负例区:以下请求「红色 = 预期」,演示约束生效,不要当 bug
 # ============================================================
@@ -540,3 +574,15 @@ Content-Type: application/json
 {
   "name": "改历史"
 }
+
+### [预期 409] released 后再变更(历史保留)
+PATCH {{host}}/api/projects/{{pkey}}/releases/{{releaseId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "改名"
+}
+
+### [预期 409] 非空删除 Release(成员关系即交付历史)
+DELETE {{host}}/api/projects/{{pkey}}/releases/{{releaseId}}
