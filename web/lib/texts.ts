@@ -161,6 +161,12 @@ export const t = {
     assignBtn: "指派",
     confirmAnyway: "仍然指派",
     warningPrefix: "该候选存在未满足项——",
+    whoTitle: "谁来做",
+    noCandidates: "(无候选——词表与成员就绪后可分配)",
+    confirmTitle: "存在未满足项",
+    cancel: "取消",
+    virtualSuffix: "(虚拟)",
+    gapSummary: (missing: number, delta: number) => `缺门${missing}·差${delta}级`,
   },
   assignDialog: {
     assignMe: "指派给我",

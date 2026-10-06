@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  Alert,
   Box,
   Button,
   Card,
@@ -112,6 +111,13 @@ const activityLabel: Record<string, string> = {
   github_branch_created: "GitHub 分支",
   dates_changed: "日期变更",
 };
+
+// 候选行配色(YPJ-1):全满足绿 / 勉强(delta=1)浅橙 / 部分满足琥珀 / 缺门红
+function candidateColor(c: Candidate): string {
+  if (c.signal === "RED") return "error.main";
+  if (c.signal === "GREEN") return "success.main";
+  return c.totalDelta === 1 ? "warning.light" : "warning.main";
+}
 
 export default function ItemDetailPage() {
   const { key, itemId } = useParams<{ key: string; itemId: string }>();
@@ -364,10 +370,20 @@ export default function ItemDetailPage() {
 
   const runningEntry = timeLog?.entries.find((e) => e.endedAt === null) ?? null;
 
+  const hasUnmet = (c: Candidate) =>
+    c.missingCount > 0 || c.verdicts.some((v) => v.kind === "gap" || v.kind === "missing" || v.kind === "unrated");
+
   async function tryAssign(c: Candidate) {
-    const unmet = c.verdicts.some((v) => v.kind === "gap" || v.kind === "missing" || v.kind === "unrated");
-    if (unmet) setConfirmCand(c);
+    if (hasUnmet(c)) setConfirmCand(c);
     else await assign(c.memberId);
+  }
+
+  // 指派给我:未足先弹确认,干净则直达(YPJ-1 验收 3)
+  async function tryAssignMe() {
+    if (!me) return;
+    const mine = candidates.find((c) => c.memberId === me.memberId);
+    if (mine) await tryAssign(mine);
+    else await assign(me.memberId);
   }
 
   if (!item) {
@@ -531,7 +547,7 @@ export default function ItemDetailPage() {
       {activeTab === 0 && (
         <>
       <Typography variant="h6" sx={{ mb: 1 }}>
-        谁来做
+        {t.assign.whoTitle}
       </Typography>
       {!assignOpen ? (
         item.assignee ? (
@@ -545,7 +561,7 @@ export default function ItemDetailPage() {
           <Stack direction="row" spacing={1}>
             <Button
               variant="contained"
-              onClick={() => me && assign(me.memberId)}
+              onClick={tryAssignMe}
               disabled={!me}
             >
               {t.assign.assignMe}
@@ -557,63 +573,36 @@ export default function ItemDetailPage() {
         )
       ) : (
         <Stack spacing={1}>
-          {confirmCand && (
-            <Alert
-              severity="warning"
-              action={
-                <Button
-                  color="inherit"
-                  size="small"
-                  onClick={() => {
-                    assign(confirmCand.memberId);
-                    setAssignOpen(false);
-                  }}
-                >
-                  {t.assign.confirmAnyway}
-                </Button>
-              }
-              onClose={() => setConfirmCand(null)}
-            >
-              {confirmCand.displayName}:{t.assignDialog.unmetWarning}
-            </Alert>
-          )}
           {candidates.length === 0 && (
             <Typography color="text.secondary" variant="body2">
-              (无候选——词表与成员就绪后可分配)
+              {t.assign.noCandidates}
             </Typography>
           )}
           {candidates.map((c) => {
-            const unmet = c.verdicts.filter((v) => v.kind === "gap" || v.kind === "missing" || v.kind === "unrated");
             return (
               <Card
                 key={c.memberId}
                 variant="outlined"
-                sx={{
-                  borderColor:
-                    c.signal === "RED" ? "error.main" : c.signal === "YELLOW" ? "warning.main" : "success.main",
-                }}
+                sx={{ borderColor: candidateColor(c) }}
               >
                 <CardContent sx={{ py: 1, "&:last-child": { pb: 1 } }}>
                   <Stack direction="row" spacing={1} alignItems="center">
                     <Chip size="small" label={`#${c.rank}`} />
                     <Typography variant="body2">
                       {c.displayName}
-                      {c.virtual ? "(虚拟)" : ""}
+                      {c.virtual ? t.assign.virtualSuffix : ""}
                     </Typography>
                     <Chip
                       size="small"
                       variant="outlined"
-                      color={c.signal === "RED" ? "error" : c.signal === "YELLOW" ? "warning" : "success"}
-                      label={`缺门${c.missingCount}·差${c.totalDelta}级`}
+                      sx={{ color: candidateColor(c), borderColor: candidateColor(c) }}
+                      label={t.assign.gapSummary(c.missingCount, c.totalDelta)}
                     />
                     <Button
                       size="small"
                       variant="contained"
                       sx={{ ml: "auto" }}
-                      onClick={() => {
-                        if (unmet.length > 0 || c.missingCount > 0) setConfirmCand(c);
-                        else assign(c.memberId);
-                      }}
+                      onClick={() => tryAssign(c)}
                     >
                       {t.assign.assignBtn}
                     </Button>
@@ -627,6 +616,30 @@ export default function ItemDetailPage() {
           })}
         </Stack>
       )}
+
+      <Dialog
+        open={confirmCand !== null}
+        onClose={() => setConfirmCand(null)}
+      >
+        <DialogTitle>{t.assign.confirmTitle}</DialogTitle>
+        <DialogContent>
+          <Typography>
+            {confirmCand?.displayName}:{t.assignDialog.unmetWarning}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmCand(null)}>{t.assign.cancel}</Button>
+          <Button
+            color="warning"
+            variant="contained"
+            onClick={() => {
+              if (confirmCand) void assign(confirmCand.memberId);
+            }}
+          >
+            {t.assign.confirmAnyway}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {feasibility && (
         <Box sx={{ mt: 3 }}>
