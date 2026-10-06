@@ -13,6 +13,12 @@ export default defineConfig({
   timeout: 30_000,
   retries: process.env.CI ? 1 : 0,
   fullyParallel: true,
+  // YPJ-5:auth 断言依赖 me.last_project_key(用例池唯一共享可变态,任何 /p mount 都会覆盖它),
+  // auth 独占串行先行;其余用例 dependencies 强制在 auth 全部完成后才跑,杜绝写入竞态
+  projects: [
+    { name: "auth", testMatch: /auth\.spec\.ts/, fullyParallel: false },
+    { name: "e2e", testIgnore: /auth\.spec\.ts/, dependencies: ["auth"] },
+  ],
   workers: process.env.CI ? 2 : undefined,
   use: {
     baseURL: config.baseURL,
