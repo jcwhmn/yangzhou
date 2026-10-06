@@ -3,8 +3,6 @@
 import {
   Box,
   Button,
-  Card,
-  CardContent,
   Chip,
   Dialog,
   DialogActions,
@@ -25,6 +23,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { t } from "@/lib/texts";
 import { SignalChip, VerdictLine, type Signal, type Verdict } from "@/components/Verdict";
+import { AssignPopover, hasUnmet } from "@/components/AssignPopover";
 import Tab from "@mui/material/Tab";
 import Tabs from "@mui/material/Tabs";
 
@@ -112,13 +111,6 @@ const activityLabel: Record<string, string> = {
   dates_changed: "日期变更",
 };
 
-// 候选行配色(YPJ-1):全满足绿 / 勉强(delta=1)浅橙 / 部分满足琥珀 / 缺门红
-function candidateColor(c: Candidate): string {
-  if (c.signal === "RED") return "error.main";
-  if (c.signal === "GREEN") return "success.main";
-  return c.totalDelta === 1 ? "warning.light" : "warning.main";
-}
-
 export default function ItemDetailPage() {
   const { key, itemId } = useParams<{ key: string; itemId: string }>();
   const [item, setItem] = useState<Item | null>(null);
@@ -138,7 +130,6 @@ export default function ItemDetailPage() {
   const [releases, setReleases] = useState<ReleaseLite[]>([]);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
-  const [assignOpen, setAssignOpen] = useState(false);
   const [confirmCand, setConfirmCand] = useState<Candidate | null>(null);
   const [me, setMe] = useState<{ memberId: string; displayName: string } | null>(null);
   const [memberNames, setMemberNames] = useState<Map<string, string>>(new Map());
@@ -229,7 +220,6 @@ export default function ItemDetailPage() {
   async function assign(memberId: string | null) {
     await api(`/api/items/${itemId}/assignee`, { method: "PUT", body: JSON.stringify({ assigneeItemId: memberId }) });
     setConfirmCand(null);
-    setAssignOpen(false);
     await load();
   }
 
@@ -370,19 +360,11 @@ export default function ItemDetailPage() {
 
   const runningEntry = timeLog?.entries.find((e) => e.endedAt === null) ?? null;
 
-  const hasUnmet = (c: Candidate) =>
-    c.missingCount > 0 || c.verdicts.some((v) => v.kind === "gap" || v.kind === "missing" || v.kind === "unrated");
-
-  async function tryAssign(c: Candidate) {
-    if (hasUnmet(c)) setConfirmCand(c);
-    else await assign(c.memberId);
-  }
-
-  // 指派给我:未足先弹确认,干净则直达(YPJ-1 验收 3)
+  // 指派给我:未足先弹确认,干净则直达(YPJ-1 验收 3);判定用共享 hasUnmet
   async function tryAssignMe() {
     if (!me) return;
     const mine = candidates.find((c) => c.memberId === me.memberId);
-    if (mine) await tryAssign(mine);
+    if (mine && hasUnmet(mine)) setConfirmCand(mine);
     else await assign(me.memberId);
   }
 
@@ -549,71 +531,31 @@ export default function ItemDetailPage() {
       <Typography variant="h6" sx={{ mb: 1 }}>
         {t.assign.whoTitle}
       </Typography>
-      {!assignOpen ? (
-        item.assignee ? (
-          <Stack direction="row" spacing={1} alignItems="center">
-            <Chip label={`👤 ${item.assignee}`} />
-            <Button size="small" onClick={() => setAssignOpen(true)}>
-              {t.assign.reassign}
-            </Button>
-          </Stack>
-        ) : (
-          <Stack direction="row" spacing={1}>
-            <Button
-              variant="contained"
-              onClick={tryAssignMe}
-              disabled={!me}
-            >
-              {t.assign.assignMe}
-            </Button>
-            <Button variant="outlined" onClick={() => setAssignOpen(true)}>
-              {t.assign.assignMember}
-            </Button>
-          </Stack>
-        )
+      {item.assignee ? (
+        <Stack direction="row" spacing={1} alignItems="center">
+          <AssignPopover itemId={itemId} assignee={item.assignee} onChanged={load}>
+            {(onClick) => <Chip label={`👤 ${item.assignee}`} onClick={onClick} />}
+          </AssignPopover>
+          <AssignPopover itemId={itemId} assignee={item.assignee} onChanged={load}>
+            {(onClick) => (
+              <Button size="small" onClick={onClick}>
+                {t.assign.reassign}
+              </Button>
+            )}
+          </AssignPopover>
+        </Stack>
       ) : (
-        <Stack spacing={1}>
-          {candidates.length === 0 && (
-            <Typography color="text.secondary" variant="body2">
-              {t.assign.noCandidates}
-            </Typography>
-          )}
-          {candidates.map((c) => {
-            return (
-              <Card
-                key={c.memberId}
-                variant="outlined"
-                sx={{ borderColor: candidateColor(c) }}
-              >
-                <CardContent sx={{ py: 1, "&:last-child": { pb: 1 } }}>
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <Chip size="small" label={`#${c.rank}`} />
-                    <Typography variant="body2">
-                      {c.displayName}
-                      {c.virtual ? t.assign.virtualSuffix : ""}
-                    </Typography>
-                    <Chip
-                      size="small"
-                      variant="outlined"
-                      sx={{ color: candidateColor(c), borderColor: candidateColor(c) }}
-                      label={t.assign.gapSummary(c.missingCount, c.totalDelta)}
-                    />
-                    <Button
-                      size="small"
-                      variant="contained"
-                      sx={{ ml: "auto" }}
-                      onClick={() => tryAssign(c)}
-                    >
-                      {t.assign.assignBtn}
-                    </Button>
-                  </Stack>
-                  {c.verdicts.map((v, i) => (
-                    <VerdictLine key={i} v={v} />
-                  ))}
-                </CardContent>
-              </Card>
-            );
-          })}
+        <Stack direction="row" spacing={1}>
+          <Button variant="contained" onClick={tryAssignMe} disabled={!me}>
+            {t.assign.assignMe}
+          </Button>
+          <AssignPopover itemId={itemId} assignee={null} onChanged={load}>
+            {(onClick) => (
+              <Button variant="outlined" onClick={onClick}>
+                {t.assign.assignMember}
+              </Button>
+            )}
+          </AssignPopover>
         </Stack>
       )}
 

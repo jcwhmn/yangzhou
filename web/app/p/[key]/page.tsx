@@ -20,6 +20,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, API_BASE } from "@/lib/api";
 import { t } from "@/lib/texts";
 import { WorkflowEditor } from "@/components/WorkflowEditor";
+import { AssignPopover } from "@/components/AssignPopover";
 import { ProjectMembersPanel } from "@/components/ProjectMembersPanel";
 import { GithubSettingsPanel } from "@/components/GithubSettingsPanel";
 import type { Signal } from "@/components/Verdict";
@@ -320,11 +321,17 @@ export default function BoardPage() {
                             {it.sprintName && (
                               <Chip size="small" variant="outlined" label={it.sprintName} />
                             )}
-                            {it.assignee && (
-                              <Typography variant="caption" color="text.secondary">
-                                👤 {it.assignee}
-                              </Typography>
-                            )}
+                            <AssignPopover itemId={it.itemId} assignee={it.assignee} onChanged={load}>
+                              {(onClick) => (
+                                <Chip
+                                  size="small"
+                                  variant="outlined"
+                                  label={it.assignee ? `👤 ${it.assignee}` : t.assign.none}
+                                  onClick={onClick}
+                                  sx={it.assignee ? undefined : { opacity: 0.55 }}
+                                />
+                              )}
+                            </AssignPopover>
                           </Stack>
                           <Link
                             href={`/p/${key}/i/${it.itemId}`}

@@ -50,15 +50,16 @@ test("展开面板——按 rank 排序,分色:绿/浅橙(delta=1)/红", async (
   await page.goto(`/p/${projectKey}/i/${itemId}`);
   await page.getByRole("button", { name: "分配成员…" }).click();
 
-  const cards = page.locator(".MuiCard-root");
+  const pop = page.locator(".MuiPopover-paper");
+  const rows = pop.locator("[data-testid=cand-row]");
   // 排序 = 缺门少优先 → 总差距小优先:me(0,0) → 小张(0,1) → 小王(1,0)
-  await expect(cards.nth(0)).toContainText("缺门0·差0级");
-  await expect(cards.nth(1)).toContainText("缺门0·差1级");
-  await expect(cards.nth(2)).toContainText("缺门1·差0级");
+  await expect(rows.nth(0)).toContainText("缺门0·差0级");
+  await expect(rows.nth(1)).toContainText("缺门0·差1级");
+  await expect(rows.nth(2)).toContainText("缺门1·差0级");
   // 分色:绿 / 浅橙 #ff9800 / 红
-  await expect(cards.nth(0)).toHaveCSS("border-color", "rgb(46, 125, 50)");
-  await expect(cards.nth(1)).toHaveCSS("border-color", "rgb(255, 152, 0)");
-  await expect(cards.nth(2)).toHaveCSS("border-color", "rgb(211, 47, 47)");
+  await expect(rows.nth(0)).toHaveCSS("border-left-color", "rgb(46, 125, 50)");
+  await expect(rows.nth(1)).toHaveCSS("border-left-color", "rgb(255, 152, 0)");
+  await expect(rows.nth(2)).toHaveCSS("border-left-color", "rgb(198, 40, 40)");
 });
 
 test("指派给我——无未足项直接执行", async ({ page, projectKey }) => {
@@ -91,7 +92,7 @@ test("指派给我——有未足项先确认:取消维持现状,确认后指派
   await expect(page.getByText(/^👤 /).first()).toBeVisible();
 });
 
-test("面板指派缺门候选——淡出警告确认后指派成功", async ({ page, projectKey }) => {
+test("Popover 指派缺门候选——淡出警告确认后指派成功", async ({ page, projectKey }) => {
   const attr = uniqueAttr("AS 属性");
   await createAttr(attr);
   await apiCreateMember("小王");
@@ -100,12 +101,42 @@ test("面板指派缺门候选——淡出警告确认后指派成功", async ({
   await page.goto(`/p/${projectKey}/i/${itemId}`);
   await page.getByRole("button", { name: "分配成员…" }).click();
 
-  const wang = page.locator(".MuiCard-root", { hasText: "小王" });
+  const pop = page.locator(".MuiPopover-paper");
+  const wang = pop.locator("[data-testid=cand-row]", { hasText: "小王" });
   await wang.getByRole("button", { name: "指派", exact: true }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
   await expect(dialog).toContainText("小王");
   await dialog.getByRole("button", { name: "仍然指派" }).click();
   await expect(dialog).toBeHidden();
-  await expect(page.getByText(/^👤 小王/).first()).toBeVisible(); // 指派后面板收起,chip 直显
+  await expect(page.getByText(/^👤 小王/).first()).toBeVisible(); // 指派后 Popover 收起,chip 直显
+});
+
+test("看板卡片指派入口——Popover 弹出/Esc 收起/指派成功且不跳转", async ({ page, projectKey }) => {
+  await apiCreateItem(projectKey, "AP 卡片指派");
+  await page.goto(`/p/${projectKey}`);
+  const card = page.locator(".MuiCard-root", { hasText: "AP 卡片指派" });
+  await card.getByText("未指派").click(); // 占位入口
+  const pop = page.locator(".MuiPopover-paper");
+  await expect(pop).toBeVisible();
+  await expect(page).not.toHaveURL(/\/i\//); // 点入口不跳详情
+  await page.keyboard.press("Escape");
+  await expect(pop).toBeHidden(); // 淡出期后再交互
+  // 重开,指派第一个候选 → 卡片 chip 直显
+  await card.getByText("未指派").click();
+  await expect(pop).toBeVisible();
+  await pop.locator("[data-testid=cand-row]").first().getByRole("button", { name: "指派", exact: true }).click();
+  await expect(pop).toBeHidden();
+  await expect(card.getByText(/^👤 /)).toBeVisible();
+});
+
+test("重分配——候选列表标注当前负责人", async ({ page, projectKey }) => {
+  const itemId = await apiCreateItem(projectKey, "AP 当前标注");
+  await apiAssignMe(itemId);
+  await page.goto(`/p/${projectKey}`);
+  const card = page.locator(".MuiCard-root", { hasText: "AP 当前标注" });
+  await card.getByText(/^👤 /).click();
+  const pop = page.locator(".MuiPopover-paper");
+  await expect(pop).toBeVisible();
+  await expect(pop.locator("[data-testid=cand-row]", { hasText: "me" })).toContainText("当前");
 });

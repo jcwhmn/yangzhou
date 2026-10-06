@@ -163,6 +163,8 @@ export const t = {
     warningPrefix: "该候选存在未满足项——",
     whoTitle: "谁来做",
     noCandidates: "(无候选——词表与成员就绪后可分配)",
+    current: "当前",
+    loading: "加载中…",
     confirmTitle: "存在未满足项",
     cancel: "取消",
     virtualSuffix: "(虚拟)",

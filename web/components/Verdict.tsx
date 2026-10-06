@@ -50,3 +50,11 @@ export const signalColor: Record<Signal, "success" | "warning" | "error"> = {
 export function SignalChip({ signal, size = "medium" }: { signal: Signal; size?: "small" | "medium" }) {
   return <Chip size={size as "small"} label={t.signal[signal]} color={signalColor[signal]} variant="outlined" />;
 }
+
+/** 候选行配色(YPJ-1):全满足绿 / 勉强(delta=1)浅橙 / 部分满足琥珀 / 缺门红。
+ *  字面 hex 而非主题路径:调用处(borderLeft 字符串拼接/sx borderColor)两种场景都能直接用,色值对齐上方 colors 色板 */
+export function candidateColor(c: { signal: Signal; totalDelta: number }): string {
+  if (c.signal === "RED") return "#c62828";
+  if (c.signal === "GREEN") return "#2e7d32";
+  return c.totalDelta === 1 ? "#ff9800" : "#ed6c02";
+}
