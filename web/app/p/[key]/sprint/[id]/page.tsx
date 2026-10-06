@@ -28,6 +28,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { t } from "@/lib/texts";
+import { AssignPopover } from "@/components/AssignPopover";
 import { SignalChip, type Signal } from "@/components/Verdict";
 
 type Sprint = { sprintId: string; name: string; status: string; startDate: string | null; endDate: string | null };
@@ -251,11 +252,23 @@ export default function SprintPage() {
                           <Stack direction="row" spacing={1} alignItems="center">
                             <Chip label={it.number} size="small" variant="outlined" />
                             {it.priority && <Chip size="small" label={it.priority} variant="outlined" />}
-                            {it.assignee && (
-                              <Typography variant="caption" color="text.secondary">
-                                👤 {it.assignee}
-                              </Typography>
-                            )}
+                            <AssignPopover
+                              itemId={it.itemId}
+                              assignee={it.assignee}
+                              onChanged={() =>
+                                api<Item[]>(`/api/projects/${key}/sprints/${id}/items`).then(setItems).catch(() => {})
+                              }
+                            >
+                              {(onClick) => (
+                                <Chip
+                                  size="small"
+                                  variant="outlined"
+                                  label={it.assignee ? `👤 ${it.assignee}` : t.assign.none}
+                                  onClick={onClick}
+                                  sx={it.assignee ? undefined : { opacity: 0.55 }}
+                                />
+                              )}
+                            </AssignPopover>
                           </Stack>
                           <Typography variant="body2" sx={{ mt: 0.5, wordBreak: "break-word" }}>
                             {it.title}
@@ -294,7 +307,25 @@ export default function SprintPage() {
                       </TableCell>
                       <TableCell>{it.priority ?? "—"}</TableCell>
                       <TableCell>{it.status}</TableCell>
-                      <TableCell>{it.assignee ?? "—"}</TableCell>
+                      <TableCell>
+                        <AssignPopover
+                          itemId={it.itemId}
+                          assignee={it.assignee}
+                          onChanged={() =>
+                            api<Item[]>(`/api/projects/${key}/sprints/${id}/items`).then(setItems).catch(() => {})
+                          }
+                        >
+                          {(onClick) => (
+                            <Chip
+                              size="small"
+                              variant="outlined"
+                              label={it.assignee ? `👤 ${it.assignee}` : t.assign.none}
+                              onClick={onClick}
+                              sx={it.assignee ? undefined : { opacity: 0.55 }}
+                            />
+                          )}
+                        </AssignPopover>
+                      </TableCell>
                       <TableCell>{it.dueDate ?? "—"}</TableCell>
                     </TableRow>
                   ))}

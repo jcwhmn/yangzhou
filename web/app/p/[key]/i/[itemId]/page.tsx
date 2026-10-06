@@ -3,8 +3,6 @@
 import {
   Box,
   Button,
-  Card,
-  CardContent,
   Chip,
   Dialog,
   DialogActions,
@@ -25,8 +23,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { t } from "@/lib/texts";
 import { SignalChip, VerdictLine, type Signal, type Verdict } from "@/components/Verdict";
-import Tab from "@mui/material/Tab";
-import Tabs from "@mui/material/Tabs";
+import { AssignPopover } from "@/components/AssignPopover";
 
 type Status = { statusId: string; name: string; isFinal: boolean; position: number };
 type Item = {
@@ -61,16 +58,6 @@ type Feasibility = {
   itemId: string;
   number: string;
   title: string;
-  signal: Signal;
-  missingCount: number;
-  totalDelta: number;
-  verdicts: Verdict[];
-};
-type Candidate = {
-  rank: number;
-  memberId: string;
-  displayName: string;
-  virtual: boolean;
   signal: Signal;
   missingCount: number;
   totalDelta: number;
@@ -112,20 +99,12 @@ const activityLabel: Record<string, string> = {
   dates_changed: "日期变更",
 };
 
-// 候选行配色(YPJ-1):全满足绿 / 勉强(delta=1)浅橙 / 部分满足琥珀 / 缺门红
-function candidateColor(c: Candidate): string {
-  if (c.signal === "RED") return "error.main";
-  if (c.signal === "GREEN") return "success.main";
-  return c.totalDelta === 1 ? "warning.light" : "warning.main";
-}
-
 export default function ItemDetailPage() {
   const { key, itemId } = useParams<{ key: string; itemId: string }>();
   const [item, setItem] = useState<Item | null>(null);
   const [statuses, setStatuses] = useState<Status[]>([]);
   const [attributes, setAttributes] = useState<Attribute[]>([]);
   const [feasibility, setFeasibility] = useState<Feasibility | null>(null);
-  const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [activity, setActivity] = useState<Activity[]>([]);
 
   const [title, setTitle] = useState("");
@@ -138,15 +117,11 @@ export default function ItemDetailPage() {
   const [releases, setReleases] = useState<ReleaseLite[]>([]);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
-  const [assignOpen, setAssignOpen] = useState(false);
-  const [confirmCand, setConfirmCand] = useState<Candidate | null>(null);
-  const [me, setMe] = useState<{ memberId: string; displayName: string } | null>(null);
   const [memberNames, setMemberNames] = useState<Map<string, string>>(new Map());
   const [reqOpen, setReqOpen] = useState(false);
   const [comments, setComments] = useState<CommentDto[]>([]);
   const [newComment, setNewComment] = useState("");
   const [branchOpen, setBranchOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState(0);
   const [timeLog, setTimeLog] = useState<{ entries: TimeEntry[]; totalMinutes: number } | null>(null);
   const [manualMinutes, setManualMinutes] = useState("");
   const [manualNote, setManualNote] = useState("");
@@ -157,12 +132,11 @@ export default function ItemDetailPage() {
   const [newCheckText, setNewCheckText] = useState("");
 
   const load = useCallback(async () => {
-    const [it, project, attrs, feas, cands, acts, spr, rel] = await Promise.all([
+    const [it, project, attrs, feas, acts, spr, rel] = await Promise.all([
       api<Item>(`/api/items/${itemId}`),
       api<{ statuses: Status[] }>(`/api/projects/${key}`),
       api<Attribute[]>("/api/attributes"),
       api<Feasibility>(`/api/items/${itemId}/feasibility`),
-      api<Candidate[]>(`/api/items/${itemId}/candidates`),
       api<Activity[]>(`/api/items/${itemId}/activity`),
       // sprints 并入首屏:选项一次性到位,避免下拉打开后 children 变化把 MUI 菜单关掉
       api<SprintLite[]>(`/api/projects/${key}/sprints`)
@@ -179,10 +153,7 @@ export default function ItemDetailPage() {
     setItem(it); setTitle(it.title); setDescription(it.description ?? ""); setType(it.type)
     setStartDate(it.startDate ?? ""); setDueDate(it.dueDate ?? ""); setPriority(it.priority ?? "")
     setStatuses(project.statuses); setAttributes(attrs); setSprints(spr)
-    setFeasibility(feas); setCandidates(cands); setActivity(acts)
-    const allMembers = await api<{ memberId: string; displayName: string; virtual: boolean }[]>("/api/members");
-    const current = allMembers.find((m) => !m.virtual);
-    if (current) setMe(current);
+    setFeasibility(feas); setActivity(acts)
     setComments(await api<CommentDto[]>(`/api/items/${itemId}/comments`));
     api<{ entries: TimeEntry[]; totalMinutes: number }>(`/api/items/${itemId}/time-entries`)
       .then(setTimeLog)
@@ -228,8 +199,6 @@ export default function ItemDetailPage() {
 
   async function assign(memberId: string | null) {
     await api(`/api/items/${itemId}/assignee`, { method: "PUT", body: JSON.stringify({ assigneeItemId: memberId }) });
-    setConfirmCand(null);
-    setAssignOpen(false);
     await load();
   }
 
@@ -370,22 +339,6 @@ export default function ItemDetailPage() {
 
   const runningEntry = timeLog?.entries.find((e) => e.endedAt === null) ?? null;
 
-  const hasUnmet = (c: Candidate) =>
-    c.missingCount > 0 || c.verdicts.some((v) => v.kind === "gap" || v.kind === "missing" || v.kind === "unrated");
-
-  async function tryAssign(c: Candidate) {
-    if (hasUnmet(c)) setConfirmCand(c);
-    else await assign(c.memberId);
-  }
-
-  // 指派给我:未足先弹确认,干净则直达(YPJ-1 验收 3)
-  async function tryAssignMe() {
-    if (!me) return;
-    const mine = candidates.find((c) => c.memberId === me.memberId);
-    if (mine) await tryAssign(mine);
-    else await assign(me.memberId);
-  }
-
   if (!item) {
     return (
       <Box sx={{ p: 3 }}>
@@ -404,13 +357,31 @@ export default function ItemDetailPage() {
       <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
         <Chip label={item.number} />
         {feasibility && <SignalChip signal={feasibility.signal} />}
-        {item.assignee && <Chip size="small" label={`👤 ${item.assignee}`} onDelete={() => assign(null)} />}
+        {item.assignee ? (
+          <AssignPopover itemId={itemId} assignee={item.assignee} onChanged={load}>
+            {(onClick) => (
+              <Chip size="small" label={`👤 ${item.assignee}`} onClick={onClick} onDelete={() => assign(null)} />
+            )}
+          </AssignPopover>
+        ) : (
+          <AssignPopover itemId={itemId} assignee={null} onChanged={load}>
+            {(onClick) => (
+              <Chip
+                size="small"
+                variant="outlined"
+                label={t.assign.open}
+                onClick={onClick}
+                sx={{ opacity: 0.55 }}
+              />
+            )}
+          </AssignPopover>
+        )}
         <Select
           size="small"
           value={item.status}
           onChange={(e) => moveStatus(String(e.target.value))}
           inputProps={{ "aria-label": "item 状态" }}
-          sx={{ ml: "auto", minWidth: 160 }}
+          sx={{ minWidth: 160 }}
         >
           {statuses.map((s) => (
             <MenuItem key={s.statusId} value={s.name}>
@@ -536,110 +507,64 @@ export default function ItemDetailPage() {
         </Stack>
       </Stack>
 
-      <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} sx={{ mt: 3, mb: 2 }}>
-        <Tab label="详情" />
-        <Tab label="需求" />
-        <Tab label="依赖+清单" />
-        <Tab label="工时" />
-        <Tab label="GitHub" />
-      </Tabs>
-
-      {activeTab === 0 && (
-        <>
       <Typography variant="h6" sx={{ mb: 1 }}>
-        {t.assign.whoTitle}
+        评论
       </Typography>
-      {!assignOpen ? (
-        item.assignee ? (
-          <Stack direction="row" spacing={1} alignItems="center">
-            <Chip label={`👤 ${item.assignee}`} />
-            <Button size="small" onClick={() => setAssignOpen(true)}>
-              {t.assign.reassign}
-            </Button>
-          </Stack>
-        ) : (
-          <Stack direction="row" spacing={1}>
-            <Button
-              variant="contained"
-              onClick={tryAssignMe}
-              disabled={!me}
-            >
-              {t.assign.assignMe}
-            </Button>
-            <Button variant="outlined" onClick={() => setAssignOpen(true)}>
-              {t.assign.assignMember}
-            </Button>
-          </Stack>
-        )
-      ) : (
-        <Stack spacing={1}>
-          {candidates.length === 0 && (
-            <Typography color="text.secondary" variant="body2">
-              {t.assign.noCandidates}
+      <Stack spacing={1} sx={{ mb: 2 }}>
+        {comments.map((c) => (
+          <Box key={c.commentId} sx={{ p: 1.5, bgcolor: "background.paper", borderRadius: 1, border: "1px solid", borderColor: "divider" }}>
+            <Stack direction="row" justifyContent="space-between" alignItems="center">
+              <Typography variant="caption" color="text.secondary">
+                {c.author} · {new Date(c.createdAt).toLocaleString("zh-CN")}
+              </Typography>
+              <Button size="small" color="error" onClick={() => removeComment(c.commentId)}>
+                删除
+              </Button>
+            </Stack>
+            <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
+              {c.body}
             </Typography>
-          )}
-          {candidates.map((c) => {
-            return (
-              <Card
-                key={c.memberId}
-                variant="outlined"
-                sx={{ borderColor: candidateColor(c) }}
-              >
-                <CardContent sx={{ py: 1, "&:last-child": { pb: 1 } }}>
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <Chip size="small" label={`#${c.rank}`} />
-                    <Typography variant="body2">
-                      {c.displayName}
-                      {c.virtual ? t.assign.virtualSuffix : ""}
-                    </Typography>
-                    <Chip
-                      size="small"
-                      variant="outlined"
-                      sx={{ color: candidateColor(c), borderColor: candidateColor(c) }}
-                      label={t.assign.gapSummary(c.missingCount, c.totalDelta)}
-                    />
-                    <Button
-                      size="small"
-                      variant="contained"
-                      sx={{ ml: "auto" }}
-                      onClick={() => tryAssign(c)}
-                    >
-                      {t.assign.assignBtn}
-                    </Button>
-                  </Stack>
-                  {c.verdicts.map((v, i) => (
-                    <VerdictLine key={i} v={v} />
-                  ))}
-                </CardContent>
-              </Card>
-            );
-          })}
-        </Stack>
-      )}
+          </Box>
+        ))}
+      </Stack>
+      <Stack direction="row" spacing={1}>
+        <TextField
+          size="small"
+          placeholder="写评论…"
+          value={newComment}
+          onChange={(e) => setNewComment(e.target.value)}
+          fullWidth
+          multiline
+          maxRows={3}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey && newComment.trim()) {
+              e.preventDefault();
+              addComment();
+            }
+          }}
+        />
+        <Button variant="outlined" onClick={addComment} disabled={!newComment.trim()}>
+          发送
+        </Button>
+      </Stack>
 
-      <Dialog
-        open={confirmCand !== null}
-        onClose={() => setConfirmCand(null)}
-      >
-        <DialogTitle>{t.assign.confirmTitle}</DialogTitle>
-        <DialogContent>
-          <Typography>
-            {confirmCand?.displayName}:{t.assignDialog.unmetWarning}
+      {activity.length > 0 && (
+        <Box sx={{ mt: 3 }}>
+          <Typography variant="h6" gutterBottom>
+            活动日志
           </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setConfirmCand(null)}>{t.assign.cancel}</Button>
-          <Button
-            color="warning"
-            variant="contained"
-            onClick={() => {
-              if (confirmCand) void assign(confirmCand.memberId);
-            }}
-          >
-            {t.assign.confirmAnyway}
-          </Button>
-        </DialogActions>
-      </Dialog>
+          <Stack spacing={0.5}>
+            {activity.map((a) => (
+              <Typography key={a.objectId} variant="caption" color="text.secondary">
+                {new Date(a.createdAt).toLocaleString("zh-CN")} ·{" "}
+                {a.actorMemberId == null ? "GitHub" : memberNames.get(String(a.actorMemberId)) ?? `#${a.actorMemberId}`} ·{" "}
+                {activityLabel[a.kind] ?? a.kind}
+                {a.oldValue || a.newValue ? `: ${a.oldValue ?? ""} → ${a.newValue ?? ""}` : ""}
+              </Typography>
+            ))}
+          </Stack>
+        </Box>
+      )}
 
       {feasibility && (
         <Box sx={{ mt: 3 }}>
@@ -658,14 +583,14 @@ export default function ItemDetailPage() {
           </Typography>
         </Box>
       )}
-        </>
-      )}
 
-      {activeTab === 1 && (
-        <Box>
+      {/* 评论/日志/判定/需求/依赖+清单/工时/GitHub 全部单页直出,无页签(YPJ-6 反馈) */}
+
+      <Box>
+        <Typography variant="h6">{t.item.requirements}</Typography>
           {(item.requirements ?? []).length === 0 ? (
             <Typography color="text.secondary" variant="body2">
-              (无需求——可在「详情」页看判定聚合)
+              (无需求——判定聚合在上方)
             </Typography>
           ) : (
             <Stack spacing={0.5}>
@@ -681,7 +606,6 @@ export default function ItemDetailPage() {
             编辑需求
           </Button>
         </Box>
-      )}
 
       <RequirementsDialog
         open={reqOpen}
@@ -690,8 +614,6 @@ export default function ItemDetailPage() {
         attributes={attributes}
       />
 
-      {activeTab === 2 && (
-        <>
       <Box>
         <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
           <Typography variant="h6">检查清单</Typography>
@@ -755,11 +677,7 @@ export default function ItemDetailPage() {
           </Stack>
         )}
       </Box>
-        </>
-      )}
 
-      {activeTab === 3 && (
-        <>
       <Box>
         <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
           <Typography variant="h6">{t.time.section}</Typography>
@@ -825,11 +743,7 @@ export default function ItemDetailPage() {
           </Button>
         </Stack>
       </Box>
-        </>
-      )}
 
-      {activeTab === 4 && (
-        <>
       <Box>
         <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
           <Typography variant="h6">{t.gh.gitRefs}</Typography>
@@ -871,10 +785,6 @@ export default function ItemDetailPage() {
             </Stack>
           ))}
         </Stack>
-      </Box>
-        </>
-      )}
-
       <CreateBranchDialog
         open={branchOpen}
         onClose={() => setBranchOpen(false)}
@@ -885,64 +795,6 @@ export default function ItemDetailPage() {
         onCreated={load}
       />
 
-      <Typography variant="h6" sx={{ mt: 3, mb: 1 }}>
-        评论
-      </Typography>
-      <Stack spacing={1} sx={{ mb: 2 }}>
-        {comments.map((c) => (
-          <Box key={c.commentId} sx={{ p: 1.5, bgcolor: "background.paper", borderRadius: 1, border: "1px solid", borderColor: "divider" }}>
-            <Stack direction="row" justifyContent="space-between" alignItems="center">
-              <Typography variant="caption" color="text.secondary">
-                {c.author} · {new Date(c.createdAt).toLocaleString("zh-CN")}
-              </Typography>
-              <Button size="small" color="error" onClick={() => removeComment(c.commentId)}>
-                删除
-              </Button>
-            </Stack>
-            <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
-              {c.body}
-            </Typography>
-          </Box>
-        ))}
-      </Stack>
-      <Stack direction="row" spacing={1}>
-        <TextField
-          size="small"
-          placeholder="写评论…"
-          value={newComment}
-          onChange={(e) => setNewComment(e.target.value)}
-          fullWidth
-          multiline
-          maxRows={3}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey && newComment.trim()) {
-              e.preventDefault();
-              addComment();
-            }
-          }}
-        />
-        <Button variant="outlined" onClick={addComment} disabled={!newComment.trim()}>
-          发送
-        </Button>
-      </Stack>
-
-      {activity.length > 0 && (
-        <Box sx={{ mt: 3 }}>
-          <Typography variant="h6" gutterBottom>
-            活动日志
-          </Typography>
-          <Stack spacing={0.5}>
-            {activity.map((a) => (
-              <Typography key={a.objectId} variant="caption" color="text.secondary">
-                {new Date(a.createdAt).toLocaleString("zh-CN")} ·{" "}
-                {a.actorMemberId == null ? "GitHub" : memberNames.get(String(a.actorMemberId)) ?? `#${a.actorMemberId}`} ·{" "}
-                {activityLabel[a.kind] ?? a.kind}
-                {a.oldValue || a.newValue ? `: ${a.oldValue ?? ""} → ${a.newValue ?? ""}` : ""}
-              </Typography>
-            ))}
-          </Stack>
-        </Box>
-      )}
       </Box>
 
       <Box sx={{ width: 240, flexShrink: 0 }}>
@@ -959,6 +811,7 @@ export default function ItemDetailPage() {
         </Stack>
       </Box>
       </Box>
+    </Box>
     </Box>
   );
 }

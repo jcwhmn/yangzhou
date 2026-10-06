@@ -9,12 +9,17 @@ test("建 item → 详情 → 评论 → 指派 → 状态 QA → 活动日志",
   await page.getByRole("button", { name: "新建 ITEM" }).click();
   await page.getByText("E2E 冒烟 item").first().click();
 
-  await expect(page.getByRole("heading", { name: "谁来做" })).toBeVisible();
+  await expect(page.getByText("分配", { exact: true })).toBeVisible(); // 头部分配入口(YPJ-6)
   await page.getByPlaceholder("写评论…").fill("E2E 冒烟评论");
   await page.getByRole("button", { name: "发送" }).click();
   await expect(page.getByText("E2E 冒烟评论")).toBeVisible();
 
-  await page.getByRole("button", { name: "指派给我" }).click();
+  // 头部入口 → Popover 指派 me
+  await page.getByText("分配", { exact: true }).click();
+  const pop = page.locator(".MuiPopover-paper");
+  await expect(pop).toBeVisible();
+  await pop.locator("[data-testid=cand-row]", { hasText: "me" }).getByRole("button", { name: "指派", exact: true }).click();
+  await expect(pop).toBeHidden();
   await expect(page.getByText("👤 me").first()).toBeVisible();
 
   await page.getByRole("combobox", { name: "item 状态" }).click();
@@ -88,10 +93,8 @@ test("V10 依赖——blocked 标识", async ({ page, projectKey }) => {
   await apiCreateItem(projectKey, "E2E 依赖 item");
   await apiCreateItem(projectKey, "E2E 被卡 item");
   await page.goto(`/p/${projectKey}`);
-  // 打开被卡 item 详情,把依赖 item 设为它的前置
+  // 打开被卡 item 详情,把依赖 item 设为它的前置(依赖区块直接在正文,无页签)
   await page.getByText("E2E 被卡 item").first().click();
-  // 依赖区块在「依赖+清单」tab
-  await page.getByRole("tab", { name: "依赖+清单" }).click();
   await page.getByRole("button", { name: "加依赖" }).click();
   await page.getByRole("combobox", { name: "被依赖 item" }).selectOption({ index: 1 });
   await page.getByRole("button", { name: "确认添加依赖" }).click();

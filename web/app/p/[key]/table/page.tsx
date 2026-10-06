@@ -23,6 +23,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { AppNav } from "@/components/AppNav";
 import { t } from "@/lib/texts";
+import { AssignPopover } from "@/components/AssignPopover";
 
 type Status = { statusId: string; name: string; isFinal: boolean; position: number };
 type Item = {
@@ -167,7 +168,17 @@ export default function TableViewPage() {
                         ) : c.id === "priority" ? (
                           it.priority ?? "—"
                         ) : c.id === "assignee" ? (
-                          it.assignee ?? "—"
+                          <AssignPopover itemId={it.itemId} assignee={it.assignee} onChanged={load}>
+                            {(onClick) => (
+                              <Chip
+                                size="small"
+                                variant="outlined"
+                                label={it.assignee ? `👤 ${it.assignee}` : t.assign.none}
+                                onClick={onClick}
+                                sx={it.assignee ? undefined : { opacity: 0.55 }}
+                              />
+                            )}
+                          </AssignPopover>
                         ) : c.id === "startDate" ? (
                           it.startDate ?? "—"
                         ) : c.id === "dueDate" ? (

@@ -2,6 +2,7 @@
 
 import {
   Button,
+  Chip,
   Container,
   Stack,
   Table,
@@ -18,6 +19,7 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { t } from "@/lib/texts";
+import { AssignPopover } from "@/components/AssignPopover";
 
 type Item = {
   itemId: string;
@@ -109,7 +111,23 @@ export default function BacklogPage() {
                   </TableCell>
                   <TableCell>{it.priority ?? "—"}</TableCell>
                   <TableCell>{it.status}</TableCell>
-                  <TableCell>{it.assignee ?? "—"}</TableCell>
+                  <TableCell>
+                    <AssignPopover
+                      itemId={it.itemId}
+                      assignee={it.assignee}
+                      onChanged={() => api<Item[]>(`/api/projects/${key}/backlog`).then(setItems).catch(() => {})}
+                    >
+                      {(onClick) => (
+                        <Chip
+                          size="small"
+                          variant="outlined"
+                          label={it.assignee ? `👤 ${it.assignee}` : t.assign.none}
+                          onClick={onClick}
+                          sx={it.assignee ? undefined : { opacity: 0.55 }}
+                        />
+                      )}
+                    </AssignPopover>
+                  </TableCell>
                   <TableCell>{it.startDate ?? "—"}</TableCell>
                   <TableCell>
                     <span style={{ color: it.overdue ? "red" : it.dueSoon ? "orange" : "inherit" }}>
