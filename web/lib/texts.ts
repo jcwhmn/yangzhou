@@ -153,10 +153,7 @@ export const t = {
   },
   assign: {
     open: "分配",
-    reassign: "重新分配",
     none: "未指派",
-    assignMe: "指派给我",
-    assignMember: "分配成员…",
     assignTo: "指派",
     assignBtn: "指派",
     confirmAnyway: "仍然指派",

@@ -66,7 +66,7 @@ export function AssignPopover({
     else await assign(c.memberId);
   }
 
-  async function assign(memberId: string) {
+  async function assign(memberId: string | null) {
     await api(`/api/items/${itemId}/assignee`, { method: "PUT", body: JSON.stringify({ assigneeItemId: memberId }) });
     setConfirmCand(null);
     close();
@@ -87,6 +87,11 @@ export function AssignPopover({
       >
         <Stack sx={{ p: 1.5, minWidth: 320, maxWidth: 400, maxHeight: 480, overflowY: "auto" }} spacing={1}>
           <Typography variant="subtitle2">{t.assign.whoTitle}</Typography>
+          {assignee && (
+            <Button size="small" sx={{ alignSelf: "flex-start" }} onClick={() => assign(null)}>
+              {t.assignDialog.clear}
+            </Button>
+          )}
           {cands === null && (
             <Typography variant="body2" color="text.secondary">
               {t.assign.loading}

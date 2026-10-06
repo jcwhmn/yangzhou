@@ -9,12 +9,17 @@ test("建 item → 详情 → 评论 → 指派 → 状态 QA → 活动日志",
   await page.getByRole("button", { name: "新建 ITEM" }).click();
   await page.getByText("E2E 冒烟 item").first().click();
 
-  await expect(page.getByRole("heading", { name: "谁来做" })).toBeVisible();
+  await expect(page.getByText("分配", { exact: true })).toBeVisible(); // 头部分配入口(YPJ-6)
   await page.getByPlaceholder("写评论…").fill("E2E 冒烟评论");
   await page.getByRole("button", { name: "发送" }).click();
   await expect(page.getByText("E2E 冒烟评论")).toBeVisible();
 
-  await page.getByRole("button", { name: "指派给我" }).click();
+  // 头部入口 → Popover 指派 me
+  await page.getByText("分配", { exact: true }).click();
+  const pop = page.locator(".MuiPopover-paper");
+  await expect(pop).toBeVisible();
+  await pop.locator("[data-testid=cand-row]", { hasText: "me" }).getByRole("button", { name: "指派", exact: true }).click();
+  await expect(pop).toBeHidden();
   await expect(page.getByText("👤 me").first()).toBeVisible();
 
   await page.getByRole("combobox", { name: "item 状态" }).click();

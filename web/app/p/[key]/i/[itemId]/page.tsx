@@ -23,7 +23,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { t } from "@/lib/texts";
 import { SignalChip, VerdictLine, type Signal, type Verdict } from "@/components/Verdict";
-import { AssignPopover, hasUnmet } from "@/components/AssignPopover";
+import { AssignPopover } from "@/components/AssignPopover";
 import Tab from "@mui/material/Tab";
 import Tabs from "@mui/material/Tabs";
 
@@ -60,16 +60,6 @@ type Feasibility = {
   itemId: string;
   number: string;
   title: string;
-  signal: Signal;
-  missingCount: number;
-  totalDelta: number;
-  verdicts: Verdict[];
-};
-type Candidate = {
-  rank: number;
-  memberId: string;
-  displayName: string;
-  virtual: boolean;
   signal: Signal;
   missingCount: number;
   totalDelta: number;
@@ -117,7 +107,6 @@ export default function ItemDetailPage() {
   const [statuses, setStatuses] = useState<Status[]>([]);
   const [attributes, setAttributes] = useState<Attribute[]>([]);
   const [feasibility, setFeasibility] = useState<Feasibility | null>(null);
-  const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [activity, setActivity] = useState<Activity[]>([]);
 
   const [title, setTitle] = useState("");
@@ -130,8 +119,6 @@ export default function ItemDetailPage() {
   const [releases, setReleases] = useState<ReleaseLite[]>([]);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
-  const [confirmCand, setConfirmCand] = useState<Candidate | null>(null);
-  const [me, setMe] = useState<{ memberId: string; displayName: string } | null>(null);
   const [memberNames, setMemberNames] = useState<Map<string, string>>(new Map());
   const [reqOpen, setReqOpen] = useState(false);
   const [comments, setComments] = useState<CommentDto[]>([]);
@@ -148,12 +135,11 @@ export default function ItemDetailPage() {
   const [newCheckText, setNewCheckText] = useState("");
 
   const load = useCallback(async () => {
-    const [it, project, attrs, feas, cands, acts, spr, rel] = await Promise.all([
+    const [it, project, attrs, feas, acts, spr, rel] = await Promise.all([
       api<Item>(`/api/items/${itemId}`),
       api<{ statuses: Status[] }>(`/api/projects/${key}`),
       api<Attribute[]>("/api/attributes"),
       api<Feasibility>(`/api/items/${itemId}/feasibility`),
-      api<Candidate[]>(`/api/items/${itemId}/candidates`),
       api<Activity[]>(`/api/items/${itemId}/activity`),
       // sprints 并入首屏:选项一次性到位,避免下拉打开后 children 变化把 MUI 菜单关掉
       api<SprintLite[]>(`/api/projects/${key}/sprints`)
@@ -170,10 +156,7 @@ export default function ItemDetailPage() {
     setItem(it); setTitle(it.title); setDescription(it.description ?? ""); setType(it.type)
     setStartDate(it.startDate ?? ""); setDueDate(it.dueDate ?? ""); setPriority(it.priority ?? "")
     setStatuses(project.statuses); setAttributes(attrs); setSprints(spr)
-    setFeasibility(feas); setCandidates(cands); setActivity(acts)
-    const allMembers = await api<{ memberId: string; displayName: string; virtual: boolean }[]>("/api/members");
-    const current = allMembers.find((m) => !m.virtual);
-    if (current) setMe(current);
+    setFeasibility(feas); setActivity(acts)
     setComments(await api<CommentDto[]>(`/api/items/${itemId}/comments`));
     api<{ entries: TimeEntry[]; totalMinutes: number }>(`/api/items/${itemId}/time-entries`)
       .then(setTimeLog)
@@ -219,7 +202,6 @@ export default function ItemDetailPage() {
 
   async function assign(memberId: string | null) {
     await api(`/api/items/${itemId}/assignee`, { method: "PUT", body: JSON.stringify({ assigneeItemId: memberId }) });
-    setConfirmCand(null);
     await load();
   }
 
@@ -360,14 +342,6 @@ export default function ItemDetailPage() {
 
   const runningEntry = timeLog?.entries.find((e) => e.endedAt === null) ?? null;
 
-  // 指派给我:未足先弹确认,干净则直达(YPJ-1 验收 3);判定用共享 hasUnmet
-  async function tryAssignMe() {
-    if (!me) return;
-    const mine = candidates.find((c) => c.memberId === me.memberId);
-    if (mine && hasUnmet(mine)) setConfirmCand(mine);
-    else await assign(me.memberId);
-  }
-
   if (!item) {
     return (
       <Box sx={{ p: 3 }}>
@@ -386,13 +360,31 @@ export default function ItemDetailPage() {
       <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
         <Chip label={item.number} />
         {feasibility && <SignalChip signal={feasibility.signal} />}
-        {item.assignee && <Chip size="small" label={`👤 ${item.assignee}`} onDelete={() => assign(null)} />}
+        {item.assignee ? (
+          <AssignPopover itemId={itemId} assignee={item.assignee} onChanged={load}>
+            {(onClick) => (
+              <Chip size="small" label={`👤 ${item.assignee}`} onClick={onClick} onDelete={() => assign(null)} />
+            )}
+          </AssignPopover>
+        ) : (
+          <AssignPopover itemId={itemId} assignee={null} onChanged={load}>
+            {(onClick) => (
+              <Chip
+                size="small"
+                variant="outlined"
+                label={t.assign.open}
+                onClick={onClick}
+                sx={{ opacity: 0.55 }}
+              />
+            )}
+          </AssignPopover>
+        )}
         <Select
           size="small"
           value={item.status}
           onChange={(e) => moveStatus(String(e.target.value))}
           inputProps={{ "aria-label": "item 状态" }}
-          sx={{ ml: "auto", minWidth: 160 }}
+          sx={{ minWidth: 160 }}
         >
           {statuses.map((s) => (
             <MenuItem key={s.statusId} value={s.name}>
@@ -528,61 +520,6 @@ export default function ItemDetailPage() {
 
       {activeTab === 0 && (
         <>
-      <Typography variant="h6" sx={{ mb: 1 }}>
-        {t.assign.whoTitle}
-      </Typography>
-      {item.assignee ? (
-        <Stack direction="row" spacing={1} alignItems="center">
-          <AssignPopover itemId={itemId} assignee={item.assignee} onChanged={load}>
-            {(onClick) => <Chip label={`👤 ${item.assignee}`} onClick={onClick} />}
-          </AssignPopover>
-          <AssignPopover itemId={itemId} assignee={item.assignee} onChanged={load}>
-            {(onClick) => (
-              <Button size="small" onClick={onClick}>
-                {t.assign.reassign}
-              </Button>
-            )}
-          </AssignPopover>
-        </Stack>
-      ) : (
-        <Stack direction="row" spacing={1}>
-          <Button variant="contained" onClick={tryAssignMe} disabled={!me}>
-            {t.assign.assignMe}
-          </Button>
-          <AssignPopover itemId={itemId} assignee={null} onChanged={load}>
-            {(onClick) => (
-              <Button variant="outlined" onClick={onClick}>
-                {t.assign.assignMember}
-              </Button>
-            )}
-          </AssignPopover>
-        </Stack>
-      )}
-
-      <Dialog
-        open={confirmCand !== null}
-        onClose={() => setConfirmCand(null)}
-      >
-        <DialogTitle>{t.assign.confirmTitle}</DialogTitle>
-        <DialogContent>
-          <Typography>
-            {confirmCand?.displayName}:{t.assignDialog.unmetWarning}
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setConfirmCand(null)}>{t.assign.cancel}</Button>
-          <Button
-            color="warning"
-            variant="contained"
-            onClick={() => {
-              if (confirmCand) void assign(confirmCand.memberId);
-            }}
-          >
-            {t.assign.confirmAnyway}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
       {feasibility && (
         <Box sx={{ mt: 3 }}>
           <Stack direction="row" spacing={1} alignItems="center">
