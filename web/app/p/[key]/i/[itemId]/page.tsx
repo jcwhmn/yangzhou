@@ -24,8 +24,6 @@ import { api } from "@/lib/api";
 import { t } from "@/lib/texts";
 import { SignalChip, VerdictLine, type Signal, type Verdict } from "@/components/Verdict";
 import { AssignPopover } from "@/components/AssignPopover";
-import Tab from "@mui/material/Tab";
-import Tabs from "@mui/material/Tabs";
 
 type Status = { statusId: string; name: string; isFinal: boolean; position: number };
 type Item = {
@@ -124,7 +122,6 @@ export default function ItemDetailPage() {
   const [comments, setComments] = useState<CommentDto[]>([]);
   const [newComment, setNewComment] = useState("");
   const [branchOpen, setBranchOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState(0);
   const [timeLog, setTimeLog] = useState<{ entries: TimeEntry[]; totalMinutes: number } | null>(null);
   const [manualMinutes, setManualMinutes] = useState("");
   const [manualNote, setManualNote] = useState("");
@@ -510,6 +507,65 @@ export default function ItemDetailPage() {
         </Stack>
       </Stack>
 
+      <Typography variant="h6" sx={{ mb: 1 }}>
+        评论
+      </Typography>
+      <Stack spacing={1} sx={{ mb: 2 }}>
+        {comments.map((c) => (
+          <Box key={c.commentId} sx={{ p: 1.5, bgcolor: "background.paper", borderRadius: 1, border: "1px solid", borderColor: "divider" }}>
+            <Stack direction="row" justifyContent="space-between" alignItems="center">
+              <Typography variant="caption" color="text.secondary">
+                {c.author} · {new Date(c.createdAt).toLocaleString("zh-CN")}
+              </Typography>
+              <Button size="small" color="error" onClick={() => removeComment(c.commentId)}>
+                删除
+              </Button>
+            </Stack>
+            <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
+              {c.body}
+            </Typography>
+          </Box>
+        ))}
+      </Stack>
+      <Stack direction="row" spacing={1}>
+        <TextField
+          size="small"
+          placeholder="写评论…"
+          value={newComment}
+          onChange={(e) => setNewComment(e.target.value)}
+          fullWidth
+          multiline
+          maxRows={3}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey && newComment.trim()) {
+              e.preventDefault();
+              addComment();
+            }
+          }}
+        />
+        <Button variant="outlined" onClick={addComment} disabled={!newComment.trim()}>
+          发送
+        </Button>
+      </Stack>
+
+      {activity.length > 0 && (
+        <Box sx={{ mt: 3 }}>
+          <Typography variant="h6" gutterBottom>
+            活动日志
+          </Typography>
+          <Stack spacing={0.5}>
+            {activity.map((a) => (
+              <Typography key={a.objectId} variant="caption" color="text.secondary">
+                {new Date(a.createdAt).toLocaleString("zh-CN")} ·{" "}
+                {a.actorMemberId == null ? "GitHub" : memberNames.get(String(a.actorMemberId)) ?? `#${a.actorMemberId}`} ·{" "}
+                {activityLabel[a.kind] ?? a.kind}
+                {a.oldValue || a.newValue ? `: ${a.oldValue ?? ""} → ${a.newValue ?? ""}` : ""}
+              </Typography>
+            ))}
+          </Stack>
+        </Box>
+      )}
+
       {feasibility && (
         <Box sx={{ mt: 3 }}>
           <Stack direction="row" spacing={1} alignItems="center">
@@ -528,16 +584,10 @@ export default function ItemDetailPage() {
         </Box>
       )}
 
-      {/* 需求/依赖/工时/GitHub 保留页签;判定/评论/活动日志正文直出(YPJ-6 反馈:无详情栏) */}
-      <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} sx={{ my: 2 }}>
-        <Tab label="需求" />
-        <Tab label="依赖+清单" />
-        <Tab label="工时" />
-        <Tab label="GitHub" />
-      </Tabs>
+      {/* 评论/日志/判定/需求/依赖+清单/工时/GitHub 全部单页直出,无页签(YPJ-6 反馈) */}
 
-      {activeTab === 0 && (
-        <Box>
+      <Box>
+        <Typography variant="h6">{t.item.requirements}</Typography>
           {(item.requirements ?? []).length === 0 ? (
             <Typography color="text.secondary" variant="body2">
               (无需求——判定聚合在上方)
@@ -556,7 +606,6 @@ export default function ItemDetailPage() {
             编辑需求
           </Button>
         </Box>
-      )}
 
       <RequirementsDialog
         open={reqOpen}
@@ -565,8 +614,6 @@ export default function ItemDetailPage() {
         attributes={attributes}
       />
 
-      {activeTab === 1 && (
-        <>
       <Box>
         <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
           <Typography variant="h6">检查清单</Typography>
@@ -630,11 +677,7 @@ export default function ItemDetailPage() {
           </Stack>
         )}
       </Box>
-        </>
-      )}
 
-      {activeTab === 2 && (
-        <>
       <Box>
         <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
           <Typography variant="h6">{t.time.section}</Typography>
@@ -700,11 +743,7 @@ export default function ItemDetailPage() {
           </Button>
         </Stack>
       </Box>
-        </>
-      )}
 
-      {activeTab === 3 && (
-        <>
       <Box>
         <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
           <Typography variant="h6">{t.gh.gitRefs}</Typography>
@@ -746,10 +785,6 @@ export default function ItemDetailPage() {
             </Stack>
           ))}
         </Stack>
-      </Box>
-        </>
-      )}
-
       <CreateBranchDialog
         open={branchOpen}
         onClose={() => setBranchOpen(false)}
@@ -760,64 +795,6 @@ export default function ItemDetailPage() {
         onCreated={load}
       />
 
-      <Typography variant="h6" sx={{ mt: 3, mb: 1 }}>
-        评论
-      </Typography>
-      <Stack spacing={1} sx={{ mb: 2 }}>
-        {comments.map((c) => (
-          <Box key={c.commentId} sx={{ p: 1.5, bgcolor: "background.paper", borderRadius: 1, border: "1px solid", borderColor: "divider" }}>
-            <Stack direction="row" justifyContent="space-between" alignItems="center">
-              <Typography variant="caption" color="text.secondary">
-                {c.author} · {new Date(c.createdAt).toLocaleString("zh-CN")}
-              </Typography>
-              <Button size="small" color="error" onClick={() => removeComment(c.commentId)}>
-                删除
-              </Button>
-            </Stack>
-            <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
-              {c.body}
-            </Typography>
-          </Box>
-        ))}
-      </Stack>
-      <Stack direction="row" spacing={1}>
-        <TextField
-          size="small"
-          placeholder="写评论…"
-          value={newComment}
-          onChange={(e) => setNewComment(e.target.value)}
-          fullWidth
-          multiline
-          maxRows={3}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey && newComment.trim()) {
-              e.preventDefault();
-              addComment();
-            }
-          }}
-        />
-        <Button variant="outlined" onClick={addComment} disabled={!newComment.trim()}>
-          发送
-        </Button>
-      </Stack>
-
-      {activity.length > 0 && (
-        <Box sx={{ mt: 3 }}>
-          <Typography variant="h6" gutterBottom>
-            活动日志
-          </Typography>
-          <Stack spacing={0.5}>
-            {activity.map((a) => (
-              <Typography key={a.objectId} variant="caption" color="text.secondary">
-                {new Date(a.createdAt).toLocaleString("zh-CN")} ·{" "}
-                {a.actorMemberId == null ? "GitHub" : memberNames.get(String(a.actorMemberId)) ?? `#${a.actorMemberId}`} ·{" "}
-                {activityLabel[a.kind] ?? a.kind}
-                {a.oldValue || a.newValue ? `: ${a.oldValue ?? ""} → ${a.newValue ?? ""}` : ""}
-              </Typography>
-            ))}
-          </Stack>
-        </Box>
-      )}
       </Box>
 
       <Box sx={{ width: 240, flexShrink: 0 }}>
@@ -834,6 +811,7 @@ export default function ItemDetailPage() {
         </Stack>
       </Box>
       </Box>
+    </Box>
     </Box>
   );
 }

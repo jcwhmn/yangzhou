@@ -93,10 +93,8 @@ test("V10 依赖——blocked 标识", async ({ page, projectKey }) => {
   await apiCreateItem(projectKey, "E2E 依赖 item");
   await apiCreateItem(projectKey, "E2E 被卡 item");
   await page.goto(`/p/${projectKey}`);
-  // 打开被卡 item 详情,把依赖 item 设为它的前置
+  // 打开被卡 item 详情,把依赖 item 设为它的前置(依赖区块直接在正文,无页签)
   await page.getByText("E2E 被卡 item").first().click();
-  // 依赖区块在「依赖+清单」tab
-  await page.getByRole("tab", { name: "依赖+清单" }).click();
   await page.getByRole("button", { name: "加依赖" }).click();
   await page.getByRole("combobox", { name: "被依赖 item" }).selectOption({ index: 1 });
   await page.getByRole("button", { name: "确认添加依赖" }).click();
