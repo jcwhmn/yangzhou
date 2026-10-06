@@ -21,7 +21,8 @@ export default defineConfig({
     trace: "retain-on-failure",
   },
   webServer: {
-    command: "npm run dev",
+    // 双 profile 并存(YPJ-3):日常 3000→8081;E2E 可用 E2E_FRONT_PORT 另起临时前端(配 E2E_BASE_URL + BACKEND_URL 指 test profile)
+    command: process.env.E2E_FRONT_PORT ? `npx next dev -p ${process.env.E2E_FRONT_PORT}` : "npm run dev",
     url: config.baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

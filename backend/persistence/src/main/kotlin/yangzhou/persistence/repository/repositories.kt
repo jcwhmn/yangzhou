@@ -175,6 +175,7 @@ interface ItemGroupRepository : CrudRepository<ItemGroup, Long> {
 
 interface ItemGroupMemberRepository : CrudRepository<ItemGroupMember, Long> {
     fun findByGroupId(groupId: Long): List<ItemGroupMember>
+    fun findByGroupIdIn(groupIds: Collection<Long>): List<ItemGroupMember>
     fun existsByGroupId(groupId: Long): Boolean
     fun findByItemIdIn(itemIds: Collection<Long>): List<ItemGroupMember>
 }

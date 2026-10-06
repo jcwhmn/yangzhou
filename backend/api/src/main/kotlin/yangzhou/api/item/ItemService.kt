@@ -69,6 +69,8 @@ class ItemService(
         val createdAt: String? = null,
         val sprintId: UUID? = null,
         val sprintName: String? = null,
+        val releaseId: UUID? = null,
+        val releaseName: String? = null,
     )
 
     @Transactional
@@ -137,7 +139,11 @@ class ItemService(
         val memberships = groupMembers.findByItemIdIn(projectItems.mapNotNull { it.id })
         val groupById = if (memberships.isEmpty()) emptyMap() else groupRepo.findAllById(memberships.map { it.groupId }.toSet()).associateBy { it.id!! }
         val currentSprint = memberships.mapNotNull { m ->
-            groupById[m.groupId]?.takeIf { it.status != "completed" }?.let { m.itemId to it }
+            groupById[m.groupId]?.takeIf { it.status != "completed" && it.type == "sprint" }?.let { m.itemId to it }
+        }.toMap()
+        // V15:release 归属(单选,spec 0012)
+        val currentRelease = memberships.mapNotNull { m ->
+            groupById[m.groupId]?.takeIf { it.type == "release" }?.let { m.itemId to it }
         }.toMap()
         val finalIds = statusById.filterValues { it.isFinal }.keys
         val visible = if (backlogOnly) projectItems.filter { it.statusObjectId !in finalIds && it.id !in currentSprint } else projectItems
@@ -162,6 +168,8 @@ class ItemService(
                 createdAt = item.createdAt.toString(),
                 sprintId = currentSprint[item.id]?.objectId,
                 sprintName = currentSprint[item.id]?.name,
+                releaseId = currentRelease[item.id]?.objectId,
+                releaseName = currentRelease[item.id]?.name,
                 externalRef = item.externalRef,
                 parentItemId = item.parentObjectId,
                 requirements = reqs.filter { it.itemId == item.id }.map {

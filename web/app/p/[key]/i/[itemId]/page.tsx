@@ -47,12 +47,15 @@ type Item = {
   priority: string | null;
   sprintId: string | null;
   sprintName: string | null;
+  releaseId: string | null;
+  releaseName: string | null;
   overdue: boolean;
   dueSoon: boolean;
   blocked: boolean;
   createdAt: string | null;
 };
 type SprintLite = { sprintId: string; name: string; status: string };
+type ReleaseLite = { releaseId: string; name: string; status: string };
 type Repo = { repoId: string; repo: string };
 type Attribute = { attributeId: string; name: string; kind: string; leveled: boolean };
 type Feasibility = {
@@ -126,6 +129,7 @@ export default function ItemDetailPage() {
   const [priority, setPriority] = useState("");
   const [type, setType] = useState("task");
   const [sprints, setSprints] = useState<SprintLite[]>([]);
+  const [releases, setReleases] = useState<ReleaseLite[]>([]);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
   const [assignOpen, setAssignOpen] = useState(false);
@@ -147,7 +151,7 @@ export default function ItemDetailPage() {
   const [newCheckText, setNewCheckText] = useState("");
 
   const load = useCallback(async () => {
-    const [it, project, attrs, feas, cands, acts, spr] = await Promise.all([
+    const [it, project, attrs, feas, cands, acts, spr, rel] = await Promise.all([
       api<Item>(`/api/items/${itemId}`),
       api<{ statuses: Status[] }>(`/api/projects/${key}`),
       api<Attribute[]>("/api/attributes"),
@@ -163,7 +167,9 @@ export default function ItemDetailPage() {
             ),
         ) // CI 冷 JVM 偶发连接重置(status -1),延迟重试,否则静默成空选项
         .catch(() => [] as SprintLite[]),
+      api<ReleaseLite[]>(`/api/projects/${key}/releases`).catch(() => [] as ReleaseLite[]),
     ])
+    setReleases(rel);
     setItem(it); setTitle(it.title); setDescription(it.description ?? ""); setType(it.type)
     setStartDate(it.startDate ?? ""); setDueDate(it.dueDate ?? ""); setPriority(it.priority ?? "")
     setStatuses(project.statuses); setAttributes(attrs); setSprints(spr)
@@ -219,6 +225,19 @@ export default function ItemDetailPage() {
     setConfirmCand(null);
     setAssignOpen(false);
     await load();
+  }
+
+  // V15:拉入/移出 release(值 = 指派,null = 移出;released 也可补录,spec 0012)
+  async function assignRelease(releaseId: string | null) {
+    try {
+      const it = await api<Item>(`/api/items/${itemId}/release`, {
+        method: "PUT",
+        body: JSON.stringify({ releaseId }),
+      });
+      setItem(it);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "指派失败");
+    }
   }
 
   // V12-S3:指派/移出当前 sprint(值 = 指派,null = 移出;completed sprint 不在选项中)
@@ -457,6 +476,21 @@ export default function ItemDetailPage() {
               </Typography>
             </Link>
           )}
+          <TextField
+            select
+            label={t.item.release}
+            size="small"
+            value={item.releaseId ?? ""}
+            onChange={(e) => assignRelease(e.target.value || null)}
+            sx={{ width: 170 }}
+          >
+            <MenuItem value="">无</MenuItem>
+            {releases.map((r) => (
+              <MenuItem key={r.releaseId} value={r.releaseId}>
+                {r.name}
+              </MenuItem>
+            ))}
+          </TextField>
         </Stack>
         <TextField select label={t.item.type} value={type} onChange={(e) => setType(e.target.value)} sx={{ width: 200 }}>
           {["task", "bug", "goal", "story"].map((tp) => (
