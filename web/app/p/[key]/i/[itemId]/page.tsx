@@ -63,6 +63,12 @@ type Feasibility = {
   totalDelta: number;
   verdicts: Verdict[];
 };
+type CommitBlock = {
+  repo: string;
+  ref: string;
+  commits: { sha: string; message: string; author: string | null; date: string | null; url: string | null }[];
+};
+
 type Activity = {
   objectId: string;
   kind: string;
@@ -122,6 +128,9 @@ export default function ItemDetailPage() {
   const [comments, setComments] = useState<CommentDto[]>([]);
   const [newComment, setNewComment] = useState("");
   const [branchOpen, setBranchOpen] = useState(false);
+  const [commits, setCommits] = useState<CommitBlock[] | null>(null);
+  const [commitsLoading, setCommitsLoading] = useState(false);
+  const [commitsError, setCommitsError] = useState("");
   const [timeLog, setTimeLog] = useState<{ entries: TimeEntry[]; totalMinutes: number } | null>(null);
   const [manualMinutes, setManualMinutes] = useState("");
   const [manualNote, setManualNote] = useState("");
@@ -785,6 +794,48 @@ export default function ItemDetailPage() {
             </Stack>
           ))}
         </Stack>
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 2, mb: 1 }}>
+          <Typography variant="h6">{t.gh.commitsTitle}</Typography>
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={() => {
+              setCommitsError("");
+              setCommitsLoading(true);
+              api<CommitBlock[]>(`/api/items/${itemId}/commits`)
+                .then(setCommits)
+                .catch((e) => setCommitsError(e instanceof Error ? e.message : "拉取失败"))
+                .finally(() => setCommitsLoading(false));
+            }}
+            disabled={commitsLoading}
+          >
+            {t.gh.loadCommits}
+          </Button>
+        </Stack>
+        {commitsError && <Typography color="error" variant="body2">{commitsError}</Typography>}
+        {commits === null && !commitsError && (
+          <Typography color="text.secondary" variant="body2">
+            {t.gh.commitsHint}
+          </Typography>
+        )}
+        {(commits ?? []).map((block) => (
+          <Box key={`${block.repo}-${block.ref}`} sx={{ mb: 1 }}>
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+              {block.repo} · {block.ref}
+            </Typography>
+            {block.commits.length === 0 && (
+              <Typography variant="caption" color="text.secondary">
+                {t.gh.noCommits}
+              </Typography>
+            )}
+            {block.commits.map((c) => (
+              <Typography key={c.sha} variant="caption" color="text.secondary" component="div">
+                {c.sha.slice(0, 7)} {c.message}
+                {c.author ? ` · ${c.author}` : ""}
+              </Typography>
+            ))}
+          </Box>
+        ))}
       <CreateBranchDialog
         open={branchOpen}
         onClose={() => setBranchOpen(false)}

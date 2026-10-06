@@ -513,6 +513,30 @@ Content-Type: application/json
 ### 删除 Release(非空 409,见负例区)
 DELETE {{host}}/api/projects/{{pkey}}/releases/{{releaseId}}
 
+# ============ 12. GitHub(V6 配置 + V16-2 按需拉取;轮询兑底见 application.yml yangzhou.github) ============
+
+### 配 workspace PAT(永不回显,只回尾 4 位)
+PUT {{host}}/api/workspace/github-token
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "token": "github_pat_xxx"
+}
+
+### 项目挂载仓库(handler 不存变量;repo = owner/name)
+POST {{host}}/api/projects/{{pkey}}/repos
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "repo": "octo/r"
+}
+
+### 按需拉取 item 分支的提交历史(不落库不依赖轮询;无 PAT/无挂载 400 可操作报错)
+GET {{host}}/api/items/{{itemId}}/commits
+Authorization: Bearer {{token}}
+
 # ============================================================
 # 负例区:以下请求「红色 = 预期」,演示约束生效,不要当 bug
 # ============================================================

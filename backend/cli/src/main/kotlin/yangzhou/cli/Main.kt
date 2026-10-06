@@ -44,6 +44,7 @@ private fun usage() {
           feasibility <KEY> [--item <ID>] [--json]     可行性/差距分析
           candidates <KEY-N|itemId> [--json]          候选建议(谁来做:排序+理由)
           assign <KEY-N|itemId> <成员名|--clear>      指派/取消(引擎建议,人拍板)
+          log <KEY-N|itemId> [--json]                 按需拉取 item 分支的 GitHub 提交历史
           export <KEY> [--csv] [--file <路径>]          导出(JSON 全保真/CSV 扁平)
           sync-linear <KEY> <linear.csv>                (退役)方向已反转:yangzhou 为唯一真相源;仅作历史导入
           import <KEY> <文件>                           导入(JSON 按扩展名或 .csv;Linear CSV 可直接灌)
@@ -176,6 +177,28 @@ private fun run(args: List<String>) {
         val body = api.json("PUT", "/api/items/$itemId/assignee", mapOf("assigneeItemId" to assigneeId))
         val who = body["assignee"]
         println(if (who.isNull) "已取消指派:${body["number"].asString()}" else "已指派:${body["number"].asString()}" + " → " + who.asString())
+        return
+    }
+    if (noun == "log") {
+        val ref = positional.getOrNull(1) ?: error("缺少 <KEY-N|itemId>(如 CHE-1)")
+        val itemId = resolveItemId(api, ref)
+        val body = api.json("GET", "/api/items/$itemId/commits")
+        if (flags.containsKey("json")) return printRaw(body.toString())
+        if (body.size() == 0) return println("(无关联分支——先建分支或等轮询回捞)")
+        body.forEach { block ->
+            println("${block["repo"].asString()} · ${block["ref"].asString()}")
+            val commits = block["commits"]
+            if (commits.isEmpty) return@forEach println("  (无提交——分支可能已删)")
+            commits.forEach { c ->
+                val author = c["author"]
+                val date = c["date"]
+                println(
+                    "  ${c["sha"].asString().take(7)} ${c["message"].asString()}" +
+                        (if (!author.isNull) " · ${author.asString()}" else "") +
+                        (if (!date.isNull) " · ${date.asString().take(10)}" else ""),
+                )
+            }
+        }
         return
     }
     if (noun == "sync-linear") {
