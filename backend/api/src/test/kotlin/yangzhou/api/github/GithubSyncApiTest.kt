@@ -35,6 +35,8 @@ class FakeGithubGateway : GithubGateway {
         createError?.let { throw it }
         created.add(Triple(repo, branch, fromBranch))
     }
+
+    override fun listCommits(repo: String, sha: String, token: String): List<GithubCommit> = emptyList()
 }
 
 @TestConfiguration(proxyBeanMethods = false)

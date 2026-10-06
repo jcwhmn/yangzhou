@@ -34,6 +34,24 @@ class RealGithubGateway(private val mapper: ObjectMapper) : GithubGateway {
         mapper.readTree(get(repo, "/pulls?state=all&sort=updated&direction=desc&per_page=50", token))
             .map { toGithubPr(it) }
 
+    // ponytail: 只取第一页 per_page=20——按需查看量级足够,翻页等真实需要再加
+    override fun listCommits(repo: String, sha: String, token: String): List<GithubCommit> =
+        try {
+            mapper.readTree(get(repo, "/commits?sha=$sha&per_page=20", token))
+                .map { c ->
+                    GithubCommit(
+                        sha = c.get("sha").asString(),
+                        message = c.path("commit").path("message").asString().lineSequence().firstOrNull().orEmpty(),
+                        author = c.path("author").path("login").asString(null)
+                            ?: c.path("commit").path("author").path("name").asString(null),
+                        date = c.path("commit").path("author").path("date").asString(null),
+                        url = c.path("html_url").asString(null),
+                    )
+                }
+        } catch (e: GithubApiException) {
+            if (e.status == 404) emptyList() else throw e // ref 已删 → 视为无提交
+        }
+
     companion object {
         /** 列表载荷无 merged 布尔,只有 merged_at(dogfood JCW-113 抓到的 NPE):非空即已合并。 */
         fun toGithubPr(pr: tools.jackson.databind.JsonNode): GithubPr =

@@ -10,6 +10,9 @@ interface GithubGateway {
 
     /** 从 fromBranch 建新分支;已存在 → GithubApiException(422)。 */
     fun createBranch(repo: String, branch: String, fromBranch: String, token: String)
+
+    /** sha/分支上的提交(第一页,新→旧);ref 已删 → 空表(真实现归一)。 */
+    fun listCommits(repo: String, sha: String, token: String): List<GithubCommit>
 }
 
 /** state ∈ open|merged|closed(GitHub 的 merged=closed+merged,在此归一)。 */
@@ -19,6 +22,15 @@ data class GithubPr(
     val state: String,
     val url: String? = null,
     val authorLogin: String? = null,
+)
+
+/** message 只留首行(列表语义);author 优先 login,无则 commit.author.name。 */
+data class GithubCommit(
+    val sha: String,
+    val message: String,
+    val author: String? = null,
+    val date: String? = null,
+    val url: String? = null,
 )
 
 class GithubApiException(val status: Int, message: String) : RuntimeException(message)

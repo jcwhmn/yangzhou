@@ -17,5 +17,7 @@ yangzhou:
     secret: ${YANGZHOU_JWT_SECRET:yangzhou-dev-secret-0123456789abcdef0123456789abcdef}
     ttl-hours: 24
   github:
+    # 轮询同步(分支/PR 关联 + 事件→状态映射移列)——仅作兑底;按需拉取
+    # (yz log / item 详情提交历史)不依赖此开关。关闭:poll-enabled: false。
     poll-enabled: true
-    poll-interval-ms: 300000
+    poll-interval-ms: 300000 # 默认 5 分钟:兜底频度,勿调过密(GitHub API 限额)

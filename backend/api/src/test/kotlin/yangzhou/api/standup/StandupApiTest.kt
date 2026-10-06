@@ -37,7 +37,8 @@ class StandupApiTest : AbstractApiTest() {
         authed.patch().uri("/api/items/$x")
             .body(mapOf("statusItemId" to qa))
             .exchange().expectStatus().isOk()
-        jdbc.update("update item_activity set created_at = now() - interval '25 hours' where kind = 'status_changed'")
+        // 回拨到「昨天 12:00」——自然日窗口内任意时刻跑都稳定(25h 写法跨午夜会落到前天)
+        jdbc.update("update item_activity set created_at = date_trunc('day', now()) - interval '12 hours' where kind = 'status_changed'")
 
         // z 依赖 x(未终态)→ z 被阻塞;指给小李
         val z = createItem(authed, "CHE", "z")["itemId"].asText()
