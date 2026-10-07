@@ -19,7 +19,7 @@ export default defineConfig({
     { name: "auth", testMatch: /auth\.spec\.ts/, fullyParallel: false },
     { name: "e2e", testIgnore: /auth\.spec\.ts/, dependencies: ["auth"] },
   ],
-  workers: process.env.CI ? 2 : undefined,
+  workers: process.env.CI ? 2 : 4,
   use: {
     baseURL: config.baseURL,
     locale: "zh-CN",
