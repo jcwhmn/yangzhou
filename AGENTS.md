@@ -1,6 +1,6 @@
 # yangzhou — 仓库指南(给 agent)
 
-开源项目管理系统。核心:**匹配引擎**(Requirement × Capability → 单人输出可行性/技能差距,团队输出分配建议)。API-first:CLI 与 Web 都是 OpenAPI 契约的瘦客户端。栈:Kotlin + Spring Boot 4 / Postgres + JSONB / Next.js + MUI + TS / MIT。
+开源项目管理系统。核心:**匹配引擎**(Requirement × Capability → 单人输出可行性/技能差距,团队输出分配建议)。API-first:CLI 与 Web 都是 OpenAPI 契约的瘦客户端。栈:Kotlin + Spring Boot 4 / Postgres + JSONB / Next.js + MUI + TS / AGPL-3.0。
 
 ## 真相源(动笔前按触发条件读)
 
