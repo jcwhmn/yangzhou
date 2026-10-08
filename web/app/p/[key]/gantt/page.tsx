@@ -85,9 +85,6 @@ export default function GanttPage() {
     <Container maxWidth="lg" sx={{ py: 4 }}>
       <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
         <Typography variant="h5">{`${String(key)} · 甘特`}</Typography>
-        <Button size="small" component={Link} href={`/p/${key}`}>
-          ← 看板
-        </Button>
       </Stack>
 
       {rows === null ? (

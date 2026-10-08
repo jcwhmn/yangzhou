@@ -21,7 +21,6 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { AppNav } from "@/components/AppNav";
 import { t } from "@/lib/texts";
 import { AssignPopover } from "@/components/AssignPopover";
 
@@ -106,7 +105,6 @@ export default function TableViewPage() {
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
-      <AppNav />
       <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }} flexWrap="wrap" useFlexGap>
         <Typography variant="h5">{`${String(key)} · 表格`}</Typography>
         <Select size="small" value={sort} onChange={(e) => setSort(String(e.target.value))} sx={{ width: 150 }}>
@@ -114,9 +112,6 @@ export default function TableViewPage() {
           <MenuItem value="priority">按优先级</MenuItem>
           <MenuItem value="status">按状态</MenuItem>
         </Select>
-        <Button size="small" component={Link} href={`/p/${key}`}>
-          ← 看板
-        </Button>
       </Stack>
 
       {/* 列 toggle */}
