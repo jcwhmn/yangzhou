@@ -12,6 +12,8 @@ import {
   MenuItem,
   Select,
   Stack,
+  Tab,
+  Tabs,
   TextField,
   Typography,
 } from "@mui/material";
@@ -149,6 +151,7 @@ export default function ItemDetailPage() {
   const [depAddOpen, setDepAddOpen] = useState(false);
   const [checklist, setChecklist] = useState<Checklist | null>(null);
   const [newCheckText, setNewCheckText] = useState("");
+  const [tab, setTab] = useState(0);
 
   const load = useCallback(async () => {
     const [it, project, attrs, feas, acts, spr, rel] = await Promise.all([
@@ -555,6 +558,14 @@ export default function ItemDetailPage() {
         </Stack>
       </Stack>
 
+      <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="scrollable" sx={{ mb: 2, minHeight: 32 }}>
+        {t.item.detailTabs.map((label) => (
+          <Tab key={label} label={label} sx={{ minHeight: 32, py: 0.5 }} />
+        ))}
+      </Tabs>
+
+      {tab === 0 && (
+      <>
       <Typography variant="h6" sx={{ mb: 1 }}>
         评论
       </Typography>
@@ -595,8 +606,10 @@ export default function ItemDetailPage() {
           发送
         </Button>
       </Stack>
+      </>)}
 
-      {activity.length > 0 && (
+
+      {tab === 1 && activity.length > 0 && (
         <Box sx={{ mt: 3 }}>
           <Typography variant="h6" gutterBottom>
             活动日志
@@ -614,7 +627,7 @@ export default function ItemDetailPage() {
         </Box>
       )}
 
-      {feasibility && (
+      {tab === 2 && feasibility && (
         <Box sx={{ mt: 3 }}>
           <Stack direction="row" spacing={1} alignItems="center">
             <Typography variant="h6">{t.item.verdicts}</Typography>
@@ -632,8 +645,9 @@ export default function ItemDetailPage() {
         </Box>
       )}
 
-      {/* 评论/日志/判定/需求/依赖+清单/工时/GitHub 全部单页直出,无页签(YPJ-6 反馈) */}
+      {/* 七区块横向页签:评论/日志/判定/需求/依赖+清单/工时/GitHub,顺序即昨日所定(YPJ-11;恢复 YPJ-6 曾一度去页签的形态) */}
 
+      {tab === 3 && (
       <Box>
         <Typography variant="h6">{t.item.requirements}</Typography>
           {(item.requirements ?? []).length === 0 ? (
@@ -654,6 +668,7 @@ export default function ItemDetailPage() {
             编辑需求
           </Button>
         </Box>
+      )}
 
       <RequirementsDialog
         open={reqOpen}
@@ -662,6 +677,8 @@ export default function ItemDetailPage() {
         attributes={attributes}
       />
 
+      {tab === 4 && (
+        <>
       <Box>
         <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
           <Typography variant="h6">检查清单</Typography>
@@ -725,7 +742,10 @@ export default function ItemDetailPage() {
           </Stack>
         )}
       </Box>
+        </>
+      )}
 
+      {tab === 5 && (
       <Box>
         <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
           <Typography variant="h6">{t.time.section}</Typography>
@@ -812,7 +832,9 @@ export default function ItemDetailPage() {
           </Stack>
         ))}
       </Box>
+      )}
 
+      {tab === 6 && (
       <Box>
         <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
           <Typography variant="h6">{t.gh.gitRefs}</Typography>
@@ -907,6 +929,7 @@ export default function ItemDetailPage() {
       />
 
       </Box>
+      )}
 
       <Box sx={{ width: 240, flexShrink: 0 }}>
         <Typography variant="caption" color="text.secondary">
