@@ -5,12 +5,15 @@ import AddIcon from "@mui/icons-material/Add";
 import Link from "next/link";
 import { usePathname, useParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { api, API_BASE } from "@/lib/api";
 import { t } from "@/lib/texts";
 import { MilestoneManager, type Milestone } from "@/components/MilestoneManager";
 import { ReleaseManager, type Release } from "@/components/ReleaseManager";
-import { Tune as TuneIcon } from "@mui/icons-material";
+import { Download as DownloadIcon, GitHub as GitHubIcon, Group as GroupIcon, Tune as TuneIcon } from "@mui/icons-material";
 import type { Signal } from "@/components/Verdict";
+import { WorkflowEditor } from "@/components/WorkflowEditor";
+import { ProjectMembersPanel } from "@/components/ProjectMembersPanel";
+import { GithubSettingsPanel } from "@/components/GithubSettingsPanel";
 
 type Sprint = { sprintId: string; name: string; status: string };
 type NavItem = { itemId: string; number: string; title: string; type: string; parentItemId: string | null; feasSignal: Signal | null };
@@ -34,6 +37,9 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [error, setError] = useState("");
+  const [wfOpen, setWfOpen] = useState(false);
+  const [membersOpen, setMembersOpen] = useState(false);
+  const [ghOpen, setGhOpen] = useState(false);
 
   const loadSprints = () => {
     // CI 冷 JVM 偶发连接重置(status -1):失败隔 1s 重试一次
@@ -98,9 +104,41 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
   };
   const dotColor: Record<Signal, string> = { GREEN: "success.main", YELLOW: "warning.main", RED: "error.main" };
 
+  async function exportXlsx(projectKey: string) {
+    const token = localStorage.getItem("yz-token");
+    const res = await fetch(`${API_BASE}/api/projects/${projectKey}/export.xlsx`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) throw new Error("导出失败");
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${projectKey}-export.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <Box sx={{ display: "flex", minHeight: "100vh" }}>
       <Box component="nav" sx={{ width: 210, flexShrink: 0, bgcolor: "grey.50" }}>
+        <Box sx={{ px: 1.5, pt: 1.5, pb: 0.5, display: "flex", alignItems: "center", gap: 0.25 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>
+            {String(key).toUpperCase()}
+          </Typography>
+          <IconButton size="small" aria-label={t.wf.button} onClick={() => setWfOpen(true)}>
+            <TuneIcon fontSize="small" />
+          </IconButton>
+          <IconButton size="small" aria-label={t.membersPanel.button} onClick={() => setMembersOpen(true)}>
+            <GroupIcon fontSize="small" />
+          </IconButton>
+          <IconButton size="small" aria-label={t.gh.button} onClick={() => setGhOpen(true)}>
+            <GitHubIcon fontSize="small" />
+          </IconButton>
+          <IconButton size="small" aria-label="导出" onClick={() => exportXlsx(String(key))}>
+            <DownloadIcon fontSize="small" />
+          </IconButton>
+        </Box>
         <List dense disablePadding sx={{ py: 2 }}>
           <ListItemButton component={Link} href={`/p/${key}/overview`} selected={pathname === `/p/${key}/overview`} sx={itemSx}>
             <ListItemText primary={t.projectNav.overview} />
@@ -276,6 +314,23 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
         projectKey={String(key)}
         releases={releases}
         onChanged={loadSide}
+      />
+      <WorkflowEditor
+        projectKey={String(key)}
+        open={wfOpen}
+        onClose={() => setWfOpen(false)}
+        onChanged={() => window.dispatchEvent(new Event("yz:project-changed"))}
+      />
+      <ProjectMembersPanel
+        projectKey={String(key)}
+        open={membersOpen}
+        onClose={() => setMembersOpen(false)}
+        onChanged={() => window.dispatchEvent(new Event("yz:project-changed"))}
+      />
+      <GithubSettingsPanel
+        projectKey={String(key)}
+        open={ghOpen}
+        onClose={() => setGhOpen(false)}
       />
     </Box>
   );

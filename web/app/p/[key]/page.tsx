@@ -19,12 +19,9 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { api, API_BASE } from "@/lib/api";
+import { api } from "@/lib/api";
 import { t } from "@/lib/texts";
-import { WorkflowEditor } from "@/components/WorkflowEditor";
 import { AssignPopover } from "@/components/AssignPopover";
-import { ProjectMembersPanel } from "@/components/ProjectMembersPanel";
-import { GithubSettingsPanel } from "@/components/GithubSettingsPanel";
 import type { Signal } from "@/components/Verdict";
 
 type Status = { statusId: string; name: string; icon: string | null; isStart: boolean; isFinal: boolean; position: number };
@@ -59,9 +56,6 @@ export default function BoardPage() {
   const [filter, setFilter] = useState<Filter>("all");
   const [sprintFilter, setSprintFilter] = useState("all");
   const [sprints, setSprints] = useState<SprintLite[]>([]);
-  const [wfOpen, setWfOpen] = useState(false);
-  const [membersOpen, setMembersOpen] = useState(false);
-  const [ghOpen, setGhOpen] = useState(false);
 
   // V9-Q3:看板 30s 自动刷新(手刷按钮同函数)
   useEffect(() => {
@@ -98,6 +92,13 @@ export default function BoardPage() {
     load();
   }, [load]);
 
+  // 项目级面板(工作流/成员)改动 → 刷新本页数据(面板已上移至 layout,YPJ-13)
+  useEffect(() => {
+    const h = () => load();
+    window.addEventListener("yz:project-changed", h);
+    return () => window.removeEventListener("yz:project-changed", h);
+  }, [load]);
+
   async function addItem(e: React.FormEvent) {
     e.preventDefault();
     if (!newTitle.trim()) return;
@@ -108,21 +109,6 @@ export default function BoardPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "创建失败");
     }
-  }
-
-  async function exportXlsx(projectKey: string) {
-    const token = localStorage.getItem("yz-token");
-    const res = await fetch(`${API_BASE}/api/projects/${projectKey}/export.xlsx`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
-    if (!res.ok) throw new Error("导出失败");
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${projectKey}-export.xlsx`;
-    a.click();
-    URL.revokeObjectURL(url);
   }
 
   async function moveTo(itemId: string, status: Status) {
@@ -177,20 +163,8 @@ export default function BoardPage() {
           </Button>
         </Stack>
         <Box sx={{ ml: "auto" }}>
-          <Button size="small" onClick={() => setWfOpen(true)}>
-            {t.wf.button}
-          </Button>
-          <Button size="small" onClick={() => setMembersOpen(true)}>
-            {t.membersPanel.button}
-          </Button>
-          <Button size="small" onClick={() => setGhOpen(true)}>
-            {t.gh.button}
-          </Button>
           <Button size="small" component={Link} href={`/p/${key}/time`}>
             工时
-          </Button>
-          <Button size="small" onClick={() => exportXlsx(String(key))}>
-            导出
           </Button>
         </Box>
       </Stack>
@@ -367,23 +341,6 @@ export default function BoardPage() {
         </Stack>
       )}
 
-      <WorkflowEditor
-        projectKey={String(key)}
-        open={wfOpen}
-        onClose={() => setWfOpen(false)}
-        onChanged={load}
-      />
-      <ProjectMembersPanel
-        projectKey={String(key)}
-        open={membersOpen}
-        onClose={() => setMembersOpen(false)}
-        onChanged={load}
-      />
-      <GithubSettingsPanel
-        projectKey={String(key)}
-        open={ghOpen}
-        onClose={() => setGhOpen(false)}
-      />
     </Box>
   );
 }
