@@ -72,8 +72,9 @@ docs/      adr/ · spec/ · architecture/(puml 类图) · requirement/(PRD) · p
 ## 测试
 
 - 唯一 seam = REST API 黑盒(spec);引擎纯函数直测。
-- 单元测试:类级并行安全——无共享可变全局态、不碰真 DB/网络,不起 Spring;CI 跑。
-- 集成测试:`@SpringBootTest(RANDOM_PORT)` + `RestTestClient`;不用 MockMvc / @WebMvcTest / TestRestTemplate;不用 @Transactional 回滚——每测试自清自建、只造自己要的数据,断言响应体与库内状态。
+- 单元测试:类级并行安全——无共享可变全局态、不碰真 DB/网络,不起 Spring;CI 只跑单元(`gradle test`)。
+- 集成测试:`@SpringBootTest(RANDOM_PORT)` + `RestTestClient`;不用 MockMvc / @WebMvcTest / TestRestTemplate;不用 @Transactional 回滚——每测试自清自建、只造自己要的数据,断言响应体与库内状态。**必须 extends AbstractApiTest**(靠基类 @Tag 继承归轨,spec 0014)。
+- 双轨(2026-10-09):CI 只跑单元;集成测试 merge 前本人本地 `gradle integrationTest`;nightly workflow 全量兜底,红了必修。
 - 敏感值(密码/token)永不进日志;登录失败消息保持笼统。
 - **不要猜前端或后端是否已运行,需要运行环境的,告知需要的运行环境,命令,从我这里确认**。
 
@@ -114,3 +115,5 @@ docs/      adr/ · spec/ · architecture/(puml 类图) · requirement/(PRD) · p
 main 干线开发;原型留 `prototype/*` 分支;每张票 = 一个 YPJ item(dogfood),验收清单全绿才关票。
 
 - **spec 文件是版本必须项**:开工前立 `docs/spec/00NN`(增量节,概要设计),完工后补 As-built;无 spec 不开工(2026-10-08 定,V16 系补录见 0013)。Linear 已冻结只读(历史存档),不再开新票。
+- **每票实现前三件套**(2026-10-09 立):spec 增量节含 ①需求(写细,含范围/非目标)②详细设计(代码级修改计划:改哪些文件、怎么改、否决的备选)③手工测试用例(供用户 build/debug 阶段执行);用户过目后才编码。
+- **编码完成后停**:功能代码+测试代码写完即停,等用户 build/debug,通过后再 PR。
