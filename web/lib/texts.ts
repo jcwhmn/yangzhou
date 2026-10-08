@@ -331,6 +331,8 @@ export const t = {
   projectNav: {
     overview: "Overview",
     board: "看板",
+    gantt: "甘特",
+    table: "表格",
     sprints: "Sprint",
     backlog: "Backlog",
     epics: "Epic",
