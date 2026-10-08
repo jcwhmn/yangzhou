@@ -246,6 +246,9 @@ export const t = {
     noteLabel: "备注(可选)",
     save: "保存",
     failed: "操作失败",
+    suggest: "从 GitHub 生成建议",
+    suggestEmpty: "无关联分支,或分支 commit 不足以成段(需 ≥2 个提交)。",
+    logSuggestion: "落账",
     fmt: (m: number) => (m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`),
   },
   activity: {

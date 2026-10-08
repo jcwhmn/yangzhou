@@ -92,6 +92,14 @@ type TimeEntry = {
   note: string | null;
 };
 
+type SuggestedEntry = {
+  repo: string;
+  ref: string;
+  commitCount: number;
+  startedAt: string;
+  endedAt: string;
+  note: string;
+};
 const activityLabel: Record<string, string> = {
   created: "创建",
   status_changed: "状态变更",
@@ -134,6 +142,8 @@ export default function ItemDetailPage() {
   const [timeLog, setTimeLog] = useState<{ entries: TimeEntry[]; totalMinutes: number } | null>(null);
   const [manualMinutes, setManualMinutes] = useState("");
   const [manualNote, setManualNote] = useState("");
+  const [suggestions, setSuggestions] = useState<SuggestedEntry[] | null>(null);
+  const [suggestionsBusy, setSuggestionsBusy] = useState(false);
   const [deps, setDeps] = useState<Dep[] | null>(null);
   const [depBlocked, setDepBlocked] = useState(false);
   const [depAddOpen, setDepAddOpen] = useState(false);
@@ -265,6 +275,35 @@ export default function ItemDetailPage() {
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : t.time.failed);
+    }
+  }
+
+  async function loadSuggestions() {
+    setError("");
+    setSuggestionsBusy(true);
+    try {
+      setSuggestions(await api<SuggestedEntry[]>(`/api/items/${itemId}/time-entry-suggestions`));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t.time.failed);
+    } finally {
+      setSuggestionsBusy(false);
+    }
+  }
+
+  async function logSuggestion(s: SuggestedEntry) {
+    setError("");
+    setSuggestionsBusy(true);
+    try {
+      await api(`/api/items/${itemId}/time-entries`, {
+        method: "POST",
+        body: JSON.stringify({ minutes: null, startedAt: s.startedAt, endedAt: s.endedAt, note: s.note }),
+      });
+      setSuggestions((prev) => (prev ?? []).filter((x) => x.ref !== s.ref));
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t.time.failed);
+    } finally {
+      setSuggestionsBusy(false);
     }
   }
 
@@ -751,6 +790,27 @@ export default function ItemDetailPage() {
             {t.time.addManual}
           </Button>
         </Stack>
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
+          <Button size="small" variant="outlined" onClick={loadSuggestions} disabled={suggestionsBusy}>
+            {t.time.suggest}
+          </Button>
+        </Stack>
+        {suggestions !== null && suggestions.length === 0 && (
+          <Typography variant="caption" color="text.secondary">
+            {t.time.suggestEmpty}
+          </Typography>
+        )}
+        {(suggestions ?? []).map((s) => (
+          <Stack key={s.ref} direction="row" spacing={1} alignItems="center" sx={{ mt: 0.5 }}>
+            <Typography variant="caption" color="text.secondary">
+              {s.ref} · {s.commitCount} commits · {new Date(s.startedAt).toLocaleString("zh-CN")} →{" "}
+              {new Date(s.endedAt).toLocaleTimeString("zh-CN")}
+            </Typography>
+            <Button size="small" variant="outlined" onClick={() => logSuggestion(s)} disabled={suggestionsBusy}>
+              {t.time.logSuggestion}
+            </Button>
+          </Stack>
+        ))}
       </Box>
 
       <Box>

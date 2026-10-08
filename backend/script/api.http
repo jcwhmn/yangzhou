@@ -537,9 +537,79 @@ Content-Type: application/json
 GET {{host}}/api/items/{{itemId}}/commits
 Authorization: Bearer {{token}}
 
+# ============ 13. 工时(V8-S3;V16-3 起止补录 + 工时建议) ============
+
+### 开计时(minutes 空 = 计时;全局唯一,开新自动停旧)
+POST {{host}}/api/items/{{itemId}}/time-entries
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "minutes": null
+}
+
+### 补录 minutes(与起止互斥;服务端按 now 往回推)
+POST {{host}}/api/items/{{itemId}}/time-entries
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "minutes": 90,
+  "note": "下午改引擎"
+}
+
+### 起止补录(V16-3;工时建议落账走这里,ISO-8601)
+POST {{host}}/api/items/{{itemId}}/time-entries
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "minutes": null,
+  "startedAt": "2026-10-07T01:00:00Z",
+  "endedAt": "2026-10-07T03:30:00Z",
+  "note": "分支 cwjiang/YPJ-8-x 提交段"
+}
+
+### item 工时明细 + 合计
+GET {{host}}/api/items/{{itemId}}/time-entries
+Authorization: Bearer {{token}}
+
+### 停止计时
+POST {{host}}/api/time-entries/{{timeEntryId}}/stop
+Authorization: Bearer {{token}}
+
+### 项目按人聚合
+GET {{host}}/api/projects/{{pkey}}/time-summary
+Authorization: Bearer {{token}}
+
+### 工时建议(V16-3:分支 commit 时间轴 → 草稿;人确认后走上方起止补录)
+GET {{host}}/api/items/{{itemId}}/time-entry-suggestions
+Authorization: Bearer {{token}}
+
 # ============================================================
 # 负例区:以下请求「红色 = 预期」,演示约束生效,不要当 bug
 # ============================================================
+
+### [预期 400] 起止不成对(只有 startedAt)
+POST {{host}}/api/items/{{itemId}}/time-entries
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "minutes": null,
+  "startedAt": "2026-10-07T01:00:00Z"
+}
+
+### [预期 400] endedAt 不晚于 startedAt
+POST {{host}}/api/items/{{itemId}}/time-entries
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "minutes": null,
+  "startedAt": "2026-10-07T03:00:00Z",
+  "endedAt": "2026-10-07T01:00:00Z"
+}
 
 ### [预期 409] 重复加入池
 POST {{host}}/api/projects/{{pkey}}/members

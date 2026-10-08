@@ -129,4 +129,29 @@ class TimeEntryApiTest : AbstractApiTest() {
         authed.get().uri("/api/projects/NOPE/time-summary")
             .exchange().expectStatus().isNotFound()
     }
+    @Test
+    fun `起止补录——真实时间落库——分钟按段折算`() {
+        val (authed, i1, _) = setup()
+        authed.post().uri("/api/items/$i1/time-entries")
+            .body(mapOf<String, Any?>("minutes" to null, "startedAt" to "2026-10-07T01:00:00Z", "endedAt" to "2026-10-07T03:30:00Z", "note" to "分支提交段"))
+            .exchange().expectStatus().isCreated()
+
+        val e = log(authed, i1)["entries"][0]
+        assertEquals("2026-10-07T01:00:00Z", e["startedAt"].asText())
+        assertEquals(150, e["minutes"].asLong())
+        assertEquals("分支提交段", e["note"].asText())
+    }
+
+    @Test
+    fun `起止补录负例——不成对 400——end 不晚于 start 400——与 minutes 互斥 400——坏格式 400`() {
+        val (authed, i1, _) = setup()
+        val post: (Map<String, Any?>) -> org.springframework.test.web.servlet.client.RestTestClient.ResponseSpec =
+            { b -> authed.post().uri("/api/items/$i1/time-entries").body(b).exchange() }
+        post(mapOf<String, Any?>("minutes" to null, "startedAt" to "2026-10-07T01:00:00Z")).expectStatus().isBadRequest()
+        post(mapOf<String, Any?>("minutes" to null, "startedAt" to "2026-10-07T03:00:00Z", "endedAt" to "2026-10-07T01:00:00Z")).expectStatus().isBadRequest()
+        post(mapOf<String, Any?>("minutes" to 30, "startedAt" to "2026-10-07T01:00:00Z", "endedAt" to "2026-10-07T02:00:00Z")).expectStatus().isBadRequest()
+        post(mapOf<String, Any?>("minutes" to null, "startedAt" to "not-a-time", "endedAt" to "2026-10-07T02:00:00Z")).expectStatus().isBadRequest()
+        assertEquals(0, log(authed, i1)["entries"].size())
+    }
+
 }
