@@ -59,6 +59,7 @@ export const t = {
     status: "状态",
     type: "类型",
     requirements: "需求",
+    detailTabs: ["评论", "日志", "判定", "需求", "依赖+清单", "工时", "GitHub"],
     addRequirement: "加一条需求",
     attribute: "属性",
     minLevel: "最低等级",
