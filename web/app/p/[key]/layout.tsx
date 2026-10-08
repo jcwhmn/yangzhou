@@ -108,6 +108,12 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
           <ListItemButton component={Link} href={`/p/${key}`} selected={pathname === `/p/${key}`} sx={itemSx}>
             <ListItemText primary={t.projectNav.board} />
           </ListItemButton>
+          <ListItemButton component={Link} href={`/p/${key}/gantt`} selected={pathname === `/p/${key}/gantt`} sx={itemSx}>
+            <ListItemText primary={t.projectNav.gantt} />
+          </ListItemButton>
+          <ListItemButton component={Link} href={`/p/${key}/table`} selected={pathname === `/p/${key}/table`} sx={itemSx}>
+            <ListItemText primary={t.projectNav.table} />
+          </ListItemButton>
           <Divider sx={{ my: 1 }} />
           <ListSubheader disableSticky sx={{ bgcolor: "transparent", display: "flex", alignItems: "center" }}>
             <span style={{ flex: 1 }}>{t.projectNav.sprints}</span>
