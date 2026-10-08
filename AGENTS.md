@@ -111,4 +111,6 @@ docs/      adr/ · spec/ · architecture/(puml 类图) · requirement/(PRD) · p
 
 ## 工作流
 
-main 干线开发;原型留 `prototype/*` 分支;每张票 = 一个 YPJ item(dogfood),验收清单全绿才关票。Linear 已冻结只读(历史存档),不再开新票。
+main 干线开发;原型留 `prototype/*` 分支;每张票 = 一个 YPJ item(dogfood),验收清单全绿才关票。
+
+- **spec 文件是版本必须项**:开工前立 `docs/spec/00NN`(增量节,概要设计),完工后补 As-built;无 spec 不开工(2026-10-08 定,V16 系补录见 0013)。Linear 已冻结只读(历史存档),不再开新票。
