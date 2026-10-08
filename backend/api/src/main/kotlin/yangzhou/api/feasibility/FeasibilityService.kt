@@ -135,7 +135,9 @@ class FeasibilityService(
 
     /** capability 变更影响全 workspace:重算所有项目(V9-Q2)。 */
     fun recomputeWorkspace() {
-        projects.findAll().forEach { recomputeProjectSignal(it.id!!) }
+        // YPJ-10:按 id 升序锁定 project 行——并发重算各自按同一全序 UPDATE,消除锁序环
+        // (此前 findAll 无序,行锁获取顺序不定 → PostgreSQL 40P01 deadlock → 500,日志实锤)
+        projects.findAll().sortedBy { it.id }.forEach { recomputeProjectSignal(it.id!!) }
     }
 
     /** V9-S1 短板聚合(服务端算,替代首页 N 次调用+客户端聚合)。 */
