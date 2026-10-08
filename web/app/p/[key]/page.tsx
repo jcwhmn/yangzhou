@@ -7,6 +7,7 @@ import {
   Card,
   CardContent,
   Chip,
+  IconButton,
   MenuItem,
   Select,
   Skeleton,
@@ -14,6 +15,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import RefreshIcon from "@mui/icons-material/Refresh";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -160,6 +162,9 @@ export default function BoardPage() {
     <Box sx={{ p: 3 }}>
       <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
         <Typography variant="h5">{String(key).toUpperCase()} · 看板</Typography>
+        <IconButton size="small" aria-label={t.board.refresh} onClick={() => load()}>
+          <RefreshIcon fontSize="small" />
+        </IconButton>
         <Stack component="form" direction="row" spacing={1} onSubmit={addItem}>
           <TextField
             size="small"
@@ -180,15 +185,6 @@ export default function BoardPage() {
           </Button>
           <Button size="small" onClick={() => setGhOpen(true)}>
             {t.gh.button}
-          </Button>
-          <Button size="small" onClick={() => load()}>
-            {t.board.refresh}
-          </Button>
-          <Button size="small" component={Link} href={`/p/${key}/gantt`}>
-            甘特
-          </Button>
-          <Button size="small" component={Link} href={`/p/${key}/table`}>
-            表格
           </Button>
           <Button size="small" component={Link} href={`/p/${key}/time`}>
             工时
