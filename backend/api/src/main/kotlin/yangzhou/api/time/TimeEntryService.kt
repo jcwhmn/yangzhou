@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
+import yangzhou.api.github.GithubCommitService
 import yangzhou.api.member.MemberService
 import yangzhou.api.projectmember.ProjectMemberService
 import yangzhou.api.support.BadRequestException
@@ -37,6 +38,7 @@ class TimeEntryService(
     private val members: MemberRepository,
     private val memberService: MemberService,
     private val projectMembers: ProjectMemberService,
+    private val githubCommits: GithubCommitService,
 ) {
 
     data class TimeEntryDto(
@@ -65,11 +67,21 @@ class TimeEntryService(
         if (minutes != null && (startedAtText != null || endedAtText != null)) {
             throw BadRequestException("补录只填 minutes 与备注;计时模式由服务端生成起止")
         }
+        if (minutes == null && startedAtText == null && endedAtText != null) {
+            throw BadRequestException("起止需成对:startedAt 与 endedAt 都要给")
+        }
         val item = items.findByObjectId(itemId) ?: throw NotFoundException("item 不存在")
         val me = memberService.current()
         projectMembers.assertAssignable(item.projectId, me.id!!)
 
         val entry = when {
+            minutes == null && startedAtText != null -> { // V16-3 起止补录(工时建议落账走这里);首末 commit ≈ 开工/收工
+                val endText = endedAtText ?: throw BadRequestException("起止需成对:startedAt 与 endedAt 都要给")
+                val start = parseInstant(startedAtText) ?: throw BadRequestException("startedAt 应为 ISO-8601(如 2026-10-07T14:00:00Z)")
+                val end = parseInstant(endText) ?: throw BadRequestException("endedAt 应为 ISO-8601")
+                if (!end.isAfter(start)) throw BadRequestException("endedAt 必须晚于 startedAt")
+                TimeEntry(itemId = item.id!!, memberId = me.id!!, startedAt = start, endedAt = end, note = note)
+            }
             minutes == null -> { // 计时:停掉我所有进行中的,再开新的
                 timeEntries.findByMemberIdAndEndedAtIsNull(me.id!!)
                     .forEach { timeEntries.save(it.copy(endedAt = Instant.now())) }
@@ -125,6 +137,39 @@ class TimeEntryService(
             .sortedByDescending { it.totalMinutes }
     }
 
+    data class SuggestedEntry(
+        val repo: String,
+        val ref: String,
+        val commitCount: Int,
+        val startedAt: String,
+        val endedAt: String,
+        val note: String,
+    )
+
+    /** V16-3 工时建议:分支 commit 时间轴 ≈ 工作记录(首 commit ≈ 开工,末 commit ≈ 收工);只出草稿,不落账。 */
+    fun suggest(itemId: UUID): List<SuggestedEntry> = buildSuggestions(githubCommits.commitsForItem(itemId))
+
+    private fun parseInstant(text: String): Instant? = runCatching { Instant.parse(text) }.getOrNull()
+
+    companion object {
+        /** 纯映射:≥2 个带时间戳的 commit 才成段(单 commit 无从定义收工);无日期 commit 忽略。 */
+        fun buildSuggestions(refs: List<GithubCommitService.RefCommitsDto>): List<SuggestedEntry> =
+            refs.mapNotNull { ref ->
+                val dates = ref.commits
+                    .mapNotNull { c -> c.date?.let { d -> runCatching { Instant.parse(d) }.getOrNull() } }
+                    .sorted()
+                if (dates.size < 2) return@mapNotNull null
+                SuggestedEntry(
+                    repo = ref.repo,
+                    ref = ref.ref,
+                    commitCount = ref.commits.size,
+                    startedAt = dates.first().toString(),
+                    endedAt = dates.last().toString(),
+                    note = "分支 ${ref.ref} · ${ref.commits.size} commits",
+                )
+            }
+    }
+
     // ---------- 内部 ----------
 
     private fun toDto(e: TimeEntry, memberName: String) = TimeEntryDto(
@@ -168,4 +213,7 @@ class TimeEntryController(private val service: TimeEntryService) {
 
     @GetMapping("/projects/{key}/time-summary")
     fun summary(@PathVariable key: String): List<TimeEntryService.MemberSummary> = service.summary(key)
+
+    @GetMapping("/items/{itemId}/time-entry-suggestions")
+    fun suggestions(@PathVariable itemId: UUID): List<TimeEntryService.SuggestedEntry> = service.suggest(itemId)
 }
