@@ -33,9 +33,32 @@ tasks.withType<Test> {
 }
 
 tasks.test {
+    useJUnitPlatform {
+        excludeTags("integration")
+    }
     testLogging {
         events("failed")
         exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
         showStandardStreams = true
     }
+}
+
+val integrationTest by tasks.registering(Test::class) {
+    group = "verification"
+    description = "Integration tests (Spring Boot + Testcontainers, needs Docker; spec 0014)"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform {
+        includeTags("integration")
+    }
+    shouldRunAfter(tasks.test)
+    testLogging {
+        events("failed")
+        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+        showStandardStreams = true
+    }
+}
+
+tasks.named("check") {
+    dependsOn(integrationTest)
 }

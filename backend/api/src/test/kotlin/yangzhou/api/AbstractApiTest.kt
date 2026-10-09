@@ -3,6 +3,7 @@ package yangzhou.api
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Tag
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.web.server.LocalServerPort
@@ -18,6 +19,7 @@ import kotlin.test.assertEquals
  * 唯一 seam = REST API 黑盒(Testcontainers 真 Postgres,不 mock 领域/仓储)。
  * 容器为 JVM 级单例,跨测试类复用;每测试自清全部表。
  */
+@Tag("integration")
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 abstract class AbstractApiTest {
 

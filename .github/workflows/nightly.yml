@@ -1,13 +1,12 @@
-name: backend
+name: nightly
 
 on:
-  push:
-    paths: [backend/**, .github/workflows/backend.yml]
-  pull_request:
-    paths: [backend/**, .github/workflows/backend.yml]
+  schedule:
+    - cron: '0 20 * * *' # UTC 20:00 = 北京 04:00,全量兜底(spec 0014)
+  workflow_dispatch:
 
 jobs:
-  build:
+  full-build:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -19,4 +18,4 @@ jobs:
           distribution: temurin
           java-version: 25
       - uses: gradle/actions/setup-gradle@v4
-      - run: gradle test
+      - run: gradle build
