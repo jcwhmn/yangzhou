@@ -10,6 +10,7 @@ import { config } from "./e2e/config";
  */
 export default defineConfig({
   testDir: "./e2e",
+  globalSetup: "./e2e/global-setup.mjs",
   timeout: 30_000,
   retries: process.env.CI ? 1 : 0,
   fullyParallel: true,
