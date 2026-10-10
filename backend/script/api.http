@@ -516,12 +516,13 @@ DELETE {{host}}/api/projects/{{pkey}}/releases/{{releaseId}}
 # ============ 12. GitHub(V6 配置 + V16-2 按需拉取;轮询兑底见 application.yml yangzhou.github) ============
 
 ### 配 workspace PAT(永不回显,只回尾 4 位)
+# token 真值放 http-client.private.env.json(gitignored 不入库);private 同名 env 自动覆盖
 PUT {{host}}/api/workspace/github-token
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-  "token": "github_pat_xxx"
+  "token": "{{github-token}}"
 }
 
 ### 项目挂载仓库(handler 不存变量;repo = owner/name)

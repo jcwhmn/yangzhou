@@ -24,3 +24,5 @@ web/pnpm-workspace.yaml
 .screenshots/
 test-results/
 .scratch/
+# JetBrains HTTP Client 私有环境(本机密钥,永不入库)
+backend/script/http-client.private.env.json
