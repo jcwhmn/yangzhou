@@ -61,27 +61,6 @@ jobs:
         working-directory: web
         run: npx playwright install --with-deps chromium
 
-      - name: 预热路由(临时 dev server 编译全部用例路由后关闭)
-        working-directory: web
-        run: |
-          npm run dev > /tmp/dev.log 2>&1 &
-          echo $! > /tmp/dev.pid
-          for i in $(seq 1 60); do
-            curl -s -o /dev/null http://localhost:3000/login && break
-            sleep 2
-          done
-          TOKEN=$(curl -s -X POST http://localhost:8080/api/auth/login -H "Content-Type: application/json" -d '{"username":"me","password":"secret"}' | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
-          for route in / /notifications /recycle-bin /capabilities /attributes /members; do
-            curl -s -o /dev/null -H "Authorization: Bearer $TOKEN" "http://localhost:3000$route"
-          done
-          curl -s -o /dev/null -X POST http://localhost:8080/api/projects -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" -d '{"key":"WARMUP1","name":"warmup"}'
-          ITEM=$(curl -s -X POST http://localhost:8080/api/projects/WARMUP1/items -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" -d '{"title":"warmup"}' | sed -n 's/.*"itemId":"\([^"]*\)".*/\1/p')
-          for route in "/p/WARMUP1" "/p/WARMUP1/backlog" "/p/WARMUP1/gantt" "/p/WARMUP1/table" "/p/WARMUP1/i/$ITEM" "/p/WARMUP1/sprint/00000000-0000-0000-0000-000000000000"; do
-            curl -s -o /dev/null -H "Authorization: Bearer $TOKEN" "http://localhost:3000$route"
-          done
-          fuser -k 3000/tcp || true
-          sleep 2
-
       - name: 跑 E2E
         working-directory: web
         run: npx playwright test

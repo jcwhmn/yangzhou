@@ -1,6 +1,6 @@
 # 0021 — V17-8 E2E 稳定性:跑前自动清库 + 路由预热进 globalSetup,修标准命令
 
-> 状态:**设计评审中** —— 待用户确认后编码;编码完成后停,等用户 build/debug
+> 状态:**已实现(v3 prod server 方案)** —— 编码完成,待用户 build/debug(TC1–TC5)
 > 票:YPJ-21 · 前置:YPJ-14 合并(同动 AbstractApiTest/AGENTS)· 影响面:web/e2e、playwright 配置、AbstractApiTest、AGENTS
 
 ## 1. 需求(详细)
@@ -80,4 +80,28 @@ CI 两个 workflow(backend.yml / e2e.yml)· 后端任何生产代码 · E2E 用�
 
 ## As-built
 
-(完工后补)
+> 2026-10-09 实现。§2 的 dev 预热方案(v1/v2)两轮实测失败后,**设计修订为 v3:前端跑 prod server**;以下为最终形态。
+
+### 顺序纠正(推翻 §2.1 假设)
+
+实测:**webServer 先启动,globalSetup 后跑**(§2.1 写反)。v1(globalSetup 起临时 dev 预热后杀)因此失效——webServer 另起的新 dev 仍逐路由按需编译、广播照发;v2(预热 dev 存活被 reuseExistingServer 复用)中 warm 阶段本身就是 ~2s/条的 hot-update 广播风暴(13 条 37s 连环),auth 首个 goto 撞进 webpack 未安定窗口 → `net::ERR_ABORTED`。dev 模式下「预热」与「广播」同源,顺序无解。
+
+### v3 最终形态:webServer 直接 build + start
+
+- `playwright.config.ts`:command = `` `npx next build && npx next start -p ${E2E_FRONT_PORT ?? 3000}` ``,timeout 120s→300s(冷 build 1–2min);globalTeardown 引用移除
+- **E2E 独立构建目录**:`next.config.mjs` 加 `distDir: process.env.NEXT_DIST_DIR ?? ".next"`,webServer.env 注入 `NEXT_DIST_DIR=.next-e2e`——build 不踩常驻 dev(3000)的 `.next`;`.next-e2e/` 已入 web/.gitignore
+- `global-setup.mjs` 重写:CI 短路用 **return**(原来 `process.exit(0)` 会吞掉整个测试运行,虚绿);本地仅 resetDb()
+- 删除 `warmup.mjs`、`global-teardown.mjs`(pid 收尾随预热一并删);`npm run e2e` 不再串预热
+- `e2e.yml`:删「预热路由」整步(webServer 自建 prod server);起后端/种子用户步骤不变
+- AGENTS E2E 段同步更新
+
+### TC 调整(相对 §3)
+
+- TC1:prod build 每次全量,无需先删 `.next`,直接全量跑
+- TC2–TC4 照旧;TC5 推分支后看 e2e workflow 绿
+
+### 效果与代价
+
+- 残渣 flake → 每跑自动清库;Fast Refresh 广播 flake → prod server 无 HMR/按需编译,物理根除
+- 代价:每次全量多 ~1–2min build;dev 模式保留日常开发,E2E 不再用
+- 已知残留:board.spec 日期空值偶发断言超时,归 V17-6 日期组件票
