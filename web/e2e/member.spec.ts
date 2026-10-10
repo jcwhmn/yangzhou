@@ -3,7 +3,7 @@ import { expect } from "./support/fixtures";
 import { test } from "./support/fixtures";
 import { apiAssignMe, apiCreateItem, apiCreateMember } from "./support/helpers";
 
-test("V11 成员池色点——有非终态 item 🟢,无 ⚪", async ({ page, projectKey }) => {
+test("V11 成员池色点——有非终态 item 🟢,无 ⚪ @smoke", async ({ page, projectKey }) => {
   // 小王是虚拟成员,干净库不存在,先 API 预置
   await apiCreateMember("小王");
   // me 名下放一个非终态 item → 🟢

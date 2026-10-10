@@ -3,7 +3,7 @@ import { expect } from "./support/fixtures";
 import { test } from "./support/fixtures";
 import { apiCreateItem, selectOption } from "./support/helpers";
 
-test("V12-S3 Sprint 全链路——建/指派/开始/完成/backlog/历史", async ({ page, projectKey }) => {
+test("V12-S3 Sprint 全链路——建/指派/开始/完成/backlog/历史 @smoke", async ({ page, projectKey }) => {
   test.slow();
   await apiCreateItem(projectKey, "E2E 冒烟 item");
   await page.goto(`/p/${projectKey}`);

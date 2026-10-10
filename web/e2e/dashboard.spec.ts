@@ -2,7 +2,7 @@
 import { expect, test } from "./support/fixtures";
 import { apiAssignMe, apiCall, apiCreateItem } from "./support/helpers";
 
-test("驾驶舱聚合——我的 items、活跃 sprint、进行中 milestone", async ({ page, projectKey }) => {
+test("驾驶舱聚合——我的 items、活跃 sprint、进行中 milestone @smoke", async ({ page, projectKey }) => {
   const itemId = await apiCreateItem(projectKey, "驾驶舱聚合任务");
   await apiAssignMe(itemId);
   const sprint = await apiCall<{ sprintId: string }>("POST", `/api/projects/${projectKey}/sprints`, {

@@ -2,7 +2,7 @@
 import { expect } from "./support/fixtures";
 import { test } from "./support/fixtures";
 
-test("建项目表单——创建并打开看板(默认五列)", async ({ page, projectKey }) => {
+test("建项目表单——创建并打开看板(默认五列) @smoke", async ({ page, projectKey }) => {
   await page.goto("/");
   await page.getByLabel("KEY(如 CHE)").fill(`${projectKey}P`);
   await page.getByLabel("名称").fill("E2E UI 建的项目");
