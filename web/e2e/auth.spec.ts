@@ -27,7 +27,8 @@ test("V11-S1 登录后进入上次项目", async ({ page }) => {
   const token = await apiToken();
   // 看板 mount 写 last-project;API 再兜底写一次,压掉并行用例的干扰写
   await page.goto(`/p/${key}`);
-  await page.waitForLoadState("load");
+  // 未登录看板会被 client 端重定向回 /login;等它落定,否则与 uiLogin 的 goto 同 URL 双导航互掐(prod 首载竞态,2026-10-10 CI 取证)
+  await expect(page).toHaveURL(/\/login$/);
   await fetch(`${config.apiURL}/api/members/me/last-project`, {
     method: "PUT",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },

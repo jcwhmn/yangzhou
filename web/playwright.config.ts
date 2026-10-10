@@ -5,11 +5,13 @@ import { config } from "./e2e/config";
  * E2E:并行、按用例隔离(project fixture 唯一 key,数据走 API 预置)。
  * 前置:本机 Postgres(共享 compose)+ 后端 test profile:
  *   gradle :api:bootRun --args='--spring.profiles.active=test'
- * 前端 dev server 由 webServer 拉起(已在跑则复用)。
+ * 前端 prod server(next build && next start)由 webServer 拉起(已在跑则复用);
+ * 构建走独立目录 .next-e2e(NEXT_DIST_DIR),不踩常驻 dev 的 .next。
  * 凭证/地址见 e2e/.env(模板 .env.example)。
  */
 export default defineConfig({
   testDir: "./e2e",
+  globalSetup: "./e2e/global-setup.mjs",
   timeout: 30_000,
   retries: process.env.CI ? 1 : 0,
   fullyParallel: true,
@@ -28,9 +30,10 @@ export default defineConfig({
   },
   webServer: {
     // 双 profile 并存(YPJ-3):日常 3000→8081;E2E 可用 E2E_FRONT_PORT 另起临时前端(配 E2E_BASE_URL + BACKEND_URL 指 test profile)
-    command: process.env.E2E_FRONT_PORT ? `npx next dev -p ${process.env.E2E_FRONT_PORT}` : "npm run dev",
+    command: `npx next build && npx next start -p ${process.env.E2E_FRONT_PORT ?? 3000}`,
+    env: { ...process.env, NEXT_DIST_DIR: ".next-e2e" },
     url: config.baseURL,
     reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
+    timeout: 300_000,
   },
 });

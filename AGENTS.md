@@ -80,7 +80,8 @@ docs/      adr/ · spec/ · architecture/(puml 类图) · requirement/(PRD) · p
 
 ### E2E(web/;Playwright,并行按用例隔离)
 
-- 后端跑 **test profile**(库 yangzhou_test):`gradle :api:bootRun --args='--spring.profiles.active=test'`;前端 `npm run dev`(webServer 自动拉起/复用);凭证与地址在 `web/e2e/.env`(模板 `.env.example`),不硬编码不提交。
+- 后端跑 **test profile**(库 yangzhou_test):`gradle :api:bootRun --args='--spring.profiles.active=test'`;前端由 webServer 拉起 prod server(`next build && next start`,独立构建目录 .next-e2e,不踩日常 dev 的 .next);凭证与地址在 `web/e2e/.env`(模板 `.env.example`),不硬编码不提交。
+- 标准全量跑法(web/ 下):`E2E_FRONT_PORT=3001 E2E_BASE_URL=http://localhost:3001 E2E_API_URL=http://localhost:8080 BACKEND_URL=http://localhost:8080 npx playwright test`;globalSetup 自带**清测试库**(残渣 flake 解法;Fast Refresh 类由 prod server 根除,spec 0021 As-built),勿绕过;BACKEND_URL 必须 8080(rewrites 代理目标,8081 会污染 PM 库);手动清库 `npm run db:reset`
 - 用例按模块分文件(一个功能域一个 `*.spec.ts`),`fullyParallel`;每用例经 fixture 独享唯一 key 项目(API 预置),**不依赖其它用例留下的状态,可单跑**。
 - 用例内只对被测行为走 UI;数据准备走 API helpers(`e2e/support/helpers.ts`)。MUI 对话框淡出期(~200ms)会吞下层点击,断言/点下层前先 `expect(dialog).toBeHidden()`。
 
@@ -97,7 +98,7 @@ docs/      adr/ · spec/ · architecture/(puml 类图) · requirement/(PRD) · p
 
 - JDK 25(LTS)。后端在 `backend/`:`gradle build`(含测试)/ `gradle :domain:run`(引擎 Demo,输出与 prototype S1–S7 可比对)。
 - `./gradlew` 同效;首次需下载发行包,国内网络慢属已知,用本地 gradle 即可。
-- CI(GitHub Actions):`backend.yml` — backend 变更跑 `gradle build`(含 Testcontainers,需 Docker);`e2e.yml` — web/backend 变更起 bootRun + Playwright 整跑 E2E。
+- CI(GitHub Actions):`backend.yml` 跑 `gradle test`(纯单元,免 Docker;spec 0014);`nightly.yml` 每日全量兜底(含集成,红了必修);`e2e.yml` web/backend 变更起 bootRun + Playwright 整跑 E2E
 - 本机开发库:`yangzhou`(共享 compose,已建);bootRun 用 `gradle :api:bootRun`。
 - **双 profile 并存**(2026-10-06 起):8080 常跑 **test profile**(库 `yangzhou_test`,E2E 用);**PM 日常实例 = default profile**(库 `yangzhou`,dogfood 项目 YPJ),约定端口 **8081**:`gradle :api:bootRun --args='--server.port=8081'`。CLI `yz` 的 session(`~/.yangzhou/session.json`)指向谁就写谁的库——动 PM 数据前确认 server 指向 default 实例。
 - PM 实例部署形态(已拍板):本机常驻即可;Postgres 备份手工期(`pg_dump`),自动化另票。

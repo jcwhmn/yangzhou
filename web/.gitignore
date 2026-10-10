@@ -6,3 +6,6 @@ tsconfig.tsbuildinfo
 # E2E 凭证与环境
 e2e/.env
 .scratch-n2.txt
+
+# E2E 独立构建目录(prod build,不与 dev .next 互踩)
+.next-e2e/
