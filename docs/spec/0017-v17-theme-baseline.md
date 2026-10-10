@@ -91,4 +91,9 @@ export const tokens = { text: 近黑, border: 1px, radius, spacingUnit, elevatio
 
 ## As-built
 
-(完工后补)
+- **定稿淡蓝**:bg `#f4f8fb` / field `#e9f0f6` / divider `#dde5ec` / border `#c5d3e0` / text `#1c1b1f`,radius 8,spacing 7;候选淡绿 `#f2f8f4` 系走查落选(TC1 两版截图,用户拍板)。
+- **方案演进(走查驱动,超出 spec 原文)**:outlined 细线 → **无边框控件**(用户反馈「去掉控件边框,用底色标记」):静止态仅 field 底色,hover 无变化,聚焦 = 底色变纸白 + 1px 边框浮现;MuiPaper 描边平面化 + 按钮 disableElevation。
+- 下划线全灭:代码零显式 variant,`MuiTextField`/`MuiFormControl` 默认一处翻转全局生效;e2e 零 underline/MuiInput 类名依赖,实测无 theme 相关红。
+- 走查微调(用户手改,item 详情页):Tabs 上方 `mt:3`;评论标题 `mb:1`;评论列表 `mb:0`;评论输入框 `minRows=4`/`maxRows=8`(Enter 发送保留)。
+- `scripts/shots.mjs` 落地:17 页 walk list,API 种子数据 + token 注入,输出 `.scratch/shots/`(gitignored);定稿后 env 开关与落选色已删(`NEXT_PUBLIC_BG_VARIANT` grep 归零)。
+- TC3:E2E 全量本地 3 轮,首跑 2 错、后两轮全绿(用户拍板接受;非 theme 断言,既有偶发面)。
