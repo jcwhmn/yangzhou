@@ -1,13 +1,22 @@
 #!/usr/bin/env bash
-# yz — yangzhou CLI 包装脚本:jar 不在则自动构建
+# yz — yangzhou CLI 包装脚本:发行形态查脚本同目录,开发形态查 repo 构建,jar 不在则自动构建
 # 用法: script/yz [命令...]  (等价 java -jar backend/cli/build/libs/yz-*.jar [命令...])
 set -e
-cd "$(dirname "$0")/.."
 
-JAR=$(ls backend/cli/build/libs/yz-*.jar 2>/dev/null | head -1)
+DIR="$(cd "$(dirname "$0")" && pwd)"
+ROOT="$(dirname "$DIR")"
+
+# 1) jar beside this script (release layout from GitHub Releases)
+JAR="$(ls "$DIR"/yz-*.jar 2>/dev/null | head -n 1 || true)"
+# 2) repo layout (dev)
+if [ -z "$JAR" ]; then
+  JAR="$(ls "$ROOT"/backend/cli/build/libs/yz-*.jar 2>/dev/null | head -n 1 || true)"
+fi
+# 3) auto-build (dev, first run)
 if [ -z "$JAR" ]; then
   echo "首次运行:构建 CLI(fat-jar)…"
-  (cd backend && gradle :cli:jar --console=plain)
-  JAR=$(ls backend/cli/build/libs/yz-*.jar | head -1)
+  (cd "$ROOT/backend" && gradle :cli:jar --console=plain)
+  JAR="$(ls "$ROOT"/backend/cli/build/libs/yz-*.jar | head -n 1)"
 fi
+
 exec java -jar "$JAR" "$@"

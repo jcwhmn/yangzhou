@@ -1,0 +1,28 @@
+name: release-yz
+
+on:
+  push:
+    tags: ['yz-v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 25
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build fat-jar (version from tag)
+        run: gradle :cli:jar "-PcliVersion=${GITHUB_REF_NAME#yz-v}"
+        working-directory: backend
+      - name: Guard — jar file must match tag version
+        run: ls "backend/cli/build/libs/yz-${GITHUB_REF_NAME#yz-v}.jar"
+      - name: Create GitHub Release (jar + launch scripts)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" --generate-notes backend/cli/build/libs/yz-*.jar backend/script/yz backend/script/yz.cmd
