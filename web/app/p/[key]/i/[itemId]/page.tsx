@@ -446,7 +446,7 @@ export default function ItemDetailPage() {
 
       <Box sx={{ display: "flex", gap: 4, alignItems: "flex-start" }}>
       <Box sx={{ flex: 1, minWidth: 0 }}>
-      <Stack spacing={2} component="section">
+      <Stack spacing={3} component="section">
         <TextField label={t.item.title} value={title} onChange={(e) => setTitle(e.target.value)} fullWidth />
         <TextField
           label={t.item.description}
@@ -558,7 +558,7 @@ export default function ItemDetailPage() {
         </Stack>
       </Stack>
 
-      <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="scrollable" sx={{ mb: 2, minHeight: 32 }}>
+      <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="scrollable" sx={{ mt: 3, mb: 2, minHeight: 32 }}>
         {t.item.detailTabs.map((label) => (
           <Tab key={label} label={label} sx={{ minHeight: 32, py: 0.5 }} />
         ))}
@@ -569,7 +569,7 @@ export default function ItemDetailPage() {
       <Typography variant="h6" sx={{ mb: 1 }}>
         评论
       </Typography>
-      <Stack spacing={1} sx={{ mb: 2 }}>
+      <Stack spacing={1} sx={{ mb: 0 }}>
         {comments.map((c) => (
           <Box key={c.commentId} sx={{ p: 1.5, bgcolor: "background.paper", borderRadius: 1, border: "1px solid", borderColor: "divider" }}>
             <Stack direction="row" justifyContent="space-between" alignItems="center">
@@ -594,7 +594,8 @@ export default function ItemDetailPage() {
           onChange={(e) => setNewComment(e.target.value)}
           fullWidth
           multiline
-          maxRows={3}
+          minRows={4}
+          maxRows={8}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey && newComment.trim()) {
               e.preventDefault();
