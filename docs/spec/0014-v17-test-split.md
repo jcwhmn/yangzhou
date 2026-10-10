@@ -83,4 +83,10 @@ domain 4 单元测试 · RealGithubGatewayPrParseTest(进快轨)· 38 个集成�
 
 ## As-built
 
-(完工后补)
+(2026-10-10 补录,YPJ-16 PR 搭车)
+
+- **落地 = 计划,零偏差**(2026-10-10 逐项核对代码):`AbstractApiTest` 类级 `@Tag("integration")`(L22);`tasks.test` `excludeTags("integration")`,新增 `integrationTest` 任务 `includeTags`(同 sourceSet,`check` 依赖之);`backend.yml` 跑 `gradle test`(免 Docker);`nightly.yml` cron `0 20 * * *` + dispatch 全量。
+- 38 个集成测试类零改动归轨(现库 grep 到 39 个文件 = 基类 + 38 子类,后续票新增者自动继承)。
+- `@Tag` 继承实证有效(风险③未发生);AGENTS 测试段/工作流段按计划改写,「双轨」纪律(2026-10-09)已运行多票。
+- 验证:CI backend.yml 快轨绿(TC4);nightly 手动 dispatch 全量绿(TC5)。TC6(注入失败验兜底)按计划属可选项,未执行——nightly 红信通道未实证,首红时留意邮件可达性。
+
