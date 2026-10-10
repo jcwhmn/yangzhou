@@ -2,7 +2,7 @@
 import { expect, test } from "./support/fixtures";
 import { apiCall, apiCreateItem, selectOption } from "./support/helpers";
 
-test("Release 全链路——段显示/对话框建与补建/发布/拉入/非空删除 409", async ({ page, projectKey }) => {
+test("Release 全链路——段显示/对话框建与补建/发布/拉入/非空删除 409 @smoke", async ({ page, projectKey }) => {
   // 预置:planned R2.0 + 补建 released R1.9(§8.2)
   await apiCall("POST", `/api/projects/${projectKey}/releases`, { name: "R2.0", targetDate: "2026-12-01" });
   await apiCall("POST", `/api/projects/${projectKey}/releases`, { name: "R1.9", status: "released", releasedDate: "2026-09-15" });

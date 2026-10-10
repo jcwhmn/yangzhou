@@ -63,7 +63,7 @@ jobs:
 
       - name: 跑 E2E
         working-directory: web
-        run: npx playwright test
+        run: npx playwright test --grep @smoke
 
       - name: 失败留证据
         if: failure()

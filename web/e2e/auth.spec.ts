@@ -12,7 +12,7 @@ async function uiLogin(page: import("@playwright/test").Page) {
 
 test.describe.configure({ mode: "serial" });
 
-test("登录进首页", async ({ page }) => {
+test("登录进首页 @smoke", async ({ page }) => {
   await page.goto("/login");
   await page.getByLabel("用户名").fill(config.username);
   await page.getByLabel("密码").fill(config.password);

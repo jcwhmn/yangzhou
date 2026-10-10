@@ -3,7 +3,7 @@ import { expect } from "./support/fixtures";
 import { test } from "./support/fixtures";
 import { apiAssignMe, apiCreateItem } from "./support/helpers";
 
-test("建 item → 详情 → 评论 → 指派 → 状态 QA → 活动日志", async ({ page, projectKey }) => {
+test("建 item → 详情 → 评论 → 指派 → 状态 QA → 活动日志 @smoke", async ({ page, projectKey }) => {
   await page.goto(`/p/${projectKey}`);
   await page.getByPlaceholder("新建 item").fill("E2E 冒烟 item");
   await page.getByRole("button", { name: "新建 ITEM" }).click();

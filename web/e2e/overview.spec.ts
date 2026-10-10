@@ -2,7 +2,7 @@
 import { expect, test } from "./support/fixtures";
 import { apiAssignMe, apiCall, apiCreateItem, apiCreateSprint, apiMeId } from "./support/helpers";
 
-test("Overview 五区块——状态分布/信号/我的/风险/Sprint", async ({ page, projectKey }) => {
+test("Overview 五区块——状态分布/信号/我的/风险/Sprint @smoke", async ({ page, projectKey }) => {
   // 预置:item 覆盖各区块;信号链 = 属性 → 我的能力 → item 需求(requirements PUT 触发重算)
   const statuses = (
     await apiCall<{ statuses: { statusId: string; name: string; position: number }[] }>("GET", `/api/projects/${projectKey}`)

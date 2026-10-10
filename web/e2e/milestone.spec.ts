@@ -2,7 +2,7 @@
 import { expect, test } from "./support/fixtures";
 import { apiCall } from "./support/helpers";
 
-test("Milestone 管理对话框——建/推进/编辑/删除", async ({ page, projectKey }) => {
+test("Milestone 管理对话框——建/推进/编辑/删除 @smoke", async ({ page, projectKey }) => {
   // 预置:A 进行中,B 规划中(A 在前)
   const a = (await apiCall<{ milestoneId: string }>("POST", `/api/projects/${projectKey}/milestones`, {
     name: "MVP 里程碑",
