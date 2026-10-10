@@ -46,7 +46,6 @@ private fun usage() {
           assign <KEY-N|itemId> <成员名|--clear>      指派/取消(引擎建议,人拍板)
           log <KEY-N|itemId> [--json]                 按需拉取 item 分支的 GitHub 提交历史
           export <KEY> [--csv] [--file <路径>]          导出(JSON 全保真/CSV 扁平)
-          sync-linear <KEY> <linear.csv>                (退役)方向已反转:yangzhou 为唯一真相源;仅作历史导入
           import <KEY> <文件>                           导入(JSON 按扩展名或 .csv;Linear CSV 可直接灌)
 
         会话文件:${ApiClient.sessionFile().absolutePath}
@@ -199,12 +198,6 @@ private fun run(args: List<String>) {
                 )
             }
         }
-        return
-    }
-    if (noun == "sync-linear") {
-        val key = positional.getOrNull(1) ?: error("缺少项目 KEY")
-        val path = positional.getOrNull(2) ?: flags["file"] ?: error("缺少 Linear 导出 CSV 路径")
-        yangzhou.cli.LinearSync.sync(api, key, java.io.File(path))
         return
     }
     if (noun == "export") {

@@ -3,6 +3,9 @@ plugins {
     application
 }
 
+// CLI 独立发行(YPJ-16):默认 0.1.0;release workflow 用 tag 经 -PcliVersion 传入
+version = (findProperty("cliVersion") as String?) ?: "0.1.0"
+
 kotlin {
     jvmToolchain(25)
 }

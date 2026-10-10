@@ -2,12 +2,22 @@
 
 `yz` 是 OpenAPI 契约的瘦客户端(API-first):管项目、管 item、自评能力、查可行性——不开浏览器管完一天。
 
+## 安装(Releases)
+
+从 [GitHub Releases](../../releases/latest) 下载 `yz-<v>.jar` + `yz`(bash / macOS / Linux)+ `yz.cmd`(Windows),置于同一目录:
+
+```bash
+./yz login --server http://localhost:8081 -u me   # Windows: yz.cmd login ...
+./yz items list YPJ
+```
 ## 构建
 
 ```bash
 cd backend && gradle :cli:jar
 # 产物:cli/build/libs/yz-<version>.jar(fat-jar,一命令运行)
 ```
+
+开发 wrapper:`backend/script/yz.cmd` / `backend/script/yz`(jar 缺失时自动构建)。
 
 ## 快速开始
 
@@ -49,18 +59,6 @@ java -jar yz.jar feasibility CHE
 - [ ] `yz assign CHE-1 小李` → `已指派:CHE-1 → 小李`;不存在成员 → 错误并列出可用名单
 - [ ] `yz assign CHE-1 --clear` → `已取消指派:CHE-1`
 - [ ] KEY-N 解析:`CHE-1` 等项目编号自动换 itemId
-
-## Linear 联邦(V3)——已退役(2026-10-06)
-
-> 方向已反转:yangzhou 是唯一真相源,Linear 冻结只读。以下仅作历史记录,勿再用于日常流程。
-
-- [ ] Linear 网页导出 CSV(workspace → Settings → Import/Export),保存为 linear.csv
-- [ ] `yz sync-linear YPJ linear.csv` → 首跑:新建 N(编号自动分配,external_ref = linear:<identifier>)
-- [ ] **重跑同一命令** → 零新建(幂等;变更行更新标题/描述/状态/需求)
-- [ ] Linear 改状态后重新导出再同步 → yangzhou 状态回放;未知状态名 → 落默认起点不报错
-- [ ] Labels 自动建 label 属性;`标签>=N` 分级
-- [ ] **镜像 item 是 Linear 的影子**:在 yangzhou 改它的标题/需求,下次同步会被覆盖
-- [ ] 大批量 1000 行同步可用,每 100 条进度
 
 ## 与 API 的关系
 
