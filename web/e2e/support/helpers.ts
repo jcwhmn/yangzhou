@@ -104,7 +104,7 @@ export async function injectToken(page: Page): Promise<void> {
 
 /** MUI select 打开:hydration 期 SSR 原生 select 会被替换,首点可能落空;菜单没开就补一下 */
 export async function openSelect(page: Page, label: string): Promise<void> {
-  const box = page.getByRole("combobox", { name: label });
+  const box = page.getByRole("combobox", { name: label, exact: true });
   await box.click();
   const opened = await page.getByRole("listbox").waitFor({ state: "visible", timeout: 1500 }).then(() => true, () => false);
   if (!opened) await box.click();
@@ -113,7 +113,7 @@ export async function openSelect(page: Page, label: string): Promise<void> {
 /** MUI select 选选项:页面 settle 期菜单可能开了又被关,点在卸载节点上会无声无效;
  *  以「combobox 显示值变为目标文本」为选中生效的硬信号,否则重开菜单重试 */
 export async function selectOption(page: Page, label: string, name: string, expectText?: string): Promise<void> {
-  const box = page.getByRole("combobox", { name: label });
+  const box = page.getByRole("combobox", { name: label, exact: true });
   const opt = page.getByRole("option", { name });
   const lb = page.getByRole("listbox");
   for (let i = 0; i < 8; i++) {
@@ -124,7 +124,12 @@ export async function selectOption(page: Page, label: string, name: string, expe
     if (await opt.isVisible().catch(() => false)) {
       await opt.click({ timeout: 2000 }).catch(() => {});
     }
-    if (await expect(box).toHaveText(expectText ?? name, { timeout: 2500 }).then(() => true, () => false)) return;
+    // 回读双轨:Dropdown=原生 input(toHaveValue);旧 MUI Select 是 div(toHaveText)。B 阶段全量替换后可收敛为单轨。
+    const isInput = await box.evaluate((el) => el instanceof HTMLInputElement).catch(() => false);
+    const readback = isInput
+      ? expect(box).toHaveValue(expectText ?? name, { timeout: 2500 })
+      : expect(box).toHaveText(expectText ?? name, { timeout: 2500 });
+    if (await readback.then(() => true, () => false)) return;
   }
   throw new Error(`下拉「${label}」未能选中「${name}」`);
 }

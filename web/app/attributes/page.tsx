@@ -6,12 +6,12 @@ import {
   Chip,
   Container,
   FormControlLabel,
-  MenuItem,
   Stack,
   Switch,
   TextField,
   Typography,
 } from "@mui/material";
+import { Dropdown } from "@/components/Dropdown";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { AppNav } from "@/components/AppNav";
@@ -108,20 +108,30 @@ export default function AttributesPage() {
       {/* 创建表单 */}
       <Stack component="form" direction="row" spacing={1} onSubmit={create} sx={{ mb: 3 }} alignItems="center" flexWrap="wrap" useFlexGap>
         <TextField size="small" label={t.attrs.name} value={name} onChange={(e) => setName(e.target.value)} required />
-        <TextField select size="small" label="类型" value={kind} onChange={(e) => { setKind(e.target.value); setParentId(""); }} sx={{ width: 150 }}>
-          <MenuItem value="skill">{t.attrs.kindSkill}</MenuItem>
-          <MenuItem value="label">{t.attrs.kindLabel}</MenuItem>
-          <MenuItem value="category">分类</MenuItem>
-        </TextField>
+<Dropdown
+          label="类型"
+          size="small"
+          value={kind}
+          onChange={(v) => {
+            setKind(v);
+            setParentId("");
+          }}
+          sx={{ width: 150 }}
+          options={[
+            { value: "skill", label: t.attrs.kindSkill },
+            { value: "label", label: t.attrs.kindLabel },
+            { value: "category", label: "分类" },
+          ]}
+        />
         {kind !== "category" && (
-          <TextField select size="small" label="分类" value={parentId} onChange={(e) => setParentId(e.target.value)} sx={{ width: 150 }}>
-            <MenuItem value="">{UNCATEGORIZED}</MenuItem>
-            {categories.map((c) => (
-              <MenuItem key={c.attributeId} value={c.attributeId}>
-                {c.name}
-              </MenuItem>
-            ))}
-          </TextField>
+<Dropdown
+          label="分类"
+          size="small"
+          value={parentId}
+          onChange={(v) => setParentId(v)}
+          sx={{ width: 150 }}
+          options={[{ value: "", label: UNCATEGORIZED }, ...categories.map((c) => ({ value: c.attributeId, label: c.name }))]}
+        />
         )}
         {kind === "skill" && (
           <FormControlLabel control={<Switch checked={leveled} onChange={(e) => setLeveled(e.target.checked)} />} label={t.attrs.leveled} />

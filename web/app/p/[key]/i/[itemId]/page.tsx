@@ -9,14 +9,13 @@ import {
   DialogContent,
   DialogTitle,
   IconButton,
-  MenuItem,
-  Select,
   Stack,
   Tab,
   Tabs,
   TextField,
   Typography,
 } from "@mui/material";
+import { Dropdown } from "@/components/Dropdown";
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
 import Link from "next/link";
@@ -427,19 +426,14 @@ export default function ItemDetailPage() {
             )}
           </AssignPopover>
         )}
-        <Select
-          size="small"
-          value={item.status}
-          onChange={(e) => moveStatus(String(e.target.value))}
-          inputProps={{ "aria-label": "item 状态" }}
-          sx={{ minWidth: 160 }}
-        >
-          {statuses.map((s) => (
-            <MenuItem key={s.statusId} value={s.name}>
-              {s.name}
-            </MenuItem>
-          ))}
-        </Select>
+<Dropdown
+        ariaLabel="item 状态"
+        size="small"
+        value={item.status}
+        onChange={(v) => moveStatus(v)}
+        sx={{ minWidth: 160 }}
+        options={statuses.map((s) => ({ value: s.name, label: s.name }))}
+      />
       </Stack>
 
       {error && <Typography color="error" sx={{ mb: 1 }}>{error}</Typography>}
@@ -475,38 +469,25 @@ export default function ItemDetailPage() {
             sx={{ width: 180 }}
             slotProps={{ inputLabel: { shrink: true } }}
           />
-          <TextField
-            select
-            label={t.item.priority}
-            size="small"
-            value={priority}
-            onChange={(e) => setPriority(e.target.value)}
-            sx={{ width: 110 }}
-          >
-            <MenuItem value="">无</MenuItem>
-            {["P0", "P1", "P2", "P3"].map((p) => (
-              <MenuItem key={p} value={p}>
-                {p}
-              </MenuItem>
-            ))}
-          </TextField>
-          <TextField
-            select
-            label={t.item.sprint}
-            size="small"
-            value={item.sprintId ?? ""}
-            onChange={(e) => assignSprint(e.target.value || null)}
-            sx={{ width: 170 }}
-          >
-            <MenuItem value="">无</MenuItem>
-            {sprints
-              .filter((s) => s.status !== "completed" || s.sprintId === item.sprintId)
-              .map((s) => (
-                <MenuItem key={s.sprintId} value={s.sprintId} disabled={s.status === "completed"}>
-                  {s.name}
-                </MenuItem>
-              ))}
-          </TextField>
+<Dropdown
+          label={t.item.priority}
+          size="small"
+          value={priority}
+          onChange={(v) => setPriority(v)}
+          sx={{ width: 110 }}
+          options={[{ value: "", label: "无" }, ...["P0", "P1", "P2", "P3"].map((p) => ({ value: p, label: p }))]}
+        />
+<Dropdown
+          label={t.item.sprint}
+          size="small"
+          value={item.sprintId ?? ""}
+          onChange={(v) => assignSprint(v || null)}
+          sx={{ width: 170 }}
+          clearable
+          options={sprints
+            .filter((s) => s.status !== "completed" || s.sprintId === item.sprintId)
+            .map((s) => ({ value: s.sprintId, label: s.name, disabled: s.status === "completed" }))}
+        />
           {item.sprintId && (
             <Link href={`/p/${key}/sprint/${item.sprintId}`} style={{ textDecoration: "none", alignSelf: "center" }}>
               <Typography variant="caption" color="primary">
@@ -514,29 +495,23 @@ export default function ItemDetailPage() {
               </Typography>
             </Link>
           )}
-          <TextField
-            select
-            label={t.item.release}
-            size="small"
-            value={item.releaseId ?? ""}
-            onChange={(e) => assignRelease(e.target.value || null)}
-            sx={{ width: 170 }}
-          >
-            <MenuItem value="">无</MenuItem>
-            {releases.map((r) => (
-              <MenuItem key={r.releaseId} value={r.releaseId}>
-                {r.name}
-              </MenuItem>
-            ))}
-          </TextField>
+<Dropdown
+          label={t.item.release}
+          size="small"
+          value={item.releaseId ?? ""}
+          onChange={(v) => assignRelease(v || null)}
+          sx={{ width: 170 }}
+          clearable
+          options={releases.map((r) => ({ value: r.releaseId, label: r.name }))}
+        />
         </Stack>
-        <TextField select label={t.item.type} value={type} onChange={(e) => setType(e.target.value)} sx={{ width: 200 }}>
-          {["task", "bug", "goal", "story"].map((tp) => (
-            <MenuItem key={tp} value={tp}>
-              {tp}
-            </MenuItem>
-          ))}
-        </TextField>
+<Dropdown
+          label={t.item.type}
+          value={type}
+          onChange={(v) => setType(v)}
+          sx={{ width: 200 }}
+          options={["task", "bug", "goal", "story"].map((tp) => ({ value: tp, label: tp }))}
+        />
         <Stack direction="row" spacing={1} alignItems="center">
           <Button variant="contained" onClick={saveBasics}>
             {t.item.save}
@@ -971,44 +946,32 @@ function RequirementsDialog({
         <Stack spacing={1}>
           {rows.map((r, idx) => (
             <Stack key={idx} direction="row" spacing={1} alignItems="center">
-              <Select
-                size="small"
-                value={r.attribute}
-                onChange={(e) =>
-                  setRows((prev) => prev.map((x, i) => (i === idx ? { ...x, attribute: String(e.target.value) } : x)))
-                }
-                sx={{ minWidth: 200 }}
-                displayEmpty
-              >
-                <MenuItem value="" disabled>
-                  {t.item.attribute}
-                </MenuItem>
-                {attributes.map((a) => (
-                  <MenuItem key={a.attributeId} value={a.name}>
-                    {a.name}
-                  </MenuItem>
-                ))}
-              </Select>
-              <Select
-                size="small"
-                value={r.minLevel ?? ""}
-                onChange={(e) =>
-                  setRows((prev) =>
-                    prev.map((x, i) =>
-                      i === idx ? { ...x, minLevel: String(e.target.value) === "" ? null : Number(e.target.value) } : x,
-                    ),
-                  )
-                }
-                sx={{ minWidth: 160 }}
-                displayEmpty
-              >
-                <MenuItem value="">{t.item.none}</MenuItem>
-                {[1, 2, 3, 4].map((l) => (
-                  <MenuItem key={l} value={l}>
-                    ≥{l}
-                  </MenuItem>
-                ))}
-              </Select>
+<Dropdown
+              ariaLabel={t.item.attribute}
+              size="small"
+              placeholder={t.item.attribute}
+              value={r.attribute}
+              onChange={(v) =>
+                setRows((prev) => prev.map((x, i) => (i === idx ? { ...x, attribute: v } : x)))
+              }
+              sx={{ minWidth: 200 }}
+              options={attributes.map((a) => ({ value: a.name, label: a.name }))}
+            />
+<Dropdown
+              ariaLabel={t.item.none}
+              size="small"
+              placeholder={t.item.none}
+              value={r.minLevel == null ? "" : String(r.minLevel)}
+              onChange={(v) =>
+                setRows((prev) =>
+                  prev.map((x, i) =>
+                    i === idx ? { ...x, minLevel: v === "" ? null : Number(v) } : x,
+                  ),
+                )
+              }
+              sx={{ minWidth: 160 }}
+              options={[{ value: "", label: t.item.none }, ...[1, 2, 3, 4].map((l) => ({ value: String(l), label: `≥${l}` }))]}
+            />
               <IconButton onClick={() => setRows((prev) => prev.filter((_, i) => i !== idx))} aria-label="delete">
                 <DeleteIcon fontSize="small" />
               </IconButton>
@@ -1105,13 +1068,12 @@ function CreateBranchDialog({
           </Typography>
         )}
         <Stack spacing={2} sx={{ mt: 1 }}>
-          <TextField select label={t.gh.branchRepo} value={repoId} onChange={(e) => setRepoId(e.target.value)}>
-            {repos.map((r) => (
-              <MenuItem key={r.repoId} value={r.repoId}>
-                {r.repo}
-              </MenuItem>
-            ))}
-          </TextField>
+<Dropdown
+          label={t.gh.branchRepo}
+          value={repoId}
+          onChange={(v) => setRepoId(v)}
+          options={repos.map((r) => ({ value: r.repoId, label: r.repo }))}
+        />
           <TextField label={t.gh.branchBase} value={baseBranch} onChange={(e) => setBaseBranch(e.target.value)} />
           <TextField label={t.gh.branchName} value={name} onChange={(e) => setName(e.target.value)} />
         </Stack>

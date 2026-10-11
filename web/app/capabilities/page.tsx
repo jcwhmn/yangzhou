@@ -1,6 +1,7 @@
 "use client";
 
-import { Button, Container, MenuItem, Select, Stack, Typography } from "@mui/material";
+import { Button, Container, Stack, Typography } from "@mui/material";
+import { Dropdown } from "@/components/Dropdown";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
@@ -63,14 +64,18 @@ export default function CapabilitiesPage() {
           return (
             <Stack key={a.attributeId} direction="row" spacing={2} alignItems="center" justifyContent="space-between">
               <Typography sx={{ minWidth: 120 }}>{a.name}</Typography>
-              <Select size="small" value={value} onChange={(e) => save(a.name, String(e.target.value))} sx={{ minWidth: 140 }}>
-                <MenuItem value="none">{t.caps.none}</MenuItem>
-                <MenuItem value="unrated">{a.leveled ? t.caps.unrated : t.caps.has}</MenuItem>
-                {a.leveled &&
-                  [1, 2, 3, 4].map((l) => (
-                    <MenuItem key={l} value={String(l)}>{t.caps.level(l)}</MenuItem>
-                  ))}
-              </Select>
+<Dropdown
+                size="small"
+                ariaLabel={a.name}
+                value={value}
+                onChange={(v) => save(a.name, v)}
+                sx={{ minWidth: 140 }}
+                options={[
+                  { value: "none", label: t.caps.none },
+                  { value: "unrated", label: a.leveled ? t.caps.unrated : t.caps.has },
+                  ...(a.leveled ? [1, 2, 3, 4].map((l) => ({ value: String(l), label: t.caps.level(l) })) : []),
+                ]}
+              />
             </Stack>
           );
         })}

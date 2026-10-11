@@ -8,8 +8,6 @@ import {
   Chip,
   Container,
   IconButton,
-  MenuItem,
-  Select,
   Stack,
   Table,
   TableBody,
@@ -20,6 +18,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import { Dropdown } from "@/components/Dropdown";
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
 import SaveIcon from "@mui/icons-material/Save";
@@ -444,27 +443,19 @@ function AddTeamMemberSelect({
   const candidates = allMembers.filter((m) => !inTeam.has(m.memberId));
   if (candidates.length === 0) return null;
   return (
-    <Select
+<Dropdown
       size="small"
+      placeholder="+ 加成员"
+      ariaLabel="+ 加成员"
       value={picked}
-      displayEmpty
-      onChange={(e) => {
-        const id = String(e.target.value);
-        if (id) {
-          onAdd(team, id, "add");
+      onChange={(v) => {
+        if (v) {
+          onAdd(team, v, "add");
           setPicked("");
         }
       }}
       sx={{ minWidth: 160, fontSize: 13, mt: 1 }}
-    >
-      <MenuItem value="" disabled>
-        + 加成员
-      </MenuItem>
-      {candidates.map((m) => (
-        <MenuItem key={m.memberId} value={m.memberId}>
-          {m.displayName}
-        </MenuItem>
-      ))}
-    </Select>
+      options={candidates.map((m) => ({ value: m.memberId, label: m.displayName }))}
+    />
   );
 }

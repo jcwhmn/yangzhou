@@ -6,8 +6,6 @@ import {
   Checkbox,
   Chip,
   Container,
-  MenuItem,
-  Select,
   Stack,
   Table,
   TableBody,
@@ -17,6 +15,7 @@ import {
   TableRow,
   Typography,
 } from "@mui/material";
+import { Dropdown } from "@/components/Dropdown";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -107,11 +106,18 @@ export default function TableViewPage() {
     <Container maxWidth="lg" sx={{ py: 4 }}>
       <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }} flexWrap="wrap" useFlexGap>
         <Typography variant="h5">{`${String(key)} · 表格`}</Typography>
-        <Select size="small" value={sort} onChange={(e) => setSort(String(e.target.value))} sx={{ width: 150 }}>
-          <MenuItem value="number">按编号</MenuItem>
-          <MenuItem value="priority">按优先级</MenuItem>
-          <MenuItem value="status">按状态</MenuItem>
-        </Select>
+<Dropdown
+          ariaLabel="排序"
+          size="small"
+          value={sort}
+          onChange={(v) => setSort(v)}
+          sx={{ width: 150 }}
+          options={[
+            { value: "number", label: "按编号" },
+            { value: "priority", label: "按优先级" },
+            { value: "status", label: "按状态" },
+          ]}
+        />
       </Stack>
 
       {/* 列 toggle */}

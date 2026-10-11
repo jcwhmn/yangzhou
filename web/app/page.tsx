@@ -10,12 +10,11 @@ import {
   Chip,
   Container,
   FormControlLabel,
-  MenuItem,
-  Select,
   Stack,
   TextField,
   Typography,
 } from "@mui/material";
+import { Dropdown } from "@/components/Dropdown";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
@@ -258,11 +257,18 @@ export default function ProjectsPage() {
 
       <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }} flexWrap="wrap" useFlexGap>
         <TextField size="small" placeholder="搜索项目…" value={search} onChange={(e) => setSearch(e.target.value)} sx={{ width: 220 }} />
-        <Select size="small" value={sortBy} onChange={(e) => setSortBy(String(e.target.value))} sx={{ width: 140 }}>
-          <MenuItem value="key">按 KEY</MenuItem>
-          <MenuItem value="name">按名称</MenuItem>
-          <MenuItem value="signal">按可行性</MenuItem>
-        </Select>
+<Dropdown
+          ariaLabel="排序"
+          size="small"
+          value={sortBy}
+          onChange={(v) => setSortBy(v)}
+          sx={{ width: 140 }}
+          options={[
+            { value: "key", label: "按 KEY" },
+            { value: "name", label: "按名称" },
+            { value: "signal", label: "按可行性" },
+          ]}
+        />
         <FormControlLabel
           control={<Checkbox size="small" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />}
           label={<Typography variant="caption">{t.projects.showArchived}</Typography>}
