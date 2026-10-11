@@ -3,6 +3,13 @@ import { expect, test } from "./support/fixtures";
 import { apiCall, apiCreateItem, fillDate, selectOption } from "./support/helpers";
 
 test("Release 全链路——段显示/对话框建与补建/发布/拉入/非空删除 409 @smoke", async ({ page, projectKey }) => {
+  // 打开管理对话框:goto 后 hydration 竞态可能吞掉点击,重试到弹层可见为止
+  const openReleaseManager = async () => {
+    await expect(async () => {
+      await page.getByRole("button", { name: "管理 Release" }).click();
+      await expect(page.getByRole("dialog")).toBeVisible();
+    }).toPass({ timeout: 10_000 });
+  };
   // 预置:planned R2.0 + 补建 released R1.9(§8.2)
   await apiCall("POST", `/api/projects/${projectKey}/releases`, { name: "R2.0", targetDate: "2026-12-01" });
   await apiCall("POST", `/api/projects/${projectKey}/releases`, { name: "R1.9", status: "released", releasedDate: "2026-09-15" });
@@ -13,9 +20,8 @@ test("Release 全链路——段显示/对话框建与补建/发布/拉入/非�
   await expect(page.getByText("R1.9 (0)")).toBeVisible();
 
   // 管理对话框:新建 R3.0
-  await page.getByRole("button", { name: "管理 Release" }).click();
+  await openReleaseManager(page);
   const dialog = page.getByRole("dialog");
-  await expect(dialog).toBeVisible();
   await dialog.getByLabel("名称").fill("R3.0");
   await fillDate(dialog, "目标发布日", "2027-03-01");
   await dialog.getByRole("button", { name: "新建", exact: true }).click();
@@ -47,8 +53,7 @@ test("Release 全链路——段显示/对话框建与补建/发布/拉入/非�
   // 侧边栏计数 (1);对话框非空删除 409;移出后删 204
   await page.goto(`/p/${projectKey}`);
   await expect(page.getByText("R3.0 (1)")).toBeVisible();
-  await page.getByRole("button", { name: "管理 Release" }).click();
-  await expect(page.getByRole("dialog")).toBeVisible();
+  await openReleaseManager(page);
   const r3 = page.getByRole("dialog").getByTestId("release-row").filter({ hasText: "R3.0" });
   await r3.getByRole("button", { name: "删除" }).click();
   await r3.getByRole("button", { name: "删除" }).click();
@@ -57,8 +62,7 @@ test("Release 全链路——段显示/对话框建与补建/发布/拉入/非�
   await page.goto(`/p/${projectKey}/i/${itemId}`);
   await page.getByRole("button", { name: "清除 Release" }).click(); // Dropdown 清空走 ×(spec 0018)
   await page.goto(`/p/${projectKey}`);
-  await page.getByRole("button", { name: "管理 Release" }).click();
-  await expect(page.getByRole("dialog")).toBeVisible();
+  await openReleaseManager(page);
   const r3again = page.getByRole("dialog").getByTestId("release-row").filter({ hasText: "R3.0" });
   await r3again.getByRole("button", { name: "删除" }).click();
   await r3again.getByRole("button", { name: "删除" }).click();
