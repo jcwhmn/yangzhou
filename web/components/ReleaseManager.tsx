@@ -170,7 +170,7 @@ export function ReleaseManager({
                 )}
                 {shippingId === r.releaseId && (
                   <>
-                    <DateInput ariaLabel={t.release.releasedDate} size="small" value={shipDate} onChange={setShipDate} sx={{ width: 150 }} />
+                    <DateInput ariaLabel={t.release.releasedDate} size="small" value={shipDate} onChange={setShipDate} sx={{ width: 200 }} />
                     <Button size="small" variant="contained" onClick={() => ship(r)}>{t.release.confirmShip}</Button>
                     <Button size="small" color="inherit" onClick={() => setShippingId(null)}>{t.release.cancelShip}</Button>
                   </>

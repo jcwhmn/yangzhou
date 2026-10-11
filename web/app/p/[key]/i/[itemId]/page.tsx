@@ -452,8 +452,8 @@ export default function ItemDetailPage() {
           fullWidth
         />
         <Stack direction="row" spacing={1}>
-          <DateInput label="开始日期" size="small" value={startDate} onChange={setStartDate} sx={{ width: 180 }} />
-          <DateInput label="截止日期" size="small" value={dueDate} onChange={setDueDate} sx={{ width: 180 }} />
+          <DateInput label="开始日期" size="small" value={startDate} onChange={setStartDate} sx={{ width: 200 }} />
+          <DateInput label="截止日期" size="small" value={dueDate} onChange={setDueDate} sx={{ width: 200 }} />
 <Dropdown
           label={t.item.priority}
           size="small"

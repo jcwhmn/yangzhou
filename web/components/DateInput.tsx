@@ -1,13 +1,17 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Box, FormLabel, IconButton, type SxProps, type Theme } from "@mui/material";
+import { Box, FormLabel, IconButton, Popover, type SxProps, type Theme } from "@mui/material";
 import ClearIcon from "@mui/icons-material/Clear";
+import DateRangeIcon from "@mui/icons-material/DateRange";
+import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
+import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import { t } from "@/lib/texts";
 import { tokens } from "@/lib/tokens";
 
-// 分段日期输入(spec 0019 / YPJ-19):mm/dd/yyyy 三段直录,替代原生 type="date"。
-// 契约:onChange 只在「三段完整合法」或「清空」时外发;Esc 回滚草稿;空值点击预填今天,失焦即提交。
+// 分段日期输入(spec 0019 / YPJ-19):mm/dd/yyyy 三段直录 + mini 月历,替代原生 type="date"。
+// 契约:onChange 只在「三段完整」或「清空」时外发;越界提交时静默钳制(02/31→02/28,月 13→12);
+// Esc 回滚草稿;空值聚焦(click/Tab 同权)预填今天,失焦即提交。
 // e2e:容器 role=group(aria-label)+ data-value=已提交 ISO;段 aria-label=月/日/年(helpers fillDate/expectDate)。
 
 type Segs = { mm: string; dd: string; yyyy: string };
@@ -27,13 +31,16 @@ function isoOf(s: Segs): string {
   return s.mm.length === 2 && s.dd.length === 2 && s.yyyy.length === 4 ? `${s.yyyy}-${s.mm}-${s.dd}` : "";
 }
 
-function validDate(s: Segs): boolean {
+function daysInMonth(y: number, m: number): number {
+  return new Date(y, m, 0).getDate();
+}
+
+// 越界静默钳制(spec 0019 §1.3):月 1–12,日 = 当月最后一天(闰年自动正确),日 0→01
+function normalize(s: Segs): Segs {
   const y = Number(s.yyyy);
-  const m = Number(s.mm);
-  const d = Number(s.dd);
-  if (m < 1 || m > 12 || d < 1) return false;
-  const dt = new Date(y, m - 1, d);
-  return dt.getFullYear() === y && dt.getMonth() === m - 1 && dt.getDate() === d;
+  const m = Math.min(Math.max(Number(s.mm), 1), 12);
+  const d = Math.min(Math.max(Number(s.dd), 1), daysInMonth(y, m));
+  return { yyyy: String(y), mm: pad2(m), dd: pad2(d) };
 }
 
 function todaySegs(): Segs {
@@ -59,7 +66,7 @@ export function DateInput({
   const segText: Record<keyof Segs, string> = { mm: t.date.month, dd: t.date.day, yyyy: t.date.year };
   const name = label ?? ariaLabel;
   const [segs, setSegs] = useState<Segs>(() => parseIso(value));
-  const [error, setError] = useState(false);
+  const [calOpen, setCalOpen] = useState(false);
   const focused = useRef(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const segRefs = {
@@ -76,61 +83,101 @@ export function DateInput({
   const draftEmpty = !segs.mm && !segs.dd && !segs.yyyy;
   const showClear = !!name && (value !== "" || !draftEmpty);
 
-  // 失焦/Enter 的提交路径:全空→清空;不完整→保留草稿;组合非法→红框;完整合法→外发
+  // 提交(spec 0019 §1.3):不完整保留草稿;完整越界钳制,修正值外发并同步显示
   const commit = () => {
     if (draftEmpty) {
       if (value !== "") onChange("");
       return;
     }
-    const iso = isoOf(segs);
-    if (iso === "") return;
-    if (!validDate(segs)) {
-      setError(true);
-      return;
-    }
-    if (iso !== value) onChange(iso);
+    if (isoOf(segs) === "") return;
+    const niso = isoOf(normalize(segs));
+    if (niso !== value) onChange(niso);
+    setSegs(parseIso(niso));
   };
 
   const focusSeg = (k: keyof Segs) => segRefs[k].current?.focus();
 
+  // 8 位位置感知(spec 0019 §1.3):结果 1 位=十位槽——0/1(月)、0–3(日)留段内进位,
+  // 其余按智能个位 `0X` 跳下一段;结果 2 位=满段跳下一段;年逐位填,满 4 封口(maxLength)。
   const onSegInput = (k: keyof Segs, v: string) => {
     const clean = digits(v, MAXLEN[k]);
-    setError(false);
-    setSegs((p) => ({ ...p, [k]: clean }));
-    if (clean.length === MAXLEN[k]) {
-      const next = ORDER[ORDER.indexOf(k) + 1];
+    if (k === "yyyy") {
+      setSegs((p) => ({ ...p, yyyy: clean }));
+      return;
+    }
+    if (clean === "") {
+      setSegs((p) => ({ ...p, [k]: "" }));
+      return;
+    }
+    const next = ORDER[ORDER.indexOf(k) + 1];
+    if (clean.length === 1 && Number(clean) <= (k === "mm" ? 1 : 3)) {
+      setSegs((p) => ({ ...p, [k]: clean }));
+    } else {
+      const val = clean.length === 1 ? `0${clean}` : clean;
+      setSegs((p) => ({ ...p, [k]: val }));
       if (next) focusSeg(next);
+    }
+  };
+
+  // 段聚焦:全选(覆盖式输入);空值聚焦预填今天(click/Tab 同权),光标落本段位 1
+  const onSegFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+    e.currentTarget.select();
+    if (value === "" && draftEmpty) {
+      setSegs(todaySegs());
+      requestAnimationFrame(() => e.currentTarget.setSelectionRange(0, 0));
     }
   };
 
   const onSegKeyDown = (k: keyof Segs, e: React.KeyboardEvent<HTMLInputElement>) => {
     const i = ORDER.indexOf(k);
-    if ((e.key === "ArrowRight" || e.key === "/") && i < ORDER.length - 1) {
-      e.preventDefault();
-      focusSeg(ORDER[i + 1]);
-    } else if (e.key === "ArrowLeft" && i > 0) {
-      e.preventDefault();
-      focusSeg(ORDER[i - 1]);
+    const el = e.currentTarget;
+    const pos = el.selectionStart ?? 0;
+    if (e.key === "ArrowRight" || e.key === "/") {
+      if (pos >= segs[k].length) {
+        const next = ORDER[i + 1];
+        if (next) {
+          e.preventDefault();
+          focusSeg(next);
+        } else if (e.key === "/") {
+          e.preventDefault();
+        }
+      } else if (e.key === "/") {
+        e.preventDefault();
+        el.setSelectionRange(pos + 1, pos + 1);
+      }
+    } else if (e.key === "ArrowLeft") {
+      if (pos === 0 && (el.selectionEnd ?? 0) === 0) {
+        const prev = ORDER[i - 1];
+        if (prev) {
+          e.preventDefault();
+          focusSeg(prev);
+        }
+      }
     } else if (e.key === "Backspace" && segs[k] === "" && i > 0) {
       focusSeg(ORDER[i - 1]);
     } else if (e.key === "Delete") {
-      setError(false);
       setSegs((p) => ({ ...p, [k]: "" }));
     }
   };
 
+  // 粘贴完整日期分发三段;单段数字走普通入段
   const onSegPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
     const text = e.clipboardData.getData("text").trim();
     const iso = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(text);
     const mdy = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(text);
-    if (!iso && !mdy) return; // 非完整日期,按普通入段
+    if (!iso && !mdy) return;
     e.preventDefault();
-    setError(false);
     if (iso) {
       setSegs({ yyyy: iso[1], mm: pad2(Number(iso[2])), dd: pad2(Number(iso[3])) });
     } else if (mdy) {
       setSegs({ mm: pad2(Number(mdy[1])), dd: pad2(Number(mdy[2])), yyyy: mdy[3] });
     }
+  };
+
+  const pick = (iso: string) => {
+    setCalOpen(false);
+    setSegs(parseIso(iso));
+    if (iso !== value) onChange(iso);
   };
 
   const fieldSx = {
@@ -152,7 +199,6 @@ export function DateInput({
       color: "text.primary",
       "&::placeholder": { color: "text.secondary", opacity: 1 },
     },
-    ...(error ? { borderColor: "error.main", "&:focus-within": { borderColor: "error.main" } } : {}),
   };
 
   return (
@@ -184,14 +230,7 @@ export function DateInput({
             // 放弃编辑;拦下冒泡,免得 Dialog 把整个弹层关掉
             e.stopPropagation();
             setSegs(parseIso(value));
-            setError(false);
           }
-        }}
-        onMouseDown={(e) => {
-          const el = e.target as HTMLElement;
-          if (el.tagName !== "INPUT" && !rootRef.current?.contains(el)) return;
-          // 空值点击插当天(spec 0019):预填即草稿,失焦走 commit 即提交
-          if (value === "" && draftEmpty) setSegs(todaySegs());
         }}
         onClick={() => {
           const ae = document.activeElement;
@@ -210,6 +249,7 @@ export function DateInput({
           onChange={(e) => onSegInput("mm", e.target.value)}
           onKeyDown={(e) => onSegKeyDown("mm", e)}
           onPaste={onSegPaste}
+          onFocus={onSegFocus}
           ref={segRefs.mm}
         />
         <Box component="span" sx={{ px: 0.25, color: "text.secondary" }}>/</Box>
@@ -223,6 +263,7 @@ export function DateInput({
           onChange={(e) => onSegInput("dd", e.target.value)}
           onKeyDown={(e) => onSegKeyDown("dd", e)}
           onPaste={onSegPaste}
+          onFocus={onSegFocus}
           ref={segRefs.dd}
         />
         <Box component="span" sx={{ px: 0.25, color: "text.secondary" }}>/</Box>
@@ -236,8 +277,19 @@ export function DateInput({
           onChange={(e) => onSegInput("yyyy", e.target.value)}
           onKeyDown={(e) => onSegKeyDown("yyyy", e)}
           onPaste={onSegPaste}
+          onFocus={onSegFocus}
           ref={segRefs.yyyy}
         />
+        <IconButton
+          size="small"
+          aria-label={`月历 ${name ?? ""}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            setCalOpen(true);
+          }}
+        >
+          <DateRangeIcon fontSize="small" sx={{ color: "text.secondary" }} />
+        </IconButton>
         {showClear && (
           <IconButton
             size="small"
@@ -247,12 +299,98 @@ export function DateInput({
               e.stopPropagation();
               onChange("");
               setSegs({ mm: "", dd: "", yyyy: "" });
-              setError(false);
             }}
           >
             <ClearIcon fontSize="small" />
           </IconButton>
         )}
+      </Box>
+      <Popover
+        open={calOpen}
+        anchorEl={rootRef.current}
+        onClose={() => setCalOpen(false)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+        transformOrigin={{ vertical: "top", horizontal: "left" }}
+      >
+        <MiniCalendar initialIso={isoOf(parseIso(value))} onPick={pick} />
+      </Popover>
+    </Box>
+  );
+}
+
+// mini 月历(spec 0019 §2.8):‹ › 切月,点日回填+提交+关闭,选中=field 底色,今天=描边
+function MiniCalendar({ initialIso, onPick }: { initialIso: string; onPick: (iso: string) => void }) {
+  const init = parseIso(initialIso);
+  const [ym, setYm] = useState({ y: Number(init.yyyy), m: Number(init.mm) });
+  const startDow = new Date(ym.y, ym.m - 1, 1).getDay();
+  const days = daysInMonth(ym.y, ym.m);
+  const todayIso = isoOf(todaySegs());
+  const move = (delta: number) =>
+    setYm((p) => {
+      const m = p.m + delta;
+      return m < 1 ? { y: p.y - 1, m: 12 } : m > 12 ? { y: p.y + 1, m: 1 } : { y: p.y, m };
+    });
+
+  return (
+    <Box sx={{ p: 1.5 }}>
+      <Box sx={{ display: "flex", alignItems: "center", mb: 0.5 }}>
+        <IconButton size="small" aria-label={t.date.prevMonth} onClick={() => move(-1)}>
+          <ChevronLeftIcon fontSize="small" />
+        </IconButton>
+        <Box sx={{ flex: 1, textAlign: "center", fontSize: 14 }}>
+          {ym.y}.{pad2(ym.m)}
+        </Box>
+        <IconButton size="small" aria-label={t.date.nextMonth} onClick={() => move(1)}>
+          <ChevronRightIcon fontSize="small" />
+        </IconButton>
+      </Box>
+      <Box sx={{ display: "grid", gridTemplateColumns: "repeat(7, 28px)", gap: "2px" }}>
+        {t.date.weekdays.map((w) => (
+          <Box key={w} sx={{ textAlign: "center", fontSize: 12, color: "text.secondary", py: 0.5 }}>
+            {w}
+          </Box>
+        ))}
+        {Array.from({ length: startDow }).map((_, i) => (
+          <Box key={`empty-${i}`} />
+        ))}
+        {Array.from({ length: days }).map((_, i) => {
+          const d = i + 1;
+          const iso = `${ym.y}-${pad2(ym.m)}-${pad2(d)}`;
+          const sel = iso === initialIso;
+          const isToday = iso === todayIso;
+          return (
+            <Box
+              key={iso}
+              component="button"
+              type="button"
+              onClick={() => onPick(iso)}
+              sx={{
+                width: 28,
+                height: 28,
+                textAlign: "center",
+                fontSize: 13,
+                cursor: "pointer",
+                border: "1px solid transparent",
+                borderRadius: 1,
+                bgcolor: sel ? tokens.field : "transparent",
+                ...(isToday ? { borderColor: tokens.border } : {}),
+                "&:hover": { bgcolor: tokens.field },
+              }}
+            >
+              {d}
+            </Box>
+          );
+        })}
+      </Box>
+      <Box sx={{ display: "flex", justifyContent: "center", mt: 0.5 }}>
+        <Box
+          component="button"
+          type="button"
+          onClick={() => onPick(todayIso)}
+          sx={{ fontSize: 12, color: "text.secondary", cursor: "pointer", border: "none", background: "none", py: 0.5 }}
+        >
+          {t.date.today}
+        </Box>
       </Box>
     </Box>
   );
