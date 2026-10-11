@@ -6,6 +6,7 @@ import EditIcon from "@mui/icons-material/Edit";
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { t } from "@/lib/texts";
+import { DateInput } from "@/components/DateInput";
 
 export type Release = {
   releaseId: string;
@@ -120,14 +121,7 @@ export function ReleaseManager({
             sx={{ flex: 1, minWidth: 140 }}
             autoFocus
           />
-          <TextField
-            label={t.release.targetDate}
-            type="date"
-            size="small"
-            value={targetDate}
-            onChange={(e) => setTargetDate(e.target.value)}
-            slotProps={{ inputLabel: { shrink: true } }}
-          />
+          <DateInput label={t.release.targetDate} size="small" value={targetDate} onChange={setTargetDate} />
           <Button type="submit" variant="contained" disabled={!name.trim()}>
             {editingId ? t.release.save : t.release.create}
           </Button>
@@ -140,14 +134,7 @@ export function ReleaseManager({
               label={<Typography variant="caption">{t.release.backfill}</Typography>}
             />
             {backfill && (
-              <TextField
-                label={t.release.releasedDate}
-                type="date"
-                size="small"
-                value={releasedDate}
-                onChange={(e) => setReleasedDate(e.target.value)}
-                slotProps={{ inputLabel: { shrink: true } }}
-              />
+              <DateInput label={t.release.releasedDate} size="small" value={releasedDate} onChange={setReleasedDate} />
             )}
           </Stack>
         )}
@@ -183,14 +170,7 @@ export function ReleaseManager({
                 )}
                 {shippingId === r.releaseId && (
                   <>
-                    <TextField
-                      type="date"
-                      size="small"
-                      value={shipDate}
-                      onChange={(e) => setShipDate(e.target.value)}
-                      slotProps={{ inputLabel: { shrink: true } }}
-                      sx={{ width: 150 }}
-                    />
+                    <DateInput ariaLabel={t.release.releasedDate} size="small" value={shipDate} onChange={setShipDate} sx={{ width: 200 }} />
                     <Button size="small" variant="contained" onClick={() => ship(r)}>{t.release.confirmShip}</Button>
                     <Button size="small" color="inherit" onClick={() => setShippingId(null)}>{t.release.cancelShip}</Button>
                   </>

@@ -14,6 +14,7 @@ import type { Signal } from "@/components/Verdict";
 import { WorkflowEditor } from "@/components/WorkflowEditor";
 import { ProjectMembersPanel } from "@/components/ProjectMembersPanel";
 import { GithubSettingsPanel } from "@/components/GithubSettingsPanel";
+import { DateInput } from "@/components/DateInput";
 
 type Sprint = { sprintId: string; name: string; status: string };
 type NavItem = { itemId: string; number: string; title: string; type: string; parentItemId: string | null; feasSignal: Signal | null };
@@ -289,8 +290,8 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
             <TextField label={t.projectNav.createName} size="small" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
-            <TextField label="开始日期" type="date" size="small" value={startDate} onChange={(e) => setStartDate(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
-            <TextField label="截止日期" type="date" size="small" value={endDate} onChange={(e) => setEndDate(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
+            <DateInput label="开始日期" size="small" value={startDate} onChange={setStartDate} />
+            <DateInput label="截止日期" size="small" value={endDate} onChange={setEndDate} />
             {error && <Typography color="error" variant="body2">{error}</Typography>}
           </Stack>
         </DialogContent>

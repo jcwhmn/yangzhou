@@ -1,5 +1,16 @@
 // 文案外置(中文优先;加英文时改这里)
 export const t = {
+  date: {
+    month: "月",
+    day: "日",
+    year: "年",
+    weekdays: ["日", "一", "二", "三", "四", "五", "六"],
+    today: "今天",
+    prevMonth: "上一月",
+    nextMonth: "下一月",
+    prevYear: "上一年",
+    nextYear: "下一年",
+  },
   appName: "扬州 yangzhou",
   nav: {
     home: "主页",

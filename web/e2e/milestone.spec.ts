@@ -1,6 +1,6 @@
 // V14 Milestone:侧边栏段 + 管理对话框(CRUD/单向状态/两段式删除)+ 0..1 in_progress 拒绝
 import { expect, test } from "./support/fixtures";
-import { apiCall } from "./support/helpers";
+import { apiCall, fillDate } from "./support/helpers";
 
 test("Milestone 管理对话框——建/推进/编辑/删除 @smoke", async ({ page, projectKey }) => {
   // 预置:A 进行中,B 规划中(A 在前)
@@ -26,7 +26,7 @@ test("Milestone 管理对话框——建/推进/编辑/删除 @smoke", async ({ 
 
   // UI 新建(带日期)
   await dialog.getByLabel("名称").fill("GA 里程碑");
-  await dialog.getByLabel("目标日期").fill("2027-06-01");
+  await fillDate(dialog, "目标日期", "2027-06-01");
   await dialog.getByRole("button", { name: "新建", exact: true }).click();
   await expect(dialog.getByText("GA 里程碑")).toBeVisible();
 

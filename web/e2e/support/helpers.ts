@@ -1,6 +1,6 @@
 // API 预置/清理 helpers:数据准备全走 API,用例本体只测 UI 行为
 import { randomUUID } from "node:crypto";
-import { expect, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 import { config } from "../config";
 
 let cachedToken: string | null = null;
@@ -132,4 +132,25 @@ export async function selectOption(page: Page, label: string, name: string, expe
     if (await readback.then(() => true, () => false)) return;
   }
   throw new Error(`下拉「${label}」未能选中「${name}」`);
+}
+
+// 分段日期输入(spec 0019 / YPJ-19):group aria-label=label,三段 月/日/年;focus+Home 强制光标位首后 fill,
+// 组件 beforeinput 逐位接管——insertText 落点确定,不与预填拼串;末段 blur 提交
+export async function fillDate(page: Page | Locator, label: string, iso: string): Promise<void> {
+  const [y, m, d] = iso.split("-");
+  const g = page.getByRole("group", { name: label, exact: true });
+  const put = async (seg: string, digits: string) => {
+    const box = g.getByLabel(seg, { exact: true });
+    await box.focus();
+    await box.press("Home");
+    await box.fill(digits);
+  };
+  await put("月", m);
+  await put("日", d);
+  await put("年", y);
+  await g.getByLabel("年", { exact: true }).blur();
+}
+
+export function expectDate(page: Page | Locator, label: string, iso: string) {
+  return expect(page.getByRole("group", { name: label, exact: true })).toHaveAttribute("data-value", iso);
 }
