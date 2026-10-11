@@ -109,10 +109,15 @@ export function DateInput({
     setSegs(parseIso(niso));
   };
 
-  const focusSeg = (k: keyof Segs) => segRefs[k].current?.focus();
+  const focusSeg = (k: keyof Segs, atStart = false) => {
+    const el = segRefs[k].current;
+    if (!el) return;
+    el.focus();
+    if (atStart) el.setSelectionRange(0, 0);
+  };
 
-  // 8 位位置感知(spec 0019 §1.3):结果 1 位=十位槽——0/1(月)、0–3(日)留段内进位,
-  // 其余按智能个位 `0X` 跳下一段;结果 2 位=满段跳下一段;年逐位填,满 4 封口(maxLength)。
+  // onChange 兜底(Playwright fill / IME / 粘贴单段):整段智能解读——1 位=十位槽(留段或智能个位 0X),
+  // 2 位=满段跳下一段;日 >31 记 31;年逐位。真实键入走 writeDigit(keydown 拦截),不经此路径。
   const onSegInput = (k: keyof Segs, v: string) => {
     const clean = digits(v, MAXLEN[k]);
     if (k === "yyyy") {
@@ -130,14 +135,13 @@ export function DateInput({
       let val = clean.length === 1 ? `0${clean}` : clean;
       if (k === "dd" && Number(val) > 31) val = "31"; // 日期上限 31(spec 0019 §1.3)
       setSegs((p) => ({ ...p, [k]: val }));
-      if (next) focusSeg(next);
+      if (next) focusSeg(next, true);
     }
   };
 
-  // 段聚焦:全选(覆盖式输入);空值聚焦预填今天(click/Tab 同权),光标落本段位 1
+  // 段聚焦:无整段选中(8 位独立,点击/键入都逐位);空值聚焦预填今天(click/Tab 同权),光标落本段位 1
   // (rAF+timeout 双保险:React 提交后浏览器把程序化赋值的光标推到段尾,需再拉回位 1)
   const onSegFocus = (e: React.FocusEvent<HTMLInputElement>) => {
-    e.currentTarget.select();
     if (value === "" && draftEmpty) {
       setSegs(todaySegs());
       const el = e.currentTarget;
@@ -149,6 +153,47 @@ export function DateInput({
         setTimeout(toStart, 0);
       });
     }
+  };
+
+  // 逐位写入(spec 0019 §1.3,8 位独立):数字键覆写当前位、光标进一位;
+  // 十位遇超界数字智能个位整段 0X 跳段;个位写满跳下一段位 1;日上限 31;年满 4 覆写末位。
+  // 先直写 el.value 再同步 state:受控重渲染比对相同值跳过,光标不被重置。
+  const writeDigit = (k: keyof Segs, pos: number, d: number) => {
+    const el = segRefs[k].current;
+    if (!el) return;
+    const cur = segs[k];
+    const next = ORDER[ORDER.indexOf(k) + 1];
+    let nextVal: string;
+    let caret: number;
+    let jump = false;
+    if (k === "yyyy") {
+      const chars = cur.split("");
+      if (chars.length >= 4 && pos >= 4) pos = 3;
+      if (pos >= chars.length) chars.push(String(d));
+      else chars[pos] = String(d);
+      nextVal = chars.join("");
+      caret = Math.min(pos + 1, nextVal.length);
+    } else if (pos === 0 && d > (k === "mm" ? 1 : 3)) {
+      nextVal = `0${d}`;
+      caret = 2;
+      jump = true;
+    } else if (pos === 0) {
+      const chars = cur.split("");
+      if (chars.length === 0) chars.push(String(d));
+      else chars[0] = String(d);
+      nextVal = chars.join("").slice(0, 2);
+      caret = 1;
+    } else {
+      let ones = d;
+      if (k === "dd" && Number(cur[0] ?? "0") === 3 && ones > 1) ones = 1; // 日期上限 31
+      nextVal = `${cur.slice(0, 1)}${ones}`;
+      caret = 2;
+      jump = true;
+    }
+    el.value = nextVal;
+    setSegs((p) => ({ ...p, [k]: nextVal }));
+    el.setSelectionRange(caret, caret);
+    if (jump && next) focusSeg(next, true);
   };
 
   // 年段 Tab:跳出控件进下一个控件(DOM 会先停在段内 📅/× 按钮,手动跳过)
@@ -168,9 +213,18 @@ export function DateInput({
     const i = ORDER.indexOf(k);
     const el = e.currentTarget;
     const pos = el.selectionStart ?? 0;
-    if (k === "yyyy" && e.key === "Tab" && !e.shiftKey) {
+    if (/^[0-9]$/.test(e.key)) {
       e.preventDefault();
-      focusNextAfterGroup();
+      writeDigit(k, pos, Number(e.key));
+      return;
+    }
+    if (e.key === "Tab" && !e.shiftKey) {
+      e.preventDefault();
+      if (k === "yyyy") focusNextAfterGroup();
+      else {
+        const next = ORDER[i + 1];
+        if (next) focusSeg(next, true);
+      }
       return;
     }
     if (e.key === "ArrowRight" || e.key === "/") {
@@ -193,8 +247,6 @@ export function DateInput({
       }
     } else if (e.key === "Backspace" && segs[k] === "" && i > 0) {
       focusSeg(ORDER[i - 1]);
-    } else if (e.key === "Delete") {
-      setSegs((p) => ({ ...p, [k]: "" }));
     }
   };
 
@@ -288,7 +340,6 @@ export function DateInput({
           onKeyDown={(e) => onSegKeyDown("mm", e)}
           onPaste={onSegPaste}
           onFocus={onSegFocus}
-          onClick={(e) => e.currentTarget.select()}
           ref={segRefs.mm}
         />
         <Box component="span" sx={{ px: 0.25, color: "text.secondary" }}>/</Box>
@@ -303,7 +354,6 @@ export function DateInput({
           onKeyDown={(e) => onSegKeyDown("dd", e)}
           onPaste={onSegPaste}
           onFocus={onSegFocus}
-          onClick={(e) => e.currentTarget.select()}
           ref={segRefs.dd}
         />
         <Box component="span" sx={{ px: 0.25, color: "text.secondary" }}>/</Box>
@@ -318,7 +368,6 @@ export function DateInput({
           onKeyDown={(e) => onSegKeyDown("yyyy", e)}
           onPaste={onSegPaste}
           onFocus={onSegFocus}
-          onClick={(e) => e.currentTarget.select()}
           ref={segRefs.yyyy}
         />
         <IconButton
