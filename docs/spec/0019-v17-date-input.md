@@ -113,7 +113,7 @@
 ### 2.3 段行为(8 位独立光标模型,见 §1.3)
 
 - 每段 `<input inputMode="numeric" maxLength 同位数 aria-label=月/日/年>`;无 select-on-focus/整段选中——8 位相互独立,点击落位、逐位覆写。
-- 数字键 keydown 拦截 → writeDigit:覆写当前位、光标进一位;月/日十位超界数字按智能个位整段 `0X` 跳段;月/日个位写满跳下一段位 1;日上限 31(位 3=3 按 2–9 记 `31`);年满 4 覆写末位。
+- 数字键 keydown 拦截 → writeDigit:覆写当前位、光标进一位;月/日十位超界数字按智能个位整段 `0X` 跳段;月/日个位写满跳下一段位 1;日上限 31(位 3=3 按 2–9 记 `31`);年满 4 覆写末位。insertText(beforeinput)同走 writeDigit——Playwright fill / 输入法上屏与真实键入同语义(否则 fill 的 "01" 追加到预填 "10" 拼成 "1001",e2e 实测修复)。
 - DOM 直写 `el.value` + `setSelectionRange` 后再同步 state(受控重渲染比对相同值跳过写,光标不被重置)。
 - onChange 仅兜底(Playwright fill / IME / 单段粘贴):整段智能解读——1 位=十位槽(留段或 `0X` 跳段)、2 位=满段跳段、日 >31 记 `31`。
 - keydown:←/→ 光标位内自然移动,位首/位尾跨界段,年段位尾 →(与 Tab 同)聚焦 group 后第一个可聚焦元素;`/` 同 →;Backspace 空段回退上一段(位内自然删);Delete 自然删位。Tab:月/日段 preventDefault 聚焦下一段位 1;年段跳出控件。
@@ -191,7 +191,7 @@ expectDate(page, label, iso) // expect(group).toHaveAttribute("data-value", iso)
 
 ### 4.1 实现终态
 
-- 组件:`web/components/DateInput.tsx`——writeDigit(keydown 数字拦截逐位覆写,el.value 直写防受控光标重置)、commit(越界静默钆制 + 年短写补全)、onSegInput(fill/IME 兜底整段智能解读)、onSegPaste(整串分发)、MiniCalendar 月历 Popover(‹‹›› 跳年)、group + data-value ARIA。
+- 组件:`web/components/DateInput.tsx`——writeDigit(keydown 数字拦截逐位覆写,el.value 直写防受控光标重置)、commit(越界静默钆制 + 年短写补全)、beforeinput/onChange(fill·IME 兜底)、onSegPaste(整串分发)、MiniCalendar 月历 Popover(‹‹›› 跳年)、group + data-value ARIA。
 - 交互终版 = PRD §4(8 位独立光标模型,讨论中从「段级全选」演进到「逐位独立」,全程用户拍板)。
 - 替换 8 处 + texts `t.date.*` + helpers `fillDate/expectDate`。
 

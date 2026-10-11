@@ -157,11 +157,11 @@ export function DateInput({
 
   // 逐位写入(spec 0019 §1.3,8 位独立):数字键覆写当前位、光标进一位;
   // 十位遇超界数字智能个位整段 0X 跳段;个位写满跳下一段位 1;日上限 31;年满 4 覆写末位。
-  // 先直写 el.value 再同步 state:受控重渲染比对相同值跳过,光标不被重置。
+  // cur 取 el.value(DOM 地面真值,含自然删除后的状态);先直写 el.value 再同步 state,防受控重渲染重置光标。
   const writeDigit = (k: keyof Segs, pos: number, d: number) => {
     const el = segRefs[k].current;
     if (!el) return;
-    const cur = segs[k];
+    const cur = el.value;
     const next = ORDER[ORDER.indexOf(k) + 1];
     let nextVal: string;
     let caret: number;
@@ -206,6 +206,21 @@ export function DateInput({
         el.focus();
         return;
       }
+    }
+  };
+
+  // insertText 的逐位路径:让 Playwright fill / 输入法候选上屏与真实键入同语义(否则 fill 会把 "01"
+  // 追加到预填 "10" 后拼成 "1001");keydown 数字已拦截走 writeDigit,不会双写。
+  const onSegBeforeInput = (k: keyof Segs, e: React.FormEvent<HTMLInputElement>) => {
+    const ev = e.nativeEvent as InputEvent;
+    if (ev.inputType !== "insertText" || !ev.data || !/^[0-9]+$/.test(ev.data)) return;
+    e.preventDefault();
+    const el = segRefs[k].current;
+    if (!el) return;
+    let pos = el.selectionStart ?? el.value.length;
+    for (const ch of ev.data) {
+      writeDigit(k, pos, Number(ch));
+      pos = el.selectionStart ?? pos + 1;
     }
   };
 
@@ -340,6 +355,7 @@ export function DateInput({
           onKeyDown={(e) => onSegKeyDown("mm", e)}
           onPaste={onSegPaste}
           onFocus={onSegFocus}
+          onBeforeInput={(e) => onSegBeforeInput("mm", e)}
           ref={segRefs.mm}
         />
         <Box component="span" sx={{ px: 0.25, color: "text.secondary" }}>/</Box>
@@ -354,6 +370,7 @@ export function DateInput({
           onKeyDown={(e) => onSegKeyDown("dd", e)}
           onPaste={onSegPaste}
           onFocus={onSegFocus}
+          onBeforeInput={(e) => onSegBeforeInput("dd", e)}
           ref={segRefs.dd}
         />
         <Box component="span" sx={{ px: 0.25, color: "text.secondary" }}>/</Box>
@@ -368,6 +385,7 @@ export function DateInput({
           onKeyDown={(e) => onSegKeyDown("yyyy", e)}
           onPaste={onSegPaste}
           onFocus={onSegFocus}
+          onBeforeInput={(e) => onSegBeforeInput("yyyy", e)}
           ref={segRefs.yyyy}
         />
         <IconButton
