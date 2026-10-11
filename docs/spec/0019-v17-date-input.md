@@ -186,3 +186,24 @@ expectDate(page, label, iso) // expect(group).toHaveAttribute("data-value", iso)
 14. **月历**:点 📅 → 弹月历(初始=已提交值所在月,空则今天);‹ › 切月、‹‹/›› 跳年;点日 → 回填+提交+关闭;「今天」一键回填。
 15. **Tab 行为与年短写**:Tab 进空控件 → 预填今天、光标在位 1;年段 Tab/→ 跳出控件;Tab 顺序 开始日期 → 截止日期 → 优先级(item 详情);年输 `27` 出去 → `2027` 落库(50 及以上 → 19XX)。
 16. **e2e**:board/milestone/release 三 spec 迁移后单跑绿(agent 执行);全量本地绿。
+
+## 4. As-built(2026-10-10)
+
+### 4.1 实现终态
+
+- 组件:`web/components/DateInput.tsx`——writeDigit(keydown 数字拦截逐位覆写,el.value 直写防受控光标重置)、commit(越界静默钆制 + 年短写补全)、onSegInput(fill/IME 兜底整段智能解读)、onSegPaste(整串分发)、MiniCalendar 月历 Popover(‹‹›› 跳年)、group + data-value ARIA。
+- 交互终版 = PRD §4(8 位独立光标模型,讨论中从「段级全选」演进到「逐位独立」,全程用户拍板)。
+- 替换 8 处 + texts `t.date.*` + helpers `fillDate/expectDate`。
+
+### 4.2 否决备选(讨论演进记录)
+
+- 红框拦截组合非法 → 被越界静默修正替代(用户拍板「无需提醒」)。
+- select-on-focus / onClick 全选 → 被 8 位独立光标模型替代(31 月 bug 根因)。
+- MUI X DatePicker(引依赖)、隐藏原生 input showPicker(观感不可控+Safari 无效)→ 自研 mini 月历。
+
+### 4.3 验证与已知限制
+
+- `tsc --noEmit` 绿;结构断言(python count)验证关键实现点。
+- e2e:契约迁移完成(fillDate/expectDate);PR CI 跑 smoke,全量本地绿待跑(验收清单最后一项)。
+- 已知限制:不完整草稿时保存拿到已提交值(原生 date 同款);月历无键盘导航;虚拟键盘/IME 降级整段解读。
+- 后续工作池:`docs/requirement/DateInput PRD.md` §6(独立控件化候选已入 backlog 票)。
