@@ -1,5 +1,6 @@
 // 文案外置(中文优先;加英文时改这里)
 export const t = {
+  date: { month: "月", day: "日", year: "年" },
   appName: "扬州 yangzhou",
   nav: {
     home: "主页",

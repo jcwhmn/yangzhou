@@ -1,6 +1,6 @@
 // YPJ-4 Release(spec 0012):侧边栏段 + 管理对话框(建/补建/发布)+ 详情下拉拉入 + 非空删除 409
 import { expect, test } from "./support/fixtures";
-import { apiCall, apiCreateItem, selectOption } from "./support/helpers";
+import { apiCall, apiCreateItem, fillDate, selectOption } from "./support/helpers";
 
 test("Release 全链路——段显示/对话框建与补建/发布/拉入/非空删除 409 @smoke", async ({ page, projectKey }) => {
   // 预置:planned R2.0 + 补建 released R1.9(§8.2)
@@ -17,7 +17,7 @@ test("Release 全链路——段显示/对话框建与补建/发布/拉入/非�
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
   await dialog.getByLabel("名称").fill("R3.0");
-  await dialog.getByLabel("目标发布日").fill("2027-03-01");
+  await fillDate(dialog, "目标发布日", "2027-03-01");
   await dialog.getByRole("button", { name: "新建", exact: true }).click();
   const r3row = dialog.getByTestId("release-row").filter({ hasText: "R3.0" });
   await expect(r3row).toBeVisible();

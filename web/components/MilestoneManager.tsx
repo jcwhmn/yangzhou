@@ -6,6 +6,7 @@ import EditIcon from "@mui/icons-material/Edit";
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { t } from "@/lib/texts";
+import { DateInput } from "@/components/DateInput";
 
 export type Milestone = {
   milestoneId: string;
@@ -101,14 +102,7 @@ export function MilestoneManager({
             sx={{ flex: 1 }}
             autoFocus
           />
-          <TextField
-            label={t.milestone.targetDate}
-            type="date"
-            size="small"
-            value={targetDate}
-            onChange={(e) => setTargetDate(e.target.value)}
-            slotProps={{ inputLabel: { shrink: true } }}
-          />
+          <DateInput label={t.milestone.targetDate} size="small" value={targetDate} onChange={setTargetDate} />
           <Button type="submit" variant="contained" disabled={!name.trim()}>
             {editingId ? t.milestone.save : t.milestone.create}
           </Button>

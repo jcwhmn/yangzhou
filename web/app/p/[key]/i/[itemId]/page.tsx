@@ -25,6 +25,7 @@ import { api } from "@/lib/api";
 import { t } from "@/lib/texts";
 import { SignalChip, VerdictLine, type Signal, type Verdict } from "@/components/Verdict";
 import { AssignPopover } from "@/components/AssignPopover";
+import { DateInput } from "@/components/DateInput";
 
 type Status = { statusId: string; name: string; isFinal: boolean; position: number };
 type Item = {
@@ -451,24 +452,8 @@ export default function ItemDetailPage() {
           fullWidth
         />
         <Stack direction="row" spacing={1}>
-          <TextField
-            label="开始日期"
-            type="date"
-            size="small"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            sx={{ width: 180 }}
-            slotProps={{ inputLabel: { shrink: true } }}
-          />
-          <TextField
-            label="截止日期"
-            type="date"
-            size="small"
-            value={dueDate}
-            onChange={(e) => setDueDate(e.target.value)}
-            sx={{ width: 180 }}
-            slotProps={{ inputLabel: { shrink: true } }}
-          />
+          <DateInput label="开始日期" size="small" value={startDate} onChange={setStartDate} sx={{ width: 180 }} />
+          <DateInput label="截止日期" size="small" value={dueDate} onChange={setDueDate} sx={{ width: 180 }} />
 <Dropdown
           label={t.item.priority}
           size="small"

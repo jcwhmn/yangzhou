@@ -1,7 +1,7 @@
 // 看板与 item 详情:建项/评论/状态/日期/优先级/依赖/回收站/过滤/错误浮出
 import { expect } from "./support/fixtures";
 import { test } from "./support/fixtures";
-import { apiAssignMe, apiCreateItem } from "./support/helpers";
+import { apiAssignMe, apiCreateItem, expectDate, fillDate } from "./support/helpers";
 
 test("建 item → 详情 → 评论 → 指派 → 状态 QA → 活动日志 @smoke", async ({ page, projectKey }) => {
   await page.goto(`/p/${projectKey}`);
@@ -39,12 +39,12 @@ test("日期与超期标识——详情设置日期,看板红标,甘特可见", 
   await page.getByPlaceholder("新建 item").fill("E2E 超期 item");
   await page.getByRole("button", { name: "新建 ITEM" }).click();
   await page.getByText("E2E 超期 item").first().click();
-  await page.getByLabel("开始日期").fill("2020-01-01");
-  await page.getByLabel("截止日期").fill("2020-01-15");
+  await fillDate(page, "开始日期", "2020-01-01");
+  await fillDate(page, "截止日期", "2020-01-15");
   const saveResp = page.waitForResponse((r) => r.url().includes("/api/items/") && r.request().method() === "PATCH");
   await page.getByRole("button", { name: "保存" }).click();
   await saveResp; // 等 PATCH 落库再导航,否则请求被打断
-  await expect(page.getByLabel("开始日期")).toHaveValue("2020-01-01");
+  await expectDate(page, "开始日期", "2020-01-01");
   // 看板红标
   await page.goto(`/p/${projectKey}`);
   await expect(page.getByText("⚠ 超期 2020-01-15")).toBeVisible();

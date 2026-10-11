@@ -1,6 +1,6 @@
 // API 预置/清理 helpers:数据准备全走 API,用例本体只测 UI 行为
 import { randomUUID } from "node:crypto";
-import { expect, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 import { config } from "../config";
 
 let cachedToken: string | null = null;
@@ -132,4 +132,19 @@ export async function selectOption(page: Page, label: string, name: string, expe
     if (await readback.then(() => true, () => false)) return;
   }
   throw new Error(`下拉「${label}」未能选中「${name}」`);
+}
+
+// 分段日期输入(spec 0019 / YPJ-19):group aria-label=label,三段 月/日/年,末段 blur 提交
+export async function fillDate(page: Page | Locator, label: string, iso: string): Promise<void> {
+  const [y, m, d] = iso.split("-");
+  const g = page.getByRole("group", { name: label, exact: true });
+  await g.getByLabel("月", { exact: true }).fill(m);
+  await g.getByLabel("日", { exact: true }).fill(d);
+  const year = g.getByLabel("年", { exact: true });
+  await year.fill(y);
+  await year.blur();
+}
+
+export function expectDate(page: Page | Locator, label: string, iso: string) {
+  return expect(page.getByRole("group", { name: label, exact: true })).toHaveAttribute("data-value", iso);
 }
