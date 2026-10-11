@@ -55,7 +55,7 @@ test("Release 全链路——段显示/对话框建与补建/发布/拉入/非�
   await expect(page.getByRole("dialog").getByText(/release 非空/)).toBeVisible();
 
   await page.goto(`/p/${projectKey}/i/${itemId}`);
-  await selectOption(page, "Release", "无", "");
+  await page.getByRole("button", { name: "清除 Release" }).click(); // Dropdown 清空走 ×(spec 0018)
   await page.goto(`/p/${projectKey}`);
   await page.getByRole("button", { name: "管理 Release" }).click();
   await expect(page.getByRole("dialog")).toBeVisible();

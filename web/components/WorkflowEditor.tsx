@@ -9,12 +9,11 @@ import {
   DialogContent,
   DialogTitle,
   IconButton,
-  MenuItem,
-  Select,
   Stack,
   TextField,
   Typography,
 } from "@mui/material";
+import { Dropdown } from "@/components/Dropdown";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { t } from "@/lib/texts";
@@ -173,26 +172,22 @@ export function WorkflowEditor({
                 }}
                 sx={{ width: 90 }}
               />
-              <Select
+<Dropdown
                 size="small"
+                placeholder="—"
                 value={s.isStart ? "start" : ""}
-                onChange={(e) => patch(s.statusId, { isStart: e.target.value === "start" })}
+                onChange={(v) => patch(s.statusId, { isStart: v === "start" })}
                 sx={{ width: 110 }}
-                displayEmpty
-              >
-                <MenuItem value="">—</MenuItem>
-                <MenuItem value="start">{t.wf.start}</MenuItem>
-              </Select>
-              <Select
+                options={[{ value: "", label: "—" }, { value: "start", label: t.wf.start }]}
+              />
+<Dropdown
                 size="small"
+                placeholder="—"
                 value={s.isFinal ? "final" : ""}
-                onChange={(e) => patch(s.statusId, { isFinal: e.target.value === "final" })}
+                onChange={(v) => patch(s.statusId, { isFinal: v === "final" })}
                 sx={{ width: 110 }}
-                displayEmpty
-              >
-                <MenuItem value="">—</MenuItem>
-                <MenuItem value="final">{t.wf.final}</MenuItem>
-              </Select>
+                options={[{ value: "", label: "—" }, { value: "final", label: t.wf.final }]}
+              />
               <TextField
                 size="small"
                 type="number"
@@ -281,27 +276,25 @@ function AddTransitionRow({
   const ready = from && to && from !== to;
   return (
     <Stack direction="row" spacing={1} alignItems="center">
-      <Select size="small" value={from} displayEmpty onChange={(e) => setFrom(String(e.target.value))} sx={{ width: 150 }}>
-        <MenuItem value="" disabled>
-          {t.wf.from}
-        </MenuItem>
-        {statuses.map((s) => (
-          <MenuItem key={s.statusId} value={s.name}>
-            {s.name}
-          </MenuItem>
-        ))}
-      </Select>
+<Dropdown
+        size="small"
+        placeholder={t.wf.from}
+        ariaLabel={t.wf.from}
+        value={from}
+        onChange={(v) => setFrom(v)}
+        sx={{ width: 150 }}
+        options={statuses.map((s) => ({ value: s.name, label: s.name }))}
+      />
       <Typography variant="body2">→</Typography>
-      <Select size="small" value={to} displayEmpty onChange={(e) => setTo(String(e.target.value))} sx={{ width: 150 }}>
-        <MenuItem value="" disabled>
-          {t.wf.to}
-        </MenuItem>
-        {statuses.map((s) => (
-          <MenuItem key={s.statusId} value={s.name}>
-            {s.name}
-          </MenuItem>
-        ))}
-      </Select>
+<Dropdown
+        size="small"
+        placeholder={t.wf.to}
+        ariaLabel={t.wf.to}
+        value={to}
+        onChange={(v) => setTo(v)}
+        sx={{ width: 150 }}
+        options={statuses.map((s) => ({ value: s.name, label: s.name }))}
+      />
       <Button size="small" variant="outlined" disabled={!ready} onClick={() => onAdd({ from, to })}>
         {t.wf.addTransition}
       </Button>

@@ -16,7 +16,7 @@ test("V12-S3 Sprint 全链路——建/指派/开始/完成/backlog/历史 @smok
   // 详情指派(item 详情常驻区 Sprint 下拉)
   await page.getByText("E2E 冒烟 item").first().click();
   await selectOption(page, "Sprint", "Sprint 42");
-  await expect(page.getByRole("combobox", { name: "Sprint" })).toHaveText("Sprint 42");
+  await expect(page.getByRole("combobox", { name: "Sprint", exact: true })).toHaveValue("Sprint 42");
 
   // sprint 看板:冒烟 item 在列
   await page.getByRole("link", { name: /Sprint 42/ }).first().click();
@@ -29,8 +29,8 @@ test("V12-S3 Sprint 全链路——建/指派/开始/完成/backlog/历史 @smok
   // 详情清除 → 回 backlog
   await page.goto(`/p/${projectKey}`);
   await page.getByText("E2E 冒烟 item").first().click();
-  await selectOption(page, "Sprint", "无", "");
-  await expect(page.getByRole("combobox", { name: "Sprint" })).toHaveText("");
+  await page.getByRole("button", { name: "清除 Sprint" }).click(); // Dropdown 无边框方案:清空走 ×(spec 0018)
+  await expect(page.getByRole("combobox", { name: "Sprint", exact: true })).toHaveValue("");
   await page.goto(`/p/${projectKey}/backlog`);
   await expect(page.getByText("E2E 冒烟 item").first()).toBeVisible();
 
@@ -53,7 +53,7 @@ test("V12-S3 Sprint 全链路——建/指派/开始/完成/backlog/历史 @smok
   // 详情只显示当前 sprint(裁决 2):已完成 sprint 不回填下拉也不在选项中
   await page.goto(`/p/${projectKey}`);
   await page.getByText("E2E 冒烟 item").first().click();
-  await expect(page.getByRole("combobox", { name: "Sprint" })).not.toHaveText("Sprint 42");
+  await expect(page.getByRole("combobox", { name: "Sprint", exact: true })).not.toHaveValue("Sprint 42");
 });
 
 test("V13-S3 拉入对话框——多选勾入/移出 + 详情回链", async ({ page, projectKey }) => {

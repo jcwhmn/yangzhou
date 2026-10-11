@@ -1,6 +1,7 @@
 "use client";
 
-import { Box, Card, CardContent, Chip, Container, MenuItem, Select, Stack, Typography } from "@mui/material";
+import { Box, Card, CardContent, Chip, Container, Stack, Typography } from "@mui/material";
+import { Dropdown } from "@/components/Dropdown";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
@@ -85,14 +86,14 @@ export default function StandupPage() {
       <AppNav />
       <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
         <Typography variant="h5">站会</Typography>
-        <Select size="small" value={memberId} onChange={(e) => setMemberId(String(e.target.value))} sx={{ minWidth: 160 }}>
-          {members.map((m) => (
-            <MenuItem key={m.memberId} value={m.memberId}>
-              {m.displayName}
-              {m.virtual ? "(虚拟)" : ""}
-            </MenuItem>
-          ))}
-        </Select>
+<Dropdown
+          ariaLabel="成员"
+          size="small"
+          value={memberId}
+          onChange={(v) => setMemberId(v)}
+          sx={{ minWidth: 160 }}
+          options={members.map((m) => ({ value: m.memberId, label: m.displayName + (m.virtual ? "(虚拟)" : "") }))}
+        />
       </Stack>
       {error && (
         <Typography color="error" sx={{ mb: 1 }}>

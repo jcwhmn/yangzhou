@@ -8,13 +8,12 @@ import {
   CardContent,
   Chip,
   IconButton,
-  MenuItem,
-  Select,
   Skeleton,
   Stack,
   TextField,
   Typography,
 } from "@mui/material";
+import { Dropdown } from "@/components/Dropdown";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -177,21 +176,18 @@ export default function BoardPage() {
 
       {/* S7:assignee 过滤 chips;V13-S4:Sprint 维度过滤(模型 A:看板=全部,可筛) */}
       <Stack direction="row" spacing={1} sx={{ mb: 2 }} flexWrap="wrap" useFlexGap>
-        <Select
+<Dropdown
+          ariaLabel="sprint 过滤"
           size="small"
           value={sprintFilter}
-          onChange={(e) => setSprintFilter(String(e.target.value))}
-          sx={{ minWidth: 150 }}
-          inputProps={{ "aria-label": "sprint 过滤" }}
-        >
-          <MenuItem value="all">Sprint:全部</MenuItem>
-          <MenuItem value="none">未规划</MenuItem>
-          {sprints.filter((s) => s.status !== "completed").map((s) => (
-            <MenuItem key={s.sprintId} value={s.sprintId}>
-              {s.name}
-            </MenuItem>
-          ))}
-        </Select>
+          onChange={(v) => setSprintFilter(v)}
+          sx={{ width: 150 }}
+          options={[
+            { value: "all", label: "Sprint:全部" },
+            { value: "none", label: "未规划" },
+            ...sprints.filter((s) => s.status !== "completed").map((s) => ({ value: s.sprintId, label: s.name })),
+          ]}
+        />
         <Chip label={t.filter.all} size="small" color={filter === "all" ? "primary" : "default"} onClick={() => setFilter("all")} />
         <Chip
           label={t.filter.unassigned}

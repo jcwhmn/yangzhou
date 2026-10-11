@@ -26,7 +26,7 @@ test("建 item → 详情 → 评论 → 指派 → 状态 QA → 活动日志 @
   const listbox = page.getByRole("listbox");
   await expect(listbox).toBeVisible();
   await listbox.getByRole("option", { name: "QA" }).click();
-  await expect(page.getByRole("combobox", { name: "item 状态" })).toHaveText("QA");
+  await expect(page.getByRole("combobox", { name: "item 状态" })).toHaveValue("QA");
   await page.getByRole("tab", { name: "日志" }).click(); // 活动日志在页签内(YPJ-11)
   await expect(page.getByText("活动日志")).toBeVisible();
   await expect(page.getByText(/状态变更: To Do → QA/)).toBeVisible();
@@ -64,7 +64,7 @@ test("V11-S4 detail 优先级 Select 接通(P1 落库/清除)", async ({ page, p
   await page.getByRole("button", { name: "保存" }).click();
   await saveResp;
   await page.reload();
-  await expect(page.getByRole("combobox", { name: "优先级" })).toHaveText("P1");
+  await expect(page.getByRole("combobox", { name: "优先级" })).toHaveValue("P1");
   // 清除
   await page.getByRole("combobox", { name: "优先级" }).click();
   await plist.getByRole("option", { name: "无" }).click();
@@ -72,7 +72,7 @@ test("V11-S4 detail 优先级 Select 接通(P1 落库/清除)", async ({ page, p
   await page.getByRole("button", { name: "保存" }).click();
   await saveResp;
   await page.reload();
-  await expect(page.getByRole("combobox", { name: "优先级" })).not.toHaveText("P1");
+  await expect(page.getByRole("combobox", { name: "优先级" })).not.toHaveValue("P1");
 });
 
 test("V10 priority 设置与表格视图", async ({ page, projectKey }) => {
@@ -133,7 +133,7 @@ test("V13-S4 详情切状态 409——错误浮出且状态不变", async ({ pag
   await page.getByRole("option", { name: "Done" }).click();
   // V4-S3 规则:开工须有主;JCW-160-E:错误浮出而非静默
   await expect(page.getByText("开工前请先指派负责人")).toBeVisible();
-  await expect(page.getByRole("combobox", { name: "item 状态" })).toHaveText("To Do");
+  await expect(page.getByRole("combobox", { name: "item 状态" })).toHaveValue("To Do");
 });
 
 test("V13-S4 看板 Sprint 过滤——未规划视图", async ({ page, projectKey }) => {

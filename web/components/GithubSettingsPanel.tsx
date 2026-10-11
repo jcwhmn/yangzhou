@@ -8,12 +8,11 @@ import {
   DialogContent,
   DialogTitle,
   IconButton,
-  MenuItem,
-  Select,
   Stack,
   TextField,
   Typography,
 } from "@mui/material";
+import { Dropdown } from "@/components/Dropdown";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
@@ -163,20 +162,14 @@ export function GithubSettingsPanel({
               <Typography variant="body2" sx={{ width: 140 }}>
                 {EVENT_LABELS[ev]}
               </Typography>
-              <Select
+<Dropdown
                 size="small"
+                placeholder={t.gh.ruleNone}
                 value={rules[ev] ?? ""}
-                onChange={(e) => setRules((prev) => ({ ...prev, [ev]: String(e.target.value) || null }))}
+                onChange={(v) => setRules((prev) => ({ ...prev, [ev]: v || null }))}
                 sx={{ minWidth: 200 }}
-                displayEmpty
-              >
-                <MenuItem value="">{t.gh.ruleNone}</MenuItem>
-                {statuses.map((s) => (
-                  <MenuItem key={s.statusId} value={s.statusId}>
-                    {s.name}
-                  </MenuItem>
-                ))}
-              </Select>
+                options={[{ value: "", label: t.gh.ruleNone }, ...statuses.map((s) => ({ value: s.statusId, label: s.name }))]}
+              />
             </Stack>
           ))}
         </Stack>
