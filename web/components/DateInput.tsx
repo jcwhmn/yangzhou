@@ -85,14 +85,26 @@ export function DateInput({
   const draftEmpty = !segs.mm && !segs.dd && !segs.yyyy;
   const showClear = !!name && (value !== "" || !draftEmpty);
 
-  // 提交(spec 0019 §1.3):不完整保留草稿;完整越界钳制,修正值外发并同步显示
+  // 提交(spec 0019 §1.3):不完整保留草稿;完整越界钳制,修正值外发并同步显示;
+  // 年份短写补全:mm/dd 已满而年 1–3 位(27→2027,2 位按 50→1900 pivot;3 位前补 0)
   const commit = () => {
     if (draftEmpty) {
       if (value !== "") onChange("");
       return;
     }
-    if (isoOf(segs) === "") return;
-    const niso = isoOf(normalize(segs));
+    let { yyyy } = segs;
+    if (segs.mm.length === 2 && segs.dd.length === 2 && yyyy.length > 0 && yyyy.length < 4) {
+      const n = Number(yyyy);
+      yyyy =
+        yyyy.length === 1
+          ? String(2000 + n)
+          : yyyy.length === 2
+            ? String(n >= 50 ? 1900 + n : 2000 + n)
+            : yyyy.padStart(4, "0");
+    }
+    const full = { ...segs, yyyy };
+    if (isoOf(full) === "") return;
+    const niso = isoOf(normalize(full));
     if (niso !== value) onChange(niso);
     setSegs(parseIso(niso));
   };
@@ -162,13 +174,10 @@ export function DateInput({
     }
     if (e.key === "ArrowRight" || e.key === "/") {
       if (pos >= segs[k].length) {
+        e.preventDefault();
         const next = ORDER[i + 1];
-        if (next) {
-          e.preventDefault();
-          focusSeg(next);
-        } else if (e.key === "/") {
-          e.preventDefault();
-        }
+        if (next) focusSeg(next);
+        else focusNextAfterGroup(); // 年段位尾 → 出控件,同 Tab
       } else if (e.key === "/") {
         e.preventDefault();
         el.setSelectionRange(pos + 1, pos + 1);
@@ -278,6 +287,7 @@ export function DateInput({
           onKeyDown={(e) => onSegKeyDown("mm", e)}
           onPaste={onSegPaste}
           onFocus={onSegFocus}
+          onClick={(e) => e.currentTarget.select()}
           ref={segRefs.mm}
         />
         <Box component="span" sx={{ px: 0.25, color: "text.secondary" }}>/</Box>
@@ -292,6 +302,7 @@ export function DateInput({
           onKeyDown={(e) => onSegKeyDown("dd", e)}
           onPaste={onSegPaste}
           onFocus={onSegFocus}
+          onClick={(e) => e.currentTarget.select()}
           ref={segRefs.dd}
         />
         <Box component="span" sx={{ px: 0.25, color: "text.secondary" }}>/</Box>
@@ -306,6 +317,7 @@ export function DateInput({
           onKeyDown={(e) => onSegKeyDown("yyyy", e)}
           onPaste={onSegPaste}
           onFocus={onSegFocus}
+          onClick={(e) => e.currentTarget.select()}
           ref={segRefs.yyyy}
         />
         <IconButton
