@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { Box, FormLabel, IconButton, Popover, type SxProps, type Theme } from "@mui/material";
 import ClearIcon from "@mui/icons-material/Clear";
 import DateRangeIcon from "@mui/icons-material/DateRange";
@@ -140,18 +141,15 @@ export function DateInput({
   };
 
   // 段聚焦:无整段选中(8 位独立,点击/键入都逐位);空值聚焦预填今天(click/Tab 同权),光标落本段位 1
-  // (rAF+timeout 双保险:React 提交后浏览器把程序化赋值的光标推到段尾,需再拉回位 1)
+  // flushSync 立即提交渲染再落光标——异步拉回(rAF)与 fill 的 insertText 有竞态,已证 flaky
   const onSegFocus = (e: React.FocusEvent<HTMLInputElement>) => {
     if (value === "" && draftEmpty) {
       setSegs(todaySegs());
-      const el = e.currentTarget;
-      const toStart = () => {
-        if (document.activeElement === el) el.setSelectionRange(0, 0);
-      };
-      requestAnimationFrame(() => {
-        toStart();
-        setTimeout(toStart, 0);
+      flushSync(() => {
+        /* 立即提交预填渲染,再落光标 */
       });
+      const el = e.currentTarget;
+      if (document.activeElement === el) el.setSelectionRange(0, 0);
     }
   };
 

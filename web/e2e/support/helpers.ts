@@ -134,15 +134,21 @@ export async function selectOption(page: Page, label: string, name: string, expe
   throw new Error(`下拉「${label}」未能选中「${name}」`);
 }
 
-// 分段日期输入(spec 0019 / YPJ-19):group aria-label=label,三段 月/日/年,末段 blur 提交
+// 分段日期输入(spec 0019 / YPJ-19):group aria-label=label,三段 月/日/年;focus+Home 强制光标位首后 fill,
+// 组件 beforeinput 逐位接管——insertText 落点确定,不与预填拼串;末段 blur 提交
 export async function fillDate(page: Page | Locator, label: string, iso: string): Promise<void> {
   const [y, m, d] = iso.split("-");
   const g = page.getByRole("group", { name: label, exact: true });
-  await g.getByLabel("月", { exact: true }).fill(m);
-  await g.getByLabel("日", { exact: true }).fill(d);
-  const year = g.getByLabel("年", { exact: true });
-  await year.fill(y);
-  await year.blur();
+  const put = async (seg: string, digits: string) => {
+    const box = g.getByLabel(seg, { exact: true });
+    await box.focus();
+    await box.press("Home");
+    await box.fill(digits);
+  };
+  await put("月", m);
+  await put("日", d);
+  await put("年", y);
+  await g.getByLabel("年", { exact: true }).blur();
 }
 
 export function expectDate(page: Page | Locator, label: string, iso: string) {
