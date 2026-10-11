@@ -127,7 +127,8 @@ export function DateInput({
     if (clean.length === 1 && Number(clean) <= (k === "mm" ? 1 : 3)) {
       setSegs((p) => ({ ...p, [k]: clean }));
     } else {
-      const val = clean.length === 1 ? `0${clean}` : clean;
+      let val = clean.length === 1 ? `0${clean}` : clean;
+      if (k === "dd" && Number(val) > 31) val = "31"; // 日期上限 31(spec 0019 §1.3)
       setSegs((p) => ({ ...p, [k]: val }));
       if (next) focusSeg(next);
     }
