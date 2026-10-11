@@ -6,6 +6,8 @@ import ClearIcon from "@mui/icons-material/Clear";
 import DateRangeIcon from "@mui/icons-material/DateRange";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import KeyboardDoubleArrowLeftIcon from "@mui/icons-material/KeyboardDoubleArrowLeft";
+import KeyboardDoubleArrowRightIcon from "@mui/icons-material/KeyboardDoubleArrowRight";
 import { t } from "@/lib/texts";
 import { tokens } from "@/lib/tokens";
 
@@ -120,11 +122,32 @@ export function DateInput({
   };
 
   // 段聚焦:全选(覆盖式输入);空值聚焦预填今天(click/Tab 同权),光标落本段位 1
+  // (rAF+timeout 双保险:React 提交后浏览器把程序化赋值的光标推到段尾,需再拉回位 1)
   const onSegFocus = (e: React.FocusEvent<HTMLInputElement>) => {
     e.currentTarget.select();
     if (value === "" && draftEmpty) {
       setSegs(todaySegs());
-      requestAnimationFrame(() => e.currentTarget.setSelectionRange(0, 0));
+      const el = e.currentTarget;
+      const toStart = () => {
+        if (document.activeElement === el) el.setSelectionRange(0, 0);
+      };
+      requestAnimationFrame(() => {
+        toStart();
+        setTimeout(toStart, 0);
+      });
+    }
+  };
+
+  // 年段 Tab:跳出控件进下一个控件(DOM 会先停在段内 📅/× 按钮,手动跳过)
+  const focusNextAfterGroup = () => {
+    const sel = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex="0"]';
+    const list = Array.from(document.querySelectorAll<HTMLElement>(sel));
+    const start = list.indexOf(rootRef.current ?? document.body);
+    for (const el of list.slice(start + 1)) {
+      if (!rootRef.current?.contains(el)) {
+        el.focus();
+        return;
+      }
     }
   };
 
@@ -132,6 +155,11 @@ export function DateInput({
     const i = ORDER.indexOf(k);
     const el = e.currentTarget;
     const pos = el.selectionStart ?? 0;
+    if (k === "yyyy" && e.key === "Tab" && !e.shiftKey) {
+      e.preventDefault();
+      focusNextAfterGroup();
+      return;
+    }
     if (e.key === "ArrowRight" || e.key === "/") {
       if (pos >= segs[k].length) {
         const next = ORDER[i + 1];
@@ -334,6 +362,9 @@ function MiniCalendar({ initialIso, onPick }: { initialIso: string; onPick: (iso
   return (
     <Box sx={{ p: 1.5 }}>
       <Box sx={{ display: "flex", alignItems: "center", mb: 0.5 }}>
+        <IconButton size="small" aria-label={t.date.prevYear} onClick={() => move(-12)}>
+          <KeyboardDoubleArrowLeftIcon fontSize="small" />
+        </IconButton>
         <IconButton size="small" aria-label={t.date.prevMonth} onClick={() => move(-1)}>
           <ChevronLeftIcon fontSize="small" />
         </IconButton>
@@ -342,6 +373,9 @@ function MiniCalendar({ initialIso, onPick }: { initialIso: string; onPick: (iso
         </Box>
         <IconButton size="small" aria-label={t.date.nextMonth} onClick={() => move(1)}>
           <ChevronRightIcon fontSize="small" />
+        </IconButton>
+        <IconButton size="small" aria-label={t.date.nextYear} onClick={() => move(12)}>
+          <KeyboardDoubleArrowRightIcon fontSize="small" />
         </IconButton>
       </Box>
       <Box sx={{ display: "grid", gridTemplateColumns: "repeat(7, 28px)", gap: "2px" }}>

@@ -8,6 +8,8 @@ export const t = {
     today: "今天",
     prevMonth: "上一月",
     nextMonth: "下一月",
+    prevYear: "上一年",
+    nextYear: "下一年",
   },
   appName: "扬州 yangzhou",
   nav: {
