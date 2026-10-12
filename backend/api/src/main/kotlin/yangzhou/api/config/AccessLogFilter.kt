@@ -6,8 +6,13 @@ import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.slf4j.LoggerFactory
+import org.springframework.context.annotation.Configuration
 import org.springframework.stereotype.Component
 import org.springframework.web.filter.OncePerRequestFilter
+import org.springframework.web.method.HandlerMethod
+import org.springframework.web.servlet.HandlerInterceptor
+import org.springframework.web.servlet.config.annotation.InterceptorRegistry
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer
 import org.springframework.web.util.ContentCachingRequestWrapper
 import tools.jackson.databind.ObjectMapper
 import java.nio.charset.StandardCharsets
@@ -42,6 +47,7 @@ class AccessLogFilter(private val mapper: ObjectMapper) : OncePerRequestFilter()
                 append(" path=").append(request.requestURI)
                 append(" status=").append(response.status)
                 append(" durationMs=").append(System.currentTimeMillis() - start)
+                (wrapped.getAttribute(ATTR) as? String)?.let { append(" handler=").append(it) }
                 if (body.isNotEmpty()) append(" body=").append(body)
             }
             if (method in WRITES) LOG.info(line) else LOG.debug(line)
@@ -80,7 +86,32 @@ class AccessLogFilter(private val mapper: ObjectMapper) : OncePerRequestFilter()
         private val WRITES = setOf("POST", "PUT", "PATCH", "DELETE")
         private val SENSITIVE = setOf("password", "token", "secret", "githubtoken", "authorization", "apikey")
         private const val MAX_BODY = 500
+        internal const val ATTR = "yz.access.handler"
 
         private fun truncate(s: String) = if (s.length <= MAX_BODY) s else s.take(MAX_BODY) + "…(truncated)"
+    }
+}
+
+/** 把实际 handler(AuthController#login)带给 AccessLogFilter——filter 层拿不到 HandlerMethod。 */
+@Component
+class AccessLogHandlerInterceptor : HandlerInterceptor {
+
+    override fun preHandle(
+        request: HttpServletRequest,
+        response: HttpServletResponse,
+        handler: Any,
+    ): Boolean {
+        if (handler is HandlerMethod) {
+            request.setAttribute(AccessLogFilter.ATTR, "${handler.beanType.simpleName}#${handler.method.name}")
+        }
+        return true
+    }
+}
+
+@Configuration(proxyBeanMethods = false)
+class AccessLogWebConfig(private val interceptor: AccessLogHandlerInterceptor) : WebMvcConfigurer {
+
+    override fun addInterceptors(registry: InterceptorRegistry) {
+        registry.addInterceptor(interceptor)
     }
 }

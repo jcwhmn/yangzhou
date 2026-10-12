@@ -27,6 +27,7 @@ class AccessLogFilterTest : AbstractApiTest() {
 
         val logs = captured.toString()
         assertTrue("method=POST path=/api/auth/bootstrap status=201" in logs, logs)
+        assertTrue("handler=AuthController#bootstrap" in logs, logs)
         assertTrue("\"password\":\"***\"" in logs, logs)
         assertFalse("pw-plain-123" in logs, logs)
     }
@@ -48,8 +49,9 @@ class AccessLogFilterTest : AbstractApiTest() {
             .exchange()
             .expectStatus().isUnauthorized()
 
-        // body 未被下游消费 → 不落 body 段;POST=INFO 默认可见
+        // body 未被下游消费 → 不落 body 段;POST=INFO 默认可见;JWT 短路在 interceptor 之前 → 无 handler 段
         assertTrue("method=POST path=/api/projects status=401" in captured.toString(), captured.toString())
+        assertFalse("handler=" in captured.toString(), captured.toString())
     }
 }
 

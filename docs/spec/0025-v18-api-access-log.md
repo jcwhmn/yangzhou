@@ -78,6 +78,7 @@
 - `config/AccessLogFilter.kt`(新):`OncePerRequestFilter` + `ContentCachingRequestWrapper(request, 8192)`;单行 `method= path= status= durationMs= body=`;拒绝表 `{password, token, secret, githubtoken, authorization, apikey}`(键名小写比对)→ `"***"`;body 截 500 + truncated 标记;非 JSON 原样截断;响应体不落。
 - `SecurityConfig`:`addFilterBefore(accessLogFilter, LogoutFilter::class)`——**编码期修正**:Spring Security 要求锚点为已知序 filter,自定义 JwtAuthFilter 不能做锚;LogoutFilter 标准序在 UsernamePassword 之前,AccessLog 仍居 JWT 外层,401 留痕达成。
 - `application.yml` / `application-test.yml`:`logging.level.yangzhou.api.access: INFO`(本仓库首批 logging 配置)。
+- **handler= 段(2026-10-13 评审追加)**:`AccessLogHandlerInterceptor` 把 `beanType#method`(如 `AuthController#login`)写入 request attribute,filter 取到则追加 `handler=…`;JWT 401 短路在 interceptor 之前 → 无该段。同文件新增 `AccessLogWebConfig` 注册。
 - 测试 4 例(2 类):bootstrap 密码 mask + INFO 行 / GET 默认不落 / DEBUG 变体(properties 覆盖)GET 落行 / 401 短路留痕(body 未消费不落段,同设计)。
 
 **编码期发现(设计外修正)**
