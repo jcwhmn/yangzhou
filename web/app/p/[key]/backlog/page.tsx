@@ -100,12 +100,12 @@ export default function BacklogPage() {
               {items.map((it) => (
                 <TableRow key={it.itemId} hover>
                   <TableCell>
-                    <Link href={`/p/${key}/i/${it.itemId}`}>
+                    <Link href={`/p/${key}/i/${it.itemId}?from=backlog`}>
                       <Typography variant="body2">{it.number}</Typography>
                     </Link>
                   </TableCell>
                   <TableCell>
-                    <Link href={`/p/${key}/i/${it.itemId}`}>
+                    <Link href={`/p/${key}/i/${it.itemId}?from=backlog`}>
                       <Typography variant="body2">{it.title}</Typography>
                     </Link>
                   </TableCell>
