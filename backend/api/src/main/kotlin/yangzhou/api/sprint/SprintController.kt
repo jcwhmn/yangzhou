@@ -49,4 +49,7 @@ class SprintController(private val service: SprintService) {
 
     @GetMapping("/projects/{key}/backlog")
     fun backlog(@PathVariable key: String): List<ItemService.ItemDto> = service.backlog(key)
+
+    @GetMapping("/projects/{key}/board")
+    fun board(@PathVariable key: String): SprintService.BoardDto = service.board(key)
 }

@@ -488,6 +488,9 @@ Content-Type: application/json
   "name": "R2.0",
   "targetDate": "2026-12-01"
 }
+> {%
+    client.global.set("releaseId", response.body.releaseId);
+ %}
 
 ### Release 列表(planned 先 target 升序;released 按发布日降序;含 memberCount)
 GET {{host}}/api/projects/{{pkey}}/releases
@@ -512,6 +515,10 @@ Content-Type: application/json
 
 ### 删除 Release(非空 409,见负例区)
 DELETE {{host}}/api/projects/{{pkey}}/releases/{{releaseId}}
+
+### 看板(YPJ-29 spec 0023;active sprint 的 items,无 active → 全量降级)
+GET {{host}}/api/projects/{{pkey}}/board
+Authorization: Bearer {{token}}
 
 # ============ 12. GitHub(V6 配置 + V16-2 按需拉取;轮询兑底见 application.yml yangzhou.github) ============
 
@@ -548,6 +555,9 @@ Content-Type: application/json
 {
   "minutes": null
 }
+> {%
+    client.global.set("timeEntryId", response.body.timeEntryId);
+ %}
 
 ### 补录 minutes(与起止互斥;服务端按 now 往回推)
 POST {{host}}/api/items/{{itemId}}/time-entries
