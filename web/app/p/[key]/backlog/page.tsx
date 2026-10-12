@@ -3,7 +3,6 @@
 import {
   Button,
   Chip,
-  Container,
   Stack,
   Table,
   TableBody,
@@ -14,6 +13,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import { PageShell } from "@/components/PageShell";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -64,7 +64,7 @@ export default function BacklogPage() {
   const columns = ["编号", "标题", "优先级", "状态", "负责人", "开始", "截止", "可行性"];
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
+    <PageShell>
       <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
         <Typography variant="h5">{`${String(key)} · ${t.projectNav.backlog}`}</Typography>
         {items !== null && (
@@ -141,6 +141,6 @@ export default function BacklogPage() {
           </Table>
         </TableContainer>
       )}
-    </Container>
+    </PageShell>
   );
 }

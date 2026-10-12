@@ -15,6 +15,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import { PageShell } from "@/components/PageShell";
 import { Dropdown } from "@/components/Dropdown";
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
@@ -399,7 +400,7 @@ export default function ItemDetailPage() {
   }
 
   return (
-    <Box sx={{ maxWidth: 1100, mx: "auto", p: 3 }}>
+    <PageShell>
       <Link href={`/p/${key}`} style={{ textDecoration: "none" }}>
         <Typography variant="body2" color="primary" gutterBottom>
           {t.item.back}
@@ -907,7 +908,7 @@ export default function ItemDetailPage() {
       </Box>
       </Box>
     </Box>
-    </Box>
+    </PageShell>
   );
 }
 

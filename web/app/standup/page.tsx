@@ -1,6 +1,7 @@
 "use client";
 
-import { Box, Card, CardContent, Chip, Container, Stack, Typography } from "@mui/material";
+import { Box, Card, CardContent, Chip, Stack, Typography } from "@mui/material";
+import { PageShell } from "@/components/PageShell";
 import { Dropdown } from "@/components/Dropdown";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
@@ -82,7 +83,7 @@ export default function StandupPage() {
   }
 
   return (
-    <Container maxWidth="md" sx={{ py: 4 }}>
+    <PageShell>
       <AppNav />
       <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
         <Typography variant="h5">站会</Typography>
@@ -107,6 +108,6 @@ export default function StandupPage() {
           {group("⛔ 阻塞中", "error", data.blocked)}
         </>
       )}
-    </Container>
+    </PageShell>
   );
 }

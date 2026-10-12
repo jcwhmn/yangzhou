@@ -1,6 +1,7 @@
 "use client";
 
-import { Box, Card, CardContent, Chip, Container, Stack, TextField, Typography } from "@mui/material";
+import { Box, Card, CardContent, Chip, Stack, TextField, Typography } from "@mui/material";
+import { PageShell } from "@/components/PageShell";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
@@ -28,7 +29,7 @@ export default function SearchPage() {
   }, [query]);
 
   return (
-    <Container maxWidth="md" sx={{ py: 4 }}>
+    <PageShell>
       <Typography variant="h5" gutterBottom>
         搜索
       </Typography>
@@ -58,6 +59,6 @@ export default function SearchPage() {
           </Link>
         ))}
       </Stack>
-    </Container>
+    </PageShell>
   );
 }

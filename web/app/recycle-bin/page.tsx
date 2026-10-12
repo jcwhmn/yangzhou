@@ -1,6 +1,7 @@
 "use client";
 
-import { Button, Card, CardContent, Chip, Container, Stack, Typography } from "@mui/material";
+import { Button, Card, CardContent, Chip, Stack, Typography } from "@mui/material";
+import { PageShell } from "@/components/PageShell";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { AppNav } from "@/components/AppNav";
@@ -59,7 +60,7 @@ export default function RecycleBinPage() {
   }
 
   return (
-    <Container maxWidth="md" sx={{ py: 4 }}>
+    <PageShell>
       <AppNav />
       <Typography variant="h5" gutterBottom>
         回收站
@@ -93,6 +94,6 @@ export default function RecycleBinPage() {
           </Card>
         ))}
       </Stack>
-    </Container>
+    </PageShell>
   );
 }

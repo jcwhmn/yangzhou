@@ -4,13 +4,13 @@ import {
   Box,
   Button,
   Chip,
-  Container,
   FormControlLabel,
   Stack,
   Switch,
   TextField,
   Typography,
 } from "@mui/material";
+import { PageShell } from "@/components/PageShell";
 import { Dropdown } from "@/components/Dropdown";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
@@ -95,7 +95,7 @@ export default function AttributesPage() {
   const groups = [...byGroup.entries()].sort((a, b) => (a[0] === UNCATEGORIZED ? 1 : b[0] === UNCATEGORIZED ? -1 : a[0].localeCompare(b[0])));
 
   return (
-    <Container maxWidth="md" sx={{ py: 4 }}>
+    <PageShell>
       <AppNav />
       <Typography variant="h5" gutterBottom>
         {t.attrs.title}
@@ -174,6 +174,6 @@ export default function AttributesPage() {
           </Stack>
         </Box>
       ))}
-    </Container>
+    </PageShell>
   );
 }

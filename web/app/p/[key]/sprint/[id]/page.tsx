@@ -3,7 +3,6 @@
 import {
   Button,
   Chip,
-  Container,
   Checkbox,
   Dialog,
   DialogActions,
@@ -23,6 +22,7 @@ import {
   ToggleButtonGroup,
   Typography,
 } from "@mui/material";
+import { PageShell } from "@/components/PageShell";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -152,19 +152,19 @@ export default function SprintPage() {
   // 页内错误态:未知 sprint id 等;给返回按钮,不依赖浏览器后退(用户反馈)
   if (gone) {
     return (
-      <Container maxWidth="sm" sx={{ py: 10 }}>
+      <PageShell>
         <Stack spacing={2} alignItems="center">
           <Typography variant="h5">Sprint 不存在或已被删除</Typography>
           <Button variant="contained" onClick={() => router.back()}>
             ← 返回上一页
           </Button>
         </Stack>
-      </Container>
+      </PageShell>
     );
   }
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
+    <PageShell>
       <Button size="small" onClick={() => router.back()} sx={{ mb: 1 }}>
         ← 返回
       </Button>
@@ -389,6 +389,6 @@ export default function SprintPage() {
           </Dialog>
         </>
       )}
-    </Container>
+    </PageShell>
   );
 }

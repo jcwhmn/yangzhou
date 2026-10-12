@@ -1,6 +1,7 @@
 "use client";
 
-import { Alert, Box, Button, Chip, Container, Stack, Typography } from "@mui/material";
+import { Alert, Box, Button, Chip, Stack, Typography } from "@mui/material";
+import { PageShell } from "@/components/PageShell";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
@@ -77,7 +78,7 @@ export default function NotificationsPage() {
   }
 
   return (
-    <Container maxWidth="md" sx={{ py: 4 }}>
+    <PageShell>
       <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
         <Typography variant="h5">{t.notif.title}</Typography>
         <Button size="small" onClick={markAllRead} disabled={rows.every((r) => r.read)}>
@@ -141,6 +142,6 @@ export default function NotificationsPage() {
           </Box>
         ))}
       </Stack>
-    </Container>
+    </PageShell>
   );
 }
