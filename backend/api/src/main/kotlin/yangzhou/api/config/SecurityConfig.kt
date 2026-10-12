@@ -13,7 +13,10 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 @Configuration
 @EnableWebSecurity
-class SecurityConfig(private val jwtAuthFilter: JwtAuthFilter) {
+class SecurityConfig(
+    private val jwtAuthFilter: JwtAuthFilter,
+    private val accessLogFilter: AccessLogFilter,
+) {
 
     @Bean
     fun filterChain(http: HttpSecurity): SecurityFilterChain = http
@@ -23,6 +26,7 @@ class SecurityConfig(private val jwtAuthFilter: JwtAuthFilter) {
             it.requestMatchers("/api/auth/bootstrap", "/api/auth/login", "/error", "/scalar/**", "/v3/api-docs/**").permitAll()
                 .anyRequest().authenticated()
         }
+        .addFilterBefore(accessLogFilter, org.springframework.security.web.authentication.logout.LogoutFilter::class.java)
         .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter::class.java)
         .exceptionHandling { cfg ->
             cfg.authenticationEntryPoint { _, response, _ ->
