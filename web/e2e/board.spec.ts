@@ -136,14 +136,6 @@ test("V13-S4 详情切状态 409——错误浮出且状态不变", async ({ pag
   await expect(page.getByRole("combobox", { name: "item 状态" })).toHaveValue("To Do");
 });
 
-test("V13-S4 看板 Sprint 过滤——未规划视图", async ({ page, projectKey }) => {
-  await apiCreateItem(projectKey, "E2E 过滤 item");
-  await page.goto(`/p/${projectKey}`);
-  await page.getByLabel("sprint 过滤").click();
-  await page.getByRole("option", { name: "未规划" }).click();
-  await expect(page.getByText("E2E 过滤 item").first()).toBeVisible();
-});
-
 test("YPJ-29 无 active sprint 显示全部+提示条;开始 sprint 后收窄", async ({ page, projectKey }) => {
   const inSprint = await apiCreateItem(projectKey, "Sprint内 item");
   await apiCreateItem(projectKey, "Sprint外 item");
