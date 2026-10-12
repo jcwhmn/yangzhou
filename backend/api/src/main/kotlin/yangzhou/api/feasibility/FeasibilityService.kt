@@ -106,8 +106,8 @@ class FeasibilityService(
 
     private val rank = mapOf("GREEN" to 0, "YELLOW" to 1, "RED" to 2)
 
-    /** 重算单 item 冗余并返回 signal。 */
-    fun recomputeItemSignal(item: yangzhou.persistence.Item): String {
+    /** 重算单 item 冗余并返回 signal。private:外部直接调用会先锁单个 item 行,破坏 recompute 的编号序锁序(YPJ-26 40P01 死锁根因)。 */
+    private fun recomputeItemSignal(item: yangzhou.persistence.Item): String {
         val signal = item(item.objectId).signal
 
         itemRepo.save(item.copy(feasSignal = signal))
