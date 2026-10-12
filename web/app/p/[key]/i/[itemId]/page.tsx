@@ -23,6 +23,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { resolveBack } from "@/lib/back";
 import { t } from "@/lib/texts";
 import { SignalChip, VerdictLine, type Signal, type Verdict } from "@/components/Verdict";
 import { AssignPopover } from "@/components/AssignPopover";
@@ -153,6 +154,13 @@ export default function ItemDetailPage() {
   const [checklist, setChecklist] = useState<Checklist | null>(null);
   const [newCheckText, setNewCheckText] = useState("");
   const [tab, setTab] = useState(0);
+  const [back, setBack] = useState(() => resolveBack(null, key));
+
+  // ?from= 白名单 token → 返回来源页(YPJ-31);不用 useSearchParams,免 Suspense 边界要求
+  useEffect(() => {
+    const from = new URLSearchParams(window.location.search).get("from");
+    setBack(resolveBack(from, key));
+  }, [key]);
 
   const load = useCallback(async () => {
     const [it, project, attrs, feas, acts, spr, rel] = await Promise.all([
@@ -401,9 +409,9 @@ export default function ItemDetailPage() {
 
   return (
     <PageShell>
-      <Link href={`/p/${key}`} style={{ textDecoration: "none" }}>
+      <Link href={back.href} style={{ textDecoration: "none" }}>
         <Typography variant="body2" color="primary" gutterBottom>
-          {t.item.back}
+          {back.label}
         </Typography>
       </Link>
       <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
@@ -509,7 +517,7 @@ export default function ItemDetailPage() {
             onClick={() => {
               if (confirm(`删除 item ${item.number}?`)) {
                 api(`/api/items/${itemId}`, { method: "DELETE" })
-                  .then(() => (window.location.href = `/p/${key}`))
+                  .then(() => (window.location.href = back.href))
                   .catch((e) => setError(e.message));
               }
             }}

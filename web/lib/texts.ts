@@ -86,6 +86,13 @@ export const t = {
     sprint: "Sprint",
     release: "Release",
     back: "← 返回看板",
+    backTo: {
+      backlog: "← 返回 Backlog",
+      table: "← 返回表格",
+      gantt: "← 返回甘特图",
+      sprint: "← 返回 Sprint",
+      search: "← 返回搜索",
+    },
   },
   caps: {
     title: "我的能力",

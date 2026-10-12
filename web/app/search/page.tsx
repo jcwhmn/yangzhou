@@ -46,7 +46,7 @@ export default function SearchPage() {
       )}
       <Stack spacing={1}>
         {results.map((r) => (
-          <Link key={r.itemId} href={`/p/${r.projectKey}/i/${r.itemId}`} style={{ textDecoration: "none" }}>
+          <Link key={r.itemId} href={`/p/${r.projectKey}/i/${r.itemId}?from=search`} style={{ textDecoration: "none" }}>
             <Card>
               <CardContent sx={{ py: 1.5, "&:last-child": { pb: 1.5 } }}>
                 <Stack direction="row" spacing={1} alignItems="center">

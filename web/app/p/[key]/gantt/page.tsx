@@ -204,7 +204,7 @@ export default function GanttPage() {
                       )}
                     </Box>
                     <Link
-                      href={`/p/${key}/i/${r.itemId}`}
+                      href={`/p/${key}/i/${r.itemId}?from=gantt`}
                       style={{ position: "absolute", left: 0, top: 0, right: 0, bottom: 0, display: "block" }}
                       aria-label={r.number}
                     >

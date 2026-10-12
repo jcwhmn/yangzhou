@@ -239,7 +239,7 @@ export default function SprintPage() {
                       </Typography>
                     )}
                     {list.map((it) => (
-                      <Link key={it.itemId} href={`/p/${key}/i/${it.itemId}`} style={{ textDecoration: "none", color: "inherit" }}>
+                      <Link key={it.itemId} href={`/p/${key}/i/${it.itemId}?from=sprint-${id}`} style={{ textDecoration: "none", color: "inherit" }}>
                         <Stack
                           sx={{
                             p: 1,
@@ -296,12 +296,12 @@ export default function SprintPage() {
                   {items.map((it) => (
                     <TableRow key={it.itemId} hover>
                       <TableCell>
-                        <Link href={`/p/${key}/i/${it.itemId}`}>
+                        <Link href={`/p/${key}/i/${it.itemId}?from=sprint-${id}`}>
                           <Typography variant="body2">{it.number}</Typography>
                         </Link>
                       </TableCell>
                       <TableCell>
-                        <Link href={`/p/${key}/i/${it.itemId}`}>
+                        <Link href={`/p/${key}/i/${it.itemId}?from=sprint-${id}`}>
                           <Typography variant="body2">{it.title}</Typography>
                         </Link>
                       </TableCell>

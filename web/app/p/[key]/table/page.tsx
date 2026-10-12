@@ -159,11 +159,11 @@ export default function TableViewPage() {
                     .map((c) => (
                       <TableCell key={c.id}>
                         {c.id === "number" ? (
-                          <Link href={`/p/${key}/i/${it.itemId}`}>
+                          <Link href={`/p/${key}/i/${it.itemId}?from=table`}>
                             <Typography variant="body2">{it.number}</Typography>
                           </Link>
                         ) : c.id === "title" ? (
-                          <Link href={`/p/${key}/i/${it.itemId}`}>
+                          <Link href={`/p/${key}/i/${it.itemId}?from=table`}>
                             <Typography variant="body2">{it.title}</Typography>
                           </Link>
                         ) : c.id === "priority" ? (
