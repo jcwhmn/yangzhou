@@ -1,3 +1,7 @@
 spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/yangzhou_test
+
+logging:
+  level:
+    yangzhou.api.access: INFO
