@@ -101,6 +101,10 @@ class GithubBranchApiTest : AbstractApiTest() {
         fake.createError = GithubApiException(404, "base not found")
         create(authed, itemId, repoId, base = "ghost").expectStatus().isBadRequest()
 
+        // 其余 GitHub 错误(如 401 PAT 失效)映射可操作 400(原裸抛 500,YPJ-27)
+        fake.createError = GithubApiException(401, "Bad credentials")
+        create(authed, itemId, repoId).expectStatus().isBadRequest()
+
         // repo 不属于该项目
         createProject(authed, "SEC")
         val otherRepoId = json.readTree(

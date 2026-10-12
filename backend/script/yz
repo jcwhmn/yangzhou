@@ -4,7 +4,7 @@
 set -e
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
-ROOT="$(dirname "$DIR")"
+ROOT="$(cd "$DIR/../.." && pwd)"
 
 # 1) jar beside this script (release layout from GitHub Releases)
 JAR="$(ls "$DIR"/yz-*.jar 2>/dev/null | head -n 1 || true)"

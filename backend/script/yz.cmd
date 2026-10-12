@@ -10,7 +10,7 @@ for %%f in ("%~dp0yz-*.jar") do set "JAR=%%~ff"
 if defined JAR goto run
 
 rem 2) repo layout (dev)
-cd /d "%~dp0.."
+cd /d "%~dp0..\.."
 for %%f in ("backend\cli\build\libs\yz-*.jar") do set "JAR=%%~ff"
 if defined JAR goto run
 
