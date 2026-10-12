@@ -1,6 +1,6 @@
 # 0024 — YPJ-27:yz wrapper dev 路径修复 + CLI items branch
 
-> 2026-10-12 立项。状态:**草稿,待用户过目**。As-built 编码完成后补。
+> 2026-10-12 立项。状态:**已过目(2026-10-12):④ 并入本票;分支命名另立 YPJ-37**。As-built 编码完成后补。
 > 关联:spec 0016(发行三层结构)。
 
 ## 需求
@@ -10,7 +10,7 @@
 **范围**
 1. 修两个 wrapper 的 repo 根计算,dev 布局 jar 查找与自动构建目录均正确。
 2. CLI 新增 `items branch <KEY-N> <分支名> [--base <基线>]`(默认 main)——经 `POST /api/items/{id}/branches` 建分支并落 item_git_refs 关联(`yz log` 依赖)。当前 CLI 无此命令,2026-10-12 起的新开工流程每次都要手搓 curl。
-3. **(待定,用户裁决)** `GithubBranchService.createBranch` 对 GithubApiException 只特判 422/404,401(如 PAT 失效)裸抛 500;同族 commits 端点映射为可操作 400。本 session 实际踩中:建分支请求因 PAT 失效吃 500,排障多绕一圈。
+3. `GithubBranchService.createBranch` 对 GithubApiException 只特判 422/404,401(如 PAT 失效)裸抛 500;同族 commits 端点映射为可操作 400。本 session 实际踩中:建分支请求因 PAT 失效吃 500,排障多绕一圈。
 
 **非目标**
 - wrapper 不重构,保持 0016 三层结构(脚本同目录 → repo 布局 → 自动构建)。
@@ -35,7 +35,7 @@
   4. `POST /api/items/{id}/branches`,body `{repoId, baseBranch, name}`,打印 `分支已建:branch(repo) url`
 - ApiClient 已有泛型 `json(method, path, body)`,零新依赖。帮助文本补一行。
 
-**④(待定)`GithubBranchService` 兜底映射(约 3 行 + 1 测试)**
+**④ `GithubBranchService` 兜底映射(约 3 行 + 1 测试;2026-10-12 用户拍板并入)**
 - catch GithubApiException 补通用分支,对齐 `GithubCommitService.kt:56`:`BadRequestException("GitHub API 错误(${e.status}):先检查 PAT/仓库名")`,422/404 特判保留在前。
 - 测试:`GithubBranchApiTest` 补一例(gateway mock/桩 抛 401 → 断言 400 而非 500)。
 
@@ -49,6 +49,8 @@
 5. **items branch**(需 PAT 有效):`yz items branch YPJ-27 cwjiang/YPJ-27-scratch --base main` → 201 提示,GitHub 远端见分支,`yz log YPJ-27` 可拉;测完删远端分支。
 6. **负例**:项目无挂载仓库 → `items branch` 明确报错提示挂载;分支名非法(空格/`..`)→ API 400 透出。
 
+> 附带:web 分支自动命名对 CJK 标题产出残迹 → 已立 YPJ-37(backlog),不在本票。
+
 ## 验收对照(票)
 
 - [ ] dev 布局下 `backend/script/yz` 直接可用 → 用例 1/2
@@ -56,4 +58,24 @@
 
 ## As-built
 
-(编码完成后补)
+> 2026-10-12 完工(PR #95)。与设计差异:无结构性偏离;spec 状态节在 PR 后经 main 订正(编码期编辑漏入 PR)。
+
+**实际落地**
+
+- `backend/script/yz`:`ROOT="$(dirname "$DIR")"` → `ROOT="$(cd "$DIR/../.." && pwd)"`(1 行);三层查找结构不动。
+- `backend/script/yz.cmd`:`cd /d "%~dp0.."` → `cd /d "%~dp0..\.."`(1 处)。
+- CLI `items branch <KEY-N> <分支名> [--base <基线>]`:dispatch 一例 + help 一行;repoId 取项目第一个挂载,无挂载报错提示;`ApiClient.json` 泛型直调,零新依赖。
+- `GithubBranchService.createBranch`:catch 尾改 `throw BadRequestException("GitHub API 错误(${e.status}):先检查 PAT/仓库名")`(对齐 `GithubCommitService:56` 先例);422→409 / 404→400 特判保留。
+- `GithubBranchApiTest`:既有负例用例补 401→400 一例。
+- `api.http`:§12 补 branches 请求;repos POST 补 handler 回填 `repoId`(消未解析变量)。
+
+**验证**
+
+- wrapper 直用(dev 布局)`backend/script/yz attrs list` 无「首次构建」✓(agent 自测 + 用户复测 yz 命令 ✓)
+- `gradle :cli:jar :api:compileTestKotlin` 全绿;新 jar `items branch` dispatch 冒烟通
+- 发行布局用例 4 未单独跑(发行层路径不触 ROOT,零改动面);集成测试走 nightly/合并前本地双轨
+
+**遗留**
+
+- web 分支自动命名 CJK 残迹 → YPJ-37(backlog)
+- 旧 ref 行(`YPJ-27-yz-wrapper-dev-…`,改名残留)在 PM 库留一节空历史;SQL 清理待用户点头
