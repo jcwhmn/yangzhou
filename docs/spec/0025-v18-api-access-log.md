@@ -68,3 +68,29 @@
 
 - [ ] 集成测试断言日志输出存在(至少写操作 INFO 一行)→ 集成用例 1/2
 - [ ] 登录接口日志中密码字段为 mask → 集成用例 1
+
+## As-built
+
+> 2026-10-13 完工。机制经用户裁决:Filter(票面 AOP 偏移,理由见「机制选择」表)。
+
+**实际落地**
+
+- `config/AccessLogFilter.kt`(新):`OncePerRequestFilter` + `ContentCachingRequestWrapper(request, 8192)`;单行 `method= path= status= durationMs= body=`;拒绝表 `{password, token, secret, githubtoken, authorization, apikey}`(键名小写比对)→ `"***"`;body 截 500 + truncated 标记;非 JSON 原样截断;响应体不落。
+- `SecurityConfig`:`addFilterBefore(accessLogFilter, LogoutFilter::class)`——**编码期修正**:Spring Security 要求锚点为已知序 filter,自定义 JwtAuthFilter 不能做锚;LogoutFilter 标准序在 UsernamePassword 之前,AccessLog 仍居 JWT 外层,401 留痕达成。
+- `application.yml` / `application-test.yml`:`logging.level.yangzhou.api.access: INFO`(本仓库首批 logging 配置)。
+- 测试 4 例(2 类):bootstrap 密码 mask + INFO 行 / GET 默认不落 / DEBUG 变体(properties 覆盖)GET 落行 / 401 短路留痕(body 未消费不落段,同设计)。
+
+**编码期发现(设计外修正)**
+
+1. Framework 7 的 `ContentCachingRequestWrapper` 必传 `cacheLimit`(取 8KB:截断 500 chars 足够)。
+2. **测试级别全局泄漏**:DEBUG 变体类把 logger 全局改 DEBUG;其他类复用缓存 context 时 startup 不重放 yml 级别 → 顺序依赖偶发。修:两个测试类各自用 context properties 钉死级别(任意顺序确定);DEBUG 类跑完后全局 logger 留 DEBUG,对无关类仅控制台噪音。
+3. Jackson 3 导入包为 `tools.jackson`(误用 com.fasterxml 编译期即报)。
+
+**验证**
+
+- 集成 4 例 + 全量 `:api:integrationTest`(40 类)绿;`:api:test` 单元套件绿;用户本地 `gradle clean build` 通过(修泄漏后复跑)。
+
+**遗留**
+
+- Grafana 接入(日志→指标管道)另票;DEBUG 变体类的全局 logger 残留无断言影响,如后续测试类断言该 logger 需同样钉级别。
+
