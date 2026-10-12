@@ -488,6 +488,9 @@ Content-Type: application/json
   "name": "R2.0",
   "targetDate": "2026-12-01"
 }
+> {%
+    client.global.set("releaseId", response.body.releaseId);
+ %}
 
 ### Release 列表(planned 先 target 升序;released 按发布日降序;含 memberCount)
 GET {{host}}/api/projects/{{pkey}}/releases
@@ -552,6 +555,9 @@ Content-Type: application/json
 {
   "minutes": null
 }
+> {%
+    client.global.set("timeEntryId", response.body.timeEntryId);
+ %}
 
 ### 补录 minutes(与起止互斥;服务端按 now 往回推)
 POST {{host}}/api/items/{{itemId}}/time-entries
