@@ -44,7 +44,7 @@ docs/      adr/ · spec/ · architecture/(puml 类图) · requirement/(PRD) · p
 
 ## Issue 工作流(PR 模式;票在 YPJ 项目,2026-10-06 起 Linear 冻结只读)
 
-1. 开工:`git checkout main && git pull --ff-only && git checkout -b cwjiang/YPJ-{N}-{short}`;同时 `yz assign YPJ-{N} me && yz items move YPJ-{N} "In Progress"`(开工须有主,未 assign 会被 move 409 拒)
+1. 开工:`git checkout main && git pull --ff-only && git checkout -b cwjiang/YPJ-{N}-{short}`;同时 `yz assign YPJ-{N} me && yz items move YPJ-{N} "In Progress"`(开工须有主,未 assign 会被 move 409 拒);**分支经 yz 创建并关联 item**(2026-10-12 定:`POST /api/items/{id}/branches`,CLI 暂无命令直调 API,或用户在 yz web 里建;`yz log` 依赖该关联;本地对应 `git fetch && git switch` 跟踪远端新分支)
 2. 实现带测试,跑全相关验证
 3. PR:`gh pr create --base main --title "YPJ-{N}: ..."`;开出后 `yz items move YPJ-{N} "In Review"`
 4. **停**,等用户审阅合并
