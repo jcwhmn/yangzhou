@@ -10,6 +10,11 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /** YPJ-33:访问日志黑盒——每 call 一行、写操作 INFO、密码脱敏、GET 默认不落。 */
+// 级别钉在本类自己的 context:DEBUG 变体类会全局改 logger 级别,复用缓存 context 时 startup 不重放 yml → 顺序依赖偶发
+@SpringBootTest(
+    webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+    properties = ["logging.level.yangzhou.api.access=INFO"],
+)
 @ExtendWith(OutputCaptureExtension::class)
 class AccessLogFilterTest : AbstractApiTest() {
 
