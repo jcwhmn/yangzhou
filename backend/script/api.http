@@ -541,6 +541,21 @@ Content-Type: application/json
   "repo": "octo/r"
 }
 
+> {%
+    client.global.set("repoId", response.body.repoId);
+%}
+
+### 建 item 分支(YPJ-27:422→409 已存在,404→400 基线不存在,其余 GitHub 错→400 可操作)
+POST {{host}}/api/items/{{itemId}}/branches
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "repoId": "{{repoId}}",
+  "baseBranch": "main",
+  "name": "ypj-27-scratch"
+}
+
 ### 按需拉取 item 分支的提交历史(不落库不依赖轮询;无 PAT/无挂载 400 可操作报错)
 GET {{host}}/api/items/{{itemId}}/commits
 Authorization: Bearer {{token}}

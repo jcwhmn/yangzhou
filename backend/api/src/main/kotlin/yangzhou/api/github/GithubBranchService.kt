@@ -58,7 +58,7 @@ class GithubBranchService(
         } catch (e: GithubApiException) {
             if (e.status == 422) throw ConflictException("分支已存在:$branch")
             if (e.status == 404) throw BadRequestException("基线分支不存在:$base")
-            throw e
+            throw BadRequestException("GitHub API 错误(${e.status}):先检查 PAT/仓库名")
         }
 
         val url = "https://github.com/${mount.repo}/tree/$branch"
