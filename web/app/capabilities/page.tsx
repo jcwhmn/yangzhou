@@ -1,6 +1,7 @@
 "use client";
 
-import { Button, Container, Stack, Typography } from "@mui/material";
+import { Button, Stack, Typography } from "@mui/material";
+import { PageShell } from "@/components/PageShell";
 import { Dropdown } from "@/components/Dropdown";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -47,7 +48,7 @@ export default function CapabilitiesPage() {
   }
 
   return (
-    <Container maxWidth="sm" sx={{ py: 4 }}>
+    <PageShell>
       <Typography variant="h5" gutterBottom>
         {t.caps.title}
       </Typography>
@@ -84,6 +85,6 @@ export default function CapabilitiesPage() {
       <Button variant="text" component={Link} href="/" sx={{ mt: 2 }}>
         {t.caps.back}
       </Button>
-    </Container>
+    </PageShell>
   );
 }

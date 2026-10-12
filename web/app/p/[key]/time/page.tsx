@@ -1,6 +1,7 @@
 "use client";
 
-import { Box, Button, Card, CardContent, Container, Stack, Typography } from "@mui/material";
+import { Box, Button, Card, CardContent, Stack, Typography } from "@mui/material";
+import { PageShell } from "@/components/PageShell";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -35,7 +36,7 @@ export default function TimeSummaryPage() {
   const projectTotal = (summary ?? []).reduce((acc, m) => acc + m.totalMinutes, 0);
 
   return (
-    <Container maxWidth="md" sx={{ py: 4 }}>
+    <PageShell>
       <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
         <Button size="small" component={Link} href={`/p/${key}`}>
           ← 看板
@@ -81,6 +82,6 @@ export default function TimeSummaryPage() {
           </Card>
         ))}
       </Stack>
-    </Container>
+    </PageShell>
   );
 }

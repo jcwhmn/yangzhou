@@ -1,6 +1,7 @@
 "use client";
 
-import { Box, Button, Chip, Container, Stack, Typography } from "@mui/material";
+import { Box, Button, Chip, Stack, Typography } from "@mui/material";
+import { PageShell } from "@/components/PageShell";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -82,7 +83,7 @@ export default function GanttPage() {
   const byId = new Map((rows ?? []).map((r) => [r.itemId, r]));
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
+    <PageShell>
       <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
         <Typography variant="h5">{`${String(key)} · 甘特`}</Typography>
       </Stack>
@@ -221,7 +222,7 @@ export default function GanttPage() {
           </Typography>
         </>
       )}
-    </Container>
+    </PageShell>
   );
 
   function RowTitle({ r }: { r: GanttRow }) {

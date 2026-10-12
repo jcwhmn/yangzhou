@@ -5,7 +5,6 @@ import {
   Button,
   Checkbox,
   Chip,
-  Container,
   Stack,
   Table,
   TableBody,
@@ -15,6 +14,7 @@ import {
   TableRow,
   Typography,
 } from "@mui/material";
+import { PageShell } from "@/components/PageShell";
 import { Dropdown } from "@/components/Dropdown";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -103,7 +103,7 @@ export default function TableViewPage() {
   });
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
+    <PageShell>
       <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }} flexWrap="wrap" useFlexGap>
         <Typography variant="h5">{`${String(key)} · 表格`}</Typography>
 <Dropdown
@@ -209,6 +209,6 @@ export default function TableViewPage() {
           </Table>
         </TableContainer>
       )}
-    </Container>
+    </PageShell>
   );
 }

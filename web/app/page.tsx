@@ -8,12 +8,12 @@ import {
   CardContent,
   Checkbox,
   Chip,
-  Container,
   FormControlLabel,
   Stack,
   TextField,
   Typography,
 } from "@mui/material";
+import { PageShell } from "@/components/PageShell";
 import { Dropdown } from "@/components/Dropdown";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -114,7 +114,7 @@ export default function ProjectsPage() {
     return list;
   }, [projects, search, sortBy, showArchived]);
   return (
-    <Container maxWidth="md" sx={{ py: 4 }}>
+    <PageShell>
       <Typography variant="h4" gutterBottom>
         {t.dashboard.title}
       </Typography>
@@ -309,6 +309,6 @@ export default function ProjectsPage() {
           ))}
         </Stack>
       )}
-    </Container>
+    </PageShell>
   );
 }

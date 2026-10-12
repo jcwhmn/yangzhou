@@ -6,7 +6,6 @@ import {
   CardContent,
   Checkbox,
   Chip,
-  Container,
   IconButton,
   Stack,
   Table,
@@ -18,6 +17,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import { PageShell } from "@/components/PageShell";
 import { Dropdown } from "@/components/Dropdown";
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
@@ -182,7 +182,7 @@ export default function MembersPage() {
   });
 
   return (
-    <Container maxWidth="md" sx={{ py: 4 }}>
+    <PageShell>
       <Typography variant="h5" gutterBottom>
         {t.members.title}
       </Typography>
@@ -425,7 +425,7 @@ export default function MembersPage() {
           </Card>
         ))}
       </Stack>
-    </Container>
+    </PageShell>
   );
 }
 
