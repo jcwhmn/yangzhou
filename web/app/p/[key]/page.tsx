@@ -53,7 +53,7 @@ export default function BoardPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<Filter>("all");
-  const [sprintFilter, setSprintFilter] = useState("all");
+  const [activeSprints, setActiveSprints] = useState<SprintLite[]>([]);
   const [sprints, setSprints] = useState<SprintLite[]>([]);
 
   // V9-Q3:看板 30s 自动刷新(手刷按钮同函数)
@@ -78,7 +78,10 @@ export default function BoardPage() {
       const project = await api<{ statuses: Status[] }>(`/api/projects/${key}`);
       setStatuses(project.statuses);
       // V9-S1:item 列表自带 feasSignal 冗余,不再单 feasibility 调用
-      setItems(await api<Item[]>(`/api/projects/${key}/items`));
+      // YPJ-29:看板数据范围由后端决定(active sprint 的 items;无 active → 全量)
+      const board = await api<{ activeSprints: SprintLite[]; items: Item[] }>(`/api/projects/${key}/board`);
+      setActiveSprints(board.activeSprints);
+      setItems(board.items);
       setSprints(await api<SprintLite[]>(`/api/projects/${key}/sprints`));
     } catch (e) {
       setError(e instanceof Error ? e.message : "加载失败");
@@ -110,6 +113,17 @@ export default function BoardPage() {
     }
   }
 
+  // YPJ-29:看板内一键激活 planned sprint(激活后重拉 board,范围收窄)
+  async function startSprint(sprintId: string) {
+    if (!sprintId) return;
+    try {
+      await api(`/api/projects/${key}/sprints/${sprintId}`, { method: "PATCH", body: JSON.stringify({ status: "active" }) });
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t.board.startFailed);
+    }
+  }
+
   async function moveTo(itemId: string, status: Status) {
     const item = items.find((i) => i.itemId === itemId);
     if (!item || item.status === status.name) return;
@@ -123,16 +137,12 @@ export default function BoardPage() {
     }
   }
 
-  // S7:assignee 过滤(纯前端;"未指派" = assignee 为 null);V13-S4:增加 Sprint 维度过滤
-  const bySprint =
-    sprintFilter === "all" ? items
-    : sprintFilter === "none" ? items.filter((i) => !i.sprintName)
-    : items.filter((i) => i.sprintName === sprints.find((s) => s.sprintId === sprintFilter)?.name);
+// S7:assignee filter (purely frontend; "unassigned" = assignee is null); sprint scope is determined by the backend board endpoint (YPJ-29)
   const filtered =
-    filter === "all" ? bySprint
-    : filter === "unassigned" ? bySprint.filter((i) => !i.assignee)
-    : filter === "blocked" ? bySprint.filter((i) => i.blocked)
-    : bySprint.filter((i) => i.assignee === filter);
+    filter === "all" ? items
+    : filter === "unassigned" ? items.filter((i) => !i.assignee)
+    : filter === "blocked" ? items.filter((i) => i.blocked)
+    : items.filter((i) => i.assignee === filter);
   const memberOptions = [...new Set(items.map((i) => i.assignee).filter((a): a is string => !!a))];
 
   const byStatusName = new Map<string, Item[]>();
@@ -174,20 +184,29 @@ export default function BoardPage() {
         </Alert>
       )}
 
-      {/* S7:assignee 过滤 chips;V13-S4:Sprint 维度过滤(模型 A:看板=全部,可筛) */}
+      {/* YPJ-29:无 active sprint → 提示条 + 「开始 sprint」(激活后看板自动收窄) */}
+      {!loading && activeSprints.length === 0 && (
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
+          <Alert severity="info" sx={{ py: 0.5, flex: 1 }}>
+            {t.board.noActiveSprint}
+          </Alert>
+          {sprints.some((s) => s.status === "planned") && (
+            <Dropdown
+              ariaLabel={t.board.startSprint}
+              size="small"
+              value=""
+              onChange={(v) => startSprint(v)}
+              sx={{ width: 240 }}
+              options={sprints
+                .filter((s) => s.status === "planned")
+                .map((s) => ({ value: s.sprintId, label: `${t.board.startSprint}: ${s.name}` }))}
+            />
+          )}
+        </Stack>
+      )}
+
+      {/* S7:assignee 过滤 chips;sprint 范围由后端 board 端点决定(YPJ-29) */}
       <Stack direction="row" spacing={1} sx={{ mb: 2 }} flexWrap="wrap" useFlexGap>
-<Dropdown
-          ariaLabel="sprint 过滤"
-          size="small"
-          value={sprintFilter}
-          onChange={(v) => setSprintFilter(v)}
-          sx={{ width: 150 }}
-          options={[
-            { value: "all", label: "Sprint:全部" },
-            { value: "none", label: "未规划" },
-            ...sprints.filter((s) => s.status !== "completed").map((s) => ({ value: s.sprintId, label: s.name })),
-          ]}
-        />
         <Chip label={t.filter.all} size="small" color={filter === "all" ? "primary" : "default"} onClick={() => setFilter("all")} />
         <Chip
           label={t.filter.unassigned}

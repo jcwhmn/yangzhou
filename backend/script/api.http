@@ -513,6 +513,10 @@ Content-Type: application/json
 ### 删除 Release(非空 409,见负例区)
 DELETE {{host}}/api/projects/{{pkey}}/releases/{{releaseId}}
 
+### 看板(YPJ-29 spec 0023;active sprint 的 items,无 active → 全量降级)
+GET {{host}}/api/projects/{{pkey}}/board
+Authorization: Bearer {{token}}
+
 # ============ 12. GitHub(V6 配置 + V16-2 按需拉取;轮询兑底见 application.yml yangzhou.github) ============
 
 ### 配 workspace PAT(永不回显,只回尾 4 位)

@@ -28,3 +28,4 @@ test-results/
 backend/script/http-client.private.env.json
 # next-env.d.ts 为纯生成物,distDir 在 .next/.next-e2e 间切换会反复改写,不再跟踪
 web/next-env.d.ts
+backend/ijhttp.zip

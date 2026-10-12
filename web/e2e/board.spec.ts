@@ -1,7 +1,7 @@
 // 看板与 item 详情:建项/评论/状态/日期/优先级/依赖/回收站/过滤/错误浮出
 import { expect } from "./support/fixtures";
 import { test } from "./support/fixtures";
-import { apiAssignMe, apiCreateItem, expectDate, fillDate } from "./support/helpers";
+import { apiAssignMe, apiCall, apiCreateItem, apiCreateSprint, expectDate, fillDate } from "./support/helpers";
 
 test("建 item → 详情 → 评论 → 指派 → 状态 QA → 活动日志 @smoke", async ({ page, projectKey }) => {
   await page.goto(`/p/${projectKey}`);
@@ -142,4 +142,25 @@ test("V13-S4 看板 Sprint 过滤——未规划视图", async ({ page, projectK
   await page.getByLabel("sprint 过滤").click();
   await page.getByRole("option", { name: "未规划" }).click();
   await expect(page.getByText("E2E 过滤 item").first()).toBeVisible();
+});
+
+test("YPJ-29 无 active sprint 显示全部+提示条;开始 sprint 后收窄", async ({ page, projectKey }) => {
+  const inSprint = await apiCreateItem(projectKey, "Sprint内 item");
+  await apiCreateItem(projectKey, "Sprint外 item");
+  const sprintId = await apiCreateSprint(projectKey, "E2E Board Sprint");
+  await apiCall("PUT", `/api/items/${inSprint}/sprint`, { sprintId });
+
+  await page.goto(`/p/${projectKey}`);
+  await expect(page.getByText("当前无进行中 sprint")).toBeVisible();
+  await expect(page.getByText("Sprint内 item")).toBeVisible();
+  await expect(page.getByText("Sprint外 item")).toBeVisible();
+
+  // 开始 sprint(看板内一键激活)→ 范围收窄,提示条消失
+  await page.getByRole("combobox", { name: "开始 sprint" }).click();
+  const resp = page.waitForResponse((r) => r.url().includes("/sprints/") && r.request().method() === "PATCH");
+  await page.getByRole("option", { name: "E2E Board Sprint" }).click();
+  await resp;
+  await expect(page.getByText("当前无进行中 sprint")).toBeHidden();
+  await expect(page.getByText("Sprint内 item")).toBeVisible();
+  await expect(page.getByText("Sprint外 item")).toBeHidden();
 });

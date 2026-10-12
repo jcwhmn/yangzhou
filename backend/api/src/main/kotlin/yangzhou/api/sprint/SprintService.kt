@@ -140,6 +140,19 @@ class SprintService(
     /** backlog 派生桶:非终态 ∧ 不在任何 planned/active sprint(裁决 2/5,零建模)。 */
     fun backlog(key: String): List<ItemService.ItemDto> = itemService.list(key, backlogOnly = true)
 
+    data class BoardDto(val activeSprints: List<SprintDto>, val items: List<ItemService.ItemDto>)
+
+    /** 看板(YPJ-29):active sprint 的 items 并集;无 active → 全量(降级语义在后端,前端零 sprint 逻辑)。 */
+    fun board(key: String): BoardDto {
+        val active = groups.findByProjectIdOrderByCreatedAt(project(key).id!!).filter { it.status == "active" }
+        val activeDto = active.map { it.toDto() }
+        if (active.isEmpty()) return BoardDto(emptyList(), itemService.list(key))
+        val rows = active.flatMap { memberships.findByGroupId(it.id!!) }
+        if (rows.isEmpty()) return BoardDto(activeDto, emptyList())
+        val objectIds = itemRepo.findAllById(rows.map { it.itemId }.toSet()).map { it.objectId }.toSet()
+        return BoardDto(activeDto, itemService.list(key).filter { it.itemId in objectIds })
+    }
+
     /**
      * 指派/移出 item 的当前 sprint。替换式:先删旧 planned/active 行再插新行;
      * completed sprint 拒绝指派(历史不可变);sprintId=null = 移出(仅删 planned/active 行)。
