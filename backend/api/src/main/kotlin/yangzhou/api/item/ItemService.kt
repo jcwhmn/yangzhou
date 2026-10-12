@@ -315,7 +315,7 @@ class ItemService(
         }
         val summary = requirements.joinToString(";") { r -> r.attribute + (r.minLevel?.let { ">=" + it } ?: "") }
         logActivity(rowId, "requirement_changed", null, summary.ifEmpty { "(清空)" }, actorId())
-        feasibilityService.recomputeItemSignal(item)
+        // YPJ-26:不单独先锁本 item 行——与并发重算的编号序扫描成环(40P01);信号由下方按编号序的扫全量覆盖
         feasibilityService.recomputeProjectSignal(project.id!!) // V9-S1
         return get(item.objectId)
     }
