@@ -82,6 +82,19 @@ Clear 的 accessible name：
 
 ---
 
+## 2.5 Floating Label(与其它表单控件统一)
+
+DateInput 的 label 采用与其它表单控件一致的 floating label 样式:
+
+* label 位于控件的顶部边框线上,不在控件内部顶部,也不在控件上方独立占行。
+* label 的垂直中心线与控件上边框线重合(文字中心落在 border 的 Y 位置)。
+* label 自带与控件背景一致的背景色,遮挡 label 下方经过的上边框,形成边框被 label"切开"的效果。
+* label 与控件左右边缘保持适当间距,不贴圆角。
+* 视觉位置、字体、颜色、间距与同一表单中其它 floating-label 控件一致。
+
+无可见 label 时(仅 ariaLabel),不渲染 label,其余不变。
+
+---
 # 3. Value 契约
 
 ## 3.1 对外 Value

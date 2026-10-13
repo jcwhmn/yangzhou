@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import { Box, FormLabel, IconButton, Popover, type SxProps, type Theme } from "@mui/material";
+import { Box, IconButton, Popover, Typography, type SxProps, type Theme } from "@mui/material";
 import ClearIcon from "@mui/icons-material/Clear";
 import DateRangeIcon from "@mui/icons-material/DateRange";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
@@ -342,17 +342,12 @@ export function DateInput({
 
   return (
     <Box sx={[{ display: "inline-flex", flexDirection: "column" }, ...(Array.isArray(sx) ? sx : [sx])]}>
-      {label && (
-        <FormLabel aria-hidden sx={{ fontSize: 13, color: "text.secondary", mb: 0.25, ml: 0.5 }}>
-          {label}
-        </FormLabel>
-      )}
       <Box
         ref={rootRef}
         role="group"
         aria-label={name}
         data-value={value}
-        sx={fieldSx}
+        sx={[fieldSx, ...(label ? [{ position: "relative" }] : [])]}
         onFocus={() => {
           focused.current = true;
         }}
@@ -379,6 +374,24 @@ export function DateInput({
           focusSeg(first);
         }}
       >
+        {label && (
+          <Typography
+            component="span"
+            sx={{
+              position: "absolute",
+              top: 0,
+              transform: "translateY(-50%)",
+              left: 10,
+              bgcolor: tokens.field,
+              px: 0.5,
+              fontSize: 11,
+              lineHeight: 1.2,
+              color: "text.secondary",
+            }}
+          >
+            {label}
+          </Typography>
+        )}
         <input
           className={`seg${invalidSeg === "mm" ? " seg-invalid" : ""}`}
           aria-invalid={invalidSeg === "mm" || undefined}
@@ -450,6 +463,9 @@ export function DateInput({
               setSegs({ mm: "", dd: "", yyyy: "" });
               dirty.current = false;
               setInvalidSeg(null);
+              // §14:清空后回焦月段,以今天为基准继续录(显式预填:此处理 value prop 尚为旧值,onSegFocus 不会触发)
+              setSegs(todaySegs());
+              focusSeg("mm");
             }}
           >
             <ClearIcon fontSize="small" />

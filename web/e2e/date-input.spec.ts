@@ -111,3 +111,44 @@ test("月历:点日回填提交关闭;←/→ 移格 Enter 选中(YPJ-23)", asyn
   await expectDate(page, "开始日期", "2026-01-16");
   await expect(pop).toBeHidden();
 });
+
+test("draft 不外泄:编辑中 data-value 不变,提交才变(§3.1/§3.2)", async ({ page, projectKey }) => {
+  await gotoDetail(page, projectKey, "E2E draft 不外泄");
+  const g = page.getByRole("group", { name: "开始日期", exact: true });
+  const mm = seg(page, "开始日期", "月");
+  const dd = seg(page, "开始日期", "日");
+  await mm.click(); // 预填今天
+  await mm.fill("");
+  await page.keyboard.press("1"); // 月段 1_(等待位)
+  await expect(g).toHaveAttribute("data-value", ""); // 编辑中不外泄
+  await page.keyboard.press("2"); // 12 → 跳日段
+  await dd.press("Home"); // fill 逐位从位首起,避免 click 落点在段中
+  await dd.fill("20");
+  await expect(g).toHaveAttribute("data-value", ""); // 仍不外泄
+  await seg(page, "开始日期", "年").blur(); // fill("20") 跳年段(§7.1),从年段离开触发 commit
+  const t = new Date();
+  const exp = `${t.getFullYear()}-12-20`; // 月/日为键入值,年=今天基准
+  await expectDate(page, "开始日期", exp);
+});
+
+test("Clear:清空、回焦月段并以今天为基准(§14)", async ({ page, projectKey }) => {
+  await gotoDetail(page, projectKey, "E2E Clear 契约");
+  await fillDate(page, "开始日期", "2026-01-15");
+  await expectDate(page, "开始日期", "2026-01-15");
+  const g = page.getByRole("group", { name: "开始日期", exact: true });
+  const clearBtn = g.getByRole("button", { name: "清除 开始日期" });
+  await expect(clearBtn).toBeVisible();
+  await clearBtn.click();
+  await expect(g).toHaveAttribute("data-value", "");
+  await expect(seg(page, "开始日期", "月")).toBeFocused(); // 回焦(§14)
+  await seg(page, "开始日期", "月").blur(); // 纯预填不产生值(§10.2)
+  await expect(g).toHaveAttribute("data-value", "");
+});
+
+test("ARIA:group role/name、段名、月历按钮名(§2.2/§15)", async ({ page, projectKey }) => {
+  await gotoDetail(page, projectKey, "E2E ARIA 契约");
+  const g = page.getByRole("group", { name: "开始日期", exact: true });
+  await expect(g).toBeVisible();
+  for (const s of ["月", "日", "年"] as const) await expect(seg(page, "开始日期", s)).toBeVisible();
+  await expect(g.getByRole("button", { name: "月历 开始日期" })).toBeVisible();
+});
