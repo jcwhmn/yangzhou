@@ -12,9 +12,10 @@ import KeyboardDoubleArrowRightIcon from "@mui/icons-material/KeyboardDoubleArro
 import { t } from "@/lib/texts";
 import { tokens } from "@/lib/tokens";
 
-// 分段日期输入(spec 0019 / YPJ-19):mm/dd/yyyy 三段直录 + mini 月历,替代原生 type="date"。
-// 契约:onChange 只在「三段完整」或「清空」时外发;越界提交时静默钳制(02/31→02/28,月 13→12);
-// Esc 回滚草稿;空值聚焦(click/Tab 同权)预填今天,失焦即提交。
+// 分段日期输入(spec 0019/0029 / YPJ-19/34+23):mm/dd/yyyy 三段直录 + mini 月历,替代原生 type="date"。
+// 契约:onChange 只在「三段完整且日期合法」或「清空」时外发;段内非法 digit 即拒(PRD_V2 §6.1/§7.1);
+// 跨字段非法 commit 阻止 + focus 回问题段(§10.3);空控件聚焦预填今天仅作基准,未输入失焦不产生值(§10.2);
+// Esc 回滚草稿;焦点/键入进位/点击落点均以单 digit 选中呈现,键入即覆写(用户拍板 2026-10-13)。
 // e2e:容器 role=group(aria-label)+ data-value=已提交 ISO;段 aria-label=月/日/年(helpers fillDate/expectDate)。
 
 type Segs = { mm: string; dd: string; yyyy: string };
@@ -36,14 +37,6 @@ function isoOf(s: Segs): string {
 
 function daysInMonth(y: number, m: number): number {
   return new Date(y, m, 0).getDate();
-}
-
-// 越界静默钳制(spec 0019 §1.3):月 1–12,日 = 当月最后一天(闰年自动正确),日 0→01
-function normalize(s: Segs): Segs {
-  const y = Number(s.yyyy);
-  const m = Math.min(Math.max(Number(s.mm), 1), 12);
-  const d = Math.min(Math.max(Number(s.dd), 1), daysInMonth(y, m));
-  return { yyyy: String(y), mm: pad2(m), dd: pad2(d) };
 }
 
 function todaySegs(): Segs {
@@ -70,6 +63,8 @@ export function DateInput({
   const name = label ?? ariaLabel;
   const [segs, setSegs] = useState<Segs>(() => parseIso(value));
   const [calOpen, setCalOpen] = useState(false);
+  const [invalidSeg, setInvalidSeg] = useState<keyof Segs | null>(null);
+  const dirty = useRef(false); // 本焦点期是否有过真实写入(§10.2 空进空出判据)
   const focused = useRef(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const segRefs = {
@@ -86,11 +81,16 @@ export function DateInput({
   const draftEmpty = !segs.mm && !segs.dd && !segs.yyyy;
   const showClear = !!name && (value !== "" || !draftEmpty);
 
-  // 提交(spec 0019 §1.3):不完整保留草稿;完整越界钳制,修正值外发并同步显示;
+  // 提交(spec 0029 §10):不完整保留草稿;完整 → 跨字段验证(§10.3),非法不提交、focus 回问题段;
+  // 空进空出(§10.2):本焦点期无真实写入且外部为空 → 还原空直接离开;
   // 年份短写补全:mm/dd 已满而年 1–3 位(27→2027,2 位按 50→1900 pivot;3 位前补 0)
   const commit = () => {
     if (draftEmpty) {
       if (value !== "") onChange("");
+      return;
+    }
+    if (value === "" && !dirty.current) {
+      setSegs({ mm: "", dd: "", yyyy: "" });
       return;
     }
     let { yyyy } = segs;
@@ -105,20 +105,35 @@ export function DateInput({
     }
     const full = { ...segs, yyyy };
     if (isoOf(full) === "") return;
-    const niso = isoOf(normalize(full));
+    const y = Number(full.yyyy);
+    const m = Number(full.mm);
+    const d = Number(full.dd);
+    const problem: keyof Segs | null = m < 1 || m > 12 ? "mm" : d < 1 || d > daysInMonth(y, m) ? "dd" : null;
+    if (problem) {
+      setInvalidSeg(problem);
+      focusSeg(problem, true);
+      return; // §10.3:不提交、value 不动、focus 定位问题段(blur 场景即拉回)
+    }
+    setInvalidSeg(null);
+    const niso = isoOf(full);
     if (niso !== value) onChange(niso);
     setSegs(parseIso(niso));
   };
 
+  // digit 选中(overwrite 视觉):pos 处有数字则选它,段尾仅落 caret
+  const selectDigitEl = (el: HTMLInputElement, pos: number) => {
+    const end = Math.min(pos + 1, el.value.length);
+    el.setSelectionRange(pos, Math.max(end, pos));
+  };
   const focusSeg = (k: keyof Segs, atStart = false) => {
     const el = segRefs[k].current;
     if (!el) return;
     el.focus();
-    if (atStart) el.setSelectionRange(0, 0);
+    selectDigitEl(el, atStart ? 0 : Math.max(el.value.length - 1, 0));
   };
 
   // onChange 兜底(Playwright fill / IME / 粘贴单段):整段智能解读——1 位=十位槽(留段或智能个位 0X),
-  // 2 位=满段跳下一段;日 >31 记 31;年逐位。真实键入走 writeDigit(keydown 拦截),不经此路径。
+  // 2 位=满段跳下一段;成段非法(00/月>12/日>31)拒绝不应用(§6.1/§7.1);年逐位。真实键入走 writeDigit(keydown 拦截),不经此路径。
   const onSegInput = (k: keyof Segs, v: string) => {
     const clean = digits(v, MAXLEN[k]);
     if (k === "yyyy") {
@@ -129,12 +144,18 @@ export function DateInput({
       setSegs((p) => ({ ...p, [k]: "" }));
       return;
     }
+    const num = Number(clean);
+    if (clean.length === 2 && (num === 0 || (k === "mm" && num > 12) || (k === "dd" && num > 31))) {
+      setInvalidSeg(k); // §6.1/§7.1:成段非法拒绝(不钳制)
+      return;
+    }
     const next = ORDER[ORDER.indexOf(k) + 1];
+    dirty.current = true;
+    setInvalidSeg(null);
     if (clean.length === 1 && Number(clean) <= (k === "mm" ? 1 : 3)) {
       setSegs((p) => ({ ...p, [k]: clean }));
     } else {
-      let val = clean.length === 1 ? `0${clean}` : clean;
-      if (k === "dd" && Number(val) > 31) val = "31"; // 日期上限 31(spec 0019 §1.3)
+      const val = clean.length === 1 ? `0${clean}` : clean;
       setSegs((p) => ({ ...p, [k]: val }));
       if (next) focusSeg(next, true);
     }
@@ -149,7 +170,7 @@ export function DateInput({
         /* 立即提交预填渲染,再落光标 */
       });
       const el = e.currentTarget;
-      if (document.activeElement === el) el.setSelectionRange(0, 0);
+      if (document.activeElement === el) selectDigitEl(el, 0);
     }
   };
 
@@ -182,15 +203,21 @@ export function DateInput({
       nextVal = chars.join("").slice(0, 2);
       caret = 1;
     } else {
-      let ones = d;
-      if (k === "dd" && Number(cur[0] ?? "0") === 3 && ones > 1) ones = 1; // 日期上限 31
-      nextVal = `${cur.slice(0, 1)}${ones}`;
+      // pos === 1(§6.1/§7.1 第二位):成段非法 → 拒 digit + feedback,保持原地
+      const formed = Number(`${cur.slice(0, 1)}${d}`);
+      if (formed === 0 || formed > (k === "mm" ? 12 : 31)) {
+        setInvalidSeg(k);
+        return;
+      }
+      nextVal = `${cur.slice(0, 1)}${d}`;
       caret = 2;
       jump = true;
     }
+    dirty.current = true;
+    setInvalidSeg(null);
     el.value = nextVal;
     setSegs((p) => ({ ...p, [k]: nextVal }));
-    el.setSelectionRange(caret, caret);
+    selectDigitEl(el, caret);
     if (jump && next) focusSeg(next, true);
   };
 
@@ -205,6 +232,14 @@ export function DateInput({
         return;
       }
     }
+  };
+
+  // 点击段:落点 digit 选中;延时到浏览器放置完 caret 再取 selectionStart
+  const onSegClick = (k: keyof Segs, e: React.MouseEvent<HTMLInputElement>) => {
+    const el = e.currentTarget;
+    window.setTimeout(() => {
+      if (document.activeElement === el) selectDigitEl(el, el.selectionStart ?? 0);
+    }, 0);
   };
 
   // insertText 的逐位路径:让 Playwright fill / 输入法候选上屏与真实键入同语义(否则 fill 会把 "01"
@@ -241,22 +276,22 @@ export function DateInput({
       return;
     }
     if (e.key === "ArrowRight" || e.key === "/") {
-      if (pos >= segs[k].length) {
-        e.preventDefault();
-        const next = ORDER[i + 1];
-        if (next) focusSeg(next);
-        else focusNextAfterGroup(); // 年段位尾 → 出控件,同 Tab
-      } else if (e.key === "/") {
-        e.preventDefault();
+      e.preventDefault();
+      if (e.key === "/" && pos < segs[k].length) {
         el.setSelectionRange(pos + 1, pos + 1);
+      } else if (pos < segs[k].length) {
+        selectDigitEl(el, pos + 1);
+      } else {
+        const next = ORDER[i + 1];
+        if (next) focusSeg(next, true);
+        else focusNextAfterGroup(); // 年段位尾 → 出控件,同 Tab
       }
     } else if (e.key === "ArrowLeft") {
-      if (pos === 0 && (el.selectionEnd ?? 0) === 0) {
+      e.preventDefault();
+      if (pos > 0) selectDigitEl(el, pos - 1);
+      else {
         const prev = ORDER[i - 1];
-        if (prev) {
-          e.preventDefault();
-          focusSeg(prev);
-        }
+        if (prev) focusSeg(prev); // 落上段末位 digit
       }
     } else if (e.key === "Backspace" && segs[k] === "" && i > 0) {
       focusSeg(ORDER[i - 1]);
@@ -302,6 +337,7 @@ export function DateInput({
       color: "text.primary",
       "&::placeholder": { color: "text.secondary", opacity: 1 },
     },
+    "& .seg-invalid": { color: "error.main" },
   };
 
   return (
@@ -333,6 +369,7 @@ export function DateInput({
             // 放弃编辑;拦下冒泡,免得 Dialog 把整个弹层关掉
             e.stopPropagation();
             setSegs(parseIso(value));
+            setInvalidSeg(null);
           }
         }}
         onClick={() => {
@@ -343,7 +380,8 @@ export function DateInput({
         }}
       >
         <input
-          className="seg"
+          className={`seg${invalidSeg === "mm" ? " seg-invalid" : ""}`}
+          aria-invalid={invalidSeg === "mm" || undefined}
           style={{ width: 26 }}
           inputMode="numeric"
           placeholder="mm"
@@ -351,6 +389,7 @@ export function DateInput({
           value={segs.mm}
           onChange={(e) => onSegInput("mm", e.target.value)}
           onKeyDown={(e) => onSegKeyDown("mm", e)}
+          onClick={(e) => onSegClick("mm", e)}
           onPaste={onSegPaste}
           onFocus={onSegFocus}
           onBeforeInput={(e) => onSegBeforeInput("mm", e)}
@@ -358,7 +397,8 @@ export function DateInput({
         />
         <Box component="span" sx={{ px: 0.25, color: "text.secondary" }}>/</Box>
         <input
-          className="seg"
+          className={`seg${invalidSeg === "dd" ? " seg-invalid" : ""}`}
+          aria-invalid={invalidSeg === "dd" || undefined}
           style={{ width: 26 }}
           inputMode="numeric"
           placeholder="dd"
@@ -366,6 +406,7 @@ export function DateInput({
           value={segs.dd}
           onChange={(e) => onSegInput("dd", e.target.value)}
           onKeyDown={(e) => onSegKeyDown("dd", e)}
+          onClick={(e) => onSegClick("dd", e)}
           onPaste={onSegPaste}
           onFocus={onSegFocus}
           onBeforeInput={(e) => onSegBeforeInput("dd", e)}
@@ -373,7 +414,8 @@ export function DateInput({
         />
         <Box component="span" sx={{ px: 0.25, color: "text.secondary" }}>/</Box>
         <input
-          className="seg"
+          className={`seg${invalidSeg === "yyyy" ? " seg-invalid" : ""}`}
+          aria-invalid={invalidSeg === "yyyy" || undefined}
           style={{ width: 44 }}
           inputMode="numeric"
           placeholder="yyyy"
@@ -381,6 +423,7 @@ export function DateInput({
           value={segs.yyyy}
           onChange={(e) => onSegInput("yyyy", e.target.value)}
           onKeyDown={(e) => onSegKeyDown("yyyy", e)}
+          onClick={(e) => onSegClick("yyyy", e)}
           onPaste={onSegPaste}
           onFocus={onSegFocus}
           onBeforeInput={(e) => onSegBeforeInput("yyyy", e)}
@@ -405,6 +448,8 @@ export function DateInput({
               e.stopPropagation();
               onChange("");
               setSegs({ mm: "", dd: "", yyyy: "" });
+              dirty.current = false;
+              setInvalidSeg(null);
             }}
           >
             <ClearIcon fontSize="small" />
@@ -456,7 +501,21 @@ function MiniCalendar({ initialIso, onPick }: { initialIso: string; onPick: (iso
           <KeyboardDoubleArrowRightIcon fontSize="small" />
         </IconButton>
       </Box>
-      <Box sx={{ display: "grid", gridTemplateColumns: "repeat(7, 28px)", gap: "2px" }}>
+      <Box
+        sx={{ display: "grid", gridTemplateColumns: "repeat(7, 28px)", gap: "2px" }}
+        onKeyDown={(e) => {
+          // 月历键盘导航(V1 PRD §6.2):←/→/↑/↓ 移 ±1/±7 日格,Enter/Space 走 button 原生选中
+          const delta = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 }[e.key];
+          if (!delta) return;
+          const cells = Array.from(e.currentTarget.querySelectorAll<HTMLElement>("button[data-iso]"));
+          const i = cells.indexOf(document.activeElement as HTMLElement);
+          const target = cells[Math.max(0, Math.min(i + delta, cells.length - 1))];
+          if (target) {
+            e.preventDefault();
+            target.focus();
+          }
+        }}
+      >
         {t.date.weekdays.map((w) => (
           <Box key={w} sx={{ textAlign: "center", fontSize: 12, color: "text.secondary", py: 0.5 }}>
             {w}
@@ -475,6 +534,7 @@ function MiniCalendar({ initialIso, onPick }: { initialIso: string; onPick: (iso
               key={iso}
               component="button"
               type="button"
+              data-iso={iso}
               onClick={() => onPick(iso)}
               sx={{
                 width: 28,
