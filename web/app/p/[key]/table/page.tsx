@@ -48,19 +48,25 @@ export default function TableViewPage() {
   const [sort, setSort] = useState("number");
   const [error, setError] = useState("");
 
-  // 列可见性:localStorage 持久
-  const [cols, setCols] = useState<Record<string, boolean>>(() => {
+  // 列可见性:localStorage 持久,按项目 key 区分(YPJ-32)
+  function readCols(k: string): Record<string, boolean> {
     if (typeof window === "undefined") return {};
     try {
-      return JSON.parse(localStorage.getItem("yz-table-cols") ?? "{}");
+      return JSON.parse(localStorage.getItem(`yz-table-cols:${k}`) ?? "{}");
     } catch {
       return {};
     }
-  });
+  }
+
+  const [cols, setCols] = useState<Record<string, boolean>>(() => readCols(key));
 
   useEffect(() => {
-    localStorage.setItem("yz-table-cols", JSON.stringify(cols));
-  }, [cols]);
+    setCols(readCols(key));
+  }, [key]);
+
+  useEffect(() => {
+    localStorage.setItem(`yz-table-cols:${key}`, JSON.stringify(cols));
+  }, [cols, key]);
 
   function toggleCol(c: string) {
     // 默认值须与 chip 颜色一致(columns[].visible),否则首次点击与视觉状态相反、看似无效
