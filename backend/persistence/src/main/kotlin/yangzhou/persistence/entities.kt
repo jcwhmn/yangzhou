@@ -63,6 +63,19 @@ data class ItemActivity(
     val createdAt: Instant = Instant.now(),
 )
 
+@Table("item_status_history")
+data class ItemStatusHistory(
+    @Id val id: Long? = null,
+    val objectId: UUID = UUID.randomUUID(),
+    val itemId: Long,
+    val fromStatusId: Long? = null,
+    val toStatusId: Long,
+    val source: String,
+    val actorMemberId: Long? = null,
+    val createdAt: Instant = Instant.now(),
+    val updatedAt: Instant = Instant.now(),
+)
+
 @Table("comment")
 data class Comment(
     @Id val id: Long? = null,
