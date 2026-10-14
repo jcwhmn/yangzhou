@@ -18,8 +18,6 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  ToggleButton,
-  ToggleButtonGroup,
   Typography,
 } from "@mui/material";
 import { PageShell } from "@/components/PageShell";
@@ -47,7 +45,7 @@ type Candidate = { itemId: string; number: string; title: string; status: string
 
 /**
  * V12-S3 Sprint 落地页(spec 0010,grill 裁决 1/2):
- * 头部 = 名称/日期/状态切换(planned→active→completed);看板(只读列视图,状态迁移去主看板或详情页)/ 表格;
+ * 头部 = 名称/日期/状态切换(planned→active→completed)/ 表格(V19 YPJ-41 移除看板视图,看板语义归项目级看板,spec 0023/0034);
  * 空 sprint 给出指派路径提示;未知 sprint id → 页内错误态 + 返回上一页(用户反馈 2026-09-29)。
  * 完成的 sprint 即历史回看:items 为完成时仍在其列的成员关系。
  */
@@ -57,7 +55,6 @@ export default function SprintPage() {
   const [sprint, setSprint] = useState<Sprint | null>(null);
   const [items, setItems] = useState<Item[] | null>(null);
   const [statuses, setStatuses] = useState<Status[]>([]);
-  const [view, setView] = useState("board");
   const [error, setError] = useState("");
   const [gone, setGone] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
@@ -201,10 +198,6 @@ export default function SprintPage() {
                 </Button>
               )}
             </Stack>
-            <ToggleButtonGroup size="small" value={view} exclusive onChange={(_, v) => v && setView(v)}>
-              <ToggleButton value="board">看板</ToggleButton>
-              <ToggleButton value="table">表格</ToggleButton>
-            </ToggleButtonGroup>
             {sprint.status !== "completed" && (
               <Button size="small" variant="outlined" onClick={openAdd}>
                 拉入 item
@@ -223,66 +216,7 @@ export default function SprintPage() {
             </Typography>
           )}
 
-          {items !== null && items.length > 0 && view === "board" && (
-            <Stack direction="row" spacing={2} sx={{ overflowX: "auto", pb: 2 }}>
-              {statuses.map((s) => {
-                const list = items.filter((it) => it.status === s.name);
-                return (
-                  <Stack key={s.statusId} spacing={1} sx={{ minWidth: 260, flexShrink: 0 }}>
-                    <Typography variant="subtitle2">
-                      {s.name}({list.length})
-                      {s.isFinal && " [终态]"}
-                    </Typography>
-                    {list.length === 0 && (
-                      <Typography variant="caption" color="text.secondary">
-                        (空)
-                      </Typography>
-                    )}
-                    {list.map((it) => (
-                      <Link key={it.itemId} href={`/p/${key}/i/${it.itemId}?from=sprint-${id}`} style={{ textDecoration: "none", color: "inherit" }}>
-                        <Stack
-                          sx={{
-                            p: 1,
-                            borderRadius: 2,
-                            bgcolor: "background.paper",
-                            "&:hover": { boxShadow: 6 },
-                            cursor: "pointer",
-                          }}
-                        >
-                          <Stack direction="row" spacing={1} alignItems="center">
-                            <Chip label={it.number} size="small" variant="outlined" />
-                            {it.priority && <Chip size="small" label={it.priority} variant="outlined" />}
-                            <AssignPopover
-                              itemId={it.itemId}
-                              assignee={it.assignee}
-                              onChanged={() =>
-                                api<Item[]>(`/api/projects/${key}/sprints/${id}/items`).then(setItems).catch(() => {})
-                              }
-                            >
-                              {(onClick) => (
-                                <Chip
-                                  size="small"
-                                  variant="outlined"
-                                  label={it.assignee ? `👤 ${it.assignee}` : t.assign.none}
-                                  onClick={onClick}
-                                  sx={it.assignee ? undefined : { opacity: 0.55 }}
-                                />
-                              )}
-                            </AssignPopover>
-                          </Stack>
-                          <Typography variant="body2" sx={{ mt: 0.5, wordBreak: "break-word" }}>
-                            {it.title}
-                          </Typography>
-                        </Stack>
-                      </Link>
-                    ))}
-                  </Stack>
-                );
-              })}
-            </Stack>
-          )}
-
-          {items !== null && items.length > 0 && view === "table" && (
+          {items !== null && items.length > 0 && (
             <TableContainer>
               <Table size="small">
                 <TableHead>
