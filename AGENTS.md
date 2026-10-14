@@ -44,7 +44,7 @@ docs/      adr/ · spec/ · architecture/(puml 类图) · requirement/(PRD) · p
 
 ## Issue 工作流(PR 模式;票在 YPJ 项目,2026-10-06 起 Linear 冻结只读)
 
-1. 开工:`git checkout main && git pull --ff-only && git checkout -b cwjiang/YPJ-{N}-{short}`;同时 `yz assign YPJ-{N} me && yz items move YPJ-{N} "In Progress"`(开工须有主,未 assign 会被 move 409 拒);**分支经 yz 创建并关联 item**(2026-10-12 定:`POST /api/items/{id}/branches`,CLI 暂无命令直调 API,或用户在 yz web 里建;`yz log` 依赖该关联;本地对应 `git fetch && git switch` 跟踪远端新分支)
+1. 开工:`git checkout main && git pull --ff-only && git checkout -b cwjiang/YPJ-{N}-{short}`;同时 `yz assign YPJ-{N} me && yz items move YPJ-{N} "In Progress"`(开工须有主,未 assign 会被 move 409 拒);**分支经 yz 创建并关联 item**(2026-10-12 定,YPJ-27 起 CLI 直建:`yz items branch YPJ-{N} cwjiang/YPJ-{N}-<short> --base main`;`yz log` 依赖该关联;本地对应 `git fetch && git switch` 跟踪远端新分支)
 2. 实现带测试,跑全相关验证
 3. PR:`gh pr create --base main --title "YPJ-{N}: ..."`;开出后 `yz items move YPJ-{N} "In Review"`
 4. **停**,等用户审阅合并
@@ -71,14 +71,9 @@ docs/      adr/ · spec/ · architecture/(puml 类图) · requirement/(PRD) · p
 
 ## 测试
 
-- 唯一 seam = REST API 黑盒(spec);引擎纯函数直测。
-- 单元测试:类级并行安全——无共享可变全局态、不碰真 DB/网络,不起 Spring;CI 只跑单元(`gradle test`)。
-- 集成测试:`@SpringBootTest(RANDOM_PORT)` + `RestTestClient`;不用 MockMvc / @WebMvcTest / TestRestTemplate;不用 @Transactional 回滚——每测试自清自建、只造自己要的数据,断言响应体与库内状态。**必须 extends AbstractApiTest**(靠基类 @Tag 继承归轨,spec 0014)。
-- 双轨(2026-10-09):CI 只跑单元;集成测试 merge 前本人本地 `gradle integrationTest`;nightly workflow 全量兜底,红了必修。
-- 敏感值(密码/token)永不进日志;登录失败消息保持笼统。
-- **不要猜前端或后端是否已运行,需要运行环境的,告知需要的运行环境,命令,从我这里确认**。
+写/改后端测试、新建迁移、动 AbstractApiTest、跑 gradle 验证 → **先读 skill `.agents/skills/backend-testing/SKILL.md`**(双轨/单元与集成边界/新表同步 cleanDatabase 清单/需求矩阵/Clock 注入/跑法)。速记硬规则:唯一 seam = REST API 黑盒,集成必须 extends `AbstractApiTest`;CI 只跑单元,集成 merge 前本人本地 `gradle integrationTest`(nightly 兜底)。
 
-### E2E(web/;Playwright,并行按用例隔离)
+## E2E(web/;Playwright,并行按用例隔离)
 
 - 后端跑 **test profile**(库 yangzhou_test):`gradle :api:bootRun --args='--spring.profiles.active=test'`;前端由 webServer 拉起 prod server(`next build && next start`,独立构建目录 .next-e2e,不踩日常 dev 的 .next);凭证与地址在 `web/e2e/.env`(模板 `.env.example`),不硬编码不提交。
 - 标准全量跑法(web/ 下):`E2E_FRONT_PORT=3001 E2E_BASE_URL=http://localhost:3001 E2E_API_URL=http://localhost:8080 BACKEND_URL=http://localhost:8080 npx playwright test`;globalSetup 自带**清测试库**(残渣 flake 解法;Fast Refresh 类由 prod server 根除,spec 0021 As-built),勿绕过;BACKEND_URL 必须 8080(rewrites 代理目标,8081 会污染 PM 库);手动清库 `npm run db:reset`
@@ -101,6 +96,7 @@ docs/      adr/ · spec/ · architecture/(puml 类图) · requirement/(PRD) · p
 - `./gradlew` 同效;首次需下载发行包,国内网络慢属已知,用本地 gradle 即可。
 - CI(GitHub Actions):`backend.yml` 跑 `gradle test`(纯单元,免 Docker;spec 0014);`nightly.yml` 每日全量兜底(含集成,红了必修);`e2e.yml` web/backend 变更起 bootRun + Playwright 整跑 E2E
 - 本机开发库:`yangzhou`(共享 compose,已建);bootRun 用 `gradle :api:bootRun`。
+- **不要猜前端或后端是否已运行,需要运行环境的,告知需要的运行环境,命令,从我这里确认**。
 - **双 profile 并存**(2026-10-06 起):8080 常跑 **test profile**(库 `yangzhou_test`,E2E 用);**PM 日常实例 = default profile**(库 `yangzhou`,dogfood 项目 YPJ),约定端口 **8081**:`gradle :api:bootRun --args='--server.port=8081'`。CLI `yz` 的 session(`~/.yangzhou/session.json`)指向谁就写谁的库——动 PM 数据前确认 server 指向 default 实例。
 - PM 实例部署形态(已拍板):本机常驻即可;Postgres 备份手工期(`pg_dump`),自动化另票。
 - **⚠ 前端命令必须在 `web/` 目录下执行**:`cd /d/code/yangzhou/web && npx next build` / `npm run dev` / `npx playwright test` 等。agent 的 shell CWD 每次重置到 repo 根,漏 cd 会在错误目录跑命令导致 `.next` 污染或路径找不到。
