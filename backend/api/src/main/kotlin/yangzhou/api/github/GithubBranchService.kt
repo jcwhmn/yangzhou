@@ -73,7 +73,7 @@ class GithubBranchService(
     private fun requireValidBranch(raw: String, label: String): String {
         val n = raw.trim()
         if (n.isEmpty()) throw BadRequestException("$label 不能为空")
-        if (!Regex("^[A-Za-z0-9._\\-/]{1,200}$").matches(n) || n.contains("..") ||
+        if (!Regex("^[A-Za-z0-9._,\\-/]{1,200}$").matches(n) || n.contains("..") ||
             n.startsWith("/") || n.endsWith("/") || n.endsWith(".lock")
         ) {
             throw BadRequestException("$label 非法:$n")

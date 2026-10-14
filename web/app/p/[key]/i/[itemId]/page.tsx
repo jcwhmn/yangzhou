@@ -22,7 +22,7 @@ import AddIcon from "@mui/icons-material/Add";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { api, getUsername } from "@/lib/api";
+import { api } from "@/lib/api";
 import { resolveBack } from "@/lib/back";
 import { t } from "@/lib/texts";
 import { SignalChip, VerdictLine, type Signal, type Verdict } from "@/components/Verdict";
@@ -893,6 +893,8 @@ export default function ItemDetailPage() {
         onClose={() => setBranchOpen(false)}
         projectKey={String(key)}
         itemNumber={item.number}
+        itemType={item.type}
+        itemTitle={item.title}
         itemId={String(itemId)}
         onCreated={load}
       />
@@ -990,6 +992,8 @@ function CreateBranchDialog({
   onClose,
   projectKey,
   itemNumber,
+  itemType,
+  itemTitle,
   itemId,
   onCreated,
 }: {
@@ -997,6 +1001,8 @@ function CreateBranchDialog({
   onClose: () => void;
   projectKey: string;
   itemNumber: string;
+  itemType: string;
+  itemTitle: string;
   itemId: string;
   onCreated: () => void;
 }) {
@@ -1016,10 +1022,22 @@ function CreateBranchDialog({
         setRepoId(rs[0]?.repoId ?? "");
       })
       .catch((e) => setError(e.message));
-    // 预填 {登录名}/{票号}(可改)——V19 YPJ-37:slug 拼接对 CJK 产出残迹,废弃;精确命名走 CLI 正路径
-    const username = getUsername();
-    setName(username ? `${username}/${itemNumber}` : itemNumber);
-  }, [open, projectKey, itemNumber]);
+    // 预填 {type}/{票号[,依赖票号…]}[-英文slug] —— V19 YPJ-37 用户定案(spec 0036 v2);精确命名走 CLI 正路径
+    void (async () => {
+      const ids = [itemNumber];
+      try {
+        const deps = await api<{ dependencies: { number: string }[] }>(`/api/items/${itemId}/dependencies`);
+        ids.push(...deps.dependencies.map((d) => d.number).filter((n) => n !== "?"));
+      } catch {
+        // 依赖取不到 → 只用主票号,不阻塞预填
+      }
+      const asciiOnly = /^[A-Za-z0-9 -]+$/.test(itemTitle);
+      const slug = asciiOnly
+        ? itemTitle.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")
+        : "";
+      setName(`${itemType}/${ids.join(",")}${slug ? `-${slug}` : ""}`);
+    })();
+  }, [open, projectKey, itemId, itemNumber, itemType, itemTitle]);
 
   async function create() {
     setError("");
