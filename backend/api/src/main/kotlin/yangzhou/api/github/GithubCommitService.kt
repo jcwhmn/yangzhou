@@ -14,6 +14,7 @@ import yangzhou.persistence.repository.ItemGitRefRepository
 import yangzhou.persistence.repository.ItemRepository
 import yangzhou.persistence.repository.ProjectRepoRepository
 import yangzhou.api.workspace.WorkspaceService
+import java.time.Instant
 import java.util.UUID
 
 /**
@@ -50,12 +51,14 @@ class GithubCommitService(
             RefCommitsDto(
                 repo = ref.repo,
                 ref = ref.ref,
-                commits = runCatching { gateway.listCommits(ref.repo, ref.ref, token) }
+                commits = runCatching { gateway.listCommits(ref.repo, ref.ref, ref.createdAt, token) }
                     .getOrElse { e ->
                         if (e is GithubApiException) {
                             throw BadRequestException("GitHub API 错误(${e.status}):先检查 PAT/仓库名")
                         } else throw e
                     }
+                    // 响应侧兜底:GitHub since 按 commit date 过滤,边缘仍可能有漏网(date 缺失则保留,宁多勿漏)
+                    .filter { it.date == null || runCatching { Instant.parse(it.date) >= ref.createdAt }.getOrDefault(true) }
                     .map { CommitDto(it.sha, it.message, it.author, it.date, it.url) },
             )
         }

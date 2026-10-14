@@ -24,7 +24,7 @@ class FakeSuggestGateway : GithubGateway {
     override fun listBranches(repo: String, token: String): List<String> = emptyList()
     override fun listPullRequests(repo: String, token: String): List<GithubPr> = emptyList()
     override fun createBranch(repo: String, branch: String, fromBranch: String, token: String) {}
-    override fun listCommits(repo: String, sha: String, token: String): List<GithubCommit> {
+    override fun listCommits(repo: String, sha: String, since: java.time.Instant?, token: String): List<GithubCommit> {
         failWith?.let { throw it }
         return commits["$repo@$sha"].orEmpty()
     }
@@ -66,8 +66,8 @@ class TimeSuggestionApiTest : AbstractApiTest() {
 
     private fun seedBranchRef(itemId: String, ref: String = "cwjiang/YPJ-8-x") {
         jdbc.update(
-            "insert into item_git_ref (object_id, item_id, kind, repo, ref) " +
-                "values (md5(random()::text || clock_timestamp()::text)::uuid, (select id from item where object_id = ?::uuid), 'branch', 'octo/r', ?)",
+            "insert into item_git_ref (object_id, item_id, kind, repo, ref, created_at) " +
+                "values (md5(random()::text || clock_timestamp()::text)::uuid, (select id from item where object_id = ?::uuid), 'branch', 'octo/r', ?, '2026-01-01T00:00:00Z')",
             itemId, ref,
         )
     }

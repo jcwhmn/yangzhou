@@ -3,6 +3,8 @@ package yangzhou.api.github
 import org.springframework.stereotype.Component
 import tools.jackson.databind.ObjectMapper
 import java.net.URI
+import java.time.Instant
+import java.time.format.DateTimeFormatter
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
@@ -35,9 +37,10 @@ class RealGithubGateway(private val mapper: ObjectMapper) : GithubGateway {
             .map { toGithubPr(it) }
 
     // ponytail: 只取第一页 per_page=20——按需查看量级足够,翻页等真实需要再加
-    override fun listCommits(repo: String, sha: String, token: String): List<GithubCommit> =
+    override fun listCommits(repo: String, sha: String, since: Instant?, token: String): List<GithubCommit> =
         try {
-            mapper.readTree(get(repo, "/commits?sha=$sha&per_page=20", token))
+            val sinceQ = if (since != null) "&since=" + DateTimeFormatter.ISO_INSTANT.format(since) else ""
+            mapper.readTree(get(repo, "/commits?sha=$sha$sinceQ&per_page=20", token))
                 .map { c ->
                     GithubCommit(
                         sha = c.get("sha").asString(),

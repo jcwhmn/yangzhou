@@ -9,6 +9,7 @@ import org.springframework.context.annotation.Primary
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.web.servlet.client.RestTestClient
 import yangzhou.api.AbstractApiTest
+import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -16,13 +17,16 @@ import kotlin.test.assertTrue
 class FakeCommitGateway : GithubGateway {
     var failWith: GithubApiException? = null
     val commits = mutableMapOf<String, List<GithubCommit>>() // key = repo@sha
+    var lastSince: Instant? = null
 
     override fun listBranches(repo: String, token: String): List<String> = emptyList()
     override fun listPullRequests(repo: String, token: String): List<GithubPr> = emptyList()
     override fun createBranch(repo: String, branch: String, fromBranch: String, token: String) {}
 
-    override fun listCommits(repo: String, sha: String, token: String): List<GithubCommit> {
+    // 故意不 honor since(模拟 GitHub 不过滤)——服务侧兜底过滤由 YPJ-42 测试验证
+    override fun listCommits(repo: String, sha: String, since: Instant?, token: String): List<GithubCommit> {
         failWith?.let { throw it }
+        lastSince = since
         return commits["$repo@$sha"].orEmpty()
     }
 }
@@ -48,6 +52,7 @@ class GithubCommitsApiTest : AbstractApiTest() {
 
     /** PAT + CHE 项目 + 挂载 octo/r + item CHE-1;返回 itemId。 */
     private fun setup(pat: Boolean = true): String {
+        fake.failWith = null // 用例序无关:失败注入不复位会泄漏到后续用例
         authed = bootstrapAndAuth()
         if (pat) {
             authed.put().uri("/api/workspace/github-token")
@@ -63,8 +68,8 @@ class GithubCommitsApiTest : AbstractApiTest() {
 
     private fun seedBranchRef(itemId: String, ref: String = "CHE-1-x") {
         jdbc.update(
-            "insert into item_git_ref (object_id, item_id, kind, repo, ref) " +
-                "values (md5(random()::text || clock_timestamp()::text)::uuid, (select id from item where object_id = ?::uuid), 'branch', 'octo/r', ?)",
+            "insert into item_git_ref (object_id, item_id, kind, repo, ref, created_at) " +
+                "values (md5(random()::text || clock_timestamp()::text)::uuid, (select id from item where object_id = ?::uuid), 'branch', 'octo/r', ?, '2026-10-01T00:00:00Z')",
             itemId, ref,
         )
     }
@@ -99,6 +104,22 @@ class GithubCommitsApiTest : AbstractApiTest() {
         )
         // 只读直查:拉取本身不产生 GitHub 类活动留痕(建 item 的 created 不算)
         assertTrue(acts.toList().none { it["kind"].asText().startsWith("github") })
+    }
+
+    @Test
+    fun `分支创建前的提交被兜底过滤(fake 忽略 since 模拟 GitHub 不过滤)`() {
+        val itemId = setup()
+        seedBranchRef(itemId) // created_at = 2026-10-01
+        fake.commits["octo/r@CHE-1-x"] = listOf(
+            GithubCommit("old111full", "YPJ-7: 历史提交", "me", "2026-09-20T12:00:00Z", null),
+            GithubCommit("new222full", "YPJ-42: 新提交", "me", "2026-10-06T12:00:00Z", null),
+        )
+
+        val res = body(getCommits(itemId))
+
+        assertEquals(1, res[0]["commits"].size())
+        assertEquals("new222full", res[0]["commits"][0]["sha"].asText())
+        assertEquals(java.time.Instant.parse("2026-10-01T00:00:00Z"), fake.lastSince)
     }
 
     @Test
