@@ -156,6 +156,32 @@ class GithubSyncApiTest : AbstractApiTest() {
     }
 
     @Test
+    fun `默认规则即生效(YPJ-36)——开 PR 自动 In Review,merged 自动 Done,重复轮询幂等`() {
+        authed = bootstrapAndAuth()
+        authed.put().uri("/api/workspace/github-token")
+            .body(mapOf("token" to "test-token"))
+            .exchange().expectStatus().isOk()
+        createProject(authed, "CHE") // 不手配规则,吃默认 3 槽
+        authed.post().uri("/api/projects/CHE/repos")
+            .body(mapOf("repo" to "octo/r"))
+            .exchange().expectStatus().isCreated()
+        val itemId = createItem(authed, "CHE", "x")["itemId"].asText()
+
+        fake.prs["octo/r"] = listOf(GithubPr(1, "CHE-1-x", "open", "https://github.com/octo/r/pull/1"))
+        syncService.syncAll()
+        assertEquals("In Review", statusOf(itemId))
+
+        fake.prs["octo/r"] = listOf(GithubPr(1, "CHE-1-x", "merged", "https://github.com/octo/r/pull/1"))
+        syncService.syncAll()
+        assertEquals("Done", statusOf(itemId))
+
+        // 幂等:再轮询状态不动、不留新痕
+        syncService.syncAll()
+        assertEquals("Done", statusOf(itemId))
+        assertEquals(2, activities(itemId).filter { it["kind"].asText() == "github_status_changed" }.size)
+    }
+
+    @Test
     fun `WIP 满跳过留痕——第二个 item 不动`() {
         setup()
         jdbc.update("update status set wip_limit = 1 where name = 'In Progress'")

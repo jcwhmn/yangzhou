@@ -95,18 +95,21 @@ class GithubConfigApiTest : AbstractApiTest() {
     // ---------- 事件→状态映射 ----------
 
     @Test
-    fun `四槽默认全空——PUT 回放——跨项目状态与未知事件 400`() {
+    fun `默认 3 槽已种——PUT 回放——跨项目状态与未知事件 400`() {
         val authed = bootstrapAndAuth()
         createProject(authed, "CHE")
         createProject(authed, "SEC")
 
-        // 默认:四槽全空
-        val empty = json.readTree(
+        // 默认(YPJ-36):branch→In Progress、pr_open→In Review、pr_merged→Done,closed_unmerged 留空=人管
+        val seeded = json.readTree(
             authed.get().uri("/api/projects/CHE/workflow-rules").exchange()
                 .expectStatus().isOk().expectBody(String::class.java).returnResult().responseBody!!,
         )
-        assertEquals(4, empty.size())
-        assertTrue(empty.all { it["statusId"].isNull })
+        assertEquals(4, seeded.size())
+        assertEquals(
+            listOf("In Progress", "In Review", "Done", null),
+            seeded.map { if (it["statusName"].isNull) null else it["statusName"].asText() },
+        )
 
         val che = json.readTree(
             authed.get().uri("/api/projects/CHE").exchange()
