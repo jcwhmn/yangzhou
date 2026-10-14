@@ -144,3 +144,36 @@ epic/sprint/release/milestone 目前是 `item_group.type` 硬编码字符串;产
 | YPJ-38 | service 层 mockk 单测(CI 冒烟) | 已被 YPJ-43 吸收,待关票 |
 | Intake | 需求收集入口(与匹配引擎契合) | 未出票 |
 | Command K / WebSocket 实时 / 邮件通知 | 交互与协作增强 | 未出票 |
+
+
+### 1.5 指标优先级与分票(2026-10-14,对读 Obsidian《Metrics Chart》29 节)
+
+文档自有优先级(§28「起步 10 个」)+ §29 原则(metrics 回答「系统哪里有问题」,不做 KPI/个人排行——**产品内所有指标配口径说明、不做个人排行**为设计约束)。对照本仓数据基座(item_status_history 已就绪)分级:
+
+**Tier 1 必须——流指标核心(YPJ-45/46 票面已覆盖,零改动)**
+
+| 指标 | 回答 | 数据 |
+|---|---|---|
+| WIP 分布(×assignee) | 同时开了多少 | item 现态直查 ✅ |
+| Throughput | 单位时间完成多少 | history 进入 final ✅ |
+| Cycle / Lead Time + P50/85/95(拒绝平均数) | 多久/分布 | history 时点差 ✅ |
+| Work Item Age / Aging | 谁卡太久 | 进入当前状态时刻 ✅ |
+| CFD | 哪里堵 | history 重放 ✅ |
+| Bottleneck(队列宽) | 瓶颈在哪 | 同上 ✅ |
+
+**Tier 2 必须——sprint 维度(粒度到票,收口评审后调整)**
+
+| 指标 | 归属 | 动作 |
+|---|---|---|
+| Burndown | YPJ-46 | 已有 ✅ |
+| Burnup(含 scope 可视) | YPJ-46 | 票面补一行 |
+| Velocity(sprint 历史完成数分布) | 45 聚合 + 46 图 | 票面各补一行 |
+| Scope Change / Reopen Rate | **新立 XS 票(建议 YPJ-52)** | **数据 gap**:item 加/离 sprint(item_group_member)无留痕 → 先补留痕(迁移+写入点),再上 scope-change / velocity / reopen 三指标 |
+
+**Tier 3 后置(不立票,触发再议)**
+
+- Predictability / Forecasting / Monte Carlo(文档 §17/19/20):依赖 Tier 1/2 数据积累,上量后做;
+- Quality(§21,缺陷域:type=bug 已有,轻量可做)、Blocked Work / Dependency Metrics(§23/24:`item_dependency` 图数据已有,blocked 语义建模待 triage);
+- DORA(§25)/ Product Metrics(§26):需部署管线/产品运营数据,超出项目管理工具域,**不做**(产品边界)。
+
+**V19 收口后动作**:①46 票面补 burnup/velocity 图,45 不动;②新立 YPJ-52(scope 留痕 + 三指标);③Tier 3 各主题在本 PRD 挂账,不进 sprint。

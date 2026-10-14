@@ -56,3 +56,8 @@
 - 每票 = 一个 YPJ item(dogfood)+ `docs/spec/00NN` 三件套过目后编码;PR 模式;验收全绿才关票。
 - sprint 收口:子票全 Done → sprint 组 completed;43 为滚动票,允许跨 sprint 存续。
 - 版本 spec 与 As-built:开工前立增量节,完工后补 As-built(0031/0032 为范式)。
+
+## 五、V19 收口后动作(2026-10-14 增)
+
+1. **Metrics 优先级评审**:分析结论见 `docs/requirement/V20-V22 PRD.md` §1.5(Tier 1/2/3;源自 Obsidian《Metrics Chart》29 节对读)。评审后:46 票面补 burnup/velocity 图,新立 YPJ-52(scope 留痕 + scope-change/velocity/reopen),45 不动。
+2. **mockk 单测计划**:清点与阶段划分见 `docs/planning/mockk-unit-test-plan.md`(30 个 service,P0 基建 + P1~P3 三阶段),随 YPJ-43 滚动执行。
