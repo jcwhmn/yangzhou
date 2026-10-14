@@ -22,7 +22,7 @@ import AddIcon from "@mui/icons-material/Add";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { api, getUsername } from "@/lib/api";
 import { resolveBack } from "@/lib/back";
 import { t } from "@/lib/texts";
 import { SignalChip, VerdictLine, type Signal, type Verdict } from "@/components/Verdict";
@@ -893,7 +893,6 @@ export default function ItemDetailPage() {
         onClose={() => setBranchOpen(false)}
         projectKey={String(key)}
         itemNumber={item.number}
-        itemTitle={item.title}
         itemId={String(itemId)}
         onCreated={load}
       />
@@ -991,7 +990,6 @@ function CreateBranchDialog({
   onClose,
   projectKey,
   itemNumber,
-  itemTitle,
   itemId,
   onCreated,
 }: {
@@ -999,7 +997,6 @@ function CreateBranchDialog({
   onClose: () => void;
   projectKey: string;
   itemNumber: string;
-  itemTitle: string;
   itemId: string;
   onCreated: () => void;
 }) {
@@ -1019,16 +1016,10 @@ function CreateBranchDialog({
         setRepoId(rs[0]?.repoId ?? "");
       })
       .catch((e) => setError(e.message));
-    // 预填 <KEY>-<number>-<slug>(可改);slug = 标题小写、非字母数字转 -
-    const keyPart = itemNumber.split("-")[0];
-    const numPart = itemNumber.split("-")[1] ?? "";
-    const slug = itemTitle
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 40);
-    setName([keyPart, numPart, slug].filter(Boolean).join("-"));
-  }, [open, projectKey, itemNumber, itemTitle]);
+    // 预填 {登录名}/{票号}(可改)——V19 YPJ-37:slug 拼接对 CJK 产出残迹,废弃;精确命名走 CLI 正路径
+    const username = getUsername();
+    setName(username ? `${username}/${itemNumber}` : itemNumber);
+  }, [open, projectKey, itemNumber]);
 
   async function create() {
     setError("");

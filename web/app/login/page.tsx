@@ -19,6 +19,7 @@ export default function LoginPage() {
     setError("");
     try {
       setToken(await bootstrapOrLogin(username, password));
+      localStorage.setItem("yz-username", username); // V19 YPJ-37:分支预填前缀用
       // V11-S1:登录后进入上次项目
       try {
         const token = localStorage.getItem("yz-token");

@@ -46,6 +46,12 @@ export function setToken(token: string) {
 
 export function clearToken() {
   localStorage.removeItem("yz-token");
+  localStorage.removeItem("yz-username"); // V19 YPJ-37:登录名与 token 同生命周期
+}
+
+/** 当前登录名(登录时落);旧会话可能无 → null。 */
+export function getUsername(): string | null {
+  return localStorage.getItem("yz-username");
 }
 
 /** 全新服务器 bootstrap,否则 login(同 CLI 语义)。 */
