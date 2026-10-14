@@ -9,6 +9,7 @@
 - **实现某张票时** → YPJ item(票自带验收清单;版本 spec 对应 `docs/spec/00NN`;历史 Linear 票号 JCW-* 仅作 spec 内引用锚点,Linear 已冻结只读)
 - **做 ItemGroup/视图/导航类功能前** → `docs/requirement/ItemGroup PRD.md`(§28.2 Phase 划分;原 requirement.md 随笔已迁 Obsidian Thoughts.md)
 - **动 schema 或架构前** → `docs/adr/`(0001 三层容器 / 0002 Item 同质树 / 0003 统一属性 / 0004 monorepo 与工具链)
+- **写调研/对标类文档前** → 放 `D:\obsidian\projects\yangzhou\`(Obsidian vault),repo 不存(2026-10-14 定;plane_functions/Metrics Chart 已迁出)
 
 ## 布局(ADR-0004)
 
