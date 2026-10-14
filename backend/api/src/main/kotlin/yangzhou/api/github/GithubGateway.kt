@@ -1,5 +1,7 @@
 package yangzhou.api.github
 
+import java.time.Instant
+
 /**
  * GitHub 出网唯一 seam(V6-S2);S2 测试用 fake 替换。
  * token 由调用方传入(PAT 存 workspace,永不进日志)。
@@ -11,8 +13,8 @@ interface GithubGateway {
     /** 从 fromBranch 建新分支;已存在 → GithubApiException(422)。 */
     fun createBranch(repo: String, branch: String, fromBranch: String, token: String)
 
-    /** sha/分支上的提交(第一页,新→旧);ref 已删 → 空表(真实现归一)。 */
-    fun listCommits(repo: String, sha: String, token: String): List<GithubCommit>
+    /** sha/分支上的提交(第一页,新→旧,since 过滤分支创建前);ref 已删 → 空表(真实现归一)。 */
+    fun listCommits(repo: String, sha: String, since: Instant?, token: String): List<GithubCommit>
 }
 
 /** state ∈ open|merged|closed(GitHub 的 merged=closed+merged,在此归一)。 */
