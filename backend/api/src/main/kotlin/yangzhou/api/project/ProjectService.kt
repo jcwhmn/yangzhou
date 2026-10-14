@@ -7,9 +7,14 @@ import org.springframework.transaction.annotation.Transactional
 import yangzhou.api.support.ConflictException
 import yangzhou.api.support.NotFoundException
 import yangzhou.api.workspace.WorkspaceService
+import yangzhou.api.github.EVENT_BRANCH_CREATED
+import yangzhou.api.github.EVENT_PR_MERGED
+import yangzhou.api.github.EVENT_PR_OPENED
 import yangzhou.persistence.Project
+import yangzhou.persistence.ProjectWorkflowRule
 import yangzhou.persistence.Status
 import yangzhou.persistence.repository.ProjectRepository
+import yangzhou.persistence.repository.ProjectWorkflowRuleRepository
 import yangzhou.persistence.repository.StatusRepository
 import java.time.LocalDate
 import java.util.UUID
@@ -19,6 +24,7 @@ import java.util.UUID
 class ProjectService(
     private val projects: ProjectRepository,
     private val statuses: StatusRepository,
+    private val workflowRules: ProjectWorkflowRuleRepository,
     private val items: yangzhou.persistence.repository.ItemRepository,
     private val workspaceService: WorkspaceService,
 ) {
@@ -38,8 +44,9 @@ class ProjectService(
         if (projects.existsByKey(key)) throw ConflictException("项目 key 已存在:$key")
         val workspaceId = workspaceService.required().id!!
         val project = projects.save(Project(workspaceId = workspaceId, key = key, name = name))
-        // 默认 workflow:To Do / Development / QA / Done(final)——模板系统的最小预置
-        defaultStatuses(project.id!!).forEach { statuses.save(it) }
+        // 默认 workflow:To Do / In Progress / In Review / QA / Done(final)——模板系统的最小预置(V7 5 列)
+        val saved = defaultStatuses(project.id!!).map { statuses.save(it) }
+        seedDefaultRules(project.id!!, saved)
         return get(key)
     }
 
@@ -106,6 +113,17 @@ class ProjectService(
     )
 
     data class GanttDto(val rows: List<GanttRow>)
+
+    /** YPJ-36:默认规则 3 槽(branch→In Progress、pr_open→In Review、pr_merged→Done);closed_unmerged 留空=人管(票面裁决)。按名字映射,非标 workflow 缺列自然少种。 */
+    private fun seedDefaultRules(projectId: Long, saved: List<Status>) {
+        val byName = saved.associateBy { it.name }
+        mapOf(EVENT_BRANCH_CREATED to "In Progress", EVENT_PR_OPENED to "In Review", EVENT_PR_MERGED to "Done")
+            .forEach { (event, statusName) ->
+                byName[statusName]?.let {
+                    workflowRules.save(ProjectWorkflowRule(projectId = projectId, eventType = event, statusObjectId = it.objectId))
+                }
+            }
+    }
 
     private fun defaultStatuses(projectId: Long) = listOf( // V7:5 列(评审环节天然有位置);存量项目不动
         Status(projectId = projectId, name = "To Do", isStart = true, position = 0),
