@@ -6,6 +6,7 @@ import yangzhou.persistence.Capability
 import yangzhou.persistence.Comment
 import yangzhou.persistence.ItemActivity
 import yangzhou.persistence.ChecklistItem
+import yangzhou.persistence.ItemStatusHistory
 import yangzhou.persistence.ItemDependency
 import yangzhou.persistence.ItemGitRef
 import yangzhou.persistence.Item
@@ -52,6 +53,10 @@ interface TeamMemberRepository : CrudRepository<TeamMember, Long> {
 interface ItemActivityRepository : CrudRepository<ItemActivity, Long> {
     fun findByItemIdOrderByCreatedAtDesc(item_id: Long): List<ItemActivity>
     fun findByKindAndCreatedAtBetween(kind: String, start: java.time.Instant, end: java.time.Instant): List<ItemActivity>
+}
+
+interface ItemStatusHistoryRepository : CrudRepository<ItemStatusHistory, Long> {
+    fun findByItemIdOrderByCreatedAtAsc(item_id: Long): List<ItemStatusHistory>
 }
 
 interface AttributeDefinitionRepository : CrudRepository<AttributeDefinition, Long> {

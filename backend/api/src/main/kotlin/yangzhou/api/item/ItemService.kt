@@ -9,6 +9,7 @@ import yangzhou.api.support.ConflictException
 import yangzhou.api.support.NotFoundException
 import yangzhou.persistence.Item
 import yangzhou.persistence.ItemActivity
+import yangzhou.persistence.ItemStatusHistory
 import yangzhou.persistence.Requirement
 import yangzhou.persistence.repository.AttributeDefinitionRepository
 import yangzhou.persistence.repository.ItemGitRefRepository
@@ -36,6 +37,7 @@ class ItemService(
     private val memberService: yangzhou.api.member.MemberService,
     private val projectMembers: yangzhou.api.projectmember.ProjectMemberService,
     private val activityRepo: yangzhou.persistence.repository.ItemActivityRepository,
+    private val historyRepo: yangzhou.persistence.repository.ItemStatusHistoryRepository,
     private val gitRefs: ItemGitRefRepository,
     private val feasibilityService: yangzhou.api.feasibility.FeasibilityService,
     private val dependencyService: yangzhou.api.dependency.DependencyService,
@@ -121,6 +123,9 @@ class ItemService(
             requirementRepo.save(Requirement(itemId = itemId, attributeDefinitionId = defId, minLevel = minLevel))
         }
         logActivity(itemId, "created", null, title, memberService.current().id!!)
+        historyRepo.save(
+            ItemStatusHistory(itemId = itemId, toStatusId = status.id!!, source = "created", actorMemberId = memberService.current().id!!),
+        )
         feasibilityService.recomputeProjectSignal(projectId) // V9-S1
         return get(item.objectId)
     }
@@ -250,6 +255,9 @@ class ItemService(
             }
             current = itemRepo.save(current.copy(statusObjectId = status.objectId))
             logActivity(current.id!!, "status_changed", oldStatus?.name, status.name, actorId)
+            if (status.objectId != oldStatus?.objectId) historyRepo.save(
+                ItemStatusHistory(itemId = current.id!!, fromStatusId = oldStatus?.id, toStatusId = status.id!!, source = "manual", actorMemberId = actorId),
+            )
             notificationService.notifyStatusChange(current, actorId, oldStatus?.name, status.name)
         }
 

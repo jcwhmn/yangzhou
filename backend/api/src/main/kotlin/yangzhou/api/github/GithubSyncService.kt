@@ -5,6 +5,7 @@ import org.springframework.stereotype.Service
 import yangzhou.persistence.Item
 import yangzhou.persistence.ItemGitRef
 import yangzhou.persistence.ItemActivity
+import yangzhou.persistence.ItemStatusHistory
 import yangzhou.persistence.Project
 import yangzhou.persistence.repository.ItemActivityRepository
 import yangzhou.persistence.repository.ItemGitRefRepository
@@ -30,6 +31,7 @@ class GithubSyncService(
     private val rules: ProjectWorkflowRuleRepository,
     private val gitRefs: ItemGitRefRepository,
     private val activityRepo: ItemActivityRepository,
+    private val historyRepo: yangzhou.persistence.repository.ItemStatusHistoryRepository,
     private val members: yangzhou.persistence.repository.MemberRepository,
     private val projectMembers: yangzhou.api.projectmember.ProjectMemberService,
     private val notificationService: yangzhou.api.notification.NotificationService,
@@ -131,6 +133,7 @@ class GithubSyncService(
         }
         val saved = items.save(item.copy(statusObjectId = target.objectId))
         logActivity(itemId, current?.name, "${target.name}($event $detail)")
+        historyRepo.save(ItemStatusHistory(itemId = itemId, fromStatusId = current?.id, toStatusId = target.id!!, source = "github"))
         notificationService.notifyStatusChange(saved, null, current?.name, target.name)
     }
 
