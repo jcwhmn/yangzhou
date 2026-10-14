@@ -126,3 +126,14 @@ where a.kind in ('status_changed', 'github_status_changed')
 - [ ] 集成测试覆盖各路径 ← §测试 1–4
 - [ ] (票面)存量回填 ← V31 insert-select,手工用例 1–2 验证
 - [ ] (票面)group type 中性 ← 表结构无 group/sprint 概念,纯 item×status,天然中性
+
+
+## As-built
+
+实现与 spec 一致,补记三处实现期细节:
+
+- **回填 from 解析改 inner join**:spec 草稿 `left join status f` 会把「old 名解析不到」的行落成 from=NULL(误作初始进入),与票面「算不出即丢弃」不一致——实现改为与 to 同样的 inner join,双向解析不到均落选。
+- **repositories.kt 补 import**(ItemStatusHistory),spec 文件清单未列,编译期发现。
+- **toStatusId 用 `status.id!!` / `target.id!!`**:entity `id` 声明为 `Long?`,spec 伪码未体现非空处理。
+
+验证:全量 integrationTest **148 tests, 0 failures**(含新增 ItemStatusHistoryApiTest 3 例);`gradle clean build` 绿;bootRun(test profile)V31 落位;PM 实例(yangzhou 库)应用后回填行 created_at = 原 item_activity 迁移时刻(2026-10-06 起历史保留,用户库上实证)。无 REST 契约变更(api.http 未动);entities.puml 已同步(既有漂移:ItemActivity/Release 自 V9/V29 起缺席,未顺手扩,另票)。
