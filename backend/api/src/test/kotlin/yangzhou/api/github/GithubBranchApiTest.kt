@@ -117,6 +117,10 @@ class GithubBranchApiTest : AbstractApiTest() {
         // 分支名非法
         create(authed, itemId, repoId, name = "bad branch!").expectStatus().isBadRequest()
 
+        // YPJ-37:逗号(多票号预填)合法
+        fake.createError = null
+        create(authed, itemId, repoId, name = "task/CHE-1,CHE-2-fix").expectStatus().isCreated()
+
         // PAT 缺失
         authed.delete().uri("/api/workspace/github-token").exchange().expectStatus().isNoContent()
         create(authed, itemId, repoId).expectStatus().isBadRequest()

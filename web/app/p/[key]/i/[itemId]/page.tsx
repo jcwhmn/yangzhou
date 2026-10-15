@@ -893,6 +893,7 @@ export default function ItemDetailPage() {
         onClose={() => setBranchOpen(false)}
         projectKey={String(key)}
         itemNumber={item.number}
+        itemType={item.type}
         itemTitle={item.title}
         itemId={String(itemId)}
         onCreated={load}
@@ -991,6 +992,7 @@ function CreateBranchDialog({
   onClose,
   projectKey,
   itemNumber,
+  itemType,
   itemTitle,
   itemId,
   onCreated,
@@ -999,6 +1001,7 @@ function CreateBranchDialog({
   onClose: () => void;
   projectKey: string;
   itemNumber: string;
+  itemType: string;
   itemTitle: string;
   itemId: string;
   onCreated: () => void;
@@ -1019,16 +1022,22 @@ function CreateBranchDialog({
         setRepoId(rs[0]?.repoId ?? "");
       })
       .catch((e) => setError(e.message));
-    // 预填 <KEY>-<number>-<slug>(可改);slug = 标题小写、非字母数字转 -
-    const keyPart = itemNumber.split("-")[0];
-    const numPart = itemNumber.split("-")[1] ?? "";
-    const slug = itemTitle
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 40);
-    setName([keyPart, numPart, slug].filter(Boolean).join("-"));
-  }, [open, projectKey, itemNumber, itemTitle]);
+    // 预填 {type}/{票号[,依赖票号…]}[-英文slug] —— V19 YPJ-37 用户定案(spec 0036 v2);精确命名走 CLI 正路径
+    void (async () => {
+      const ids = [itemNumber];
+      try {
+        const deps = await api<{ dependencies: { number: string }[] }>(`/api/items/${itemId}/dependencies`);
+        ids.push(...deps.dependencies.map((d) => d.number).filter((n) => n !== "?"));
+      } catch {
+        // 依赖取不到 → 只用主票号,不阻塞预填
+      }
+      const asciiOnly = /^[A-Za-z0-9 -]+$/.test(itemTitle);
+      const slug = asciiOnly
+        ? itemTitle.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")
+        : "";
+      setName(`${itemType}/${ids.join(",")}${slug ? `-${slug}` : ""}`);
+    })();
+  }, [open, projectKey, itemId, itemNumber, itemType, itemTitle]);
 
   async function create() {
     setError("");
