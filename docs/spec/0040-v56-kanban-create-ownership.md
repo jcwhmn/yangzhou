@@ -75,3 +75,14 @@
 3. 再建第二个 sprint 并激活:看板创建 → 弹选两个 sprint → 选定后 item 入所选。
 4. api.http:创建带 sprintId 正例 201;completed sprint 负例 409 且项目 item 计数不变(负例区)。
 5. 全部响应形状与既有创建一致(ItemDto),OpenAPI(Scalar)可见新可选参数。
+
+## As-built(2026-10-16,PR #110 合入)
+
+- **按票交付**:创建请求可选 `sprintId`,同事务尾部校验+归入(负例不落库);web 三态组装(0 active 不带 / 1 自动带 / 多弹选 Dialog);api.http 正例 + 负例 2 条。偏差:无。
+- **实现期记坑**:
+  1. `ItemServiceUnitTest` 手动构造 `ItemService`——新构造参数接线**复用该测试既有的 `groupRepo`/`groupMembers` mock**(原为 `list` 的 sprint 归属逻辑而建),零新增 mock;
+  2. 原子断言写法:负例 3 例都断言「错误码 + `GET /items` 计数不变」——item 不落库是设计承诺,不只看错误码;
+  3. api.http 负例自足:409 前置「建 sprint → PATCH completed」两请求,`completedSprintId` handler 自回填;409 依赖负例区顺序执行(整链重跑协议);
+  4. `page.tsx` 无既有 Dialog,新增 MUI 三组件 import;`addItem` 抽出 `createItem(title, sprintId?)` 复用于直接创建与弹选确认。
+- 验证:集成 5 例 XML 实证 0 failure;`gradle build`/`integrationTest`/`next build` 绿;手工用例 4 条 8081 全过(用户 build/debug)。
+- 插曲:收尾时 8081 漂移至 test profile(项目列表无 YPJ),与代码无关——实例形态以 `--server.port=8081` + default profile 为准。
