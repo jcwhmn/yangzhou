@@ -35,6 +35,7 @@ Content-Type: application/json
 > {%
     client.global.set("token", response.body.token);
     client.global.set("run", Date.now().toString().slice(-6)); // 每轮唯一后缀,保证可重复执行
+    client.global.set("meId", response.body.memberId); // 本人 id(TokenResponse 自带,免去列表里找 me)
  %}
 
 # ============ 2. 项目(新 key = CHE + 后缀;后续 URL 用变量 pkey) ============
@@ -134,16 +135,7 @@ Content-Type: application/json
 GET {{host}}/api/members
 Authorization: Bearer {{token}}
 
-> {%
-    // 兼容性用显式循环(.find 在部分 IDEA JS 引擎不可用);取不到就大声失败,不留哑变量
-    var meFound = null;
-    for (var i = 0; i < response.body.length; i++) {
-        if (response.body[i].username === "me") meFound = response.body[i];
-    }
-    if (!meFound) throw new Error("成员列表里没找到 username=me: " + JSON.stringify(response.body));
-    client.global.set("meId", meFound.memberId); // 本人入池/自计时用
-    client.log("[api.http] meId=" + client.global.get("meId"));
- %}
+(meId 已在登录 handler 回填——TokenResponse 自带,此处不再做 JS 捕获)
 
 # ============ 5. 能力 ============
 
