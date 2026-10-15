@@ -21,7 +21,7 @@
 
 语义锚点(从现有 schema 推导,不新增列):
 
-- **start 状态** = 项目 workflow 中 position 最小的非 final 状态(status 表无显式 start 标记,按位置语义推导,口径写入响应)。
+- **start 状态** = `status.is_start` 显式列(V3 起;默认 workflow 的 To Do;口径写入响应)。
 - **完成时刻** = item 首次进入任一 final 状态的 history 时刻(重开后再完成不重复计);**重开** = final → 非 final 的 history 行。
 
 | # | 指标 | 口径(写进响应) | 数据源 | 归属 |

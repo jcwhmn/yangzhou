@@ -612,6 +612,44 @@ Authorization: Bearer {{token}}
 GET {{host}}/api/items/{{itemId}}/time-entry-suggestions
 Authorization: Bearer {{token}}
 
+# ============ 14. Flow Metrics(YPJ-45,spec 0037/0038;只读,口径随响应 definitions 返回) ============
+
+### Workload:三桶 + 按状态/指派/类型拆分
+GET {{host}}/api/projects/{{pkey}}/metrics/workload
+Authorization: Bearer {{token}}
+
+### Throughput:按周(窗口 90 天内;可传 groupId 限定成员)
+GET {{host}}/api/projects/{{pkey}}/metrics/throughput?from=2026-09-01T00:00:00Z&to=2026-12-31T00:00:00Z&bucket=week
+Authorization: Bearer {{token}}
+
+### Throughput:按日 + 限定 sprint 成员
+GET {{host}}/api/projects/{{pkey}}/metrics/throughput?from=2026-10-01T00:00:00Z&to=2026-10-31T00:00:00Z&bucket=day&groupId={{sprintId}}
+Authorization: Bearer {{token}}
+
+### Flow Times:cycle/lead 散点 + P50/85/95
+GET {{host}}/api/projects/{{pkey}}/metrics/flow-times?from=2026-09-01T00:00:00Z&to=2026-12-31T00:00:00Z
+Authorization: Bearer {{token}}
+
+### CFD:各状态存量按日重放
+GET {{host}}/api/projects/{{pkey}}/metrics/cfd?from=2026-09-01T00:00:00Z&to=2026-12-31T00:00:00Z
+Authorization: Bearer {{token}}
+
+### Aging WIP / Bottleneck:谁卡多久 + 队列宽
+GET {{host}}/api/projects/{{pkey}}/metrics/aging
+Authorization: Bearer {{token}}
+
+### Burndown(sprint;需起止日期)
+GET {{host}}/api/projects/{{pkey}}/metrics/burndown?groupId={{sprintId}}
+Authorization: Bearer {{token}}
+
+### Burnup(sprint;scope 线 YPJ-54 留痕前口径受限,见 definitions)
+GET {{host}}/api/projects/{{pkey}}/metrics/burnup?groupId={{sprintId}}
+Authorization: Bearer {{token}}
+
+### Velocity:各 sprint 完成数(count 口径,非生产力 KPI)
+GET {{host}}/api/projects/{{pkey}}/metrics/velocity
+Authorization: Bearer {{token}}
+
 # ============================================================
 # 负例区:以下请求「红色 = 预期」,演示约束生效,不要当 bug
 # ============================================================
@@ -706,3 +744,20 @@ Content-Type: application/json
 
 ### [预期 409] 非空删除 Release(成员关系即交付历史)
 DELETE {{host}}/api/projects/{{pkey}}/releases/{{releaseId}}
+Authorization: Bearer {{token}}
+
+### [预期 400] metrics:bucket 非法(仅 day|week)
+GET {{host}}/api/projects/{{pkey}}/metrics/throughput?from=2026-09-01T00:00:00Z&to=2026-12-31T00:00:00Z&bucket=month
+Authorization: Bearer {{token}}
+
+### [预期 400] metrics:from 晚于 to
+GET {{host}}/api/projects/{{pkey}}/metrics/flow-times?from=2026-12-31T00:00:00Z&to=2026-09-01T00:00:00Z
+Authorization: Bearer {{token}}
+
+### [预期 404] metrics:未知项目
+GET {{host}}/api/projects/NOPE/metrics/workload
+Authorization: Bearer {{token}}
+
+### [预期 404] metrics:未知 sprint
+GET {{host}}/api/projects/{{pkey}}/metrics/burndown?groupId=00000000-0000-0000-0000-000000000000
+Authorization: Bearer {{token}}

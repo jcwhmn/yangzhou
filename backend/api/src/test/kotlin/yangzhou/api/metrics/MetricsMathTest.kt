@@ -1,0 +1,75 @@
+package yangzhou.api.metrics
+
+import yangzhou.persistence.repository.MetricsHistoryRow
+import java.time.Instant
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
+
+/** 纯计算函数直测(无 Spring;spec 0038 ②)。 */
+class MetricsMathTest {
+
+    private fun row(itemId: Long = 1, from: Long?, to: Long, at: String) =
+        MetricsHistoryRow(itemId = itemId, fromStatusId = from, toStatusId = to, createdAt = Instant.parse(at))
+
+    private val h = listOf(
+        row(from = null, to = 10, at = "2026-01-01T09:00:00Z"), // created → To Do(id=10)
+        row(from = 10, to = 20, at = "2026-01-02T09:00:00Z"),   // 离开 start → In Progress(id=20)
+        row(from = 20, to = 30, at = "2026-01-05T09:00:00Z"),   // → Done(id=30, final)
+        row(from = 30, to = 20, at = "2026-01-06T09:00:00Z"),   // 重开 → In Progress
+        row(from = 20, to = 30, at = "2026-01-09T09:00:00Z"),   // 再完成(不重复计)
+    )
+
+    @Test
+    fun percentile_空表与单点() {
+        assertNull(percentile(emptyList(), 50.0))
+        assertEquals(7.0, percentile(listOf(7.0), 85.0))
+    }
+
+    @Test
+    fun percentile_线性插值() {
+        val sorted = listOf(1.0, 3.0, 20.0)
+        assertEquals(3.0, percentile(sorted, 50.0))
+        assertEquals(14.9, percentile(sorted, 85.0)!!, 1e-9)
+        assertEquals(18.3, percentile(sorted, 95.0)!!, 1e-9)
+    }
+
+    @Test
+    fun 完成时刻_取首次进final_重开不重复计() {
+        assertEquals(Instant.parse("2026-01-05T09:00:00Z"), completionTs(h, setOf(30)))
+        assertNull(completionTs(h, setOf(99)))
+    }
+
+    @Test
+    fun 周期起点_取首次离开start_创建行不计() {
+        assertEquals(Instant.parse("2026-01-02T09:00:00Z"), cycleStartTs(h, setOf(10)))
+        // 从未离开 start:仅创建行
+        val onlyCreated = listOf(row(from = null, to = 10, at = "2026-01-01T09:00:00Z"))
+        assertNull(cycleStartTs(onlyCreated, setOf(10)))
+    }
+
+    @Test
+    fun 状态回放_各时点() {
+        assertNull(statusAt(h, Instant.parse("2026-01-01T08:00:00Z")))
+        assertEquals(10L, statusAt(h, Instant.parse("2026-01-01T12:00:00Z")))
+        assertEquals(20L, statusAt(h, Instant.parse("2026-01-04T00:00:00Z")))
+        assertEquals(30L, statusAt(h, Instant.parse("2026-01-05T12:00:00Z")))
+        assertEquals(20L, statusAt(h, Instant.parse("2026-01-07T00:00:00Z"))) // 重开中
+        assertEquals(30L, statusAt(h, Instant.parse("2026-01-20T00:00:00Z")))
+    }
+
+    @Test
+    fun 周桶起点_周一同界() {
+        assertEquals(java.time.LocalDate.parse("2026-09-21"), weekStartUtc(java.time.LocalDate.parse("2026-09-25")))
+        assertEquals(java.time.LocalDate.parse("2026-10-19"), weekStartUtc(java.time.LocalDate.parse("2026-10-25"))) // 周日
+        assertEquals(java.time.LocalDate.parse("2026-09-28"), weekStartUtc(java.time.LocalDate.parse("2026-09-28"))) // 周一自身
+    }
+
+    @Test
+    fun 天数差_含小数() {
+        val d = daysBetween(Instant.parse("2026-01-01T09:00:00Z"), Instant.parse("2026-01-02T21:00:00Z"))
+        assertEquals(1.5, d, 1e-9)
+        assertTrue(d > 0)
+    }
+}
