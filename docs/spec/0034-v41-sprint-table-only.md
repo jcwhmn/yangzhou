@@ -45,3 +45,9 @@
 3. 表格内 assign 弹层改负责人生效;点编号/标题跳详情。
 4. 项目级看板(`/p/{key}`)不受影响,仍显示 active sprint items。
 5. 空 sprint 页仍显示拉入提示文案。
+## As-built(2026-10-15,PR #104 合入)
+
+- 按设计单文件落地:`web/app/p/[key]/sprint/[id]/page.tsx` 净 -19 行;看板 state/JSX/切换按钮全删,无死代码,`next build` 无 unused 告警。
+- 偏差:无——四条验收全满足;无 E2E 用例断言 sprint 页看板,未改测试。
+- 验证:用户本地全量 Playwright 通过(本票部分);合并前用户 build/debug 通过。
+

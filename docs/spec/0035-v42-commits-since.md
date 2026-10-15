@@ -34,3 +34,11 @@
 1. PM 实例(8081):任一已建分支的 item 详情页 → 提交历史不含分支创建之前的提交(对比 `git log` 分支起始)。
 2. CLI:`yz log <item>` 同上语义。
 3. 未挂仓库/无 PAT 报错行为不变。
+## As-built(2026-10-15,PR #105 合入)
+
+- 按设计落地:Gateway 签名加 `since: Instant?`,RealGithubGateway 拼 `since=<ISO_INSTANT>`,服务侧兜底过滤(`date >= ref.createdAt`,date 为 null 保留);测试 fake 故意不 honor since,专验兜底,并断言 lastSince == ref.createdAt。
+- 会话内追加两处修(非 spec 预见):
+  1. 两处 seed SQL 补 `item_git_ref.created_at` 显式值——兜底过滤依赖该列,存量 fixture 缺列会全滤光;
+  2. `setup()` 复位 `fake.failWith`——JUnit 方法序 ≠ 声明序,前例设的失败桩会污染后例(测试夹具污染模式,同 session 两踩)。
+- 偏差:其余无;CLI/web 零改动透明生效,与设计一致。
+
