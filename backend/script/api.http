@@ -133,8 +133,16 @@ Content-Type: application/json
 ### 成员列表
 GET {{host}}/api/members
 Authorization: Bearer {{token}}
+
 > {%
-    client.global.set("meId", response.body.find(m => m.username === "me").memberId); // 本人入池/自计时用
+    // 兼容性用显式循环(.find 在部分 IDEA JS 引擎不可用);取不到就大声失败,不留哑变量
+    var meFound = null;
+    for (var i = 0; i < response.body.length; i++) {
+        if (response.body[i].username === "me") meFound = response.body[i];
+    }
+    if (!meFound) throw new Error("成员列表里没找到 username=me: " + JSON.stringify(response.body));
+    client.global.set("meId", meFound.memberId); // 本人入池/自计时用
+    client.log("[api.http] meId=" + client.global.get("meId"));
  %}
 
 # ============ 5. 能力 ============
@@ -582,8 +590,11 @@ Content-Type: application/json
 {
   "minutes": null
 }
+
 > {%
+    if (!response.body.timeEntryId) throw new Error("开计时未返回 timeEntryId(查上方请求状态/响应体): " + JSON.stringify(response.body));
     client.global.set("timeEntryId", response.body.timeEntryId);
+    client.log("[api.http] timeEntryId=" + client.global.get("timeEntryId"));
  %}
 
 ### 补录 minutes(与起止互斥;服务端按 now 往回推)
