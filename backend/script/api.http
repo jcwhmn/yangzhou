@@ -381,6 +381,20 @@ Content-Type: application/json
     client.global.set("sprintId", response.body.sprintId);
  %}
 
+### 建 item 直入 Sprint(YPJ-56:创建请求带 sprintId,同事务归入;handler 存 itemIdSprint)
+POST {{host}}/api/projects/{{pkey}}/items
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "建票直入 sprint",
+  "sprintId": "{{sprintId}}"
+}
+
+> {%
+    client.global.set("itemIdSprint", response.body.itemId);
+ %}
+
 ### Sprint 列表
 GET {{host}}/api/projects/{{pkey}}/sprints
 Authorization: Bearer {{token}}
@@ -776,3 +790,45 @@ Authorization: Bearer {{token}}
 ### [预期 404] metrics:未知 sprint
 GET {{host}}/api/projects/{{pkey}}/metrics/burndown?groupId=00000000-0000-0000-0000-000000000000
 Authorization: Bearer {{token}}
+
+### 建 sprint 供负例(YPJ-56;handler 存 completedSprintId)
+POST {{host}}/api/projects/{{pkey}}/sprints
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "负例用 sprint"
+}
+
+> {%
+    client.global.set("completedSprintId", response.body.sprintId);
+ %}
+
+### 上一条 sprint 置 completed(YPJ-56 负例前置)
+PATCH {{host}}/api/projects/{{pkey}}/sprints/{{completedSprintId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "status": "completed"
+}
+
+### [预期 409] 建 item 带 completed sprint(item 不落库,YPJ-56)
+POST {{host}}/api/projects/{{pkey}}/items
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "负例:直入已完成 sprint",
+  "sprintId": "{{completedSprintId}}"
+}
+
+### [预期 404] 建 item 带未知 sprint(item 不落库,YPJ-56)
+POST {{host}}/api/projects/{{pkey}}/items
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "负例:直入不存在的 sprint",
+  "sprintId": "00000000-0000-0000-0000-000000000000"
+}

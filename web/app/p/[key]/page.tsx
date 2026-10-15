@@ -7,6 +7,9 @@ import {
   Card,
   CardContent,
   Chip,
+  Dialog,
+  DialogContent,
+  DialogTitle,
   IconButton,
   Skeleton,
   Stack,
@@ -55,6 +58,8 @@ export default function BoardPage() {
   const [filter, setFilter] = useState<Filter>("all");
   const [activeSprints, setActiveSprints] = useState<SprintLite[]>([]);
   const [sprints, setSprints] = useState<SprintLite[]>([]);
+  const [sprintPickOpen, setSprintPickOpen] = useState(false);
+  const [pendingTitle, setPendingTitle] = useState("");
 
   // V9-Q3:看板 30s 自动刷新(手刷按钮同函数)
   useEffect(() => {
@@ -104,9 +109,21 @@ export default function BoardPage() {
   async function addItem(e: React.FormEvent) {
     e.preventDefault();
     if (!newTitle.trim()) return;
+    if (activeSprints.length > 1) {
+      // YPJ-56:多 active sprint 并存 → UI 选(拍板规则 3)
+      setPendingTitle(newTitle.trim());
+      setSprintPickOpen(true);
+      return;
+    }
+    await createItem(newTitle.trim(), activeSprints[0]?.sprintId);
+  }
+
+  async function createItem(title: string, sprintId?: string) {
+    // YPJ-56:无 active → 不带 sprintId(落 backlog,与看板全量显示自洽);单 active 由调用方带上
     try {
-      await api(`/api/projects/${key}/items`, { method: "POST", body: JSON.stringify({ title: newTitle.trim() }) });
+      await api(`/api/projects/${key}/items`, { method: "POST", body: JSON.stringify({ title, ...(sprintId ? { sprintId } : {}) }) });
       setNewTitle("");
+      setSprintPickOpen(false);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "创建失败");
@@ -356,6 +373,18 @@ export default function BoardPage() {
         </Stack>
       )}
 
+      <Dialog open={sprintPickOpen} onClose={() => setSprintPickOpen(false)}>
+        <DialogTitle>放入哪个 sprint</DialogTitle>
+        <DialogContent>
+          <Stack spacing={1} sx={{ mt: 1 }}>
+            {activeSprints.map((sp) => (
+              <Button key={sp.sprintId} variant="outlined" onClick={() => createItem(pendingTitle, sp.sprintId)}>
+                {sp.name}
+              </Button>
+            ))}
+          </Stack>
+        </DialogContent>
+      </Dialog>
     </Box>
   );
 }

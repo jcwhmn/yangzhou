@@ -1,5 +1,7 @@
 package yangzhou.api.item
 
+import com.fasterxml.jackson.databind.JsonNode
+import org.springframework.test.web.servlet.client.RestTestClient
 import yangzhou.api.AbstractApiTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -240,5 +242,92 @@ class ItemsApiTest : AbstractApiTest() {
         authed.patch().uri("/api/items/${item["itemId"].asText()}")
             .body(mapOf("type" to "not-a-type"))
             .exchange().expectStatus().isBadRequest()
+    }
+
+    // ===== YPJ-56:看板创建归属(spec 0040)=====
+
+    private fun createSprint56(authed: RestTestClient, key: String, name: String): JsonNode =
+        json.readTree(authed.post().uri("/api/projects/$key/sprints")
+            .body(mapOf("name" to name, "startDate" to "2026-10-01", "endDate" to "2026-10-15"))
+            .exchange().expectBody(String::class.java).returnResult().responseBody!!)
+
+    private fun setSprintStatus56(authed: RestTestClient, key: String, sprintId: String, status: String) {
+        authed.patch().uri("/api/projects/$key/sprints/$sprintId").body(mapOf("status" to status)).exchange()
+            .expectBody(String::class.java).returnResult()
+    }
+
+    private fun countItems56(authed: RestTestClient, key: String): Int =
+        json.readTree(authed.get().uri("/api/projects/$key/items").exchange()
+            .expectBody(String::class.java).returnResult().responseBody!!).size()
+
+    private fun createWithSprint56(authed: RestTestClient, key: String, title: String, sprintId: String?) =
+        authed.post().uri("/api/projects/$key/items")
+            .body(mapOf("title" to title, "sprintId" to sprintId)).exchange()
+            .expectBody(String::class.java).returnResult()
+
+    @Test
+    fun `创建带 sprintId 归入 sprint(YPJ-56)`() {
+        val authed = bootstrapAndAuth()
+        createProject(authed, "KBO")
+        val s = createSprint56(authed, "KBO", "S1")
+        val sid = s["sprintId"].asText()
+        setSprintStatus56(authed, "KBO", sid, "active")
+        val r = createWithSprint56(authed, "KBO", "t1", sid)
+        assertEquals(201, r.status.value(), r.responseBody)
+        val itemId = json.readTree(r.responseBody!!)["itemId"].asText()
+        val members = json.readTree(authed.get().uri("/api/projects/KBO/sprints/$sid/items").exchange()
+            .expectBody(String::class.java).returnResult().responseBody!!)
+        assertTrue(members.any { it["itemId"].asText() == itemId })
+        val backlog = json.readTree(authed.get().uri("/api/projects/KBO/backlog").exchange()
+            .expectBody(String::class.java).returnResult().responseBody!!)
+        assertTrue(backlog.none { it["itemId"].asText() == itemId })
+    }
+
+    @Test
+    fun `创建不带 sprintId 落 backlog(YPJ-56)`() {
+        val authed = bootstrapAndAuth()
+        createProject(authed, "KBB")
+        val r = createWithSprint56(authed, "KBB", "t2", null)
+        assertEquals(201, r.status.value(), r.responseBody)
+        val itemId = json.readTree(r.responseBody!!)["itemId"].asText()
+        val backlog = json.readTree(authed.get().uri("/api/projects/KBB/backlog").exchange()
+            .expectBody(String::class.java).returnResult().responseBody!!)
+        assertTrue(backlog.any { it["itemId"].asText() == itemId })
+    }
+
+    @Test
+    fun `创建带 completed sprint 被拒且 item 不落库(YPJ-56)`() {
+        val authed = bootstrapAndAuth()
+        createProject(authed, "KBC")
+        val s = createSprint56(authed, "KBC", "S1")
+        val sid = s["sprintId"].asText()
+        setSprintStatus56(authed, "KBC", sid, "active")
+        setSprintStatus56(authed, "KBC", sid, "completed")
+        val before = countItems56(authed, "KBC")
+        val r = createWithSprint56(authed, "KBC", "t3", sid)
+        assertEquals(409, r.status.value(), r.responseBody)
+        assertEquals(before, countItems56(authed, "KBC"))
+    }
+
+    @Test
+    fun `创建带外项目 sprint 被拒且 item 不落库(YPJ-56)`() {
+        val authed = bootstrapAndAuth()
+        createProject(authed, "KBD")
+        createProject(authed, "KDE")
+        val s = createSprint56(authed, "KDE", "Other")
+        val before = countItems56(authed, "KBD")
+        val r = createWithSprint56(authed, "KBD", "t4", s["sprintId"].asText())
+        assertEquals(404, r.status.value(), r.responseBody)
+        assertEquals(before, countItems56(authed, "KBD"))
+    }
+
+    @Test
+    fun `创建带未知 sprint 被拒且 item 不落库(YPJ-56)`() {
+        val authed = bootstrapAndAuth()
+        createProject(authed, "KBF")
+        val before = countItems56(authed, "KBF")
+        val r = createWithSprint56(authed, "KBF", "t5", "00000000-0000-0000-0000-000000000000")
+        assertEquals(404, r.status.value(), r.responseBody)
+        assertEquals(before, countItems56(authed, "KBF"))
     }
 }

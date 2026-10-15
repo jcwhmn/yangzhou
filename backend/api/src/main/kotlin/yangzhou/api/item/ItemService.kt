@@ -9,10 +9,13 @@ import yangzhou.api.support.ConflictException
 import yangzhou.api.support.NotFoundException
 import yangzhou.persistence.Item
 import yangzhou.persistence.ItemActivity
+import yangzhou.persistence.ItemGroupMember
 import yangzhou.persistence.ItemStatusHistory
 import yangzhou.persistence.Requirement
 import yangzhou.persistence.repository.AttributeDefinitionRepository
 import yangzhou.persistence.repository.ItemGitRefRepository
+import yangzhou.persistence.repository.ItemGroupMemberRepository
+import yangzhou.persistence.repository.ItemGroupRepository
 import yangzhou.persistence.repository.ItemNumberRepository
 import yangzhou.persistence.repository.ItemRepository
 import yangzhou.persistence.repository.ProjectRepository
@@ -41,6 +44,8 @@ class ItemService(
     private val gitRefs: ItemGitRefRepository,
     private val feasibilityService: yangzhou.api.feasibility.FeasibilityService,
     private val dependencyService: yangzhou.api.dependency.DependencyService,
+    private val groups: ItemGroupRepository,
+    private val memberships: ItemGroupMemberRepository,
     private val notificationService: yangzhou.api.notification.NotificationService,
     private val groupRepo: yangzhou.persistence.repository.ItemGroupRepository,
     private val groupMembers: yangzhou.persistence.repository.ItemGroupMemberRepository,
@@ -85,6 +90,7 @@ class ItemService(
         statusItemId: UUID?,
         requirements: List<RequirementDto>,
         externalRef: String? = null,
+        sprintId: UUID? = null,
     ): ItemDto {
         val project = projects.findByKey(projectKey) ?: throw NotFoundException("项目不存在:$projectKey")
         if (type !in setOf("task", "bug", "goal", "story")) throw BadRequestException("type 非法:$type")
@@ -127,6 +133,12 @@ class ItemService(
             ItemStatusHistory(itemId = itemId, toStatusId = status.id!!, source = "created", actorMemberId = memberService.current().id!!),
         )
         feasibilityService.recomputeProjectSignal(projectId) // V9-S1
+        if (sprintId != null) { // YPJ-56:创建时初始归属,校验同 assignItem(sprint 归属该项目;completed 拒);同事务,负例下 item 不落库
+            val sprint = groups.findByProjectIdAndObjectId(projectId, sprintId)
+                ?: throw NotFoundException("sprint 不存在")
+            if (sprint.status == "completed") throw ConflictException("sprint 已完成,不能指派")
+            memberships.save(ItemGroupMember(groupId = sprint.id!!, itemId = itemId))
+        }
         return get(item.objectId)
     }
 
@@ -486,6 +498,7 @@ data class CreateItemRequest(
     val statusItemId: UUID? = null,
     val externalRef: String? = null,
     val requirements: List<RequirementInput> = emptyList(),
+    val sprintId: UUID? = null,
 )
 
 data class AssigneeRequest(val assigneeItemId: UUID? = null)

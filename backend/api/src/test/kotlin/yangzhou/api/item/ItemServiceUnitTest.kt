@@ -85,6 +85,8 @@ class ItemServiceUnitTest {
         gitRefs = mockk(relaxed = true),
         feasibilityService = feasibilityService,
         dependencyService = mockk(relaxed = true),
+        groups = groupRepo,
+        memberships = groupMembers,
         notificationService = notificationService,
         groupRepo = groupRepo,
         groupMembers = groupMembers,
