@@ -64,3 +64,17 @@
 6. burndown/burnup:对 YPJ 当前 active sprint,total = 该 sprint 成员数;actual 尾点 = total − 已完成数。
 7. velocity:YPJ 历史有日期 sprint 各计数;无日期组不出现。
 8. 全部响应可见 definitions 中文口径;burnup scope 口径含「离组不可回填」字样。
+
+## As-built(2026-10-15,PR #108 合入)
+
+- **8 端点如期交付**,形态与 spec 一致:`MetricsController`(方法级 `@GetMapping`,类级只扛 `/api`)+ `MetricsService`(纯函数 + `Clock` 注入,`config/ClockConfig.kt` 提供 bean)+ `MetricsRepository`(`@Query` 聚合 SQL + 行投影 DTO,同 `repositories.kt`);测试 `MetricsMathTest` 8 例(单元)+ `MetricsApiTest` 10 例(集成黑盒)。
+- **实现期修正(写进本节作范本)**:
+  1. **SD JDBC `@Query` DTO 投影**:构造参数按命名策略 **snake_case** 匹配列,SQL 别名写成引号驼峰(`AS "itemId"`)会**静默脱靶得 null**——别名一律 snake_case;
+  2. **纯查询 Repository 必须继承 `Repository<T, ID>` 标记接口**才被扫描注册,裸接口不生成 bean;
+  3. **start 锚点 = `status.is_start` 显式列**(V3 起,默认 workflow 的 To Do),不做 position 推导(0037 表述已同步修正)。
+- **api.http 主链三修**(多轮实证,横幅坑由用户定位):
+  1. 单 `#` 行横幅在请求体后会被 IDEA http client 解析为上一请求的**延续**,吞掉紧随的请求——16 条横幅统一 `###`,`#` 仅限文件头注释区;
+  2. meId 不写 JS 捕获——`TokenResponse` 自带 `memberId`,登录 handler 直取(旧引擎下箭头函数会静默语法死且无报错);
+  3. 调试期删除的取消指派用例已恢复;8081 全链复现通过(开计时 201+回填、停止计时 200)。
+- 偏差:无。可选参数走 `(:groupId IS NULL OR …)` 单方法;velocity `type` 缺省全类型,与 spec 一致。
+- 验证:单测 ✅、全量 integrationTest ✅、`build --no-daemon` ✅、bootRun 冒烟 ✅、8081 手测第 ③ 节用例通过(SMK* 冒烟项目残留为已知取舍)。
