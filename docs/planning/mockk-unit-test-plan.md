@@ -12,9 +12,9 @@
 
 ## P0 基建(一次性,挂 YPJ-43)
 
-- [ ] `api/build.gradle.kts` 加 `testImplementation("io.mockk:mockk")`
-- [ ] 首个样板:ItemService 主路径(直实例化 + 协作者 mockk;放 `src/test/kotlin/yangzhou/api/item/`)
-- [ ] 确认单测任务名不变(`gradle test` 即 CI 冒烟)
+- [x] `api/build.gradle.kts` 加 `testImplementation("io.mockk:mockk")`(2026-10-15,1.13.13)
+- [x] 首个样板:ItemService **全方法**单测(用户定案:nested inner class 按方法分组;`src/test/kotlin/yangzhou/api/item/`)(2026-10-15,`ItemServiceUnitTest`,11 方法 38 例:@Nested Create/ListItems/Get/Update/ReplaceRequirements/Assign/Delete/Restore/Purge/RecycleBin/Activity)
+- [x] 确认单测任务名不变(`gradle test` 即 CI 冒烟)
 
 ## 阶段清点(30 个;节奏供 triage 参考,执行随 43 滚动)
 
@@ -65,6 +65,7 @@
 - 覆盖:主路径 1 条 + 关键业务抛错分支(BadRequest/Conflict/NotFound)+ 时间行为(Clock.fixed);
 - 不覆盖:透传 DTO 组装、getter 链;controller 层不测(mock)。
 - 收尾机制:每实现票收尾顺手带 1–2 个 service;sprint 收口清点本清单。
+- P0 实证坑(样板约定沿用):①relaxed mock 对泛型 `save(entity: S): S` 返回 Object 强转炸——save 类 stub 一律 `answers { firstArg() }`;②`every { repo.findByX(uuid) }` 里现造 UUID 与调用时不同实例,匹配器用 `any()`;③service 内部 `get()` 复用 `list()` 查询链,stub 要覆盖到(repo.findByProjectId… 返回该 item),否则走软删分支标记「[已删除]」;④service 构造实体的 objectId 是**新随机 UUID**(data class 默认值)——repo.save 桩不能直接回传实参顶掉行身份,须 `arg.copy(id=行id, objectId=行objectId)`,否则后续按 objectId 的查询桩不匹配,relaxed 返回子 mock(projectId=0)引发诡异 NPE/NotFound;
 
 ## 与既有票的关系
 

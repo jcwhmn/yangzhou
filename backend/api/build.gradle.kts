@@ -26,6 +26,7 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation(kotlin("test"))
     testImplementation("org.testcontainers:postgresql:1.21.3")
+    testImplementation("io.mockk:mockk:1.13.13") // YPJ-43:service 单测(mockk 计划 P0)
 }
 
 tasks.withType<Test> {
