@@ -133,6 +133,9 @@ Content-Type: application/json
 ### 成员列表
 GET {{host}}/api/members
 Authorization: Bearer {{token}}
+> {%
+    client.global.set("meId", response.body.find(m => m.username === "me").memberId); // 本人入池/自计时用
+ %}
 
 # ============ 5. 能力 ============
 
@@ -186,7 +189,7 @@ Authorization: Bearer {{token}}
 
 # ============ 6. 项目成员池(V3.5-B) ============
 # 池语义:无行 = 全 workspace 可用;有行 = 仅池内可指派/进候选。
-# 主链只演示正常路径:加小李 + 加小王 → 列出 → 移出小王 → 池内剩小李。
+# 主链只演示正常路径:加小李 + 加小王 → 列出 → 移出小王 → 加我入池(13 区工时按本人计时)→ 池内剩小李、我。
 # 想体验「无池兼容」:跳过本区直接跑第 8 区。
 
 ### 加入池:小李
@@ -214,6 +217,15 @@ Authorization: Bearer {{token}}
 ### 移出池:小王 → 204
 DELETE {{host}}/api/projects/{{pkey}}/members/{{memberId2}}
 Authorization: Bearer {{token}}
+
+### 加入池:我(13 区开计时/停计时按当前登录人,须在池内)
+POST {{host}}/api/projects/{{pkey}}/members
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "memberId": "{{meId}}"
+}
 
 # ============ 7. Item ============
 
