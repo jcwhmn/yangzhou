@@ -47,3 +47,14 @@
 1. `gradle build --no-daemon` 绿(含集成测试)。
 2. bootRun 起后 api.http 从「登录」整链重跑:抽查 milestone / release / dashboard 各 1 端点 200(被更名文件的切片)。
 3. Scalar 页端点总数不变,响应形状不变。
+
+## As-built(2026-10-16,PR #109 合入)
+
+- **10 处全拆**:Controller 类移入同包新文件,DTO/Request/Response 留 Service 文件;dashboard/milestone/release 原文件以 Controller 命名,`git mv` 更名(文件名与主类一致);imports 按引用收敛(简单名 `` 检查,通配 import 保留)。
+- **实现期修正(记坑)**:
+  1. 票面验收复扫命令 `grep -rl @RestController | xargs grep -l "class \w*Service"` 会命中 `backend/api/bin/` 下 IDE 编译产物残留(6 个,git ignore 中)——**验收口径以 src 为准**;
+  2. 脚本化拆分两次把新文件写到包根(输出路径丢切片子目录)、一次产生双 package 行——均被编译期暴露;多类同文件的块边界 = 类行向上吸收注解/KDoc、向下至下一顶层声明,类间夹的 DTO 随 Service 走;
+  3. 拆分属机械变更但**编译验证不可省**:错位/重复声明全是编译期抓住的,零运行期症状。
+- 偏差:无(端点契约、OpenAPI 形状、api.http、entities.puml 均未动)。
+- 验证:复扫 src 口径 = 0;`gradle build` 绿 + `integrationTest` 绿;bootRun 临时端口冒烟通过;api.http 整链抽查于 8081 build/debug 环节完成。
+- 同分支顺带:AGENTS.md 分支命名对齐 spec 0036 v2(`cwjiang/` 前缀废弃,用户纠正)。
