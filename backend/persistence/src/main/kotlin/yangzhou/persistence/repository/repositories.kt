@@ -1,6 +1,8 @@
 package yangzhou.persistence.repository
 
+import org.springframework.data.jdbc.repository.query.Query
 import org.springframework.data.repository.CrudRepository
+import org.springframework.data.repository.Repository
 import yangzhou.persistence.AttributeDefinition
 import yangzhou.persistence.Capability
 import yangzhou.persistence.Comment
@@ -28,6 +30,8 @@ import yangzhou.persistence.TeamMember
 import yangzhou.persistence.StatusTransition
 import yangzhou.persistence.Workspace
 import java.util.UUID
+import java.time.Instant
+import java.time.LocalDate
 
 interface WorkspaceRepository : CrudRepository<Workspace, Long>
 
@@ -190,3 +194,111 @@ interface MilestoneRepository : CrudRepository<Milestone, Long> {
     fun findByProjectIdAndObjectId(projectId: Long, objectId: UUID): Milestone?
     fun findByProjectIdAndStatus(projectId: Long, status: String): List<Milestone>
 }
+
+// ---------- YPJ-45 Flow Metrics 只读聚合(spec 0037/0038)----------
+// Spring Data JDBC @Query 自定义查询(ADR-0004 唯一授权的持久层扩展点);
+// 列别名 snake_case(经命名策略映射到 DTO 驼峰属性,实测引号驼峰脱靶);出参一律公共 id(UUID)。
+
+interface MetricsRepository : Repository<Status, Long> {
+    @Query(
+        """SELECT s.id AS status_id, s.object_id AS status_object_id, s.name,
+            s.is_final, s.is_start, s.position
+            FROM status s JOIN project p ON p.id = s.project_id
+            WHERE p.key = :key ORDER BY s.position""",
+    )
+    fun statuses(key: String): List<MetricsStatusRow>
+
+    @Query(
+        """SELECT i.id AS item_id, i.object_id AS item_object_id, i.number,
+            i.title, i.type, i.status_object_id,
+            i.assignee_object_id, i.created_at
+            FROM item i JOIN project p ON p.id = i.project_id
+            WHERE p.key = :key AND i.deleted_at IS NULL""",
+    )
+    fun items(key: String): List<MetricsItemRow>
+
+    @Query(
+        """SELECT h.item_id, h.from_status_id,
+            h.to_status_id, h.created_at
+            FROM item_status_history h
+            JOIN item i ON i.id = h.item_id JOIN project p ON p.id = i.project_id
+            WHERE p.key = :key ORDER BY h.item_id, h.created_at""",
+    )
+    fun history(key: String): List<MetricsHistoryRow>
+
+    @Query(
+        """SELECT DISTINCT m.id AS member_id, m.object_id AS member_object_id, m.display_name
+            FROM member m
+            JOIN item i ON i.assignee_object_id = m.object_id
+            JOIN project p ON p.id = i.project_id
+            WHERE p.key = :key AND i.deleted_at IS NULL""",
+    )
+    fun assignees(key: String): List<MetricsMemberRow>
+
+    @Query(
+        """SELECT g.id AS group_id, g.object_id AS group_object_id, g.type, g.name,
+            g.status, g.start_date, g.end_date, g.created_at
+            FROM item_group g JOIN project p ON p.id = g.project_id
+            WHERE p.key = :key AND (:type IS NULL OR g.type = :type)
+            ORDER BY g.start_date NULLS LAST, g.id""",
+    )
+    fun groups(key: String, type: String?): List<MetricsGroupRow>
+
+    @Query(
+        """SELECT gm.group_id, gm.item_id, gm.created_at
+            FROM item_group_member gm
+            JOIN item_group g ON g.id = gm.group_id JOIN project p ON p.id = g.project_id
+            WHERE p.key = :key""",
+    )
+    fun groupMembers(key: String): List<MetricsGroupMemberRow>
+}
+
+data class MetricsStatusRow(
+    val statusId: Long,
+    val statusObjectId: UUID,
+    val name: String,
+    val isFinal: Boolean,
+    val isStart: Boolean,
+    val position: Int,
+)
+
+data class MetricsItemRow(
+    val itemId: Long,
+    val itemObjectId: UUID,
+    val number: Int,
+    val title: String,
+    val type: String,
+    val statusObjectId: UUID,
+    val assigneeObjectId: UUID?,
+    val createdAt: Instant,
+)
+
+data class MetricsHistoryRow(
+    val itemId: Long,
+    val fromStatusId: Long?,
+    val toStatusId: Long,
+    val createdAt: Instant,
+)
+
+data class MetricsMemberRow(
+    val memberId: Long,
+    val memberObjectId: UUID,
+    val displayName: String,
+)
+
+data class MetricsGroupRow(
+    val groupId: Long,
+    val groupObjectId: UUID,
+    val type: String,
+    val name: String,
+    val status: String,
+    val startDate: LocalDate?,
+    val endDate: LocalDate?,
+    val createdAt: Instant,
+)
+
+data class MetricsGroupMemberRow(
+    val groupId: Long,
+    val itemId: Long,
+    val createdAt: Instant,
+)
