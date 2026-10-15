@@ -1,10 +1,6 @@
 package yangzhou.api.candidate
 
 import org.springframework.stereotype.Service
-import org.springframework.web.bind.annotation.GetMapping
-import org.springframework.web.bind.annotation.PathVariable
-import org.springframework.web.bind.annotation.RequestMapping
-import org.springframework.web.bind.annotation.RestController
 import yangzhou.api.feasibility.FeasibilityService
 import yangzhou.api.member.MemberService
 import yangzhou.api.support.NotFoundException
@@ -81,12 +77,4 @@ class CandidateService(
         is Verdict.Unrated -> VerdictDto("unrated", attribute.name, null, required, null)
         is Verdict.Missing -> VerdictDto("missing", attribute.name)
     }
-}
-
-@RestController
-@RequestMapping("/api")
-class CandidateController(private val service: CandidateService) {
-
-    @GetMapping("/items/{itemId}/candidates")
-    fun candidates(@PathVariable itemId: UUID): List<CandidateService.CandidateDto> = service.candidates(itemId)
 }
