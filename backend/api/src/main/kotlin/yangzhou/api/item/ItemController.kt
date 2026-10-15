@@ -36,6 +36,7 @@ class ItemController(
         parentItemId = request.parentItemId,
         statusItemId = request.statusItemId,
         externalRef = request.externalRef,
+        sprintId = request.sprintId,
         requirements = request.requirements.map { ItemService.RequirementDto(it.attribute.trim(), it.minLevel) },
     )
 
