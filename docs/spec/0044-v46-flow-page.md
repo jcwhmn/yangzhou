@@ -67,3 +67,15 @@ Flow Metrics 端点(M1–M12 + workload/cfd/aging/burndown/burnup)全部就绪,�
 6. active sprint 的详情页:burndown 实线 + 理想虚线;无 active sprint 时 Flow 页 burnup 卡显示占位文案。
 7. 空/新项目:Flow 页各卡空态文案,不白屏。
 8. 回归:overview 数字与 Flow 图口径一致(如 wip 计数);smoke e2e 绿。
+
+## As-built(2026-10-16,PR #114 合入)
+
+- **按票交付**:Flow 页七卡(WIP 堆叠条形/throughput/cycle-lead 散点+cycle p50/p85 参考线/CFD 堆叠条形/aging 表+queueWidth caption/velocity 近8/burnup 双线,无 active sprint 占位);sprint 详情 burndown;侧栏 Flow 入口;@mui/x-charts@9;workload 微扩 AssigneeCountDto.byStatus + 集成用例(MetricsApiTest 16 例)。
+- **偏差(2 处)**:①CFD 用 BarChart stacked(x-charts 无原生 StackedArea,与 spec 裁决一致);②散点只画 cycle 水平参考线,lead 百分位走 caption。**理想线没手算**——burndown 后端本就返回 ideal/actual 双线,直接消费(spec §4 的前端插值方案作废)。
+- **实现期记坑(3 条)**:
+  1. **窗口日期须完整 ISO Instant**:date-only(`2026-10-16`)被 `MetricsService.parseInstant` 400 → `Promise.all` 整体 reject → `.catch` 静默吞掉 → 七卡全空态。e2e 只断言卡片标题拦不住(空态也显示标题)。修复:发完整 instant + 失败 `console.error` + e2e 补数据态断言(图例状态名 + svg)。
+  2. **Jackson3 `JsonNode` 自带 `map` 遮蔽 Kotlin stdlib `Iterable.map`**(取 `values().map`,详见 0043 同源坑)。
+  3. x-charts v9 适配:`ReferenceLine` 在 `@mui/x-charts/ChartsReferenceLine` 且无 `strokeDasharray`;legend slotProps 无 `hidden`。
+- 测试断言细节:e2e 卡片标题断言一律 `.first()`(图例文案与标题重复触发 strict mode)。
+- 验证:`gradle build` + 全量 integrationTest 绿;`tsc`/`next build` 绿;全量 e2e 两趟通过;手工用例 §三 用户通过(数据准确性暂不 verify,票面验收以容器/图形可见为准);ijhttp api.http 全过(8080)。
+- 插曲:commit 时 `git add -A` 误扫仓库散落的 `audit-report.md`/`audit-screenshots/`(既有未跟踪审计遗留),已从提交剔除,文件仍在工作区,处置归用户。
