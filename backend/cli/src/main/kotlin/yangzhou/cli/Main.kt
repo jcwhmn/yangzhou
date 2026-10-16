@@ -34,7 +34,7 @@ private fun usage() {
           teams add <组名> / teams list                建组/列组(纯分组,视图过滤)
           attrs list [--json]                        词表列表
           projects create <KEY> [名称]                 建项目(自动带三态 workflow)
-          projects delete <KEY> [--force]              删项目(默认预览计数,--force 物理删)
+          projects delete <KEY>... [--force]           删项目(可多 KEY;默认预览计数,--force 物理删)
           projects list [--json]                       项目列表
           items create <KEY> <标题> [--req 属性[>=N]]... [--json]   建 item(需求可分级)
           items list <KEY> [--json]                    项目 item 列表
@@ -280,19 +280,28 @@ private fun run(args: List<String>) {
             }
         }
         "projects delete" -> {
-            val key = rest.getOrNull(0) ?: error("缺少项目 KEY")
-            if ("force" !in flags) {
-                val p = api.json("GET", "/api/projects/$key/deletion-preview")
-                println(
-                    "将物理删除项目 ${p["key"].asString()}(${p["name"].asString()}):" +
-                        "item ${p["itemCount"].asInt()}、sprint/release ${p["groupCount"].asInt()}、里程碑 ${p["milestoneCount"].asInt()}、" +
-                        "视图 ${p["viewCount"].asInt()}、状态 ${p["statusCount"].asInt()}、成员关系 ${p["memberCount"].asInt()}",
-                )
-                println("未执行;确认无误加 --force")
-            } else {
-                api.json("DELETE", "/api/projects/$key")
-                println("已删除:$key")
+            val keys = rest.ifEmpty { error("缺少项目 KEY(可多个)") }
+            var failed = 0
+            for (key in keys) {
+                try {
+                    if ("force" in flags) {
+                        api.json("DELETE", "/api/projects/$key")
+                        println("已删除:$key")
+                    } else {
+                        val p = api.json("GET", "/api/projects/$key/deletion-preview")
+                        println(
+                            "将物理删除项目 ${p["key"].asString()}(${p["name"].asString()}):" +
+                                "item ${p["itemCount"].asInt()}、sprint/release ${p["groupCount"].asInt()}、里程碑 ${p["milestoneCount"].asInt()}、" +
+                                "视图 ${p["viewCount"].asInt()}、状态 ${p["statusCount"].asInt()}、成员关系 ${p["memberCount"].asInt()}",
+                        )
+                    }
+                } catch (e: IllegalStateException) {
+                    failed++
+                    println("失败:$key → ${e.message}")
+                }
             }
+            if ("force" !in flags) println("未执行;确认无误加 --force")
+            if (failed > 0) error("$failed/${keys.size} 个项目失败")
         }
 
         "items create" -> {
