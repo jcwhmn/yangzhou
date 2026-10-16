@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import {
+  Chip,
   InputAdornment,
   IconButton,
   Menu,
@@ -16,7 +17,7 @@ import CheckIcon from "@mui/icons-material/Check";
 
 // 统一选择控件(spec 0018 / YPJ-18):替代 MUI Select / TextField-select。
 // e2e 硬约束:触发器 role=combobox、弹层 listbox、选项 option——openSelect/selectOption 依赖此角色链。
-export type DropdownOption = { value: string; label: string; disabled?: boolean };
+export type DropdownOption = { value: string; label: string; disabled?: boolean; chip?: { label: string; color: "primary" | "warning" | "default" } };
 
 export function Dropdown({
   label,
@@ -123,6 +124,7 @@ export function Dropdown({
             }}
           >
             {o.label}
+            {o.chip && <Chip size="small" label={o.chip.label} color={o.chip.color} variant="outlined" sx={{ ml: 1 }} />}
             {o.value === value && <CheckIcon fontSize="small" sx={{ ml: 1 }} />}
           </MenuItem>
         ))}

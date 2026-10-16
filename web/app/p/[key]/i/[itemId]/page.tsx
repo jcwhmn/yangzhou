@@ -480,7 +480,16 @@ export default function ItemDetailPage() {
           clearable
           options={sprints
             .filter((s) => s.status !== "completed" || s.sprintId === item.sprintId)
-            .map((s) => ({ value: s.sprintId, label: s.name, disabled: s.status === "completed" }))}
+            .sort((a, b) => ["active", "planned", "completed"].indexOf(a.status) - ["active", "planned", "completed"].indexOf(b.status))
+            .map((s) => ({
+              value: s.sprintId,
+              label: s.name,
+              disabled: s.status === "completed",
+              chip: {
+                label: t.projectNav.sprintStatus[s.status as keyof typeof t.projectNav.sprintStatus],
+                color: s.status === "active" ? "primary" : s.status === "planned" ? "warning" : "default",
+              },
+            }))}
         />
           {item.sprintId && (
             <Link href={`/p/${key}/sprint/${item.sprintId}`} style={{ textDecoration: "none", alignSelf: "center" }}>
