@@ -23,8 +23,6 @@ class NotificationApiTest : AbstractApiTest() {
     @Autowired
     lateinit var syncService: GithubSyncService
 
-    @Autowired
-    lateinit var jdbc: JdbcTemplate
 
     @Test
     fun `状态变更通知——人工操作排除操作者,收件人落库`() {

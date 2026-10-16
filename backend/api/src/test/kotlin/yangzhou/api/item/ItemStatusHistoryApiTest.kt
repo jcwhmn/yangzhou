@@ -24,8 +24,6 @@ class ItemStatusHistoryApiTest : AbstractApiTest() {
     @Autowired
     lateinit var syncService: GithubSyncService
 
-    @Autowired
-    lateinit var jdbc: JdbcTemplate
 
     private lateinit var authed: RestTestClient
 

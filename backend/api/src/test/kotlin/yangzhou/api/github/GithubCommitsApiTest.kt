@@ -45,8 +45,6 @@ class GithubCommitsApiTest : AbstractApiTest() {
     @Autowired
     lateinit var fake: FakeCommitGateway
 
-    @Autowired
-    lateinit var jdbc: JdbcTemplate
 
     private lateinit var authed: RestTestClient
 

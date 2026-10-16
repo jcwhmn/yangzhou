@@ -1,6 +1,7 @@
 package yangzhou.api.project
 
 import jakarta.validation.Valid
+import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
@@ -28,6 +29,15 @@ class ProjectController(
 
     @GetMapping("/projects/{key}")
     fun get(@PathVariable key: String): ProjectService.ProjectDto = service.get(key)
+
+    @GetMapping("/projects/{key}/deletion-preview")
+    fun deletionPreview(@PathVariable key: String): ProjectService.DeletionPreviewDto =
+        service.deletionPreview(key)
+
+    /** YPJ-60:物理删除项目及从属数据;防护在 CLI 层(dry-run 默认,--force 才调)。 */
+    @DeleteMapping("/projects/{key}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun delete(@PathVariable key: String) = service.delete(key)
 
     @GetMapping("/projects/{key}/gantt")
     fun gantt(@PathVariable key: String): ProjectService.GanttDto = service.gantt(key)

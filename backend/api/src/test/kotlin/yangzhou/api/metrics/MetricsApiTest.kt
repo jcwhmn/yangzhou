@@ -27,8 +27,6 @@ import kotlin.test.assertTrue
  */
 class MetricsApiTest : AbstractApiTest() {
 
-    @Autowired
-    lateinit var jdbc: JdbcTemplate
 
     private lateinit var authed: RestTestClient
     private lateinit var status: Map<String, String> // 状态名 → objectId

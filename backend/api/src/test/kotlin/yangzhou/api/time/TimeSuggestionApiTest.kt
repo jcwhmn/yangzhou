@@ -44,8 +44,6 @@ class TimeSuggestionApiTest : AbstractApiTest() {
     @Autowired
     lateinit var fake: FakeSuggestGateway
 
-    @Autowired
-    lateinit var jdbc: JdbcTemplate
 
     private lateinit var authed: RestTestClient
 

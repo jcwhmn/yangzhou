@@ -59,10 +59,12 @@ interface TeamMemberRepository : CrudRepository<TeamMember, Long> {
 interface ItemActivityRepository : CrudRepository<ItemActivity, Long> {
     fun findByItemIdOrderByCreatedAtDesc(item_id: Long): List<ItemActivity>
     fun findByKindAndCreatedAtBetween(kind: String, start: java.time.Instant, end: java.time.Instant): List<ItemActivity>
+    fun countByActorMemberId(actorMemberId: Long?): Long
 }
 
 interface ItemStatusHistoryRepository : CrudRepository<ItemStatusHistory, Long> {
     fun findByItemIdOrderByCreatedAtAsc(item_id: Long): List<ItemStatusHistory>
+    fun countByActorMemberId(actorMemberId: Long?): Long
 }
 
 interface AttributeDefinitionRepository : CrudRepository<AttributeDefinition, Long> {
@@ -95,6 +97,7 @@ interface CommentRepository : CrudRepository<Comment, Long> {
     fun findByItemIdOrderByCreatedAtDesc(itemId: Long): List<Comment>
     fun findByItemId(itemId: Long): List<Comment>
     fun findByObjectId(objectId: UUID): Comment?
+    fun countByAuthorMemberId(authorMemberId: Long): Long
 }
 
 interface StatusRepository : CrudRepository<Status, Long> {
@@ -142,6 +145,7 @@ interface NotificationRepository : CrudRepository<Notification, Long> {
     fun findByRecipientMemberId(recipientMemberId: Long): List<Notification>
     fun findByObjectId(objectId: UUID): Notification?
     fun countByRecipientMemberIdAndReadAtIsNull(recipientMemberId: Long): Long
+    fun countByActorMemberId(actorMemberId: Long?): Long
 }
 
 interface TimeEntryRepository : CrudRepository<TimeEntry, Long> {
@@ -149,6 +153,7 @@ interface TimeEntryRepository : CrudRepository<TimeEntry, Long> {
     fun findByMemberIdAndEndedAtIsNull(memberId: Long): List<TimeEntry>
     fun findByItemIdIn(itemIds: Collection<Long>): List<TimeEntry>
     fun findByObjectId(objectId: UUID): TimeEntry?
+    fun countByMemberId(memberId: Long): Long
 }
 
 interface ChecklistItemRepository : CrudRepository<ChecklistItem, Long> {
@@ -324,4 +329,5 @@ interface ProjectViewRepository : CrudRepository<ProjectView, Long> {
     fun findByProjectIdAndCreatorIdOrderByCreatedAt(projectId: Long, creatorId: Long): List<ProjectView>
     fun findByObjectIdAndCreatorId(objectId: UUID, creatorId: Long): ProjectView?
     fun existsByProjectIdAndCreatorIdAndName(projectId: Long, creatorId: Long, name: String): Boolean
+    fun countByCreatorId(creatorId: Long): Long
 }

@@ -40,7 +40,7 @@ abstract class AbstractApiTest {
     protected var port: Int = 0
 
     @Autowired
-    private lateinit var jdbc: JdbcTemplate
+    protected lateinit var jdbc: JdbcTemplate
 
     // Boot 4 = Jackson 3(tools.jackson);测试自读响应用独立的 Jackson 2 mapper,不依赖容器
     protected val json: ObjectMapper = ObjectMapper()
