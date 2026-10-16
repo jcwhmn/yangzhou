@@ -144,6 +144,9 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
           <ListItemButton component={Link} href={`/p/${key}/overview`} selected={pathname === `/p/${key}/overview`} sx={itemSx}>
             <ListItemText primary={t.projectNav.overview} />
           </ListItemButton>
+          <ListItemButton component={Link} href={`/p/${key}/flow`} selected={pathname === `/p/${key}/flow`} sx={itemSx}>
+            <ListItemText primary={t.projectNav.flow} />
+          </ListItemButton>
           <ListItemButton component={Link} href={`/p/${key}`} selected={pathname === `/p/${key}`} sx={itemSx}>
             <ListItemText primary={t.projectNav.board} />
           </ListItemButton>
