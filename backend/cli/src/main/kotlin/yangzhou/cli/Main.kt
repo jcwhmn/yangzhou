@@ -25,7 +25,7 @@ private fun usage() {
         yz — yangzhou 命令行
         用法:yz <命令> [参数] [选项]
 
-          login [-u 用户名] [-p 密码] [--server URL]      登录(默认 8080;全新服务器自动 bootstrap)
+          login [-u 用户名] [-p 密码] [--server URL]      登录(默认 8080;PM 日常实例用 http://localhost:8081)
           attrs create <属性> [--kind skill|label|category] [--leveled] [--parent <分类>]  建词表属性
           members add <显示名>                         建虚拟成员(无凭据,不登录)
           members list [--json]                        成员目录(含我与虚拟)
@@ -222,7 +222,14 @@ private fun run(args: List<String>) {
             val server = (flags["server"] ?: "http://localhost:8080").trimEnd('/')
             val user = flags["u"] ?: error("缺少 -u")
             val pass = flags["p"] ?: error("缺少 -p")
-            ApiClient.login(server, user, pass).let { println("已登录:$server") }
+            val client = ApiClient.login(server, user, pass)
+            println("已登录:$server")
+            // YPJ-58 实例定位防护:回显项目 key;无 YPJ 打警告(test 实例误登当场可见)
+            val keys = client.json("GET", "/api/projects").values().map { it["key"].asString() }
+            println("实例项目:" + keys.joinToString("、"))
+            if ("YPJ" !in keys) {
+                println("⚠ 该实例没有 YPJ 项目;若要操作 PM 数据,重登:yz login --server http://localhost:8081 -u <用户名> -p <密码>")
+            }
         }
 
         "attrs create" -> {

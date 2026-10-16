@@ -87,7 +87,7 @@ class ApiClient private constructor(
         val response = request(method, path, body)
         if (response.statusCode() !in 200..299) {
             val msg = runCatching { mapper.readTree(response.body())["message"].asString() }.getOrElse { response.body().take(200) }
-            error("[$method $path] ${response.statusCode()}:$msg")
+            error("[$method $path] ${response.statusCode()}:$msg(server=${requireSession().server})")
         }
         return mapper.readTree(response.body())
     }
