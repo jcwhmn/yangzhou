@@ -47,3 +47,9 @@ Item 详情页把 item 归入 sprint(与 `PUT /api/items/{itemId}/sprint` 同语
 3. 选定/清空行为照旧;「sprintName ↗」链接照旧。
 4. 优先级/release 下拉无 chip(通用能力未被误扩散)。
 5. 回归:`npx playwright test --grep "@smoke"` 绿。
+
+## As-built(2026-10-16,PR #112 合入)
+
+- **按票交付**:DropdownOption 可选 chip(MenuItem 内 outlined 小 chip,CheckIcon 前);sprint 下拉排序 active→planned→completed + 状态 chip(文案 `t.projectNav.sprintStatus`,key 断言 `as keyof typeof`);completed 过滤/当前归属禁用/clearable 语义原样。偏差:`chip` 补了实现选型 `variant="outlined"`(spec 未定 variant,选 outlined 避免实底色喧宾)。
+- **实现期记坑**:filter 返回新数组,`.sort()` 原地排序不污染组件 state(顺序副作用收敛在一次渲染的 options 构造内);`sprintStatus` 索引需显式 keyof 断言(SprintLite.status 是 string)。
+- 验证:`tsc --noEmit` 干净(e2e/release.spec.ts 3 处存量类型错,stash 对照确认与本次无关);全量 E2E + 手工用例(spec §三)用户执行通过;PR #112。
