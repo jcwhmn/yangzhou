@@ -677,6 +677,12 @@ Authorization: Bearer {{token}}
 
 ### Velocity:各 sprint 完成数(count 口径,非生产力 KPI)
 GET {{host}}/api/projects/{{pkey}}/metrics/velocity
+
+### scope-change(YPJ-54)
+GET {{host}}/api/projects/{{pkey}}/metrics/scope-change?groupId={{sprintId}}
+
+### reopen-rate(YPJ-54)
+GET {{host}}/api/projects/{{pkey}}/metrics/reopen-rate?from=2026-09-01T00:00:00Z&to=2026-12-31T00:00:00Z
 Authorization: Bearer {{token}}
 
 ### ============================================================
@@ -789,6 +795,12 @@ Authorization: Bearer {{token}}
 
 ### [预期 404] metrics:未知 sprint
 GET {{host}}/api/projects/{{pkey}}/metrics/burndown?groupId=00000000-0000-0000-0000-000000000000
+
+### [预期 404] metrics:scope-change 组不存在(YPJ-54)
+GET {{host}}/api/projects/{{pkey}}/metrics/scope-change?groupId=00000000-0000-0000-0000-000000000000
+
+### [预期 400] metrics:reopen-rate from > to(YPJ-54)
+GET {{host}}/api/projects/{{pkey}}/metrics/reopen-rate?from=2026-12-31T00:00:00Z&to=2026-09-01T00:00:00Z
 Authorization: Bearer {{token}}
 
 ### 建 sprint 供负例(YPJ-56;handler 存 completedSprintId)

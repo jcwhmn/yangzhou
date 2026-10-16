@@ -74,11 +74,9 @@ class MetricsApiTest : AbstractApiTest() {
             jdbc.update("update item set status_object_id = ?::uuid where id = ?", status[currentStatus]!!, iid)
         }
         if (sprintId != null && joinedAt != null) {
-            jdbc.update(
-                "update item_group_member set created_at = ?::timestamptz where item_id = ? " +
-                    "and group_id = (select id from item_group where object_id = ?::uuid)",
-                joinedAt, iid, sprintId,
-            )
+            val gid = jdbc.queryForObject("select id from item_group where object_id = ?::uuid", Long::class.java, sprintId)
+            jdbc.update("update item_group_member set created_at = ?::timestamptz where item_id = ? and group_id = ?", joinedAt, iid, gid)
+            jdbc.update("update item_group_member_history set added_at = ?::timestamptz where item_id = ? and group_id = ?", joinedAt, iid, gid)
         }
         return itemId
     }
@@ -267,5 +265,86 @@ class MetricsApiTest : AbstractApiTest() {
             .exchange().expectStatus().isBadRequest() // 窗口上限 365 天
         authed.get().uri("/api/projects/MTR/metrics/burndown?groupId=${UUID.randomUUID()}")
             .exchange().expectStatus().isNotFound()
+    }
+
+    // ---------- YPJ-54:留痕与 scope/reopen ----------
+
+    @Test
+    fun assignItem_全程留痕() {
+        setupProject()
+        val id = createItem(authed, "MTR", "留痕")["itemId"].asText()
+        val iid = jdbc.queryForObject("select id from item where object_id = ?::uuid", Long::class.java, id)
+        fun rows(openOnly: Boolean): Int = jdbc.queryForObject(
+            "select count(*) from item_group_member_history where item_id = ? ${if (openOnly) "and removed_at is null" else ""}",
+            Int::class.java, iid,
+        )
+        put("/api/items/$id/sprint", mapOf("sprintId" to s1))
+        assertEquals(1, rows(false))
+        assertEquals(1, rows(true)) // 加入:S1 在册
+        put("/api/items/$id/sprint", mapOf("sprintId" to s2))
+        assertEquals(2, rows(false))
+        assertEquals(1, rows(true)) // 换组:旧 closed,S2 在册
+        put("/api/items/$id/sprint", mapOf("sprintId" to null))
+        assertEquals(2, rows(false))
+        assertEquals(0, rows(true)) // 移出:全 closed
+        val rel = post("/api/projects/MTR/releases", mapOf("name" to "R1"))["releaseId"].asText()
+        put("/api/items/$id/release", mapOf("releaseId" to rel))
+        assertEquals(3, rows(false)) // release 型同表留痕
+    }
+
+    @Test
+    fun create带sprintId_落episode() {
+        setupProject()
+        val r = post("/api/projects/MTR/items", mapOf("title" to "c1", "sprintId" to s1))
+        val iid = jdbc.queryForObject("select id from item where object_id = ?::uuid", Long::class.java, r["itemId"].asText())
+        assertEquals(1, jdbc.queryForObject("select count(*) from item_group_member_history where item_id = ?", Int::class.java, iid))
+    }
+
+    @Test
+    fun scopeChange_起止在册与加减次数() {
+        setupProject()
+        newItem("sca", "2026-10-02T09:00:00Z", sprintId = s1, joinedAt = "2026-10-02T09:00:00Z")
+        val b = newItem("scb", "2026-09-28T09:00:00Z", sprintId = s1, joinedAt = "2026-09-28T09:00:00Z")
+        jdbc.update(
+            "update item_group_member_history set removed_at = '2026-10-10T09:00:00Z'::timestamptz where item_id = (select id from item where object_id = ?::uuid)", b)
+        jdbc.update("delete from item_group_member where item_id = (select id from item where object_id = ?::uuid)", b)
+        val r = get("/api/projects/MTR/metrics/scope-change?groupId=$s1")
+        assertEquals(1, r["original"].asInt()) // 10-01 00:00:b 在册
+        assertEquals(1, r["final"].asInt()) // 10-15 00:00:a 在册(b 已离)
+        assertEquals(1, r["adds"].asInt())
+        assertEquals(1, r["removes"].asInt())
+        assertEquals(0, r["net"].asInt())
+        val s3 = post("/api/projects/MTR/sprints", mapOf("name" to "S3"))["sprintId"].asText()
+        authed.get().uri("/api/projects/MTR/metrics/scope-change?groupId=$s3").exchange().expectStatus().isBadRequest()
+    }
+
+    @Test
+    fun burnup_scope离组回落() {
+        setupProject()
+        newItem("bua", "2026-10-01T09:00:00Z", sprintId = s1, joinedAt = "2026-10-01T00:00:00Z")
+        val b = newItem("bub", "2026-10-01T09:00:00Z", sprintId = s1, joinedAt = "2026-10-01T00:00:00Z")
+        jdbc.update(
+            "update item_group_member_history set removed_at = '2026-10-05T12:00:00Z'::timestamptz where item_id = (select id from item where object_id = ?::uuid)", b)
+        jdbc.update("delete from item_group_member where item_id = (select id from item where object_id = ?::uuid)", b)
+        val r = get("/api/projects/MTR/metrics/burnup?groupId=$s1")
+        assertEquals(2, r["scope"][3]["total"].asInt()) // 10-04 末:b 仍在册
+        assertEquals(1, r["scope"][4]["total"].asInt()) // 10-05 末:已离
+    }
+
+    @Test
+    fun reopenRate_重开与窗口() {
+        setupProject()
+        newItem("rr一", "2026-10-01T09:00:00Z",
+            listOf(Triple(null, "Done", "2026-10-02T09:00:00Z"), Triple("Done", "In Progress", "2026-10-03T09:00:00Z")),
+            "In Progress")
+        newItem("rr二", "2026-10-01T09:00:00Z",
+            listOf(Triple(null, "Done", "2026-10-04T09:00:00Z")), "Done")
+        val full = get("/api/projects/MTR/metrics/reopen-rate?from=2026-10-01T00:00:00Z&to=2026-10-31T00:00:00Z")
+        assertEquals(2, full["completed"].asInt())
+        assertEquals(1, full["reopened"].asInt())
+        assertEquals(0.5, full["rate"].asDouble(), 0.0001)
+        val narrow = get("/api/projects/MTR/metrics/reopen-rate?from=2026-10-10T00:00:00Z&to=2026-10-20T00:00:00Z")
+        assertEquals(0, narrow["completed"].asInt())
+        assertTrue(narrow["rate"].isNull) // 分母 0 → null
     }
 }

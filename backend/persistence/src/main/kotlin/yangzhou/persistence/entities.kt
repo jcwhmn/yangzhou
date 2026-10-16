@@ -321,6 +321,17 @@ data class ItemGroupMember(
     val createdAt: Instant = Instant.now(),
 )
 
+/** V32 YPJ-54:成员加/离留痕(episode 式);同组同 item 至多一行 removed_at 为 null(部分唯一索引 ux_igmh_open)。 */
+@Table("item_group_member_history")
+data class ItemGroupMemberHistory(
+    @Id val id: Long? = null,
+    val objectId: UUID = UUID.randomUUID(),
+    val groupId: Long,
+    val itemId: Long,
+    val addedAt: Instant,
+    val removedAt: Instant? = null,
+)
+
 /** V14 Milestone:项目时间轴目标节点(PRD §9);非 ItemGroup;0..1 in_progress 由 ux_milestone_project_current 硬约束。 */
 @Table("milestone")
 data class Milestone(

@@ -20,6 +20,7 @@ import yangzhou.persistence.ProjectMember
 import yangzhou.persistence.ProjectRepo
 import yangzhou.persistence.ItemGroup
 import yangzhou.persistence.ItemGroupMember
+import yangzhou.persistence.ItemGroupMemberHistory
 import yangzhou.persistence.Milestone
 import yangzhou.persistence.ProjectWorkflowRule
 import yangzhou.persistence.Requirement
@@ -187,6 +188,21 @@ interface ItemGroupMemberRepository : CrudRepository<ItemGroupMember, Long> {
     fun findByGroupIdIn(groupIds: Collection<Long>): List<ItemGroupMember>
     fun existsByGroupId(groupId: Long): Boolean
     fun findByItemIdIn(itemIds: Collection<Long>): List<ItemGroupMember>
+}
+
+/** V32 YPJ-54:成员加/离留痕(episode 式);recordAdd/recordRemove 供服务写入点在既有事务内调用。 */
+interface ItemGroupMemberHistoryRepository : CrudRepository<ItemGroupMemberHistory, Long> {
+    fun findByGroupId(groupId: Long): List<ItemGroupMemberHistory>
+
+    fun findFirstByGroupIdAndItemIdAndRemovedAtIsNull(groupId: Long, itemId: Long): ItemGroupMemberHistory?
+
+    fun recordAdd(groupId: Long, itemId: Long, at: Instant): ItemGroupMemberHistory =
+        save(ItemGroupMemberHistory(groupId = groupId, itemId = itemId, addedAt = at))
+
+    /** 无在册行即 no-op(存量态/幂等防护);removed 不可回填,见 spec 0041。 */
+    fun recordRemove(groupId: Long, itemId: Long, at: Instant) {
+        findFirstByGroupIdAndItemIdAndRemovedAtIsNull(groupId, itemId)?.let { save(it.copy(removedAt = at)) }
+    }
 }
 
 interface MilestoneRepository : CrudRepository<Milestone, Long> {
