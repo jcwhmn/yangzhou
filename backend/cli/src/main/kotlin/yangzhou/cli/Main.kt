@@ -281,7 +281,7 @@ private fun run(args: List<String>) {
         }
         "projects delete" -> {
             val key = rest.getOrNull(0) ?: error("缺少项目 KEY")
-            if ("--force" !in rest) {
+            if ("force" !in flags) {
                 val p = api.json("GET", "/api/projects/$key/deletion-preview")
                 println(
                     "将物理删除项目 ${p["key"].asString()}(${p["name"].asString()}):" +
