@@ -57,3 +57,10 @@ login 行改为:`login [-u 用户名] [-p 密码] [--server URL]   登录(默认
 2. `yz login --server http://localhost:8080 ...` → ⚠ 警告行;随后库确认 session 落 8080。
 3. 8080 会话下 `yz attrs list` 等全局命令正常;`yz` 项目级命令 404 消息尾带 `(server=http://localhost:8080)`。
 4. 重登 8081,`yz log` 照旧。
+
+## As-built(2026-10-16,PR #113 合入)
+
+- **按票交付**:login 回显「实例项目:key 列表」+ 无 YPJ ⚠ 警告;json() 非 2xx 尾附 `(server=…)`;usage 注明 PM 实例 8081。偏差:无(第 4 项冒烟步骤「重登回 8081」由用户执行完成,session 现指 8081)。
+- **实现期记坑**:Jackson3 `JsonNode` 虽实现 `Iterable<JsonNode>`,但自带 `map(...)` 成员遮蔽 Kotlin stdlib `Iterable.map`(返回非 List,编译期才炸,症状是下游 `joinToString` 全候选不匹配)→ 改 `values().map { … }`(jackson3 新 API,`Collection<JsonNode>`)。排查法:提最小 Probe.kt 复现 + `List<String>` 显式标注让真实类型现形。
+- 验证:`gradle :cli:build` 绿;双实例冒烟(用户执行):8080 = 登录成功 + 46 个 test 库 key + ⚠ 警告;8081 = 含 YPJ 无警告。PR #113。
+- 顺带实证:8081 上 CHE*/SMK* 13 个垃圾项目 = YPJ-59(default 库清理)的活证据。
