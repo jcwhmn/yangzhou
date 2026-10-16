@@ -83,3 +83,17 @@ create unique index ux_pv_name on project_view (project_id, creator_id, name);
 5. 另一账号登录:看不到前者建的视图。
 6. 列配置 Popover:勾选/恢复默认正常,编号/标题不在可关列表。
 7. api.http views 链全过;全量 e2e 绿。
+
+## As-built(2026-10-16,PR #115 合并)
+
+- **交付范围**:新表 `project_view`(V33,用户×项目私有,filters/columns 存 JSON,同项目同人视图名唯一)+ `view` 垂直切片(ViewController/ViewService,GET 列表 / POST 建 / PATCH 改名改配置 / DELETE,creatorId 隔离,他人或不存在一律 404 不泄露,同名 409,单字段 4KB 上限);表格页三下拉筛选(status/assignee/priority,客户端过滤)+ 视图管理(默认视图 + 保存/另存为/删除/dirty 标记);列 Chip 行收进 `ColumnConfigPopover`(checkbox + 恢复默认,编号/标题恒显);texts.ts `t.view` 文案;api.http views 正例链 + 负例;ViewsApiTest 4 例 + e2e view.spec 主链。
+- **偏差(2 处)**:
+  1. filters/columns 用 **TEXT** 非 JSONB——仓内无 JSONB→Kotlin 映射先例,为它引 PGobject 转换器不值得,service 层 Jackson 校验落 String。
+  2. 砍掉「操作者必须是项目成员」校验——项目创建本就不建 project_member 行,仓内项目级端点均无此校验,跟随惯例。
+- **实现坑(5 处)**:
+  1. Jackson3 `JsonNode` 自带 `map` 遮蔽 Kotlin stdlib,遍历取 `values().map`(同 0043)。
+  2. 实体/DTO data class val 不可变,更新走 `copy()` 链。
+  3. 「不存在/非本人返回 404」不能用 JDK `check()`——它抛 IllegalStateException 被 GlobalExceptionHandler 映 500,业务上显式抛 NotFoundException。
+  4. e2e 断言视图名取的是 Dropdown 的 input value(`toHaveValue`),不是文本节点。
+  5. board.spec「V10 priority 设置与表格视图」受列配置改造波及:列开关改走「列配置」Popover(先开面板再点文字)。
+- **验证**:gradle build + 全量 integrationTest 绿;全量 e2e 绿(用户两趟);ijhttp api.http views 链全过。记坑:ijhttp 曾在 8080 旧进程上 404——后端须重启加载新代码再手测。
