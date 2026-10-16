@@ -344,3 +344,17 @@ data class Milestone(
     val createdAt: Instant = Instant.now(),
     val updatedAt: Instant = Instant.now(),
 )
+
+/** YPJ-47 视图配置:表格筛选/列配置按 用户×项目 私有保存(spec 0045)。filters/columns 为小 JSON 串(TEXT 列)。 */
+@Table("project_view")
+data class ProjectView(
+    @Id val id: Long? = null,
+    val objectId: UUID = UUID.randomUUID(),
+    val projectId: Long,
+    val creatorId: Long,
+    val name: String,
+    val filters: String = "{}",
+    val columns: String = "{}",
+    val createdAt: Instant = Instant.now(),
+    val updatedAt: Instant = Instant.now(),
+)

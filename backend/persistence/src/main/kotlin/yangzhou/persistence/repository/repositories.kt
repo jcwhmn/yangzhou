@@ -22,6 +22,7 @@ import yangzhou.persistence.ItemGroup
 import yangzhou.persistence.ItemGroupMember
 import yangzhou.persistence.ItemGroupMemberHistory
 import yangzhou.persistence.Milestone
+import yangzhou.persistence.ProjectView
 import yangzhou.persistence.ProjectWorkflowRule
 import yangzhou.persistence.Requirement
 import yangzhou.persistence.Status
@@ -318,3 +319,9 @@ data class MetricsGroupMemberRow(
     val itemId: Long,
     val createdAt: Instant,
 )
+
+interface ProjectViewRepository : CrudRepository<ProjectView, Long> {
+    fun findByProjectIdAndCreatorIdOrderByCreatedAt(projectId: Long, creatorId: Long): List<ProjectView>
+    fun findByObjectIdAndCreatorId(objectId: UUID, creatorId: Long): ProjectView?
+    fun existsByProjectIdAndCreatorIdAndName(projectId: Long, creatorId: Long, name: String): Boolean
+}

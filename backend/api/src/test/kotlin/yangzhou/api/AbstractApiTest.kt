@@ -50,7 +50,7 @@ abstract class AbstractApiTest {
     @BeforeEach
     fun cleanDatabase() {
         listOf(
-            "project_workflow_rule", "item_git_ref", "project_repo", "time_entry",
+            "project_workflow_rule", "project_view", "item_git_ref", "project_repo", "time_entry",
             "item_group_member_history", "item_group_member", "item_group", "milestone",
             "item_dependency", "item_activity", "item_status_history", "checklist_item", "comment", "favorite",
             "notification", "status_transition",
