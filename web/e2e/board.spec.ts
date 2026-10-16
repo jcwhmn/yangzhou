@@ -85,6 +85,8 @@ test("V10 priority 设置与表格视图", async ({ page, projectKey }) => {
   await saveResp;
   // 表格视图页可达且 P1 可见(优先级列默认隐藏,先开列)
   await page.goto(`/p/${projectKey}/table`);
+  // YPJ-28/47:列开关已收进列配置 Popover,先开面板再点文字切换
+  await page.getByText("列配置", { exact: false }).click();
   await page.getByText("优先级", { exact: true }).click();
   await expect(page.getByText("E2E 表格 item").first()).toBeVisible();
   await expect(page.getByText("P1").first()).toBeVisible();

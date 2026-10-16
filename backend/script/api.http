@@ -686,6 +686,41 @@ GET {{host}}/api/projects/{{pkey}}/metrics/reopen-rate?from=2026-09-01T00:00:00Z
 Authorization: Bearer {{token}}
 
 ### ============================================================
+### ============ 视图配置(YPJ-47;筛选/列配置按 用户×项目 私有保存) ============
+
+### 建视图(filters/columns 为 JSON 对象;handler 存 viewId)
+POST {{host}}/api/projects/{{pkey}}/views
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "我的进行中",
+  "filters": { "status": null, "assignee": null, "priority": "P1" },
+  "columns": { "priority": true, "blocked": true }
+}
+
+> {%
+    client.global.set("viewId", response.body.viewId);
+ %}
+
+### 视图列表(自己的)
+GET {{host}}/api/projects/{{pkey}}/views
+Authorization: Bearer {{token}}
+
+### 改视图(改名;columns 覆盖)
+PATCH {{host}}/api/projects/{{pkey}}/views/{{viewId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "我的进行中 v2",
+  "columns": { "priority": true }
+}
+
+### 删视图
+DELETE {{host}}/api/projects/{{pkey}}/views/{{viewId}}
+Authorization: Bearer {{token}}
+
 # 负例区:以下请求「红色 = 预期」,演示约束生效,不要当 bug
 ### ============================================================
 
@@ -844,3 +879,32 @@ Content-Type: application/json
   "title": "负例:直入不存在的 sprint",
   "sprintId": "00000000-0000-0000-0000-000000000000"
 }
+
+### [预期 409] 视图同名
+POST {{host}}/api/projects/{{pkey}}/views
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "我的进行中 v2"
+}
+
+### [预期 400] 视图 filters 非 JSON 对象
+POST {{host}}/api/projects/{{pkey}}/views
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "bad",
+  "filters": ["a"]
+}
+
+### [预期 404] 改不存在/非本人视图
+PATCH {{host}}/api/projects/{{pkey}}/views/00000000-0000-0000-0000-000000000000
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "hijack"
+}
+
