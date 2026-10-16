@@ -34,7 +34,7 @@ private fun usage() {
           teams add <组名> / teams list                建组/列组(纯分组,视图过滤)
           attrs list [--json]                        词表列表
           projects create <KEY> [名称]                 建项目(自动带三态 workflow)
-          projects delete <KEY>... [--force]           删项目(可多 KEY;默认预览计数,--force 物理删)
+          projects delete <KEY>... [--force]           删项目(多 KEY,可直接粘贴 login 列表;默认预览,--force 物理删)
           projects list [--json]                       项目列表
           items create <KEY> <标题> [--req 属性[>=N]]... [--json]   建 item(需求可分级)
           items list <KEY> [--json]                    项目 item 列表
@@ -280,7 +280,8 @@ private fun run(args: List<String>) {
             }
         }
         "projects delete" -> {
-            val keys = rest.ifEmpty { error("缺少项目 KEY(可多个)") }
+            // 粘贴 login 回显列表(顿号/逗号分隔)与空格分隔等价
+            val keys = rest.flatMap { it.split('、', ',') }.map { it.trim() }.filter { it.isNotEmpty() }.ifEmpty { error("缺少项目 KEY(可多个)") }
             var failed = 0
             for (key in keys) {
                 try {
