@@ -71,7 +71,7 @@ private const val D_VELOCITY = "各 sprint(有起止日期)内首次完成时刻
 // ---------- 线型 DTO(同文件,吵了再拆) ----------
 
 data class StatusCountDto(val statusId: UUID, val name: String, val isStart: Boolean, val isFinal: Boolean, val count: Int)
-data class AssigneeCountDto(val memberObjectId: UUID?, val displayName: String?, val count: Int)
+data class AssigneeCountDto(val memberObjectId: UUID?, val displayName: String?, val count: Int, val byStatus: Map<String, Int> = emptyMap())
 data class TypeCountDto(val type: String, val count: Int)
 
 data class WorkloadResponse(
@@ -189,10 +189,13 @@ class MetricsService(
         val members = repo.assignees(key).associateBy { it.memberObjectId }
         val countByStatusId = items.groupingBy { statusByObjectId.getValue(it.statusObjectId).statusId }.eachCount()
         val byStatus = statuses.map { s -> StatusCountDto(s.statusObjectId, s.name, s.isStart, s.isFinal, countByStatusId[s.statusId] ?: 0) }
-        val byAssignee = items.groupingBy { it.assigneeObjectId }.eachCount()
-            .map { (oid, c) ->
-                if (oid == null) AssigneeCountDto(null, null, c)
-                else AssigneeCountDto(oid, members[oid]?.displayName, c)
+        // YPJ-46:byAssignee 附 WIP 按 status 堆叠(Flow 页 WIP 条形)
+        val byAssignee = items.groupBy { it.assigneeObjectId }
+            .map { (oid, its) ->
+                val wipByStatus = its.filter { !statusByObjectId.getValue(it.statusObjectId).isStart && !statusByObjectId.getValue(it.statusObjectId).isFinal }
+                    .groupingBy { statusByObjectId.getValue(it.statusObjectId).name }.eachCount()
+                if (oid == null) AssigneeCountDto(null, null, its.size, wipByStatus)
+                else AssigneeCountDto(oid, members[oid]?.displayName, its.size, wipByStatus)
             }
             .sortedWith(compareBy(nullsLast<String>()) { it.displayName })
         val byType = items.groupingBy { it.type }.eachCount().map { TypeCountDto(it.key, it.value) }.sortedBy { it.type }

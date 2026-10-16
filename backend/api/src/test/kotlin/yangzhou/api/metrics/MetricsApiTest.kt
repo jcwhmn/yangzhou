@@ -145,6 +145,28 @@ class MetricsApiTest : AbstractApiTest() {
     }
 
     @Test
+    fun workload_byAssignee状态堆叠() {
+        setupProject()
+        val a = createItem(authed, "MTR", "甲")["itemId"].asText()
+        put("/api/items/$a/assignee", mapOf("assigneeItemId" to meId))
+        patch("/api/items/$a", mapOf("statusItemId" to status["In Progress"]))
+        val b = createItem(authed, "MTR", "乙")["itemId"].asText()
+        put("/api/items/$b/assignee", mapOf("assigneeItemId" to meId))
+        val c = createItem(authed, "MTR", "丙")["itemId"].asText()
+        put("/api/items/$c/assignee", mapOf("assigneeItemId" to meId))
+        patch("/api/items/$c", mapOf("statusItemId" to status["QA"]))
+        val r = get("/api/projects/MTR/metrics/workload")
+        val me = r["byAssignee"].first { !it["displayName"].isNull }
+        assertEquals(3, me["count"].asInt())
+        assertEquals(mapOf("In Progress" to 1, "QA" to 1), counts(me["byStatus"]))
+        // 未指派 item 停在 To Do(start)= 非 WIP:byStatus 为空
+        createItem(authed, "MTR", "丁")
+        val r2 = get("/api/projects/MTR/metrics/workload")
+        val unassigned = r2["byAssignee"].first { it["displayName"].isNull }
+        assertEquals(emptyMap<String, Int>(), counts(unassigned["byStatus"]))
+    }
+
+    @Test
     fun throughput_周桶与groupId过滤() {
         setupProject(); seedAll()
         val r = get("/api/projects/MTR/metrics/throughput?from=2026-09-25T00:00:00Z&to=2026-10-25T00:00:00Z&bucket=week")

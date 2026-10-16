@@ -21,6 +21,7 @@ import {
   Typography,
 } from "@mui/material";
 import { PageShell } from "@/components/PageShell";
+import { LineChart } from "@mui/x-charts/LineChart";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -63,6 +64,8 @@ export default function SprintPage() {
   const [busy, setBusy] = useState(false);
   const [allSprints, setAllSprints] = useState<Sprint[]>([]);
   const [confirmFlow, setConfirmFlow] = useState<null | "start" | "complete">(null);
+  // YPJ-46:burndown(剩余 vs 理想线);端点要求 sprint 有起止日期
+  const [bd, setBd] = useState<{ ideal: { date: string; remaining: number }[]; actual: { date: string; remaining: number }[] } | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -112,6 +115,18 @@ export default function SprintPage() {
     await changeStatus("completed");
     setConfirmFlow(null);
   }
+
+  useEffect(() => {
+    let alive = true;
+    api<{ ideal: { date: string; remaining: number }[]; actual: { date: string; remaining: number }[] }>(
+      `/api/projects/${key}/metrics/burndown?groupId=${id}`,
+    )
+      .then((r) => alive && setBd({ ideal: r.ideal, actual: r.actual }))
+      .catch(() => alive && setBd(null));
+    return () => {
+      alive = false;
+    };
+  }, [key, id]);
 
   // V13-S3:拉入/移出同一对话框——列出非终态 item 多选,确认后逐条走既有 PUT /items/{id}/sprint
   async function openAdd() {
@@ -214,6 +229,18 @@ export default function SprintPage() {
             <Typography color="text.secondary" sx={{ mt: 4 }}>
               此 Sprint 还没有 item——点右上「拉入 item」批量勾选,或在 item 详情用「Sprint」下拉指派。
             </Typography>
+          )}
+
+          {bd && bd.actual.length > 1 && (
+            <LineChart
+              height={260}
+              xAxis={[{ scaleType: "time", data: bd.actual.map((p) => new Date(p.date)) }]}
+              series={[
+                { label: t.flow.remaining, data: bd.actual.map((p) => p.remaining), showMark: false },
+                { label: t.flow.ideal, data: bd.ideal.map((p) => p.remaining), showMark: false },
+              ]}
+              sx={{ mb: 2 }}
+            />
           )}
 
           {items !== null && items.length > 0 && (
