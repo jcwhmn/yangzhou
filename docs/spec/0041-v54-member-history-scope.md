@@ -127,3 +127,17 @@ assignItem 无变化分支(同组重复指派)不写 history,与现行为一致�
 7. 完成一个 item 再拖回非 final → `reopen-rate` reopened=1。
 8. burnup 图/端点:含中途移出的 sprint,scope 线在移出日后回落;tooltip 口径文案已更新。
 9. 回归:burndown / velocity / flow-times / throughput 各端点照旧。
+
+## As-built(2026-10-16,PR #111 合入)
+
+- **按票交付**:V32 episode 表 + recordAdd/recordRemove 仓库 default 方法;5 写入点全留痕(三服务 Clock 注入);M11 scope-change / M12 reopen-rate 端点;burnup scope 线转留痕重放;entities.puml / api.http / cleanDatabase 同步。测试:MetricsMathTest + covering 单测,MetricsApiTest + 5 集成用例。
+
+**偏差(2 处)**:
+
+1. **burnup 内部结构微调**:设计写「sprintData 返回值 Triple 追加 episodes」,实现保持 sprintData 原样未改——burnup 与 scopeChange 各自直查 history(一次 `findByGroupId` 调用,不共享取数),少改一处形参链,velocity 调用点零触碰。
+2. **api.http 负例选型**:设计拟负例为「无日期 sprint 的 scope-change 400」,实现改测「组不存在/非本项目 404 与 400 文案」,与 M11 校验序一致;无日期分支由集成测试覆盖,api.http 不重复。
+
+**实现期记坑(2 雷)**:
+
+1. **`-Xjvm-default=all`**(backend/build.gradle.kts):Kotlin 接口 default 方法默认编 `DefaultImpls`,Spring Data 代理调不到 → 留痕 helper 静默不生效,症状表现为移出 PUT 500 / 删组 409(helper 无状态断言被吞)。加编译器开关后愈。诊断范式:测试结果 XML 的 access log 逐请求看 status + `ExchangeResult` 响应体——「数据库约束冲突」≠「sprint 非空」,一字之差换根因。
+2. **V32 FK `on delete cascade`**:初版 history FK 未级联,删 sprint 被 history 行挡住(判空只查 `item_group_member`)。改为 `on delete cascade` 后判空语义不回归;item 永软删,cascade 对 item 路径不触发。
