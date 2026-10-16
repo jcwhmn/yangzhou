@@ -15,14 +15,17 @@ test("Flow 页五图一表——数据态卡片与口径 caption", async ({ page
   await apiCall("PATCH", `/api/items/${done}`, { statusItemId: statuses[statuses.length - 1].statusId });
 
   await page.goto(`/p/${projectKey}/flow`);
-  await expect(page.getByText("WIP(按负责人、状态堆叠)")).toBeVisible();
-  await expect(page.getByText("吞吐(每日完成)")).toBeVisible();
-  await expect(page.getByText("Cycle / Lead 散点")).toBeVisible();
-  await expect(page.getByText("累积流(CFD)")).toBeVisible();
-  await expect(page.getByText("Aging / 瓶颈")).toBeVisible();
-  await expect(page.getByText("Velocity(近 8 个 Sprint)")).toBeVisible();
+  await expect(page.getByText("WIP(按负责人、状态堆叠)").first()).toBeVisible();
+  await expect(page.getByText("吞吐(每日完成)").first()).toBeVisible();
+  await expect(page.getByText("Cycle / Lead 散点").first()).toBeVisible();
+  await expect(page.getByText("累积流(CFD)").first()).toBeVisible();
+  await expect(page.getByText("Aging / 瓶颈").first()).toBeVisible();
+  await expect(page.getByText("Velocity(近 8 个 Sprint)").first()).toBeVisible();
   // 无 active sprint:burnup 卡显示占位
   await expect(page.getByText("无进行中的 Sprint")).toBeVisible();
+  // 数据真的进了图:WIP 图例出现状态名、页面有图表 svg(空态也显示标题,标题断言拦不住 400/空数据)
+  await expect(page.getByText("In Progress").first()).toBeVisible();
+  await expect(page.locator("svg").nth(1)).toBeVisible();
 });
 
 test("Sprint 详情 burndown——active sprint 出现剩余/理想线图例", async ({ page, projectKey }) => {

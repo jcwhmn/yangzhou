@@ -74,8 +74,9 @@ export default function FlowPage() {
 
   useEffect(() => {
     let alive = true;
-    const from = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10);
-    const to = new Date().toISOString().slice(0, 10);
+    // 后端 parseInstant 要求完整 ISO Instant,日期会被 400(YPJ-46 debug:全卡空态根因)
+    const from = new Date(Date.now() - 30 * 864e5).toISOString();
+    const to = new Date().toISOString();
     (async () => {
       const [workload, throughput, flowTimes, cfd, aging, velocity, sprints] = await Promise.all([
         api<Workload>(`/api/projects/${key}/metrics/workload`),
@@ -94,7 +95,10 @@ export default function FlowPage() {
         setData({ workload, throughput, flowTimes, cfd, aging, velocity, burnup });
         setLoaded(true);
       }
-    })().catch(() => alive && setLoaded(true));
+    })().catch((e) => {
+      console.error("flow 页数据加载失败", e);
+      if (alive) setLoaded(true);
+    });
     return () => {
       alive = false;
     };
