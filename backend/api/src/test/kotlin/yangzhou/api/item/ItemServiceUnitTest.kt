@@ -28,7 +28,9 @@ import yangzhou.persistence.repository.MemberRepository
 import yangzhou.persistence.repository.ProjectRepository
 import yangzhou.persistence.repository.RequirementRepository
 import yangzhou.persistence.repository.StatusRepository
+import java.time.Clock
 import java.time.Instant
+import java.time.ZoneOffset
 import java.util.UUID
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
@@ -90,6 +92,8 @@ class ItemServiceUnitTest {
         notificationService = notificationService,
         groupRepo = groupRepo,
         groupMembers = groupMembers,
+        memberHistory = mockk(relaxed = true),
+        clock = Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC),
     )
 
     private val projectId = 1L

@@ -1,5 +1,6 @@
 package yangzhou.api.metrics
 
+import yangzhou.persistence.ItemGroupMemberHistory
 import yangzhou.persistence.repository.MetricsHistoryRow
 import java.time.Instant
 import kotlin.test.Test
@@ -71,5 +72,18 @@ class MetricsMathTest {
         val d = daysBetween(Instant.parse("2026-01-01T09:00:00Z"), Instant.parse("2026-01-02T21:00:00Z"))
         assertEquals(1.5, d, 1e-9)
         assertTrue(d > 0)
+    }
+
+    @Test
+    fun covering_边界与离组() {
+        val t = Instant.parse("2026-10-05T00:00:00Z")
+        assertEquals(emptySet<Long>(), coveringItemIds(emptyList(), t))
+        val episodes = listOf(
+            ItemGroupMemberHistory(groupId = 1, itemId = 11, addedAt = t), // 边界:added == t
+            ItemGroupMemberHistory(groupId = 1, itemId = 12, addedAt = Instant.parse("2026-10-04T00:00:00Z"), removedAt = t), // removed == t 不覆盖
+            ItemGroupMemberHistory(groupId = 1, itemId = 13, addedAt = Instant.parse("2026-10-01T00:00:00Z"), removedAt = t.plusMillis(1)),
+            ItemGroupMemberHistory(groupId = 2, itemId = 14, addedAt = t.plusMillis(1)), // 尚未加入
+        )
+        assertEquals(setOf(11L, 13L), coveringItemIds(episodes, t))
     }
 }

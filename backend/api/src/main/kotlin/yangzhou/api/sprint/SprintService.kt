@@ -9,9 +9,11 @@ import yangzhou.api.support.NotFoundException
 import yangzhou.persistence.ItemGroup
 import yangzhou.persistence.ItemGroupMember
 import yangzhou.persistence.repository.ItemGroupMemberRepository
+import yangzhou.persistence.repository.ItemGroupMemberHistoryRepository
 import yangzhou.persistence.repository.ItemGroupRepository
 import yangzhou.persistence.repository.ItemRepository
 import yangzhou.persistence.repository.ProjectRepository
+import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
 import java.util.UUID
@@ -28,6 +30,8 @@ class SprintService(
     private val memberships: ItemGroupMemberRepository,
     private val itemRepo: ItemRepository,
     private val itemService: ItemService,
+    private val memberHistory: ItemGroupMemberHistoryRepository,
+    private val clock: Clock,
 ) {
 
     data class SprintDto(
@@ -166,15 +170,22 @@ class SprintService(
         val current = rows.firstOrNull { rowGroups[it.groupId]?.status != "completed" }
 
         if (sprintId == null) {
-            if (current != null) memberships.delete(current)
+            if (current != null) {
+                memberships.delete(current)
+                memberHistory.recordRemove(current.groupId, current.itemId, clock.instant()) // YPJ-54 留痕
+            }
             return itemService.get(itemId)
         }
         val sprint = groups.findByProjectIdAndObjectId(item.projectId, sprintId)
             ?: throw NotFoundException("sprint 不存在")
         if (sprint.status == "completed") throw ConflictException("sprint 已完成,不能指派")
         if (current != null && current.groupId == sprint.id) return itemService.get(itemId)
-        if (current != null) memberships.delete(current)
+        if (current != null) {
+            memberships.delete(current)
+            memberHistory.recordRemove(current.groupId, current.itemId, clock.instant())
+        }
         memberships.save(ItemGroupMember(groupId = sprint.id!!, itemId = item.id!!))
+        memberHistory.recordAdd(sprint.id!!, item.id!!, clock.instant())
         return itemService.get(itemId)
     }
 }

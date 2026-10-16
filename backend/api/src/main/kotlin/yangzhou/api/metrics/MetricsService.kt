@@ -3,6 +3,8 @@ package yangzhou.api.metrics
 import org.springframework.stereotype.Service
 import yangzhou.api.support.BadRequestException
 import yangzhou.api.support.NotFoundException
+import yangzhou.persistence.ItemGroupMemberHistory
+import yangzhou.persistence.repository.ItemGroupMemberHistoryRepository
 import yangzhou.persistence.repository.MetricsGroupRow
 import yangzhou.persistence.repository.MetricsHistoryRow
 import yangzhou.persistence.repository.MetricsRepository
@@ -61,7 +63,9 @@ private const val D_PCT = "对窗口内已完成 item 的天数分布取 P50/P85
 private const val D_CFD = "各状态存量按 UTC 日快照,由状态迁移史重放;item 首条 history 之前不计入(回填缺口)。"
 private const val D_AGING = "WIP item 进入当前状态的时刻与已停留天数;queueWidth = 各非 final 状态当前存量。"
 private const val D_BURNDOWN = "remaining = 当前成员总数 − 当日及之前已完成数;ideal = start→end 线性;口径注意:成员中途变动不回放(留痕票 YPJ-54 落地前)。"
-private const val D_BURNUP = "done = 成员完成累计;scope = 加入时刻 ≤ 当日的成员累计;口径注意:离组不可回填,now 起精确(留痕票 YPJ-54 落地后转准)。"
+private const val D_BURNUP = "done = 成员完成累计;scope = 当日在册成员累计(按留痕重放);口径注意:存量离组不可回填,上线时点起精确。"
+private const val D_SCOPE_CHANGE = "scope-change:sprint 开始在册(Original)与结束在册(Final)成员数,及期间加入/离出次数;net = Final − Original;口径注意:removed 存量不可回填,上线时点起精确。"
+private const val D_REOPEN = "reopen:窗口内首次完成的 item 中,此后发生过 final→非 final 迁移(重开)的占比;窗口内无完成则 rate = null。"
 private const val D_VELOCITY = "各 sprint(有起止日期)内首次完成时刻落在 [start, end] 的 item 数;count 口径,非生产力 KPI。"
 
 // ---------- 线型 DTO(同文件,吵了再拆) ----------
@@ -131,6 +135,28 @@ data class BurndownResponse(
 data class BurnupDonePointDto(val date: String, val cumulative: Int)
 data class ScopePointDto(val date: String, val total: Int)
 
+data class ScopeChangeResponse(
+    val definitions: Map<String, String>,
+    val groupId: UUID,
+    val name: String,
+    val startDate: String,
+    val endDate: String,
+    val original: Int,
+    val final: Int,
+    val adds: Int,
+    val removes: Int,
+    val net: Int,
+)
+
+data class ReopenRateResponse(
+    val definitions: Map<String, String>,
+    val from: String,
+    val to: String,
+    val completed: Int,
+    val reopened: Int,
+    val rate: Double?,
+)
+
 data class BurnupResponse(
     val definitions: Map<String, String>,
     val groupId: UUID,
@@ -152,6 +178,7 @@ data class VelocityResponse(
 class MetricsService(
     private val repo: MetricsRepository,
     private val projects: ProjectRepository,
+    private val memberHistory: ItemGroupMemberHistoryRepository,
     private val clock: Clock,
 ) {
     fun workload(key: String): WorkloadResponse {
@@ -293,16 +320,60 @@ class MetricsService(
 
     fun burnup(key: String, groupId: UUID): BurnupResponse {
         requireProject(key)
-        val (g, memberJoinTs, completions) = sprintData(key, groupId)
+        val (g, _, completions) = sprintData(key, groupId)
+        val episodes = memberHistory.findByGroupId(g.groupId) // YPJ-54:scope 线消费留痕重放
         val start = g.startDate ?: throw BadRequestException("sprint 须有起止日期")
         val end = g.endDate ?: throw BadRequestException("sprint 须有起止日期")
         val seriesEnd = minOf(end, utcDate(clock.instant()))
         fun dates(): List<LocalDate> = if (seriesEnd.isBefore(start)) emptyList() else start.datesUntil(seriesEnd.plusDays(1)).toList()
         val done = dates().map { d -> BurnupDonePointDto(d.toString(), completions.count { !it.isAfter(endOfDayUtc(d)) }) }
-        val scope = dates().map { d -> ScopePointDto(d.toString(), memberJoinTs.count { !it.isAfter(endOfDayUtc(d)) }) }
+        val scope = dates().map { d -> ScopePointDto(d.toString(), coveringItemIds(episodes, endOfDayUtc(d)).size) }
         return BurnupResponse(
             definitions = mapOf("burnup" to D_BURNUP),
             groupId = g.groupObjectId, name = g.name, done = done, scope = scope,
+        )
+    }
+
+    /** M11(Y54):sprint 成员 scope 变化——开始/结束在册数与期间加/离次数(spec 0041);口径同 burnup,要求起止日期。 */
+    fun scopeChange(key: String, groupId: UUID): ScopeChangeResponse {
+        requireProject(key)
+        val g = findGroup(key, groupId)
+        val start = g.startDate ?: throw BadRequestException("sprint 须有起止日期")
+        val end = g.endDate ?: throw BadRequestException("sprint 须有起止日期")
+        val episodes = memberHistory.findByGroupId(g.groupId)
+        val from = start.atStartOfDay(ZoneOffset.UTC).toInstant()
+        val to = endOfDayUtc(end)
+        val original = coveringItemIds(episodes, from).size
+        val final = coveringItemIds(episodes, to).size
+        val adds = episodes.count { it.addedAt >= from && it.addedAt <= to }
+        val removes = episodes.count { e -> e.removedAt?.let { it in from..to } == true }
+        return ScopeChangeResponse(
+            definitions = mapOf("scopeChange" to D_SCOPE_CHANGE),
+            groupId = g.groupObjectId, name = g.name, startDate = start.toString(), endDate = end.toString(),
+            original = original, final = final, adds = adds, removes = removes, net = final - original,
+        )
+    }
+
+    /** M12(Y54):重开率——窗口内首次完成 item 中,此后发生过 final→非 final 迁移的占比;分母 0 → null。 */
+    fun reopenRate(key: String, fromS: String?, toS: String?): ReopenRateResponse {
+        requireProject(key)
+        val (from, to) = window(fromS, toS)
+        val statuses = repo.statuses(key)
+        val finalIds = statuses.filter { it.isFinal }.map { it.statusId }.toSet()
+        val byItem = repo.history(key).groupBy { it.itemId }
+        var completed = 0
+        var reopened = 0
+        repo.items(key).forEach { item ->
+            val rows = byItem[item.itemId] ?: return@forEach
+            val firstFinal = completionTs(rows, finalIds) ?: return@forEach
+            if (firstFinal !in from..to) return@forEach
+            completed++
+            if (rows.any { it.fromStatusId != null && it.fromStatusId in finalIds && it.createdAt.isAfter(firstFinal) }) reopened++
+        }
+        val rate = if (completed == 0) null else reopened.toDouble() / completed
+        return ReopenRateResponse(
+            definitions = mapOf("reopen" to D_REOPEN),
+            from = from.toString(), to = to.toString(), completed = completed, reopened = reopened, rate = rate,
         )
     }
 
@@ -366,3 +437,7 @@ class MetricsService(
         return Triple(g, members.map { it.createdAt }, members.mapNotNull { compByItem[it.itemId] })
     }
 }
+
+/** YPJ-54:episode 覆盖判定——added_at ≤ t 且(未离组或 removed_at > t);返回 distinct itemId 集。 */
+internal fun coveringItemIds(episodes: List<ItemGroupMemberHistory>, t: Instant): Set<Long> =
+    episodes.filter { e -> e.addedAt <= t && (e.removedAt?.let { it > t } ?: true) }.map { it.itemId }.toSet()

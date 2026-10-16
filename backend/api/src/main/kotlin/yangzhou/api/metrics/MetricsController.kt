@@ -53,6 +53,20 @@ class MetricsController(private val service: MetricsService) {
         @RequestParam groupId: UUID,
     ): BurnupResponse = service.burnup(key, groupId)
 
+    @GetMapping("/projects/{key}/metrics/scope-change")
+    fun scopeChange(
+        @PathVariable key: String,
+        @RequestParam groupId: UUID,
+    ): ScopeChangeResponse = service.scopeChange(key, groupId)
+
+    @GetMapping("/projects/{key}/metrics/reopen-rate")
+    fun reopenRate(
+        @PathVariable key: String,
+        @RequestParam from: String?,
+        @RequestParam to: String?,
+    ): ReopenRateResponse = service.reopenRate(key, from, to)
+
+
     @GetMapping("/projects/{key}/metrics/velocity")
     fun velocity(@PathVariable key: String): VelocityResponse = service.velocity(key)
 }

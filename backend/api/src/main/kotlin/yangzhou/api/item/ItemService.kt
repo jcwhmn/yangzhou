@@ -14,6 +14,7 @@ import yangzhou.persistence.ItemStatusHistory
 import yangzhou.persistence.Requirement
 import yangzhou.persistence.repository.AttributeDefinitionRepository
 import yangzhou.persistence.repository.ItemGitRefRepository
+import yangzhou.persistence.repository.ItemGroupMemberHistoryRepository
 import yangzhou.persistence.repository.ItemGroupMemberRepository
 import yangzhou.persistence.repository.ItemGroupRepository
 import yangzhou.persistence.repository.ItemNumberRepository
@@ -21,6 +22,7 @@ import yangzhou.persistence.repository.ItemRepository
 import yangzhou.persistence.repository.ProjectRepository
 import yangzhou.persistence.repository.RequirementRepository
 import yangzhou.persistence.repository.StatusRepository
+import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
 import java.util.UUID
@@ -49,6 +51,8 @@ class ItemService(
     private val notificationService: yangzhou.api.notification.NotificationService,
     private val groupRepo: yangzhou.persistence.repository.ItemGroupRepository,
     private val groupMembers: yangzhou.persistence.repository.ItemGroupMemberRepository,
+    private val memberHistory: yangzhou.persistence.repository.ItemGroupMemberHistoryRepository,
+    private val clock: Clock,
 ) {
 
     data class RequirementDto(val attribute: String, val minLevel: Int?)
@@ -138,6 +142,7 @@ class ItemService(
                 ?: throw NotFoundException("sprint 不存在")
             if (sprint.status == "completed") throw ConflictException("sprint 已完成,不能指派")
             memberships.save(ItemGroupMember(groupId = sprint.id!!, itemId = itemId))
+            memberHistory.recordAdd(sprint.id!!, itemId, clock.instant()) // YPJ-54 留痕(同事务,负例不落库语义不变)
         }
         return get(item.objectId)
     }

@@ -8,12 +8,14 @@ import yangzhou.api.support.ConflictException
 import yangzhou.api.support.NotFoundException
 import yangzhou.persistence.ItemGroup
 import yangzhou.persistence.ItemGroupMember
+import yangzhou.persistence.repository.ItemGroupMemberHistoryRepository
 import yangzhou.persistence.repository.ItemGroupMemberRepository
 import yangzhou.persistence.repository.ItemGroupRepository
 import yangzhou.persistence.repository.ItemRepository
 import yangzhou.persistence.repository.MilestoneRepository
 import yangzhou.persistence.repository.ProjectRepository
 import jakarta.validation.constraints.NotBlank
+import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
 import java.util.UUID
@@ -43,6 +45,8 @@ class ReleaseService(
     private val milestones: MilestoneRepository,
     private val itemRepo: ItemRepository,
     private val itemService: ItemService,
+    private val memberHistory: ItemGroupMemberHistoryRepository,
+    private val clock: Clock,
 ) {
 
     data class ReleaseDto(
@@ -178,7 +182,10 @@ class ReleaseService(
         val current = rows.filter { rowGroups[it.groupId]?.type == "release" }
 
         if (releaseId == null) {
-            if (current.isNotEmpty()) groupMembers.deleteAll(current)
+            if (current.isNotEmpty()) {
+                groupMembers.deleteAll(current)
+                current.forEach { memberHistory.recordRemove(it.groupId, it.itemId, clock.instant()) } // YPJ-54 留痕
+            }
             return itemService.get(itemId)
         }
         val release = groups.findByProjectIdAndObjectId(item.projectId, releaseId)
@@ -186,7 +193,9 @@ class ReleaseService(
             ?: throw NotFoundException("release 不存在")
         if (current.any { it.groupId == release.id }) return itemService.get(itemId)
         groupMembers.deleteAll(current)
+        current.forEach { memberHistory.recordRemove(it.groupId, it.itemId, clock.instant()) }
         groupMembers.save(ItemGroupMember(groupId = release.id!!, itemId = item.id!!))
+        memberHistory.recordAdd(release.id!!, item.id!!, clock.instant())
         return itemService.get(itemId)
     }
 }
