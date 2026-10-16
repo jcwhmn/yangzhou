@@ -29,7 +29,7 @@ private fun usage() {
           attrs create <属性> [--kind skill|label|category] [--leveled] [--parent <分类>]  建词表属性
           members add <显示名>                         建虚拟成员(无凭据,不登录)
           members list [--json]                        成员目录(含我与虚拟)
-          members rm <成员名>                          删虚拟成员(登录账号不可删)
+          members rm <成员名>...                       删虚拟成员(可多名字/顿号分隔;登录账号不可删)
           members set <成员名> <属性> [1-4]            给成员自评能力(不带数字=未评级)
           teams add <组名> / teams list                建组/列组(纯分组,视图过滤)
           attrs list [--json]                        词表列表
@@ -85,10 +85,21 @@ private fun run(args: List<String>) {
                 println("已建虚拟成员:${body["displayName"].asString()}(无凭据,不登录)")
             }
             "rm" -> {
-                val name = rest.getOrNull(0) ?: error("缺少成员名")
-                val id = memberIdByDisplayName(api, name) ?: error("成员不存在:$name")
-                api.json("DELETE", "/api/members/$id")
-                println("已删除:$name")
+                // 与 projects delete 同规:粘贴名单(顿号/逗号)与空格分隔等价
+                val names = rest.flatMap { it.split('、', ',') }.map { it.trim() }.filter { it.isNotEmpty() }
+                    .ifEmpty { error("缺少成员名(可多个)") }
+                var failed = 0
+                for (name in names) {
+                    try {
+                        val id = memberIdByDisplayName(api, name) ?: error("成员不存在:$name")
+                        api.json("DELETE", "/api/members/$id")
+                        println("已删除:$name")
+                    } catch (e: IllegalStateException) {
+                        failed++
+                        println("失败:$name → ${e.message}")
+                    }
+                }
+                check(failed == 0) { "$failed/${names.size} 个成员失败" }
             }
             "list" -> {
                 val body = api.json("GET", "/api/members")
