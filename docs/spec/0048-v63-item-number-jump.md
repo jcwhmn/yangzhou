@@ -143,3 +143,14 @@ fixture 走 helpers(独立 key 项目;新建项目首 item 编号恒为 `{KEY}-1
 ## 补充迭代(2026-10-17,用户反馈;并入本票)
 
 项目上下文预填:在 `/p/{key}` 页面内,顶栏跳转框预置 `"KEY-"`——只输编号回车即达本项目 item;清空前缀可跨项目输全号(如 `CHE-21`)。AppNav 按 `pathname` 解析项目 key,`useEffect` 同步预置与错误态清零;e2e 增预填用例 1 例。
+
+## As-built(2026-10-17,PR #117 合并)
+
+- **交付**:详情页编号 URL——`paramId` 非 UUID 时经 `/api/search` 精确匹配 number 解析,**参数遮蔽**(`const itemId = resolvedId ?? ""`)使全页 ~30 处请求零改动;地址栏保持编号可收藏/刷新;key 段不符自动 `router.replace` 纠正;未找到态复用 `!item` 早退块。顶栏跳转框(AppNav,正则 `[A-Z0-9]+-\d+`)+ 项目上下文预填 `KEY-`(pathname 解析 + useEffect 同步)。texts 增 3 条;e2e number-jump 4 例。
+- **设计修正(前置节)**:`/api/search` 原本只 ILIKE title/description,number 为读时拼接——「复用 search 解析」假设落空;根因修在共享层(SQL 补编号 ILIKE + SearchApiTest 3 例,已随本 PR 进 main),`/search` 搜编号的存量缺陷随之修复。
+- **实现坑(3)**:
+  1. 跳转正则首版 `[A-Z]+-\d+` 漏数字 key——真实 key(CHE656626)与 E2E uniqueKey 都含数字,改 `[A-Z0-9]+-\d+`。
+  2. 仓内 Playwright 版本无 `getByDisplayValue`,断言输入值用 `getByLabel(..., { exact: true })` + `toHaveValue`。
+  3. 同面板连续点击会被落库重渲染吞掉(member.spec 色点 flake,快照实证),两次动作间插状态断言同步。
+- **验证**:tsc 绿(release.spec 3 个错误为 main 既有,与本票无关)、`next build` 绿、e2e 全量 54 passed、双 profile 用户实弹验证(编号直达/预填)。
+- **后续**:search 的 JDBC client 已由 0049 清退为 @Query(本票引入的 SQL 随迁)。
