@@ -20,6 +20,13 @@ export function AppNav() {
   const [jump, setJump] = useState("");
   const [jumpErr, setJumpErr] = useState(false);
 
+  // 项目上下文预填(Y63 补充):/p/{key} 页内预置 "KEY-",只输编号回车即达;清空可跨项目输全号
+  const projectKey = pathname.match(/^\/p\/([^/]+)/)?.[1]?.toUpperCase();
+  useEffect(() => {
+    setJump(projectKey ? `${projectKey}-` : "");
+    setJumpErr(false);
+  }, [projectKey]);
+
   useEffect(() => subscribeUnread(setUnread), []);
 
   const loadFavs = useCallback(async () => {

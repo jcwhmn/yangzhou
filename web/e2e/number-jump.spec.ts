@@ -35,3 +35,19 @@ test("负例——非法格式就地提示;未知编号未找到", async ({ page
   await page.goto(`/p/${projectKey}/i/${projectKey}-999`);
   await expect(page.getByText("未找到该编号的 item")).toBeVisible();
 });
+
+test("项目上下文预填 KEY-——只输编号直达;全号跨项目仍可用", async ({ page, projectKey }) => {
+  await apiCreateItem(projectKey, "E2E 预填 item");
+  await page.goto(`/p/${projectKey}`); // 项目上下文(看板)
+  const box = page.getByPlaceholder("编号跳转,如 YPJ-59");
+  await expect(box).toHaveValue(`${projectKey}-`);
+  await box.click();
+  await box.press("End");
+  await box.type("1");
+  await box.press("Enter");
+  await expect(page.getByText(`${projectKey}-1`)).toBeVisible();
+  // 清空改输其它项目全号 → 校验通过、解析照走(该编号不存在 → 未找到)
+  await box.fill("YPJ-999999");
+  await box.press("Enter");
+  await expect(page.getByText("未找到该编号的 item")).toBeVisible();
+});

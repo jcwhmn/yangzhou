@@ -139,3 +139,7 @@ fixture 走 helpers(独立 key 项目;新建项目首 item 编号恒为 `{KEY}-1
 开工假设「纯前端、复用现有 /api/search 解析」有误:SearchService 只 ILIKE title/description,number 是读时拼接(key + "-" + number),**搜索从不匹配编号**——解析必空;/search 页搜「YPJ-59」同为空,属存量缺陷。
 
 修正:SearchService SQL 补编号 ILIKE(`(p.key || '-' || i.number::text)`)+1 参数;新增 SearchApiTest 3 例(标题命中/编号命中含数字混合 key 与大小写/软删不命中);api.http 补全局搜索节。前端解析代码不变。偏离「零后端改动」——根因在共享层修一处,而非前端绕行。
+
+## 补充迭代(2026-10-17,用户反馈;并入本票)
+
+项目上下文预填:在 `/p/{key}` 页面内,顶栏跳转框预置 `"KEY-"`——只输编号回车即达本项目 item;清空前缀可跨项目输全号(如 `CHE-21`)。AppNav 按 `pathname` 解析项目 key,`useEffect` 同步预置与错误态清零;e2e 增预填用例 1 例。
