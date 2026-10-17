@@ -133,3 +133,9 @@ fixture 走 helpers(独立 key 项目;新建项目首 item 编号恒为 `{KEY}-1
 - [ ] uuid URL 与全部列表跳转回归不变
 - [ ] e2e 3 例绿;全量 e2e + `tsc`/`next build` 绿
 - [ ] spec 0048 补 As-built
+
+## 设计修正(2026-10-17,e2e 2 例红后定案)
+
+开工假设「纯前端、复用现有 /api/search 解析」有误:SearchService 只 ILIKE title/description,number 是读时拼接(key + "-" + number),**搜索从不匹配编号**——解析必空;/search 页搜「YPJ-59」同为空,属存量缺陷。
+
+修正:SearchService SQL 补编号 ILIKE(`(p.key || '-' || i.number::text)`)+1 参数;新增 SearchApiTest 3 例(标题命中/编号命中含数字混合 key 与大小写/软删不命中);api.http 补全局搜索节。前端解析代码不变。偏离「零后端改动」——根因在共享层修一处,而非前端绕行。

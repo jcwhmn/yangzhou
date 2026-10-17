@@ -939,3 +939,14 @@ Authorization: Bearer {{token}}
 ### [预期 404] 删除:未知项目
 DELETE /api/projects/ZZZZZZ
 Authorization: Bearer {{token}}
+
+### ============ 16. 全局搜索(YPJ-63;标题/描述/编号 ILIKE,编号直达解析同源) ============
+
+### 搜索本轮项目 item(编号,含 key 带数字场景)
+GET {{host}}/api/search?q={{pkey}}-1
+Authorization: Bearer {{token}}
+
+### 查无命中(空数组,200 非报错)
+GET {{host}}/api/search?q=不存在的词xyz
+Authorization: Bearer {{token}}
+
