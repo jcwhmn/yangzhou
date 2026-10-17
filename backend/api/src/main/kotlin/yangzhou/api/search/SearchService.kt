@@ -24,7 +24,8 @@ class SearchService(private val jdbc: JdbcOperations) {
             from item i
             join project p on i.project_id = p.id
             left join status s on i.status_object_id = s.object_id
-            where (i.title ilike ? or i.description ilike ?) and i.deleted_at is null
+            where (i.title ilike ? or i.description ilike ? or (p.key || '-' || i.number::text) ilike ?)
+            and i.deleted_at is null
             order by p.key, i.number
             limit 50
             """.trimIndent(),
@@ -37,7 +38,7 @@ class SearchService(private val jdbc: JdbcOperations) {
                     rs.getString("name"),
                 )
             },
-            pattern, pattern,
+            pattern, pattern, pattern,
         )
     }
 }
