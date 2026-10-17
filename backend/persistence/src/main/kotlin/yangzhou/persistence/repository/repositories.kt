@@ -1,5 +1,6 @@
 package yangzhou.persistence.repository
 
+import org.springframework.data.jdbc.repository.query.Modifying
 import org.springframework.data.jdbc.repository.query.Query
 import org.springframework.data.repository.CrudRepository
 import org.springframework.data.repository.Repository
@@ -330,4 +331,128 @@ interface ProjectViewRepository : CrudRepository<ProjectView, Long> {
     fun findByObjectIdAndCreatorId(objectId: UUID, creatorId: Long): ProjectView?
     fun existsByProjectIdAndCreatorIdAndName(projectId: Long, creatorId: Long, name: String): Boolean
     fun countByCreatorId(creatorId: Long): Long
+}
+
+
+// ---------- YPJ-64 持久层收敛(spec 0049):JDBC client 清退,@Query 唯一扩展点 ----------
+
+data class SearchHitRow(
+    val itemId: UUID,
+    val projectKey: String,
+    val number: String,
+    val title: String,
+    val status: String?,
+)
+
+interface SearchRepository : Repository<Item, Long> {
+    @Query(
+        """SELECT i.object_id AS item_id, p.key AS project_key,
+            p.key || '-' || i.number AS number, i.title, s.name AS status
+            FROM item i JOIN project p ON i.project_id = p.id
+            LEFT JOIN status s ON i.status_object_id = s.object_id
+            WHERE (i.title ILIKE :q OR i.description ILIKE :q OR (p.key || '-' || i.number::text) ILIKE :q)
+            AND i.deleted_at IS NULL
+            ORDER BY p.key, i.number
+            LIMIT 50""",
+    )
+    fun search(q: String): List<SearchHitRow>
+}
+
+data class DeletionPreviewRow(
+    val itemCount: Long,
+    val groupCount: Long,
+    val milestoneCount: Long,
+    val viewCount: Long,
+    val statusCount: Long,
+    val memberCount: Long,
+)
+
+interface ProjectDeletionRepository : Repository<Project, Long> {
+    @Query(
+        """SELECT (SELECT count(*) FROM item WHERE project_id = :pid)           AS item_count,
+            (SELECT count(*) FROM item_group WHERE project_id = :pid)     AS group_count,
+            (SELECT count(*) FROM milestone WHERE project_id = :pid)      AS milestone_count,
+            (SELECT count(*) FROM project_view WHERE project_id = :pid)   AS view_count,
+            (SELECT count(*) FROM status WHERE project_id = :pid)         AS status_count,
+            (SELECT count(*) FROM project_member WHERE project_id = :pid) AS member_count""",
+    )
+    fun deletionPreview(pid: Long): DeletionPreviewRow
+
+    @Modifying
+    @Query("DELETE FROM requirement WHERE item_id IN (SELECT id FROM item WHERE project_id = :pid)")
+    fun purgeRequirements(pid: Long): Int
+
+    @Modifying
+    @Query(
+        "DELETE FROM item_group_member WHERE item_id IN (SELECT id FROM item WHERE project_id = :pid) " +
+            "OR group_id IN (SELECT id FROM item_group WHERE project_id = :pid)",
+    )
+    fun purgeItemGroupMembers(pid: Long): Int
+
+    @Modifying
+    @Query("DELETE FROM item WHERE project_id = :pid")
+    fun purgeItems(pid: Long): Int
+
+    @Modifying
+    @Query("DELETE FROM item_group WHERE project_id = :pid")
+    fun purgeItemGroups(pid: Long): Int
+
+    @Modifying
+    @Query("DELETE FROM milestone WHERE project_id = :pid")
+    fun purgeMilestones(pid: Long): Int
+
+    @Modifying
+    @Query("DELETE FROM status WHERE project_id = :pid")
+    fun purgeStatuses(pid: Long): Int
+
+    @Modifying
+    @Query("DELETE FROM project_view WHERE project_id = :pid")
+    fun purgeProjectViews(pid: Long): Int
+
+    @Modifying
+    @Query("UPDATE member SET last_project_key = NULL WHERE last_project_key = :key")
+    fun clearLastProjectKey(key: String): Int
+
+    @Modifying
+    @Query("DELETE FROM project WHERE id = :pid")
+    fun deleteProject(pid: Long): Int
+}
+
+interface ItemTreeRepository : Repository<Item, Long> {
+    /** 软删/恢复共用:at=null 即恢复(替换旧字符串插值,参数化)。 */
+    @Modifying
+    @Query(
+        """WITH RECURSIVE subtree AS (
+            SELECT id, object_id FROM item WHERE id = :rootId
+            UNION ALL
+            SELECT i.id, i.object_id FROM item i JOIN subtree s ON i.parent_object_id = s.object_id
+        )
+        UPDATE item SET deleted_at = :at WHERE id IN (SELECT id FROM subtree)""",
+    )
+    fun updateSubtreeDeletedAt(rootId: Long, at: java.time.Instant?): Int
+
+    @Modifying
+    @Query(
+        """WITH RECURSIVE subtree AS (
+            SELECT id, object_id FROM item WHERE id = :rootId
+            UNION ALL
+            SELECT i.id, i.object_id FROM item i JOIN subtree s ON i.parent_object_id = s.object_id
+        )
+        DELETE FROM requirement WHERE item_id IN (SELECT id FROM subtree)""",
+    )
+    fun purgeRequirementsInSubtree(rootId: Long): Int
+
+    @Modifying
+    @Query(
+        """WITH RECURSIVE subtree AS (
+            SELECT id, object_id FROM item WHERE id = :rootId
+            UNION ALL
+            SELECT i.id, i.object_id FROM item i JOIN subtree s ON i.parent_object_id = s.object_id
+        )
+        DELETE FROM item WHERE id IN (SELECT id FROM subtree)""",
+    )
+    fun purgeItemsInSubtree(rootId: Long): Int
+
+    @Query("SELECT parent_object_id FROM item WHERE object_id = :objectId")
+    fun findParentObjectId(objectId: UUID): UUID?
 }
