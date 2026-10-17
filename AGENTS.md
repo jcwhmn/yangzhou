@@ -64,6 +64,7 @@ docs/      adr/ · spec/ · architecture/(puml 类图) · requirement/(PRD) · p
 
 ## 持久层(ADR-0004;chess 实战约定平移)
 
+- **永不用 JDBC client(JdbcTemplate/JdbcOperations)**——跨表/投影/批量/级联一律 repository `@Query`/`@Modifying`(repositories.kt,ADR-0004 唯一授权扩展点;2026-10-17 定)
 - Spring Data JDBC + Flyway;禁 JPA/Hibernate/Exposed/BaseEntity 继承
 - 实体主构造直接声明 `id` / `objectId` / `createdAt` / `updatedAt`;`objectId` 在 Kotlin 生成
 - 对外只暴露公共 ID(`projectId` / `itemId`),永不暴露内部数字 id;FK 用 `object_id` UUID 列
@@ -113,6 +114,7 @@ docs/      adr/ · spec/ · architecture/(puml 类图) · requirement/(PRD) · p
 
 main 干线开发;原型留 `prototype/*` 分支;每张票 = 一个 YPJ item(dogfood),验收清单全绿才关票。
 
+- **架构破坏必须显要标注**:凡偏离 ADR/既定架构处,在 spec/PR/报告中专节置顶 + 加粗,不得混在设计细节里带过(2026-10-17 定;起因:0046/0048 的 jdbc client 用法埋在细节未标破坏)
 - **spec 文件是版本必须项**:开工前立 `docs/spec/00NN`(增量节,概要设计),完工后补 As-built;无 spec 不开工(2026-10-08 定,V16 系补录见 0013)。Linear 已冻结只读(历史存档),不再开新票。
 - **每票实现前三件套**(2026-10-09 立):spec 增量节含 ①需求(写细,含范围/非目标)②详细设计(代码级修改计划:改哪些文件、怎么改、否决的备选)③手工测试用例(供用户 build/debug 阶段执行);用户过目后才编码。
 - **编码完成后停**:功能代码+测试代码写完即停,等用户 build/debug,通过后再 PR。
