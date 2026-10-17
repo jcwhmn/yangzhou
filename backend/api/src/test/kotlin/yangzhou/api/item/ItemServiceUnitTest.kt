@@ -20,6 +20,7 @@ import yangzhou.persistence.repository.AttributeDefinitionRepository
 import yangzhou.persistence.repository.ItemGitRefRepository
 import yangzhou.persistence.repository.ItemNumberRepository
 import yangzhou.persistence.repository.ItemRepository
+import yangzhou.persistence.repository.ItemTreeRepository
 import yangzhou.persistence.repository.ItemActivityRepository
 import yangzhou.persistence.repository.ItemStatusHistoryRepository
 import yangzhou.persistence.repository.ItemGroupRepository
@@ -36,6 +37,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
@@ -57,7 +59,7 @@ class ItemServiceUnitTest {
     private val projectMembers = mockk<yangzhou.api.projectmember.ProjectMemberService>(relaxed = true)
     private val notificationService = mockk<yangzhou.api.notification.NotificationService>(relaxed = true)
     private val feasibilityService = mockk<yangzhou.api.feasibility.FeasibilityService>(relaxed = true)
-    private val jdbc = mockk<org.springframework.jdbc.core.JdbcOperations>(relaxed = true)
+    private val itemTree = mockk<ItemTreeRepository>(relaxed = true)
     private val requirementRepo = mockk<RequirementRepository>(relaxed = true)
     private val definitions = mockk<AttributeDefinitionRepository>(relaxed = true)
     private val membersRepo = mockk<MemberRepository>(relaxed = true)
@@ -66,7 +68,7 @@ class ItemServiceUnitTest {
 
     private val allMocks = arrayOf(
         projects, itemRepo, statuses, numbering, memberService, historyRepo, activityRepo,
-        workflow, projectMembers, notificationService, feasibilityService, jdbc,
+        workflow, projectMembers, notificationService, feasibilityService, itemTree,
         requirementRepo, definitions, membersRepo, groupRepo, groupMembers,
     )
 
@@ -77,7 +79,7 @@ class ItemServiceUnitTest {
         requirementRepo = requirementRepo,
         definitions = definitions,
         numbering = numbering,
-        jdbc = jdbc,
+        itemTree = itemTree,
         workflow = workflow,
         members = membersRepo,
         memberService = memberService,
@@ -500,9 +502,11 @@ class ItemServiceUnitTest {
             service.delete(itemOid)
 
             verify { feasibilityService.recomputeProjectSignal(projectId) }
-            val sql = slot<String>()
-            verify { jdbc.update(capture(sql)) }
-            assertTrue(sql.captured.contains("WITH RECURSIVE subtree") && sql.captured.contains("UPDATE item SET deleted_at"))
+            val rootId = slot<Long>()
+            val at = slot<Instant?>()
+            verify { itemTree.updateSubtreeDeletedAt(capture(rootId), captureNullable(at)) }
+            assertEquals(row.id, rootId.captured)
+            assertEquals(Instant.parse("2026-01-01T00:00:00Z"), at.captured) // 固定 Clock
         }
 
         @Test
@@ -521,9 +525,11 @@ class ItemServiceUnitTest {
 
             service.restore(itemOid)
 
-            val sql = slot<String>()
-            verify { jdbc.update(capture(sql)) }
-            assertTrue(sql.captured.contains("SET deleted_at = null"))
+            val rootId = slot<Long>()
+            val at = slot<Instant?>()
+            verify { itemTree.updateSubtreeDeletedAt(capture(rootId), captureNullable(at)) }
+            assertEquals(row.id, rootId.captured)
+            assertNull(at.captured)
         }
 
         @Test
@@ -542,11 +548,8 @@ class ItemServiceUnitTest {
 
             service.purge(itemOid)
 
-            val sqls = mutableListOf<String>()
-            verify { jdbc.update(capture(sqls)) }
-            assertEquals(2, sqls.size)
-            assertTrue(sqls[0].contains("DELETE FROM requirement"))
-            assertTrue(sqls[1].contains("DELETE FROM item"))
+            verify(exactly = 1) { itemTree.purgeRequirementsInSubtree(row.id!!) }
+            verify(exactly = 1) { itemTree.purgeItemsInSubtree(row.id!!) }
             verify { feasibilityService.recomputeProjectSignal(projectId) }
         }
 

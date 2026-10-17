@@ -1,7 +1,7 @@
 package yangzhou.api.item
 
 import jakarta.validation.constraints.NotBlank
-import org.springframework.jdbc.core.JdbcOperations
+import yangzhou.persistence.repository.ItemTreeRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import yangzhou.api.support.BadRequestException
@@ -36,7 +36,7 @@ class ItemService(
     private val requirementRepo: RequirementRepository,
     private val definitions: AttributeDefinitionRepository,
     private val numbering: ItemNumberRepository,
-    private val jdbc: JdbcOperations,
+    private val itemTree: ItemTreeRepository,
     private val workflow: yangzhou.api.workflow.WorkflowService,
     private val members: yangzhou.persistence.repository.MemberRepository,
     private val memberService: yangzhou.api.member.MemberService,
@@ -368,41 +368,24 @@ class ItemService(
     @Transactional
     fun delete(itemId: UUID) {
         val item = itemRepo.findByObjectId(itemId) ?: throw NotFoundException("item 不存在")
-        softDeleteSubtree(item.id!!, Instant.now().toString())
+        softDeleteSubtree(item.id!!, clock.instant()) // 触碰即迁移:原裸 Instant.now() 历史债(spec 0049)
         feasibilityService.recomputeProjectSignal(item.projectId) // V9-S1
     }
 
-    /** 递归 CTE:子树经 parent_object_id 链接。 */
-    private fun subtreeUpdate(rootId: Long, atSql: String?) {
-        val atClause = if (atSql == null) "null" else "'$atSql'"
-        jdbc.update(
-            """
-            WITH RECURSIVE subtree AS (
-                SELECT id, object_id FROM item WHERE id = $rootId
-                UNION ALL
-                SELECT i.id, i.object_id FROM item i JOIN subtree s ON i.parent_object_id = s.object_id
-            )
-            UPDATE item SET deleted_at = $atClause WHERE id IN (SELECT id FROM subtree)
-            """.trimIndent(),
-        )
+    /** 子树软删/恢复(SQL 见 ItemTreeRepository)。 */
+    private fun subtreeUpdate(rootId: Long, at: Instant?) {
+        itemTree.updateSubtreeDeletedAt(rootId, at)
     }
 
-    private fun softDeleteSubtree(rootId: Long, atSql: String) = subtreeUpdate(rootId, atSql)
+    private fun softDeleteSubtree(rootId: Long, at: Instant) = subtreeUpdate(rootId, at)
 
     private fun restoreSubtree(rootId: Long) = subtreeUpdate(rootId, null)
 
     /** 物理删(回收站彻底删除):需求无级联先手动清(子树全量),item 子树随后真删。 */
     @Transactional
     fun purgeSubtree(rootId: Long) {
-        val cte = """
-            WITH RECURSIVE subtree AS (
-                SELECT id, object_id FROM item WHERE id = $rootId
-                UNION ALL
-                SELECT i.id, i.object_id FROM item i JOIN subtree s ON i.parent_object_id = s.object_id
-            )
-        """
-        jdbc.update("$cte DELETE FROM requirement WHERE item_id IN (SELECT id FROM subtree)")
-        jdbc.update("$cte DELETE FROM item WHERE id IN (SELECT id FROM subtree)")
+        itemTree.purgeRequirementsInSubtree(rootId)
+        itemTree.purgeItemsInSubtree(rootId)
     }
 
     /** 回收站列表(已删 item 的子树根,删除时间倒序;子条目随父恢复,不单列)。 */
@@ -469,11 +452,7 @@ class ItemService(
         var hops = 0
         while (cursor != null) {
             if (cursor == item.objectId) throw ConflictException("不能把 item 挂到自己的后代下")
-            cursor = jdbc.query(
-                "select parent_object_id from item where object_id = ?",
-                { rs, _ -> rs.getObject(1) as? UUID },
-                cursor,
-            ).firstOrNull()
+            cursor = itemTree.findParentObjectId(cursor)
             if (++hops > 10_000) throw ConflictException("item 树异常,拒绝操作") // ponytail: 深度上限兜底
         }
     }
