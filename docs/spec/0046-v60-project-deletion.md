@@ -107,3 +107,17 @@ project 区块加序号条目:`GET /api/projects/{{projKey}}/deletion-preview`�
 4. `yz members rm 小李046619` → 成功;`yz members rm <被 YPJ 引用的成员>` → 409 带计数提示;`yz members rm me` → 409(登录账号,现状回归)。
 5. 曾把 lastProjectKey 设为垃圾项目的账号重新登录 → 正常进入,不 404。
 6. api.http preview/DELETE 链 + 负例全过;全量 e2e 绿。
+
+### As-built(2026-10-17,PR #116)
+
+按设计落地:`ProjectService.delete` `@Transactional` + `JdbcTemplate` 按 FK 依赖序九步物理删(含回收站软删 item、`member.last_project_key` 清 NULL);`deletion-preview` 一条 JDBC 计数查询;`MemberService` 补 6 处 restrict 引用计数 409(修直删 500);CLI `projects delete <KEY>...` 默认 dry-run、`--force` 真删;`members rm` 多名字同规;`AbstractApiTest.jdbc` 提 protected(9 个测试类去重复声明);api.http 删除链 + 负例;ProjectDeletionApiTest 6 例。
+
+**能力演进链(用户驱动,逐 commit)**:单 KEY → 多 KEY(单项目失败不阻断、尾部汇总失败数)→ 顿号/逗号粘贴等价(login 回显列表可整串贴;粘贴串含 YPJ 本尊时 `--force` 前剔除)→ `members rm` 同规。
+
+**实现坑(2)**:
+1. CLI 旗标解析把 `--` 开头参数抽进 flags 表,`rest` 永不含 `--force` → dry-run 恒触发;改查 `flags["force"]`。
+2. `members rm` 的 `when` 是 `return when`(表达式语境),分支尾「无 else 的 if」编译不过 → 失败汇总改 `check()`。
+
+cli 模块零内部依赖(仅 jackson),`gradle :cli:jar` 独立秒级重出。
+
+**验证**:用户双 profile(8080 test / 8081 default)手工过;YPJ-59 清库实弹执行(13 垃圾项目 + 25 垃圾成员,零失败);ProjectDeletionApiTest 6 例绿;全量 `gradle build --no-daemon` 绿。
