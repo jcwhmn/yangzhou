@@ -20,7 +20,7 @@ import { Dropdown } from "@/components/Dropdown";
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { resolveBack } from "@/lib/back";
@@ -117,8 +117,41 @@ const activityLabel: Record<string, string> = {
   dates_changed: "日期变更",
 };
 
+// 编号直达(YPJ-63):uuid 直通;编号经现有 /api/search 精确解析,地址栏保持编号
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+type SearchHit = { itemId: string; number: string; projectKey: string };
+
 export default function ItemDetailPage() {
-  const { key, itemId } = useParams<{ key: string; itemId: string }>();
+  const { key, itemId: paramId } = useParams<{ key: string; itemId: string }>();
+  const router = useRouter();
+  const [resolvedId, setResolvedId] = useState<string | null>(() => (UUID_RE.test(paramId) ? paramId : null));
+  const [numNotFound, setNumNotFound] = useState(false);
+  const itemId = resolvedId ?? "";
+
+  useEffect(() => {
+    if (resolvedId) return;
+    let dead = false;
+    api<SearchHit[]>(`/api/search?q=${encodeURIComponent(paramId)}`)
+      .then((hits) => {
+        if (dead) return;
+        const hit = hits.find((h) => h.number.toUpperCase() === paramId.toUpperCase());
+        if (!hit) {
+          setNumNotFound(true);
+          return;
+        }
+        if (hit.projectKey !== key) {
+          router.replace(`/p/${hit.projectKey}/i/${hit.number}`); // key 段与编号不符,纠正 URL
+          return;
+        }
+        setResolvedId(hit.itemId);
+      })
+      .catch(() => {
+        if (!dead) setNumNotFound(true);
+      });
+    return () => {
+      dead = true;
+    };
+  }, [paramId, key, resolvedId, router]);
   const [item, setItem] = useState<Item | null>(null);
   const [statuses, setStatuses] = useState<Status[]>([]);
   const [attributes, setAttributes] = useState<Attribute[]>([]);
@@ -163,6 +196,7 @@ export default function ItemDetailPage() {
   }, [key]);
 
   const load = useCallback(async () => {
+    if (!itemId) return;
     const [it, project, attrs, feas, acts, spr, rel] = await Promise.all([
       api<Item>(`/api/items/${itemId}`),
       api<{ statuses: Status[] }>(`/api/projects/${key}`),
@@ -402,7 +436,9 @@ export default function ItemDetailPage() {
   if (!item) {
     return (
       <Box sx={{ p: 3 }}>
-        <Typography color={error ? "error" : "text.secondary"}>{error || "加载中…"}</Typography>
+        <Typography color={error ? "error" : "text.secondary"}>
+          {numNotFound ? t.item.number_not_found : error || "加载中…"}
+        </Typography>
       </Box>
     );
   }
