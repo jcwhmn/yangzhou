@@ -10,8 +10,6 @@ import kotlin.test.assertTrue
 /** JCW-132:V9-S4 站会黑盒(昨日推进/今日名下/阻塞中/按人切换)。 */
 class StandupApiTest : AbstractApiTest() {
 
-    @Autowired
-    lateinit var jdbc: JdbcTemplate
 
     @Test
     fun `站会三组——昨日推进_今日名下_阻塞中——按人切换`() {

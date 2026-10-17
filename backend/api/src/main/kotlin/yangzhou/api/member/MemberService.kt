@@ -9,6 +9,12 @@ import yangzhou.api.workspace.WorkspaceService
 import yangzhou.persistence.Member
 import yangzhou.persistence.repository.CapabilityRepository
 import yangzhou.persistence.repository.MemberRepository
+import yangzhou.persistence.repository.CommentRepository
+import yangzhou.persistence.repository.ItemActivityRepository
+import yangzhou.persistence.repository.ItemStatusHistoryRepository
+import yangzhou.persistence.repository.NotificationRepository
+import yangzhou.persistence.repository.ProjectViewRepository
+import yangzhou.persistence.repository.TimeEntryRepository
 import java.time.Instant
 import java.util.UUID
 
@@ -23,6 +29,12 @@ class MemberService(
     private val workspaceService: WorkspaceService,
     private val items: yangzhou.persistence.repository.ItemRepository,
     private val statuses: yangzhou.persistence.repository.StatusRepository,
+    private val comments: CommentRepository,
+    private val itemActivities: ItemActivityRepository,
+    private val itemStatusHistories: ItemStatusHistoryRepository,
+    private val timeEntries: TimeEntryRepository,
+    private val projectViews: ProjectViewRepository,
+    private val notifications: NotificationRepository,
 ) {
 
     data class MemberResponse(
@@ -76,9 +88,22 @@ class MemberService(
         val activeItems = items.findByAssigneeObjectIdAndDeletedAtIsNull(member.objectId)
             .filter { item -> statuses.findByObjectId(item.statusObjectId)?.isFinal != true }
         if (activeItems.isNotEmpty()) {
-            throw ConflictException("该成员仍有进行中 item(\${activeItems.size} 个),请先改派或完成")
+            throw ConflictException("该成员仍有进行中 item(${activeItems.size} 个),请先改派或完成")
         }
-        capabilities.deleteByMemberId(member.id!!)
+        // YPJ-60:restrict 引用非空即拒(直删会触发 DB 异常 500);附引用计数供清理决策
+        val mid = member.id!!
+        val refs = buildList {
+            comments.countByAuthorMemberId(mid).takeIf { it > 0 }?.let { add("评论 $it") }
+            itemActivities.countByActorMemberId(mid).takeIf { it > 0 }?.let { add("动态 $it") }
+            itemStatusHistories.countByActorMemberId(mid).takeIf { it > 0 }?.let { add("状态历史 $it") }
+            timeEntries.countByMemberId(mid).takeIf { it > 0 }?.let { add("工时 $it") }
+            projectViews.countByCreatorId(mid).takeIf { it > 0 }?.let { add("视图 $it") }
+            notifications.countByActorMemberId(mid).takeIf { it > 0 }?.let { add("通知 $it") }
+        }
+        if (refs.isNotEmpty()) {
+            throw ConflictException("该成员仍有引用数据(${refs.joinToString("、")}),先删除相关项目或数据")
+        }
+        capabilities.deleteByMemberId(mid)
         members.delete(member)
     }
 

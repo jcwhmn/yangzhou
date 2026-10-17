@@ -2,6 +2,7 @@ package yangzhou.api.project
 
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Pattern
+import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import yangzhou.api.support.ConflictException
@@ -27,6 +28,7 @@ class ProjectService(
     private val workflowRules: ProjectWorkflowRuleRepository,
     private val items: yangzhou.persistence.repository.ItemRepository,
     private val workspaceService: WorkspaceService,
+    private val jdbc: JdbcTemplate,
 ) {
 
     data class StatusDto(val statusId: UUID, val name: String, val icon: String?, val isStart: Boolean, val isFinal: Boolean, val position: Int)
@@ -59,6 +61,69 @@ class ProjectService(
             StatusDto(it.objectId, it.name, it.icon, it.isStart, it.isFinal, it.position)
         }
         return ProjectDto(project.objectId, project.key, project.name, project.archivedAt != null, project.feasSignal, statusDtos)
+    }
+
+    /** YPJ-60:删除预览——将随项目物理删除的数据量(只读,不动库)。 */
+    fun deletionPreview(key: String): DeletionPreviewDto {
+        val project = projects.findByKey(key) ?: throw NotFoundException("项目不存在:$key")
+        val pid = project.id ?: error("no id")
+        val c = jdbc.queryForMap(
+            """
+            select
+              (select count(*) from item where project_id = ?)           as item_count,
+              (select count(*) from item_group where project_id = ?)     as group_count,
+              (select count(*) from milestone where project_id = ?)      as milestone_count,
+              (select count(*) from project_view where project_id = ?)   as view_count,
+              (select count(*) from status where project_id = ?)         as status_count,
+              (select count(*) from project_member where project_id = ?) as member_count
+            """.trimIndent(),
+            pid, pid, pid, pid, pid, pid,
+        )
+
+        fun n(k: String) = (c[k] as Number).toLong()
+        return DeletionPreviewDto(
+            key = project.key,
+            name = project.name,
+            itemCount = n("item_count"),
+            groupCount = n("group_count"),
+            milestoneCount = n("milestone_count"),
+            viewCount = n("view_count"),
+            statusCount = n("status_count"),
+            memberCount = n("member_count"),
+        )
+    }
+
+    data class DeletionPreviewDto(
+        val key: String,
+        val name: String,
+        val itemCount: Long,
+        val groupCount: Long,
+        val milestoneCount: Long,
+        val viewCount: Long,
+        val statusCount: Long,
+        val memberCount: Long,
+    )
+
+    /** YPJ-60:物理删除项目及全部从属数据(含回收站软删 item);FK 依赖序见 spec 0046。 */
+    @Transactional
+    fun delete(key: String) {
+        val project = projects.findByKey(key) ?: throw NotFoundException("项目不存在:$key")
+        val pid = project.id ?: error("no id")
+        jdbc.update("delete from requirement where item_id in (select id from item where project_id = ?)", pid)
+        jdbc.update(
+            "delete from item_group_member where item_id in (select id from item where project_id = ?)" +
+                " or group_id in (select id from item_group where project_id = ?)",
+            pid, pid,
+        )
+        // 子表(评论/工时/动态/状态历史/依赖/清单/git_ref/通知/群组历史)随 item 级联;软删 item 一并物理删
+        jdbc.update("delete from item where project_id = ?", pid)
+        // 先于 milestone:release/sprint 同表,item_group.milestone_id restrict
+        jdbc.update("delete from item_group where project_id = ?", pid)
+        jdbc.update("delete from milestone where project_id = ?", pid)
+        jdbc.update("delete from status where project_id = ?", pid) // transition/workflow_rule 级联
+        jdbc.update("delete from project_view where project_id = ?", pid)
+        jdbc.update("update member set last_project_key = null where last_project_key = ?", key)
+        jdbc.update("delete from project where id = ?", pid) // repo/rule/favorite/project_member 级联
     }
 
     /** V8-S2 甘特数据:全量 item 按树序(父先子后,number 次序);日期可空;overdue 同看板语义。 */

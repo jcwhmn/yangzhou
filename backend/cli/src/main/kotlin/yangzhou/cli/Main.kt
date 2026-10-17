@@ -29,11 +29,12 @@ private fun usage() {
           attrs create <属性> [--kind skill|label|category] [--leveled] [--parent <分类>]  建词表属性
           members add <显示名>                         建虚拟成员(无凭据,不登录)
           members list [--json]                        成员目录(含我与虚拟)
-          members rm <成员名>                          删虚拟成员(登录账号不可删)
+          members rm <成员名>...                       删虚拟成员(可多名字/顿号分隔;登录账号不可删)
           members set <成员名> <属性> [1-4]            给成员自评能力(不带数字=未评级)
           teams add <组名> / teams list                建组/列组(纯分组,视图过滤)
           attrs list [--json]                        词表列表
           projects create <KEY> [名称]                 建项目(自动带三态 workflow)
+          projects delete <KEY>... [--force]           删项目(多 KEY,可直接粘贴 login 列表;默认预览,--force 物理删)
           projects list [--json]                       项目列表
           items create <KEY> <标题> [--req 属性[>=N]]... [--json]   建 item(需求可分级)
           items list <KEY> [--json]                    项目 item 列表
@@ -84,10 +85,21 @@ private fun run(args: List<String>) {
                 println("已建虚拟成员:${body["displayName"].asString()}(无凭据,不登录)")
             }
             "rm" -> {
-                val name = rest.getOrNull(0) ?: error("缺少成员名")
-                val id = memberIdByDisplayName(api, name) ?: error("成员不存在:$name")
-                api.json("DELETE", "/api/members/$id")
-                println("已删除:$name")
+                // 与 projects delete 同规:粘贴名单(顿号/逗号)与空格分隔等价
+                val names = rest.flatMap { it.split('、', ',') }.map { it.trim() }.filter { it.isNotEmpty() }
+                    .ifEmpty { error("缺少成员名(可多个)") }
+                var failed = 0
+                for (name in names) {
+                    try {
+                        val id = memberIdByDisplayName(api, name) ?: error("成员不存在:$name")
+                        api.json("DELETE", "/api/members/$id")
+                        println("已删除:$name")
+                    } catch (e: IllegalStateException) {
+                        failed++
+                        println("失败:$name → ${e.message}")
+                    }
+                }
+                check(failed == 0) { "$failed/${names.size} 个成员失败" }
             }
             "list" -> {
                 val body = api.json("GET", "/api/members")
@@ -277,6 +289,31 @@ private fun run(args: List<String>) {
             body.forEach {
                 println("%-7s %-8s %-7s %s".format(it["key"].asString(), it["name"].asString(), it["statuses"].size(), if (it["archived"].asBoolean()) "是" else "否"))
             }
+        }
+        "projects delete" -> {
+            // 粘贴 login 回显列表(顿号/逗号分隔)与空格分隔等价
+            val keys = rest.flatMap { it.split('、', ',') }.map { it.trim() }.filter { it.isNotEmpty() }.ifEmpty { error("缺少项目 KEY(可多个)") }
+            var failed = 0
+            for (key in keys) {
+                try {
+                    if ("force" in flags) {
+                        api.json("DELETE", "/api/projects/$key")
+                        println("已删除:$key")
+                    } else {
+                        val p = api.json("GET", "/api/projects/$key/deletion-preview")
+                        println(
+                            "将物理删除项目 ${p["key"].asString()}(${p["name"].asString()}):" +
+                                "item ${p["itemCount"].asInt()}、sprint/release ${p["groupCount"].asInt()}、里程碑 ${p["milestoneCount"].asInt()}、" +
+                                "视图 ${p["viewCount"].asInt()}、状态 ${p["statusCount"].asInt()}、成员关系 ${p["memberCount"].asInt()}",
+                        )
+                    }
+                } catch (e: IllegalStateException) {
+                    failed++
+                    println("失败:$key → ${e.message}")
+                }
+            }
+            if ("force" !in flags) println("未执行;确认无误加 --force")
+            if (failed > 0) error("$failed/${keys.size} 个项目失败")
         }
 
         "items create" -> {

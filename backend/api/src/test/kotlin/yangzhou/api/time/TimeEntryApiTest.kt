@@ -10,8 +10,6 @@ import kotlin.test.assertTrue
 /** JCW-122:V8-S3 工时黑盒(计时器唯一自动停旧/补录/互斥 400/合计聚合/越权 404)。 */
 class TimeEntryApiTest : AbstractApiTest() {
 
-    @Autowired
-    lateinit var jdbc: JdbcTemplate
 
     private fun setup(): Triple<org.springframework.test.web.servlet.client.RestTestClient, String, String> {
         val authed = bootstrapAndAuth()

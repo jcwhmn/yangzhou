@@ -18,8 +18,6 @@ class AuthorBackfillApiTest : AbstractApiTest() {
     @Autowired
     lateinit var syncService: GithubSyncService
 
-    @Autowired
-    lateinit var jdbc: JdbcTemplate
 
     @Test
     fun `PR author 映射成员——池内自动 assign——未配置池跳过`() {

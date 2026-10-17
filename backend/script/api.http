@@ -908,3 +908,34 @@ Content-Type: application/json
   "name": "hijack"
 }
 
+### ============ 15. 项目删除(YPJ-60;preview 计数 → force 删除 → 404) ============
+
+### 建一次性项目(handler 存变量 dkey;用后即删)
+POST /api/projects
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "key": "DEL{{$timestamp}}",
+  "name": "删除演练"
+}
+
+> {%
+    client.global.set("dkey", response.body.key);
+%}
+
+### 删除预览(计数只读)
+GET /api/projects/{{dkey}}/deletion-preview
+Authorization: Bearer {{token}}
+
+### 物理删除(204;再次 GET 见下方负例)
+DELETE /api/projects/{{dkey}}
+Authorization: Bearer {{token}}
+
+### [预期 404] 删除预览:未知项目
+GET /api/projects/ZZZZZZ/deletion-preview
+Authorization: Bearer {{token}}
+
+### [预期 404] 删除:未知项目
+DELETE /api/projects/ZZZZZZ
+Authorization: Bearer {{token}}
