@@ -138,3 +138,13 @@ interface ItemTreeRepository : Repository<Item, Long> {
 - [ ] subtreeUpdate 无字符串插值(参数化)
 - [ ] AGENTS.md 铁律在 main(随本票或已提交)
 - [ ] spec 0049 补 As-built
+
+## As-built(2026-10-17,PR #118 合并)
+
+- **交付**:repositories.kt 新增 `SearchRepository` / `ProjectDeletionRepository`(deletionPreview 投影 + 九步级联 @Modifying,含 project 本体,不用 derived deleteById)/ `ItemTreeRepository`(子树软删/恢复参数化、物理删双 CTE、防环父链单查);三 service 删 jdbc 注入全改 repo;`ItemServiceUnitTest` 断言从 SQL 文本改为 repo 调用与参数(mockk slot);`service.delete` 软删触碰即迁移裸 `Instant.now()` → 注入 `clock`。
+- **实现坑(3)**:
+  1. **递归 CTE 不可收敛列**:首版把 CTE 优化成单列 `SELECT id`——递归成员 `JOIN subtree s ON i.parent_object_id = s.object_id` 依赖 CTE 的 object_id 列,BadSqlGrammar,全量集成测试当场拦下;教训:递归 SQL 平移逐句、不"顺手优化"。
+  2. 裸 `Instant.now()` 历史债被新参数断言暴露(expected 固定 Clock 值 got 实时)——按 skill「触碰即迁移」改 `clock.instant()`,单测转确定。
+  3. mockk 捕获可空槽用 `captureNullable(slot)`,`capture` 不适用。
+- **偏差**:AbstractApiTest.jdbc(protected)保留——测试清库基建,非生产持久层(生产 `backend/api/src/main` 归零)。
+- **验证**:全量 integrationTest 绿;ItemsApiTest(软删/恢复/彻底删)复跑绿;`gradle build --no-daemon` 绿;e2e 全量 50 passed。
