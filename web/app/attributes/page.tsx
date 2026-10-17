@@ -14,7 +14,6 @@ import { PageShell } from "@/components/PageShell";
 import { Dropdown } from "@/components/Dropdown";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { AppNav } from "@/components/AppNav";
 import { t } from "@/lib/texts";
 
 type Attribute = {
@@ -96,7 +95,6 @@ export default function AttributesPage() {
 
   return (
     <PageShell>
-      <AppNav />
       <Typography variant="h5" gutterBottom>
         {t.attrs.title}
       </Typography>

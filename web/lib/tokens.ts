@@ -13,4 +13,12 @@ export const tokens = {
   radius: 8,
   // 紧凑:间距单位 8 → 7(不启用全局 density,避免压行高)
   spacing: 7,
+  // 语义色(V65 走查收敛:单一真相源,Providers/Verdict 共引;域色语义见 DOMAIN.md 绿黄红)
+  primary: "#2E6FAF", // 钢蓝,与 bg 同族;替代 MUI 出厂蓝 #1976d2
+  success: "#2e7d32",
+  warning: "#ed6c02",
+  error: "#c62828",
+  gap: "#b45309", // 判定「差级」
+  neutral: "#9e9e9e", // 判定「有余」/指派人兜底
+  accent: "#7c4dff", // 判定「未评级」
 };

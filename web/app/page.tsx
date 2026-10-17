@@ -182,7 +182,7 @@ export default function ProjectsPage() {
         <Box sx={{ mb: 4 }}>
           <Stack direction="row" spacing={2} alignItems="baseline" sx={{ mb: 0.5 }}>
             <Typography variant="h6">{t.dashboard.recent}</Typography>
-            <Typography variant="body2" component={Link} href="/notifications">{t.dashboard.viewAll}</Typography>
+            <Typography variant="body2" component={Link} href="/notifications" sx={{ color: "primary.main", textDecoration: "none", "&:hover": { textDecoration: "underline" } }}>{t.dashboard.viewAll}</Typography>
           </Stack>
           {recent.map((n) => (
             <Typography

@@ -134,7 +134,7 @@ export function AppNav() {
         )}
         <Stack sx={{ px: 2, py: 1, borderTop: "1px solid", borderColor: "divider", mt: 1 }}>
           <Link href="/" onClick={() => setFavAnchor(null)}>
-            <Typography variant="caption">浏览项目 →</Typography>
+            <Typography variant="caption">浏览项目</Typography>
           </Link>
         </Stack>
         {favs.map((f) => (

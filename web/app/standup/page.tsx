@@ -6,7 +6,6 @@ import { Dropdown } from "@/components/Dropdown";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { AppNav } from "@/components/AppNav";
 import { t } from "@/lib/texts";
 
 type Member = { memberId: string; displayName: string; virtual: boolean };
@@ -84,7 +83,6 @@ export default function StandupPage() {
 
   return (
     <PageShell>
-      <AppNav />
       <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
         <Typography variant="h5">站会</Typography>
 <Dropdown
