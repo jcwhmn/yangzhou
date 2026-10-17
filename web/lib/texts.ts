@@ -22,6 +22,8 @@ export const t = {
     standup: "站会",
     recycle_bin: "回收站",
     logout: "退出登录",
+    jump_placeholder: "编号跳转,如 YPJ-59",
+    jump_hint: "格式:项目KEY-编号",
   },
   fav: {
     empty: "暂无收藏——在项目卡上点 ☆",
@@ -69,6 +71,7 @@ export const t = {
   },
   item: {
     title: "标题",
+    number_not_found: "未找到该编号的 item",
     description: "描述",
     status: "状态",
     type: "类型",

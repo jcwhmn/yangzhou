@@ -1,6 +1,6 @@
 "use client";
 
-import { Badge, Button, Menu, Stack, Typography } from "@mui/material";
+import { Badge, Button, Menu, Stack, TextField, Typography } from "@mui/material";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -17,6 +17,15 @@ export function AppNav() {
   const [unread, setUnread] = useState(0);
   const [favAnchor, setFavAnchor] = useState<HTMLElement | null>(null);
   const [favs, setFavs] = useState<Fav[]>([]);
+  const [jump, setJump] = useState("");
+  const [jumpErr, setJumpErr] = useState(false);
+
+  // 项目上下文预填(Y63 补充):/p/{key} 页内预置 "KEY-",只输编号回车即达;清空可跨项目输全号
+  const projectKey = pathname.match(/^\/p\/([^/]+)/)?.[1]?.toUpperCase();
+  useEffect(() => {
+    setJump(projectKey ? `${projectKey}-` : "");
+    setJumpErr(false);
+  }, [projectKey]);
 
   useEffect(() => subscribeUnread(setUnread), []);
 
@@ -43,6 +52,17 @@ export function AppNav() {
     } catch {
       /* 静默 */
     }
+  }
+
+  // 编号直达(YPJ-63):回车跳 /p/{key}/i/{编号},解析归详情页;非法格式就地提示
+  function doJump() {
+    const v = jump.trim().toUpperCase();
+    if (!/^[A-Z0-9]+-\d+$/.test(v)) {
+      setJumpErr(true);
+      return;
+    }
+    setJumpErr(false);
+    router.push(`/p/${v.split("-")[0]}/i/${v}`);
   }
 
   function logout() {
@@ -82,10 +102,20 @@ export function AppNav() {
       <Button color="inherit" size="small" onClick={openFavs}>
         {t.nav.favorites}
       </Button>
+      <TextField
+        size="small"
+        placeholder={t.nav.jump_placeholder}
+        value={jump}
+        onChange={(e) => setJump(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && doJump()}
+        error={jumpErr}
+        helperText={jumpErr ? t.nav.jump_hint : undefined}
+        sx={{ ml: "auto", width: 190, "& .MuiFormHelperText-root": { whiteSpace: "nowrap" } }}
+      />
       <Typography
         component={Link}
         href="/notifications"
-        sx={{ ml: "auto", textDecoration: "none", color: pathname === "/notifications" ? "primary.main" : "text.secondary" }}
+        sx={{ textDecoration: "none", color: pathname === "/notifications" ? "primary.main" : "text.secondary" }}
         aria-label={t.notif.bell}
       >
         <Badge badgeContent={unread} color="error" max={99}>
