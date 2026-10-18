@@ -1,6 +1,10 @@
 package yangzhou.persistence
 
+import org.springframework.data.annotation.CreatedBy
+import org.springframework.data.annotation.CreatedDate
 import org.springframework.data.annotation.Id
+import org.springframework.data.annotation.LastModifiedBy
+import org.springframework.data.annotation.LastModifiedDate
 import org.springframework.data.relational.core.mapping.Table
 import java.time.Instant
 import java.time.LocalDate
@@ -12,8 +16,14 @@ data class Workspace(
     val objectId: UUID = UUID.randomUUID(),
     val name: String = "default",
     val githubToken: String? = null,
-    val createdAt: Instant = Instant.now(),
-    val updatedAt: Instant = Instant.now(),
+    @CreatedDate
+    var createdAt: Instant = Instant.now(),
+    @LastModifiedDate
+    var updatedAt: Instant = Instant.now(),
+    @CreatedBy
+    var createdBy: Long? = null,
+    @LastModifiedBy
+    var updatedBy: Long? = null,
 )
 
 @Table("member")
@@ -27,8 +37,14 @@ data class Member(
     val color: String? = null,
     val lastProjectKey: String? = null,
     val githubUsername: String? = null,
-    val createdAt: Instant = Instant.now(),
-    val updatedAt: Instant = Instant.now(),
+    @CreatedDate
+    var createdAt: Instant = Instant.now(),
+    @LastModifiedDate
+    var updatedAt: Instant = Instant.now(),
+    @CreatedBy
+    var createdBy: Long? = null,
+    @LastModifiedBy
+    var updatedBy: Long? = null,
 )
 
 @Table("team")
@@ -37,8 +53,14 @@ data class Team(
     val objectId: UUID = UUID.randomUUID(),
     val workspaceId: Long,
     val name: String,
-    val createdAt: Instant = Instant.now(),
-    val updatedAt: Instant = Instant.now(),
+    @CreatedDate
+    var createdAt: Instant = Instant.now(),
+    @LastModifiedDate
+    var updatedAt: Instant = Instant.now(),
+    @CreatedBy
+    var createdBy: Long? = null,
+    @LastModifiedBy
+    var updatedBy: Long? = null,
 )
 
 @Table("team_member")
@@ -47,8 +69,14 @@ data class TeamMember(
     val objectId: UUID = UUID.randomUUID(),
     val teamId: Long,
     val memberId: Long,
-    val createdAt: Instant = Instant.now(),
-    val updatedAt: Instant = Instant.now(),
+    @CreatedDate
+    var createdAt: Instant = Instant.now(),
+    @LastModifiedDate
+    var updatedAt: Instant = Instant.now(),
+    @CreatedBy
+    var createdBy: Long? = null,
+    @LastModifiedBy
+    var updatedBy: Long? = null,
 )
 
 @Table("item_activity")
@@ -72,8 +100,14 @@ data class ItemStatusHistory(
     val toStatusId: Long,
     val source: String,
     val actorMemberId: Long? = null,
-    val createdAt: Instant = Instant.now(),
-    val updatedAt: Instant = Instant.now(),
+    @CreatedDate
+    var createdAt: Instant = Instant.now(),
+    @LastModifiedDate
+    var updatedAt: Instant = Instant.now(),
+    @CreatedBy
+    var createdBy: Long? = null,
+    @LastModifiedBy
+    var updatedBy: Long? = null,
 )
 
 @Table("comment")
@@ -83,8 +117,14 @@ data class Comment(
     val itemId: Long,
     val authorMemberId: Long,
     val body: String,
-    val createdAt: Instant = Instant.now(),
-    val updatedAt: Instant = Instant.now(),
+    @CreatedDate
+    var createdAt: Instant = Instant.now(),
+    @LastModifiedDate
+    var updatedAt: Instant = Instant.now(),
+    @CreatedBy
+    var createdBy: Long? = null,
+    @LastModifiedBy
+    var updatedBy: Long? = null,
 )
 
 @Table("attribute_definition")
@@ -96,8 +136,14 @@ data class AttributeDefinition(
     val kind: String = "skill",
     val leveled: Boolean = false,
     val parentId: Long? = null,
-    val createdAt: Instant = Instant.now(),
-    val updatedAt: Instant = Instant.now(),
+    @CreatedDate
+    var createdAt: Instant = Instant.now(),
+    @LastModifiedDate
+    var updatedAt: Instant = Instant.now(),
+    @CreatedBy
+    var createdBy: Long? = null,
+    @LastModifiedBy
+    var updatedBy: Long? = null,
 )
 
 @Table("capability")
@@ -107,8 +153,14 @@ data class Capability(
     val memberId: Long,
     val attributeDefinitionId: Long,
     val level: Int? = null,
-    val createdAt: Instant = Instant.now(),
-    val updatedAt: Instant = Instant.now(),
+    @CreatedDate
+    var createdAt: Instant = Instant.now(),
+    @LastModifiedDate
+    var updatedAt: Instant = Instant.now(),
+    @CreatedBy
+    var createdBy: Long? = null,
+    @LastModifiedBy
+    var updatedBy: Long? = null,
 )
 
 @Table("project")
@@ -121,8 +173,14 @@ data class Project(
     val lastItemNumber: Int = 0,
     val archivedAt: Instant? = null,
     val feasSignal: String? = null,
-    val createdAt: Instant = Instant.now(),
-    val updatedAt: Instant = Instant.now(),
+    @CreatedDate
+    var createdAt: Instant = Instant.now(),
+    @LastModifiedDate
+    var updatedAt: Instant = Instant.now(),
+    @CreatedBy
+    var createdBy: Long? = null,
+    @LastModifiedBy
+    var updatedBy: Long? = null,
 )
 
 @Table("project_member")
@@ -131,8 +189,14 @@ data class ProjectMember(
     val objectId: UUID = UUID.randomUUID(),
     val projectId: Long,
     val memberId: Long,
-    val createdAt: Instant = Instant.now(),
-    val updatedAt: Instant = Instant.now(),
+    @CreatedDate
+    var createdAt: Instant = Instant.now(),
+    @LastModifiedDate
+    var updatedAt: Instant = Instant.now(),
+    @CreatedBy
+    var createdBy: Long? = null,
+    @LastModifiedBy
+    var updatedBy: Long? = null,
 )
 
 @Table("status")
@@ -146,8 +210,14 @@ data class Status(
     val isStart: Boolean = false,
     val wipLimit: Int? = null,
     val position: Int = 0,
-    val createdAt: Instant = Instant.now(),
-    val updatedAt: Instant = Instant.now(),
+    @CreatedDate
+    var createdAt: Instant = Instant.now(),
+    @LastModifiedDate
+    var updatedAt: Instant = Instant.now(),
+    @CreatedBy
+    var createdBy: Long? = null,
+    @LastModifiedBy
+    var updatedBy: Long? = null,
 )
 
 @Table("status_transition")
@@ -157,8 +227,14 @@ data class StatusTransition(
     val projectId: Long,
     val fromStatusId: Long,
     val toStatusId: Long,
-    val createdAt: Instant = Instant.now(),
-    val updatedAt: Instant = Instant.now(),
+    @CreatedDate
+    var createdAt: Instant = Instant.now(),
+    @LastModifiedDate
+    var updatedAt: Instant = Instant.now(),
+    @CreatedBy
+    var createdBy: Long? = null,
+    @LastModifiedBy
+    var updatedBy: Long? = null,
 )
 
 @Table("item")
@@ -179,9 +255,14 @@ data class Item(
     val feasSignal: String? = null,
     val priority: String? = null,
     val deletedAt: Instant? = null,
-    val createdBy: Long? = null,
-    val createdAt: Instant = Instant.now(),
-    val updatedAt: Instant = Instant.now(),
+    @CreatedDate
+    var createdAt: Instant = Instant.now(),
+    @LastModifiedDate
+    var updatedAt: Instant = Instant.now(),
+    @CreatedBy
+    var createdBy: Long? = null,
+    @LastModifiedBy
+    var updatedBy: Long? = null,
 )
 
 /** V7:站内通知(收件人维度;动作按钮读时现算,不落库)。 */
@@ -208,8 +289,14 @@ data class ChecklistItem(
     val text: String,
     val done: Boolean = false,
     val position: Int = 0,
-    val createdAt: Instant = Instant.now(),
-    val updatedAt: Instant = Instant.now(),
+    @CreatedDate
+    var createdAt: Instant = Instant.now(),
+    @LastModifiedDate
+    var updatedAt: Instant = Instant.now(),
+    @CreatedBy
+    var createdBy: Long? = null,
+    @LastModifiedBy
+    var updatedBy: Long? = null,
 )
 
 /** V9:item 依赖(阻塞关系):本 item 依赖 depends_on_item;依赖未终态 → 本 item 被阻塞。 */
@@ -253,8 +340,14 @@ data class ProjectRepo(
     val objectId: UUID = UUID.randomUUID(),
     val projectId: Long,
     val repo: String,
-    val createdAt: Instant = Instant.now(),
-    val updatedAt: Instant = Instant.now(),
+    @CreatedDate
+    var createdAt: Instant = Instant.now(),
+    @LastModifiedDate
+    var updatedAt: Instant = Instant.now(),
+    @CreatedBy
+    var createdBy: Long? = null,
+    @LastModifiedBy
+    var updatedBy: Long? = null,
 )
 
 /** V6:item↔GitHub 分支/PR 链接;uk(repo,kind,ref) 是轮询幂等锚点。 */
@@ -268,8 +361,14 @@ data class ItemGitRef(
     val ref: String,
     val url: String? = null,
     val state: String? = null,
-    val createdAt: Instant = Instant.now(),
-    val updatedAt: Instant = Instant.now(),
+    @CreatedDate
+    var createdAt: Instant = Instant.now(),
+    @LastModifiedDate
+    var updatedAt: Instant = Instant.now(),
+    @CreatedBy
+    var createdBy: Long? = null,
+    @LastModifiedBy
+    var updatedBy: Long? = null,
 )
 
 /** V6:每项目「GitHub 事件→目标状态」映射(Kaneo WorkflowRule 同款);GitHub 永不知道状态名。 */
@@ -280,8 +379,14 @@ data class ProjectWorkflowRule(
     val projectId: Long,
     val eventType: String,
     val statusObjectId: UUID,
-    val createdAt: Instant = Instant.now(),
-    val updatedAt: Instant = Instant.now(),
+    @CreatedDate
+    var createdAt: Instant = Instant.now(),
+    @LastModifiedDate
+    var updatedAt: Instant = Instant.now(),
+    @CreatedBy
+    var createdBy: Long? = null,
+    @LastModifiedBy
+    var updatedBy: Long? = null,
 )
 
 @Table("requirement")
@@ -291,8 +396,14 @@ data class Requirement(
     val itemId: Long,
     val attributeDefinitionId: Long,
     val minLevel: Int? = null,
-    val createdAt: Instant = Instant.now(),
-    val updatedAt: Instant = Instant.now(),
+    @CreatedDate
+    var createdAt: Instant = Instant.now(),
+    @LastModifiedDate
+    var updatedAt: Instant = Instant.now(),
+    @CreatedBy
+    var createdBy: Long? = null,
+    @LastModifiedBy
+    var updatedBy: Long? = null,
 )
 
 @Table("item_group")
@@ -307,8 +418,14 @@ data class ItemGroup(
     val endDate: LocalDate? = null,
     val releasedDate: LocalDate? = null,
     val milestoneId: Long? = null,
-    val createdAt: Instant = Instant.now(),
-    val updatedAt: Instant = Instant.now(),
+    @CreatedDate
+    var createdAt: Instant = Instant.now(),
+    @LastModifiedDate
+    var updatedAt: Instant = Instant.now(),
+    @CreatedBy
+    var createdBy: Long? = null,
+    @LastModifiedBy
+    var updatedBy: Long? = null,
 )
 
 /** item × group 多对多;不变量「至多一个 planned/active sprint」在 SprintService 保证(见 spec 0010 裁决 2);release 归属同理单选(release 端点语义,spec 0012)。 */
@@ -341,8 +458,14 @@ data class Milestone(
     val name: String,
     val status: String = "planned",
     val targetDate: LocalDate? = null,
-    val createdAt: Instant = Instant.now(),
-    val updatedAt: Instant = Instant.now(),
+    @CreatedDate
+    var createdAt: Instant = Instant.now(),
+    @LastModifiedDate
+    var updatedAt: Instant = Instant.now(),
+    @CreatedBy
+    var createdBy: Long? = null,
+    @LastModifiedBy
+    var updatedBy: Long? = null,
 )
 
 /** YPJ-47 视图配置:表格筛选/列配置按 用户×项目 私有保存(spec 0045)。filters/columns 为小 JSON 串(TEXT 列)。 */
@@ -355,6 +478,12 @@ data class ProjectView(
     val name: String,
     val filters: String = "{}",
     val columns: String = "{}",
-    val createdAt: Instant = Instant.now(),
-    val updatedAt: Instant = Instant.now(),
+    @CreatedDate
+    var createdAt: Instant = Instant.now(),
+    @LastModifiedDate
+    var updatedAt: Instant = Instant.now(),
+    @CreatedBy
+    var createdBy: Long? = null,
+    @LastModifiedBy
+    var updatedBy: Long? = null,
 )

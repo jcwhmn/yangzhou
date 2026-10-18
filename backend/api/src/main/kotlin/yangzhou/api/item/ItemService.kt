@@ -179,14 +179,13 @@ class ItemService(
                 status = statusNames[item.statusObjectId] ?: "?",
                 startDate = item.startDate?.toString(),
                 dueDate = item.dueDate?.toString(),
-                overdue = item.dueDate?.let { it < LocalDate.now() } == true
-                    && statusById[item.statusObjectId]?.isFinal != true,
+                overdue = isOverdue(item.dueDate, LocalDate.now(clock), statusById[item.statusObjectId]?.isFinal == true),
                 feasSignal = item.feasSignal,
                 priority = item.priority,
                 blocked = item.id in blockedIds,
                 assignee = item.assigneeObjectId?.let { memberNames[it] },
                 assigneeColor = item.assigneeObjectId?.let { memberMap[it]?.color },
-                dueSoon = item.dueDate?.let { it >= LocalDate.now() && it < LocalDate.now().plusDays(3) } == true,
+                dueSoon = isDueSoon(item.dueDate, LocalDate.now(clock)),
                 createdAt = item.createdAt.toString(),
                 sprintId = currentSprint[item.id]?.objectId,
                 sprintName = currentSprint[item.id]?.name,
@@ -499,3 +498,10 @@ data class UpdateItemRequest(
     val dueDate: String? = null,
     val priority: String? = null,
 )
+
+/** dueSoon/overdue 纯函数(时钟纪律:today 由注入 Clock 提供,可测;spec 0051)。 */
+internal fun isOverdue(due: LocalDate?, today: LocalDate, statusFinal: Boolean): Boolean =
+    due != null && due < today && !statusFinal
+
+internal fun isDueSoon(due: LocalDate?, today: LocalDate): Boolean =
+    due != null && due >= today && due < today.plusDays(3)
