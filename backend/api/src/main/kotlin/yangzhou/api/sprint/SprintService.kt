@@ -32,6 +32,7 @@ class SprintService(
     private val itemService: ItemService,
     private val memberHistory: ItemGroupMemberHistoryRepository,
     private val clock: Clock,
+    private val groupTypes: yangzhou.persistence.repository.ItemGroupTypeRepository,
 ) {
 
     data class SprintDto(
@@ -85,6 +86,7 @@ class SprintService(
     fun create(key: String, request: CreateSprintRequest): SprintDto {
         val name = request.name?.trim().takeUnless { it.isNullOrEmpty() } ?: throw BadRequestException("name 必填")
         val p = project(key)
+        groupTypes.findByProjectIdAndTypeKey(p.id!!, "sprint") ?: throw ConflictException("项目缺少 sprint 类型")
         val saved = groups.save(
             ItemGroup(
                 projectId = p.id!!,

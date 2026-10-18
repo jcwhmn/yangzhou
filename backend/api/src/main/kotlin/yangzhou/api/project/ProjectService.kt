@@ -32,6 +32,7 @@ class ProjectService(
     private val deletions: ProjectDeletionRepository,
     private val members: yangzhou.api.member.MemberService,
     private val projectMembers: yangzhou.persistence.repository.ProjectMemberRepository,
+    private val groupTypes: yangzhou.persistence.repository.ItemGroupTypeRepository,
 ) {
 
     private val log = LoggerFactory.getLogger(ProjectService::class.java)
@@ -56,6 +57,10 @@ class ProjectService(
         seedDefaultRules(project.id!!, saved)
         // 0047:创建者自动入池(池=合法指派范围,保证创建者至少能给自己指派)
         projectMembers.save(yangzhou.persistence.ProjectMember(projectId = project.id!!, memberId = members.current().id!!))
+        // 0056:内建 group 类型种子(sprint/release);既有项目由 V35 迁移种子
+        listOf("sprint" to "Sprint", "release" to "Release").forEach { (k, n) ->
+            groupTypes.save(yangzhou.persistence.ItemGroupType(projectId = project.id!!, typeKey = k, name = n, builtin = true))
+        }
         return get(key)
     }
 
@@ -113,6 +118,7 @@ class ProjectService(
         deletions.purgeItems(pid)
         // 先于 milestone:release/sprint 同表,item_group.milestone_id restrict
         deletions.purgeItemGroups(pid)
+        deletions.purgeItemGroupTypes(pid)
         deletions.purgeMilestones(pid)
         deletions.purgeStatuses(pid) // transition/workflow_rule 级联
         deletions.purgeProjectViews(pid)

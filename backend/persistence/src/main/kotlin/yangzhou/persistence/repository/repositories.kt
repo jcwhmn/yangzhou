@@ -20,6 +20,7 @@ import yangzhou.persistence.Project
 import yangzhou.persistence.ProjectMember
 import yangzhou.persistence.ProjectRepo
 import yangzhou.persistence.ItemGroup
+import yangzhou.persistence.ItemGroupType
 import yangzhou.persistence.ItemGroupMember
 import yangzhou.persistence.ItemGroupMemberHistory
 import yangzhou.persistence.Milestone
@@ -193,6 +194,12 @@ interface RequirementRepository : CrudRepository<Requirement, Long> {
 interface ItemGroupRepository : CrudRepository<ItemGroup, Long> {
     fun findByProjectIdOrderByCreatedAt(projectId: Long): List<ItemGroup>
     fun findByProjectIdAndObjectId(projectId: Long, objectId: UUID): ItemGroup?
+}
+
+interface ItemGroupTypeRepository : CrudRepository<ItemGroupType, Long> {
+    fun findByProjectIdOrderByCreatedAt(projectId: Long): List<ItemGroupType>
+    fun findByProjectIdAndTypeKey(projectId: Long, typeKey: String): ItemGroupType?
+    fun existsByProjectIdAndTypeKey(projectId: Long, typeKey: String): Boolean
 }
 
 interface ItemGroupMemberRepository : CrudRepository<ItemGroupMember, Long> {
@@ -401,6 +408,10 @@ interface ProjectDeletionRepository : Repository<Project, Long> {
     @Modifying
     @Query("DELETE FROM item_group WHERE project_id = :pid")
     fun purgeItemGroups(pid: Long): Int
+
+    @Modifying
+    @Query("DELETE FROM item_group_type WHERE project_id = :pid")
+    fun purgeItemGroupTypes(pid: Long): Int
 
     @Modifying
     @Query("DELETE FROM milestone WHERE project_id = :pid")

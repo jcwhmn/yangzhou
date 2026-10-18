@@ -92,6 +92,11 @@ class ItemGroup {
   releasedDate: LocalDate?
   milestoneId: Long?
 }
+class ItemGroupType {
+  typeKey: String
+  name: String
+  builtin: Boolean
+}
 class ItemGroupMember
 class ItemGroupMemberHistory
 class Milestone {
@@ -139,7 +144,9 @@ Project "1" *-- "*" StatusTransition
 Project "1" *-- "*" ProjectMember : 成员池
 Project "1" *-- "*" ProjectRepo : GitHub 仓库
 Project "1" *-- "*" ProjectWorkflowRule
-Project "1" *-- "*" ItemGroup : Sprint(Phase 1)
+Project "1" *-- "*" ItemGroup : Sprint
+Project "1" *-- "*" ItemGroupType : group 类型运行时定义(V35)
+ItemGroup "*" --> "1" ItemGroupType : type 命中项目类型(Phase 1)
 Project "1" *-- "*" Milestone : 时间轴节点(V14;0..1 in_progress)
 ItemGroup "*" --> "0..1" Milestone : release 关联(可空 N:1)
 ItemGroup "1" *-- "*" ItemGroupMember
