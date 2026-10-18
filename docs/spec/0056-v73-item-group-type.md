@@ -82,3 +82,13 @@ alter table item_group drop constraint ck_item_group_type;
 4. 删 `phase` 类型(其下有组)→ 409;删组后再删类型 → 成功。
 5. 删 sprint 类型 → 409。
 6. 既有功能回归:sprint 建组/派单、release 建组照常(api.http 对应段)。
+
+## 四、As-built(2026-10-18 实现完成)
+
+- 迁移:`V35__item_group_type.sql`(表 + created_by/updated_by 审计列,V34 约定;存量种子 sprint=全项目、release=仅用过的;放开 `ck_item_group_type`)。
+- 持久层:`ItemGroupType` 实体 + `ItemGroupTypeRepository`(repositories.kt);`item_group.type` 保持 varchar,service 层校验命中项目类型行(未做 FK,见设计否决)。
+- api/grouptype 切片:类型 CRUD(`/projects/{key}/group-types`,typeKey 正则 `[a-z][a-z0-9-]{1,19}`、项目内唯一 409、builtin 不可删 409、类型下有组拒删 409)+ 自定义类型通用组 CRUD(`/projects/{key}/groups`,name+可选起止日期+planned/active/completed;内建类型全封闭 400;删组级联清 membership+留痕行)。
+- 联动:ProjectService.create 双种子;项目删除 purgeItemGroupTypes;AbstractApiTest cleanDatabase 加 `item_group_type`;entities.puml 同步;api.http 11b 区块 + 17 区 POOLNEG key 改 `PN{{run}}`(重跑幂等)。
+- web 最小前端:侧栏入口(CategoryIcon)→ GroupTypesPanel(列/增/删;改名仅 API)。
+- 测试:GroupTypeServiceUnitTest 14 例(单测优先)+ GroupTypeApiTest 3 条集成(sprint/release/project/metrics/dashboard 回归绿);`gradle build` 绿;e2e 全量绿(用户验证);api.http 全绿(用户验证,ijhttp)。
+- 与 spec 差异:无。手工用例 1–5 与 3b 全过。
