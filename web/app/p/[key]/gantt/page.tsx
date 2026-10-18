@@ -48,8 +48,11 @@ export default function GanttPage() {
     const end = new Date(+max + 4 * DAY);
     const span = Math.max(+end - +start, DAY);
     const ticks: string[] = [];
-    for (let i = 0; i <= 8; i++) {
-      ticks.push(new Date(+start + (span * i) / 8).toISOString().slice(0, 10));
+    // 按月取整:从起点次月 1 号起逐月一 tick(V65:跨度均分会产出 12-07 类非历法日期)
+    const cur = new Date(Date.UTC(start.getFullYear(), start.getMonth() + 1, 1));
+    while (+cur <= +end) {
+      ticks.push(cur.toISOString().slice(0, 10));
+      cur.setUTCMonth(cur.getUTCMonth() + 1);
     }
     return { start, span, ticks, todayX: ((+today - +start) / span) * 100 };
   }, [rows]);

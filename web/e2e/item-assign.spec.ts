@@ -55,9 +55,9 @@ test("展开面板——按 rank 排序,分色:绿/浅橙(delta=1)/红", async (
   await expect(rows.nth(0)).toContainText("缺门0·差0级");
   await expect(rows.nth(1)).toContainText("缺门0·差1级");
   await expect(rows.nth(2)).toContainText("缺门1·差0级");
-  // 分色:绿 / 浅橙 #ff9800 / 红
+  // 分色:绿 / 橙 #ed6c02(V65 勉强与有差距同档)/ 红
   await expect(rows.nth(0)).toHaveCSS("border-left-color", "rgb(46, 125, 50)");
-  await expect(rows.nth(1)).toHaveCSS("border-left-color", "rgb(255, 152, 0)");
+  await expect(rows.nth(1)).toHaveCSS("border-left-color", "rgb(237, 108, 2)");
   await expect(rows.nth(2)).toHaveCSS("border-left-color", "rgb(198, 40, 40)");
 });
 

@@ -75,7 +75,7 @@ test("V13-S3 拉入对话框——多选勾入/移出 + 详情回链", async ({ 
 
   // 详情回链:点 sprint 名跳回 sprint 页
   await page.getByText("E2E 冒烟 item").first().click();
-  await page.getByRole("link", { name: "Sprint 43 ↗" }).click();
+  await page.getByRole("link", { name: "Sprint 43" }).click(); // V65 删箭头后缀
   await expect(page).toHaveURL(/\/sprint\/[0-9a-f-]{36}/);
 
   // 移出:同一对话框去勾

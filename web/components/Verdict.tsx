@@ -1,6 +1,7 @@
 // 判定行/信号 chip:颜色语义同 DOMAIN.md(有余克制灰、未评级紫、缺门红、差级琥珀)
 import { Chip } from "@mui/material";
 import { t } from "@/lib/texts";
+import { tokens } from "@/lib/tokens";
 
 export type Verdict = {
   kind: "satisfied" | "surplus" | "gap" | "unrated" | "missing";
@@ -10,12 +11,13 @@ export type Verdict = {
   actual?: number | null;
 };
 
+// 色值取自 tokens(V65 收敛单一真相源);仍以字符串导出:borderLeft 拼接等非 sx 场景需要裸值
 const colors: Record<Verdict["kind"], string> = {
-  satisfied: "#2e7d32",
-  surplus: "#9e9e9e", // 有余:克制,不炫耀
-  gap: "#b45309",
-  unrated: "#7c4dff",
-  missing: "#c62828",
+  satisfied: tokens.success,
+  surplus: tokens.neutral, // 有余:克制,不炫耀
+  gap: tokens.gap,
+  unrated: tokens.accent,
+  missing: tokens.error,
 };
 
 export function verdictText(v: Verdict): string {
@@ -51,10 +53,9 @@ export function SignalChip({ signal, size = "medium" }: { signal: Signal; size?:
   return <Chip size={size as "small"} label={t.signal[signal]} color={signalColor[signal]} variant="outlined" />;
 }
 
-/** 候选行配色(YPJ-1):全满足绿 / 勉强(delta=1)浅橙 / 部分满足琥珀 / 缺门红。
- *  字面 hex 而非主题路径:调用处(borderLeft 字符串拼接/sx borderColor)两种场景都能直接用,色值对齐上方 colors 色板 */
+/** 候选行配色(YPJ-1):全满足绿 / 勉强(delta=1)与有差距同橙 / 部分满足琥珀 / 缺门红(V65 三琥珀归两档) */
 export function candidateColor(c: { signal: Signal; totalDelta: number }): string {
-  if (c.signal === "RED") return "#c62828";
-  if (c.signal === "GREEN") return "#2e7d32";
-  return c.totalDelta === 1 ? "#ff9800" : "#ed6c02";
+  if (c.signal === "RED") return tokens.error;
+  if (c.signal === "GREEN") return tokens.success;
+  return c.totalDelta === 1 ? tokens.warning : tokens.gap;
 }

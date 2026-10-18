@@ -13,6 +13,10 @@ const theme = createTheme({
     text: { primary: tokens.text },
     background: { default: tokens.bg, paper: tokens.paper },
     divider: tokens.divider,
+    primary: { main: tokens.primary },
+    success: { main: tokens.success },
+    warning: { main: tokens.warning },
+    error: { main: tokens.error },
   },
   typography: {
     fontFamily: 'system-ui, "Segoe UI", "Microsoft YaHei", sans-serif',

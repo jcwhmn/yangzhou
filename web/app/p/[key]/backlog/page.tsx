@@ -101,7 +101,7 @@ export default function BacklogPage() {
                 <TableRow key={it.itemId} hover>
                   <TableCell>
                     <Link href={`/p/${key}/i/${it.itemId}?from=backlog`}>
-                      <Typography variant="body2">{it.number}</Typography>
+                      <Typography variant="body2" sx={{ whiteSpace: "nowrap" }}>{it.number}</Typography>
                     </Link>
                   </TableCell>
                   <TableCell>

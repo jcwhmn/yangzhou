@@ -43,7 +43,7 @@ export default function TimeSummaryPage() {
         </Button>
         <Typography variant="h5">{t.time.title(String(key))}</Typography>
         {projectTotal > 0 && (
-          <Typography variant="h6" color="primary">
+          <Typography variant="h6" sx={{ color: "text.primary", fontWeight: 600 }}>
             {t.time.total}:{t.time.fmt(projectTotal)}
           </Typography>
         )}

@@ -57,7 +57,7 @@ export const t = {
     sprint: "冲刺",
     milestone: "里程碑",
     recent: "最近动态",
-    viewAll: "全部 →",
+    viewAll: "全部",
   },
   board: {
     addItem: "新建 item",

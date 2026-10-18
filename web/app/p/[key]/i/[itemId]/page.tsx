@@ -530,7 +530,7 @@ export default function ItemDetailPage() {
           {item.sprintId && (
             <Link href={`/p/${key}/sprint/${item.sprintId}`} style={{ textDecoration: "none", alignSelf: "center" }}>
               <Typography variant="caption" color="primary">
-                {item.sprintName} ↗
+                {item.sprintName}
               </Typography>
             </Link>
           )}
@@ -1160,7 +1160,7 @@ function DependencyAddForm({
         aria-label="被依赖 item"
         value={pick}
         onChange={(e) => setPick(e.target.value)}
-        style={{ padding: "6px", borderRadius: 4 }}
+        style={{ padding: "6px", borderRadius: 8 }}
       >
         <option value="">选择被依赖 item…</option>
         {items.map((i) => (

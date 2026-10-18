@@ -4,7 +4,6 @@ import { Button, Card, CardContent, Chip, Stack, Typography } from "@mui/materia
 import { PageShell } from "@/components/PageShell";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { AppNav } from "@/components/AppNav";
 import { t } from "@/lib/texts";
 
 type RecycleItem = {
@@ -61,7 +60,6 @@ export default function RecycleBinPage() {
 
   return (
     <PageShell>
-      <AppNav />
       <Typography variant="h5" gutterBottom>
         回收站
       </Typography>

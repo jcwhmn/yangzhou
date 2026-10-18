@@ -327,14 +327,14 @@ export default function TableViewPage() {
                     <TableCell key={c.id}>
                       {c.id === "number" ? (
                         <Link href={`/p/${key}/i/${it.itemId}?from=table`}>
-                          <Typography variant="body2">{it.number}</Typography>
+                          <Typography variant="body2" sx={{ whiteSpace: "nowrap" }}>{it.number}</Typography>
                         </Link>
                       ) : c.id === "title" ? (
                         <Link href={`/p/${key}/i/${it.itemId}?from=table`}>
                           <Typography variant="body2">{it.title}</Typography>
                         </Link>
                       ) : c.id === "priority" ? (
-                        it.priority ?? "—"
+                        it.priority ?? ""
                       ) : c.id === "assignee" ? (
                         <AssignPopover itemId={it.itemId} assignee={it.assignee} onChanged={load}>
                           {(onClick) => (
@@ -348,19 +348,19 @@ export default function TableViewPage() {
                           )}
                         </AssignPopover>
                       ) : c.id === "startDate" ? (
-                        it.startDate ?? "—"
+                        it.startDate ?? ""
                       ) : c.id === "dueDate" ? (
-                        <span style={{ color: it.overdue ? "red" : it.dueSoon ? "orange" : "inherit" }}>{it.dueDate ?? "—"}</span>
+                        <span style={{ color: it.overdue ? "red" : it.dueSoon ? "orange" : "inherit" }}>{it.dueDate ?? ""}</span>
                       ) : c.id === "overdue" ? (
                         it.overdue ? "是" : "否"
                       ) : c.id === "feasSignal" ? (
-                        it.feasSignal ? t.signal[it.feasSignal] : "—"
+                        it.feasSignal ? t.signal[it.feasSignal] : ""
                       ) : c.id === "sprint" ? (
-                        it.sprintName ?? "—"
+                        it.sprintName ?? ""
                       ) : c.id === "blocked" ? (
-                        it.blocked ? "⛔" : "—"
+                        it.blocked ? "⛔" : ""
                       ) : (
-                        "—"
+                        ""
                       )}
                     </TableCell>
                   ))}
