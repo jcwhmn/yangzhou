@@ -42,7 +42,7 @@ class ConcurrentPutHammerApiTest : AbstractApiTest() {
         assertTrue(members.isArray && members.size() > 0, "无成员可打:/api/members 响应=$members")
         val memberId = members[0]["memberId"].asText()
 
-        val token = login("me", "secret")["token"].asText()
+        val token = login("me", "secret123")["token"].asText()
         val client = HttpClient.newHttpClient()
         val pool = Executors.newFixedThreadPool(8)
         val futures = mutableListOf<java.util.concurrent.Future<*>>()

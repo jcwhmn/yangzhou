@@ -21,7 +21,7 @@ class CapabilityParallelPutApiTest : AbstractApiTest() {
         val attrs = (1..8).map { "技能$it" }
         attrs.forEach { createSkillAttribute(authed, it) }
 
-        val token = login("me", "secret")["token"].asText()
+        val token = login("me", "secret123")["token"].asText()
         val client = HttpClient.newHttpClient()
         val pool = Executors.newFixedThreadPool(attrs.size)
         val futures = attrs.map { attr ->

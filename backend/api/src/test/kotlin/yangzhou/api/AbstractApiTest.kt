@@ -66,9 +66,9 @@ abstract class AbstractApiTest {
 
     protected fun bootstrapAndAuth(): RestTestClient {
         rest.post().uri("/api/auth/bootstrap")
-            .body(mapOf("username" to "me", "password" to "secret"))
+            .body(mapOf("username" to "me", "password" to "secret123"))
             .exchange()
-        val token = login("me", "secret")["token"].asText()
+        val token = login("me", "secret123")["token"].asText()
         return rest.mutate().defaultHeaders { it.setBearerAuth(token) }.build()
     }
 

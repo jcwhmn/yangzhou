@@ -103,11 +103,30 @@ class Requirement {
   minLevel: Int?
 }
 
+class Comment {
+  authorMemberId: Long
+  body: String
+}
+class ItemActivity {
+  kind: String
+  oldValue: String?
+  newValue: String?
+}
+class Favorite
+class ProjectView {
+  name: String
+  filters: String
+  columns: String
+}
+class TeamMember
+
 Workspace "1" *-- "*" Member : 目录
 Workspace "1" *-- "*" AttributeDefinition : 词表
 Workspace "1" *-- "*" Team : 分组
 Team "1" *-- "*" TeamMember
 TeamMember "*" *-- "1" Member
+Member "1" *-- "*" Comment : 发布
+Member "1" *-- "*" Favorite : 收藏
 
 Workspace "1" *-- "*" Project
 

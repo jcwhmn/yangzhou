@@ -93,6 +93,7 @@ class GithubSyncService(
                         if (authorMember != null && authorMember.id != null) {
                             val authorId = authorMember.id
                             runCatching { projectMembers.assertAssignable(project.id!!, authorId!!) }
+                            .onFailure { log.warn("PR 自动指派跳过(作者不在指派池?),事件照常应用: {}", it.message) }
                                 .onSuccess {
                                     items.save(item.copy(assigneeObjectId = authorMember.objectId))
                                 }
