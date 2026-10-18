@@ -41,19 +41,29 @@ class RealGithubGateway(private val mapper: ObjectMapper) : GithubGateway {
         try {
             val sinceQ = if (since != null) "&since=" + DateTimeFormatter.ISO_INSTANT.format(since) else ""
             mapper.readTree(get(repo, "/commits?sha=$sha$sinceQ&per_page=20", token))
-                .map { c ->
-                    GithubCommit(
-                        sha = c.get("sha").asString(),
-                        message = c.path("commit").path("message").asString().lineSequence().firstOrNull().orEmpty(),
-                        author = c.path("author").path("login").asString(null)
-                            ?: c.path("commit").path("author").path("name").asString(null),
-                        date = c.path("commit").path("author").path("date").asString(null),
-                        url = c.path("html_url").asString(null),
-                    )
-                }
+                .map { parseCommit(it) }
         } catch (e: GithubApiException) {
             if (e.status == 404) emptyList() else throw e // ref 已删 → 视为无提交
         }
+
+    // ponytail: pulls commits 无 since 参数,过滤交给调用方;第一页 per_page=100 同量级假设
+    override fun listPullRequestCommits(repo: String, number: Int, token: String): List<GithubCommit> =
+        try {
+            mapper.readTree(get(repo, "/pulls/$number/commits?per_page=100", token))
+                .map { parseCommit(it) }
+        } catch (e: GithubApiException) {
+            if (e.status == 404) emptyList() else throw e
+        }
+
+    private fun parseCommit(c: tools.jackson.databind.JsonNode) =
+        GithubCommit(
+            sha = c.get("sha").asString(),
+            message = c.path("commit").path("message").asString().lineSequence().firstOrNull().orEmpty(),
+            author = c.path("author").path("login").asString(null)
+                ?: c.path("commit").path("author").path("name").asString(null),
+            date = c.path("commit").path("author").path("date").asString(null),
+            url = c.path("html_url").asString(null),
+        )
 
     companion object {
         /** 列表载荷无 merged 布尔,只有 merged_at(dogfood JCW-113 抓到的 NPE):非空即已合并。 */

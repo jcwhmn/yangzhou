@@ -18,7 +18,7 @@ Content-Type: application/json
 
 {
   "username": "me",
-  "password": "secret"
+  "password": "secret123"
 }
 
 ### ============ 1. 登录(生成 token 与本轮唯一后缀) ============
@@ -29,7 +29,7 @@ Content-Type: application/json
 
 {
   "username": "me",
-  "password": "secret"
+  "password": "secret123"
 }
 
 > {%

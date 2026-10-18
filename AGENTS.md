@@ -49,7 +49,7 @@ docs/      adr/ · spec/ · architecture/(puml 类图) · requirement/(PRD) · p
 2. 实现带测试,跑全相关验证
 3. PR:`gh pr create --base main --title "YPJ-{N}: ..."`;开出后 `yz items move YPJ-{N} "In Review"`
 4. **停**,等用户审阅合并
-5. 合并后同回合完成:`git checkout main && git pull --ff-only` → 删分支 → **YPJ 移 Done**(`yz items move YPJ-{N} "Done"`,非可选)→ 扫父 item:子票全 Done 则父票 Done,否则 In Progress。PR 已合而 item 停在 In Progress = 流程破损态。
+5. 合并后同回合完成:`git checkout main && git pull --ff-only` → 删远程分支(`gh pr merge --squash --delete-branch` 或 `git push origin --delete <branch>`;GITHub 栏已支持删后经 PR 回溯,YPJ-69)→ **YPJ 移 Done**(`yz items move YPJ-{N} "Done"`,非可选)→ 扫父 item:子票全 Done 则父票 Done,否则 In Progress。PR 已合而 item 停在 In Progress = 流程破损态。
 
 ## Kotlin 风格
 

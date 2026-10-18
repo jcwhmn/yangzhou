@@ -70,6 +70,8 @@ type Feasibility = {
 type CommitBlock = {
   repo: string;
   ref: string;
+  viaPr?: boolean;
+  prNumber?: number;
   commits: { sha: string; message: string; author: string | null; date: string | null; url: string | null }[];
 };
 
@@ -919,6 +921,11 @@ export default function ItemDetailPage() {
           <Box key={`${block.repo}-${block.ref}`} sx={{ mb: 1 }}>
             <Typography variant="body2" sx={{ fontWeight: 600 }}>
               {block.repo} · {block.ref}
+              {block.viaPr && (
+                <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 1, fontWeight: 400 }}>
+                  {t.gh.viaPr}{block.prNumber != null ? ` #${block.prNumber}` : ""}
+                </Typography>
+              )}
             </Typography>
             {block.commits.length === 0 && (
               <Typography variant="caption" color="text.secondary">
