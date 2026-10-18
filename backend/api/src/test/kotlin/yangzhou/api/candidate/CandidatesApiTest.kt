@@ -35,6 +35,8 @@ class CandidatesApiTest : AbstractApiTest() {
         setMemberCap(authed, xiaowang, "React", 1)
 
         createProject(authed, "CHE")
+        addPoolMember(authed, "CHE", xiaoli) // 0047:池=合法指派范围,显式入池
+        addPoolMember(authed, "CHE", xiaowang)
         val item = createItem(authed, "CHE", "wire frontend", listOf(mapOf("attribute" to "React", "minLevel" to 2)))
         return authed to item["itemId"].asText()
     }

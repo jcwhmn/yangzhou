@@ -113,6 +113,7 @@ class MembersApiTest : AbstractApiTest() {
         ).first { it["displayName"].asText() == "小李" }["memberId"].asText()
 
         createProject(authed, "CHE")
+        addPoolMember(authed, "CHE", li) // 0047:池外不可指派
         val item = createItem(authed, "CHE", "x")
         authed.put().uri("/api/items/${item["itemId"].asText()}/assignee")
             .body(mapOf("assigneeItemId" to li))

@@ -34,6 +34,7 @@ class AuthorBackfillApiTest : AbstractApiTest() {
             .exchange().expectStatus().isOk()
 
         createProject(authed, "CHE")
+        addPoolMember(authed, "CHE", li["object_id"].toString()) // 0047:池内才自动 assign
         authed.post().uri("/api/projects/CHE/repos")
             .body(mapOf("repo" to "octo/r"))
             .exchange().expectStatus().isCreated()

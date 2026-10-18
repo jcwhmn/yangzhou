@@ -18,6 +18,7 @@ class StandupApiTest : AbstractApiTest() {
             .body(mapOf("displayName" to "小李"))
             .exchange().expectStatus().isCreated()
         createProject(authed, "CHE")
+        addPoolMember(authed, "CHE", memberIdOf(authed, "小李")) // 0047:池外不可指派
         val x = createItem(authed, "CHE", "x")["itemId"].asText()   // assignee = 我
         val y = createItem(authed, "CHE", "y")["itemId"].asText()   // → 小李
         authed.put().uri("/api/items/$x/assignee")

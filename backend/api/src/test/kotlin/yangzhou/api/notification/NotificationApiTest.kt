@@ -35,6 +35,7 @@ class NotificationApiTest : AbstractApiTest() {
         val me = members.first { it["username"] == "me" }
 
         createProject(authed, "CHE")
+        addPoolMember(authed, "CHE", xiaoLi["object_id"].toString()) // 0047:池外不可指派
         val itemId = createItem(authed, "CHE", "x")["itemId"].asText() // createdBy = me
         authed.put().uri("/api/items/$itemId/assignee")
             .body(mapOf("assigneeItemId" to xiaoLi["object_id"].toString()))

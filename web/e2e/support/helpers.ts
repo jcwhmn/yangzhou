@@ -87,6 +87,11 @@ export async function apiCreateSprint(key: string, name: string): Promise<string
   return ((await res.json()) as { sprintId: string }).sprintId;
 }
 
+/** 0047:池=合法指派范围;虚拟成员入池后才可指派/进候选 */
+export async function apiAddPoolMember(projectKey: string, memberId: string): Promise<void> {
+  await apiCall("POST", `/api/projects/${projectKey}/members`, { memberId });
+}
+
 export async function apiAssignMe(itemId: string): Promise<void> {
   const meId = await apiMeId();
   const res = await fetch(`${config.apiURL}/api/items/${itemId}/assignee`, {

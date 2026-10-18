@@ -65,9 +65,10 @@ class ProjectMembersApiTest : AbstractApiTest() {
         assertEquals(201, post(authed, "CHE", xiaowang).status.value())
 
         val list = listMembers(authed, "CHE")
-        assertEquals(2, list.size())
-        assertEquals("小李", list[0]["displayName"].asText())
-        assertEquals("小王", list[1]["displayName"].asText())
+        // 0047:创建者(me)自动入池,创建者在前
+        assertEquals(3, list.size())
+        assertEquals("小李", list[1]["displayName"].asText())
+        assertEquals("小王", list[2]["displayName"].asText())
 
         assertEquals(409, post(authed, "CHE", xiaoli).status.value()) // 重复
         assertEquals(404, post(authed, "CHE", "00000000-0000-0000-0000-000000000000").status.value()) // 未知成员
@@ -84,8 +85,8 @@ class ProjectMembersApiTest : AbstractApiTest() {
         assertEquals(204, delete(authed, "CHE", xiaowang).status.value())
         assertEquals(404, delete(authed, "CHE", xiaowang).status.value())
         val list = listMembers(authed, "CHE")
-        assertEquals(1, list.size())
-        assertEquals("小李", list[0]["displayName"].asText())
+        assertEquals(2, list.size()) // 0047:创建者(me)仍在池
+        assertEquals("小李", list[1]["displayName"].asText())
     }
 
     @Test
@@ -102,17 +103,20 @@ class ProjectMembersApiTest : AbstractApiTest() {
         assertEquals("该成员不在项目成员中", json.readTree(conflict.responseBody!!)["message"].asText())
 
         assertEquals(200, assign(authed, itemId, xiaoli).status.value()) // 池内 OK
-        assertEquals(setOf(xiaoli), candidateIds(authed, itemId)) // 候选仅池内
+        // 候选仅池内(me 创建者自动入池 + 小李)
+        assertEquals(setOf(xiaoli, meMemberId(authed)), candidateIds(authed, itemId))
     }
 
     @Test
-    fun `无池行 - 全员可指派进候选(存量零配置回归)`() {
+    fun `仅创建者在池 - 池外指派409 - 候选仅我(0047 严格化)`() {
         val (authed, xiaoli, xiaowang) = seed() // 不加任何项目成员
         val item = createItem(authed, "CHE", "回归", listOf(mapOf("attribute" to "Java", "minLevel" to 2)))
         val itemId = item["itemId"].asText()
 
-        assertEquals(200, assign(authed, itemId, xiaowang).status.value()) // 任意成员可指派
-        assertEquals(3, candidateIds(authed, itemId).size) // 我 + 小李 + 小王 全员进候选
+        val conflict = assign(authed, itemId, xiaowang)
+        assertEquals(409, conflict.status.value()) // 池外 = 409(创建者自动入池,池外恒 409)
+        assertEquals("该成员不在项目成员中", json.readTree(conflict.responseBody!!)["message"].asText())
+        assertEquals(setOf(meMemberId(authed)), candidateIds(authed, itemId)) // 候选仅创建者
     }
 
     @Test
@@ -134,8 +138,8 @@ class ProjectMembersApiTest : AbstractApiTest() {
 
         authed.delete().uri("/api/members/$xiaoli").exchange().expectStatus().isNoContent()
 
-        // project_member 行随 FK 级联清 → 池回退到“未配置 = 全池”
-        assertEquals(0, listMembers(authed, "CHE").size())
+        // project_member 行随 FK 级联清;0047:创建者(me)仍在池
+        assertEquals(1, listMembers(authed, "CHE").size())
         // assignee 由 V5 FK(on delete set null)置空
         val itemAfter = json.readTree(
             authed.get().uri("/api/items/$itemId")
@@ -143,6 +147,29 @@ class ProjectMembersApiTest : AbstractApiTest() {
                 .expectBody(String::class.java).returnResult().responseBody!!,
         )
         assertEquals(null, itemAfter["assignee"].let { if (it.isNull) null else it.asText() })
+    }
+
+    @Test
+    fun `真·空池(jdbc 删行)- 指派409 - 候选空数组`() {
+        val (authed, xiaoli, _) = seed()
+        jdbc.update("delete from project_member") // 绕过 API 造真空池(API 入口必带创建者)
+        val item = createItem(authed, "CHE", "空池")
+        val itemId = item["itemId"].asText()
+
+        val conflict = assign(authed, itemId, xiaoli)
+        assertEquals(409, conflict.status.value())
+        assertEquals(emptySet(), candidateIds(authed, itemId))
+    }
+
+    @Test
+    fun `新建项目 - 创建者自动入池且可直接被指派(0047)`() {
+        val authed = bootstrapAndAuth()
+        createProject(authed, "CHE")
+        val me = meMemberId(authed)
+        assertTrue(listMembers(authed, "CHE").any { it["memberId"].asText() == me })
+
+        val item = createItem(authed, "CHE", "自指派")
+        assertEquals(200, assign(authed, item["itemId"].asText(), me).status.value())
     }
 
     private fun setMemberCap(authed: RestTestClient, memberId: String, attribute: String, level: Int) {

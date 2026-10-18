@@ -30,6 +30,8 @@ class ProjectService(
     private val items: yangzhou.persistence.repository.ItemRepository,
     private val workspaceService: WorkspaceService,
     private val deletions: ProjectDeletionRepository,
+    private val members: yangzhou.api.member.MemberService,
+    private val projectMembers: yangzhou.persistence.repository.ProjectMemberRepository,
 ) {
 
     private val log = LoggerFactory.getLogger(ProjectService::class.java)
@@ -52,6 +54,8 @@ class ProjectService(
         // 默认 workflow:To Do / In Progress / In Review / QA / Done(final)——模板系统的最小预置(V7 5 列)
         val saved = defaultStatuses(project.id!!).map { statuses.save(it) }
         seedDefaultRules(project.id!!, saved)
+        // 0047:创建者自动入池(池=合法指派范围,保证创建者至少能给自己指派)
+        projectMembers.save(yangzhou.persistence.ProjectMember(projectId = project.id!!, memberId = members.current().id!!))
         return get(key)
     }
 

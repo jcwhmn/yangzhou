@@ -12,9 +12,9 @@ import yangzhou.persistence.repository.ProjectRepository
 import java.util.UUID
 
 /**
- * 项目成员池(V3.5-B):项目的"合法指派范围"。
- * 语义(Q6 同款):表无行 = 全 workspace 池可用(存量项目零配置);
- * 有行 = 仅池内可指派/进候选。指派(ItemService)与候选(CandidateService)共用 [restrictedPool]。
+ * 项目成员池(V3.5-B → 0047 严格化):项目内「合法指派范围」。
+ * 恒校验:池内成员可指派/进候选;空池 = 无人可指派/无候选。
+ * 指派(ItemService)与候选(CandidateService)共用 [restrictedPool]。
  */
 @Service
 class ProjectMemberService(
@@ -52,14 +52,13 @@ class ProjectMemberService(
         projectMembers.delete(row)
     }
 
-    /** 池规则共用点:null = 未配置池(全 workspace 池可用);非空 = 仅池内成员 id。 */
-    fun restrictedPool(projectId: Long): Set<Long>? =
-        projectMembers.findByProjectId(projectId).takeIf { it.isNotEmpty() }?.mapTo(HashSet()) { it.memberId }
+    /** 池规则共用点(0047 严格化):恒返回池内成员 id;空池 = 无人可指派/无候选。 */
+    fun restrictedPool(projectId: Long): Set<Long> =
+        projectMembers.findByProjectId(projectId).mapTo(HashSet()) { it.memberId }
 
-    /** 池外指派 fail-fast(409);未配置池时全放行。 */
+    /** 池外指派 fail-fast(409)。 */
     fun assertAssignable(projectId: Long, memberId: Long) {
-        val pool = restrictedPool(projectId)
-        if (pool != null && memberId !in pool) throw ConflictException("该成员不在项目成员中")
+        if (memberId !in restrictedPool(projectId)) throw ConflictException("该成员不在项目成员中")
     }
 
     private fun Member.toDto() = MemberDto(objectId, displayName, virtual = passwordHash == null)

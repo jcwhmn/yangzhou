@@ -78,6 +78,7 @@ class ActivityApiTest : AbstractApiTest() {
                 .exchange().expectStatus().isCreated()
                 .expectBody(String::class.java).returnResult().responseBody!!,
         )["memberId"].asText()
+        addPoolMember(authed, "CHE", xiaoli) // 0047:池外不可指派
 
         authed.put().uri("/api/items/$itemId/assignee")
             .body(mapOf("assigneeItemId" to xiaoli))

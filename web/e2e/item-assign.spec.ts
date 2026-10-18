@@ -1,7 +1,7 @@
 // YPJ-1/6 候选分配体验:头部入口/Popover 分色(delta=1 浅橙)/未足确认/取消指派
 import { randomUUID } from "node:crypto";
 import { expect, test } from "./support/fixtures";
-import { apiAssignMe, apiCall, apiCreateItem, apiCreateMember, apiMeId } from "./support/helpers";
+import { apiAddPoolMember, apiAssignMe, apiCall, apiCreateItem, apiCreateMember, apiMeId } from "./support/helpers";
 
 /** 属性名带随机后缀:并行用例/重跑同毫秒也不撞(409) */
 const uniqueAttr = (prefix: string) => `${prefix} ${randomUUID().slice(0, 8)}`;
@@ -43,6 +43,9 @@ test("展开面板——按 rank 排序,分色:绿/浅橙(delta=1)/红", async (
   await setCap(attr, 3); // me 满足 → GREEN
   await setCap(attr, 1, "小张"); // 差 1 级 → 勉强浅橙
   await apiCreateMember("小王"); // 无能力 → 缺门 RED
+  // 0047:池=合法指派范围,虚拟成员入池才进候选
+  const members = await apiCall<{ memberId: string; displayName: string }[]>("GET", "/api/members");
+  for (const name of ["小张", "小王"]) await apiAddPoolMember(projectKey, members.find((m) => m.displayName === name)!.memberId);
 
   const itemId = await apiCreateItem(projectKey, "AS 分色 item");
   await apiCall("PUT", `/api/items/${itemId}/requirements`, { requirements: [{ attribute: attr, minLevel: 2 }] });
@@ -101,6 +104,10 @@ test("Popover 指派缺门候选——淡出警告确认后指派成功", async 
   const attr = uniqueAttr("AS 属性");
   await createAttr(attr);
   await apiCreateMember("小王");
+  const wangId = (await apiCall<{ memberId: string; displayName: string }[]>("GET", "/api/members")).find(
+    (m) => m.displayName === "小王",
+  )!.memberId;
+  await apiAddPoolMember(projectKey, wangId); // 0047:入池才可指派
   const itemId = await apiCreateItem(projectKey, "AS 缺门候选");
   await apiCall("PUT", `/api/items/${itemId}/requirements`, { requirements: [{ attribute: attr, minLevel: 2 }] });
   await page.goto(`/p/${projectKey}/i/${itemId}`);
