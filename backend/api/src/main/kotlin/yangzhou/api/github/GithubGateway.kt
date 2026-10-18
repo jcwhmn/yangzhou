@@ -15,6 +15,9 @@ interface GithubGateway {
 
     /** sha/分支上的提交(第一页,新→旧,since 过滤分支创建前);ref 已删 → 空表(真实现归一)。 */
     fun listCommits(repo: String, sha: String, since: Instant?, token: String): List<GithubCommit>
+
+    /** PR 上的提交(第一页,新→旧;API 不支持 since,由调用方按 date 过滤);PR 不存在 → 空表。 */
+    fun listPullRequestCommits(repo: String, number: Int, token: String): List<GithubCommit>
 }
 
 /** state ∈ open|merged|closed(GitHub 的 merged=closed+merged,在此归一)。 */

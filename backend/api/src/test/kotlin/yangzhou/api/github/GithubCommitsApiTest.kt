@@ -17,10 +17,12 @@ import kotlin.test.assertTrue
 class FakeCommitGateway : GithubGateway {
     var failWith: GithubApiException? = null
     val commits = mutableMapOf<String, List<GithubCommit>>() // key = repo@sha
+    val prCommits = mutableMapOf<Int, List<GithubCommit>>() // key = PR 号
+    var prs: Map<String, List<GithubPr>> = emptyMap() // key = repo
     var lastSince: Instant? = null
 
     override fun listBranches(repo: String, token: String): List<String> = emptyList()
-    override fun listPullRequests(repo: String, token: String): List<GithubPr> = emptyList()
+    override fun listPullRequests(repo: String, token: String): List<GithubPr> = prs[repo].orEmpty()
     override fun createBranch(repo: String, branch: String, fromBranch: String, token: String) {}
 
     // 故意不 honor since(模拟 GitHub 不过滤)——服务侧兜底过滤由 YPJ-42 测试验证
@@ -28,6 +30,11 @@ class FakeCommitGateway : GithubGateway {
         failWith?.let { throw it }
         lastSince = since
         return commits["$repo@$sha"].orEmpty()
+    }
+
+    override fun listPullRequestCommits(repo: String, number: Int, token: String): List<GithubCommit> {
+        failWith?.let { throw it }
+        return prCommits[number].orEmpty()
     }
 }
 
@@ -118,6 +125,39 @@ class GithubCommitsApiTest : AbstractApiTest() {
         assertEquals(1, res[0]["commits"].size())
         assertEquals("new222full", res[0]["commits"][0]["sha"].asText())
         assertEquals(java.time.Instant.parse("2026-10-01T00:00:00Z"), fake.lastSince)
+    }
+
+    @Test
+    fun `分支已删——降级按 head 分支名匹配 PR 取提交(YPJ-69)`() {
+        val itemId = setup()
+        seedBranchRef(itemId) // created_at = 2026-10-01
+        fake.commits.clear() // 分支已删:listCommits 空 → 走 PR
+        fake.prs = mapOf("octo/r" to listOf(GithubPr(7, "CHE-1-x", "merged")))
+        fake.prCommits[7] = listOf(
+            GithubCommit("old333full", "基线提交", "me", "2026-09-20T12:00:00Z", null),
+            GithubCommit("new444full", "YPJ-69: 降级取回", "me", "2026-10-06T12:00:00Z", "https://github.com/octo/r/pull/7/commits/new444full"),
+        )
+
+        val res = body(getCommits(itemId))
+
+        assertEquals(1, res.size())
+        assertEquals(true, res[0]["viaPr"].asBoolean())
+        assertEquals(7, res[0]["prNumber"].asInt())
+        assertEquals(1, res[0]["commits"].size()) // PR 路径同样按 branch createdAt 过滤
+        assertEquals("new444full", res[0]["commits"][0]["sha"].asText())
+    }
+
+    @Test
+    fun `分支与 PR 均无提交——空数组不报错`() {
+        val itemId = setup()
+        seedBranchRef(itemId)
+        fake.prs = mapOf("octo/r" to listOf(GithubPr(8, "other-branch", "open")))
+
+        val res = body(getCommits(itemId))
+
+        assertEquals(1, res.size())
+        assertEquals(false, res[0]["viaPr"].asBoolean())
+        assertEquals(0, res[0]["commits"].size())
     }
 
     @Test

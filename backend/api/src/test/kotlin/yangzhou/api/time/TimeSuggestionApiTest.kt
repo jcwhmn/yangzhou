@@ -28,6 +28,8 @@ class FakeSuggestGateway : GithubGateway {
         failWith?.let { throw it }
         return commits["$repo@$sha"].orEmpty()
     }
+
+    override fun listPullRequestCommits(repo: String, number: Int, token: String): List<GithubCommit> = emptyList()
 }
 
 @TestConfiguration(proxyBeanMethods = false)

@@ -236,6 +236,7 @@ export const t = {
     loadCommits: "加载提交历史",
     commitsHint: "点「加载提交历史」按需拉取 remote 提交(不自动轮询)。",
     noCommits: "(无提交——分支可能已删)",
+    viaPr: "分支已删,经 PR 回溯",
     stateOpen: "open",
     stateMerged: "已合并",
     stateClosed: "已关闭",
