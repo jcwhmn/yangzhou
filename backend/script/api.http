@@ -949,3 +949,72 @@ Authorization: Bearer {{token}}
 ### 查无命中(空数组,200 非报错)
 GET {{host}}/api/search?q=不存在的词xyz
 Authorization: Bearer {{token}}
+
+### ============ 17. 指派池严格化负例(YPJ-62;空池/池外 409) ============
+
+### 建一次性项目(创建者自动入池,池=仅我)
+POST {{host}}/api/projects
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "key": "POOLNEG",
+  "name": "池负例"
+}
+
+> {%
+    client.global.set("poolneg", response.body.key);
+%}
+
+### 建虚拟成员(不加入池)
+POST {{host}}/api/members
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "displayName": "池外小王"
+}
+
+> {%
+    client.global.set("poolnegMember", response.body.memberId);
+%}
+
+### 建票(POOLNEG)
+POST {{host}}/api/projects/{{poolneg}}/items
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "池负例票"
+}
+
+> {%
+    client.global.set("poolnegItem", response.body.itemId);
+%}
+
+### 自指派(创建者在池,预期 200;meId 登录时已回填)
+PUT {{host}}/api/items/{{poolnegItem}}/assignee
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "assigneeItemId": "{{meId}}"
+}
+
+### [预期 409] 池外指派(小王未入池)
+PUT {{host}}/api/items/{{poolnegItem}}/assignee
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "assigneeItemId": "{{poolnegMember}}"
+}
+
+### [预期 409] 真空池指派(先 jdbc:delete from project_member where project_id=...;或删掉自己的池行后重试)
+PUT {{host}}/api/items/{{poolnegItem}}/assignee
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "assigneeItemId": "{{poolnegMember}}"
+}

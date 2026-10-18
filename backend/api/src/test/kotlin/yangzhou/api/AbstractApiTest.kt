@@ -110,6 +110,21 @@ abstract class AbstractApiTest {
             .expectBody(String::class.java).returnResult().responseBody!!
             .let { json.readTree(it) }
 
+    /** 0047:创建者(me)自动入池,测试常需要其 memberId。 */
+    protected fun meMemberId(authed: RestTestClient): String =
+        json.readTree(
+            authed.get().uri("/api/members").exchange()
+                .expectStatus().isOk().expectBody(String::class.java).returnResult().responseBody!!,
+        ).first { !it["virtual"].asBoolean() }["memberId"].asText()
+
+    /** 0047:池语义严格化后,指派虚拟成员的用例需先入池。memberId = workspace 成员 objectId。 */
+    protected fun addPoolMember(authed: RestTestClient, projectKey: String, memberId: String) {
+        authed.post().uri("/api/projects/$projectKey/members")
+            .body(mapOf("memberId" to memberId))
+            .exchange()
+            .expectStatus().isCreated()
+    }
+
     protected fun createItem(
         authed: RestTestClient,
         projectKey: String,

@@ -275,7 +275,7 @@ class ItemService(
         return get(item.objectId)
     }
 
-    /** 指派/取消(assigneeItemId=null 取消);成员不存在 404;池外指派 409(V3.5-B,未配置池全放行)。 */
+    /** 指派/取消(assigneeItemId=null 取消);成员不存在 404;池外指派 409(0047:空池=无人可指派)。 */
     @Transactional
     fun assign(itemId: UUID, assigneeItemId: UUID?): ItemDto {
         val item = itemRepo.findByObjectId(itemId) ?: throw NotFoundException("item 不存在")
