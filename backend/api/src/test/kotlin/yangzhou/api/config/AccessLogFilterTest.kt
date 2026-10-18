@@ -10,13 +10,20 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /** YPJ-33:访问日志黑盒——每 call 一行、写操作 INFO、密码脱敏、GET 默认不落。 */
-// 级别钉在本类自己的 context:DEBUG 变体类会全局改 logger 级别,复用缓存 context 时 startup 不重放 yml → 顺序依赖偶发
+// 级别在 @BeforeEach 直接钉 logback(JVM 全局)——context properties 在缓存 context 复用时不重放,
+// 顺序依赖偶发(YPJ-72 会话实锤:DebugLevel 变体先行则 INFO 用例偶发抓不到行)
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
     properties = ["logging.level.yangzhou.api.access=INFO"],
 )
 @ExtendWith(OutputCaptureExtension::class)
 class AccessLogFilterTest : AbstractApiTest() {
+
+    @org.junit.jupiter.api.BeforeEach
+    fun pinLogLevel() {
+        (org.slf4j.LoggerFactory.getLogger("yangzhou.api.access") as ch.qos.logback.classic.Logger).level =
+            ch.qos.logback.classic.Level.INFO
+    }
 
     @Test
     fun `bootstrap(写操作)落 INFO 一行——密码字段 mask 原文不落`(captured: CapturedOutput) {
@@ -62,6 +69,12 @@ class AccessLogFilterTest : AbstractApiTest() {
 )
 @ExtendWith(OutputCaptureExtension::class)
 class AccessLogFilterDebugLevelTest : AbstractApiTest() {
+
+    @org.junit.jupiter.api.BeforeEach
+    fun pinLogLevel() {
+        (org.slf4j.LoggerFactory.getLogger("yangzhou.api.access") as ch.qos.logback.classic.Logger).level =
+            ch.qos.logback.classic.Level.DEBUG
+    }
 
     @Test
     fun `GET 在 DEBUG 级别落行`(captured: CapturedOutput) {

@@ -53,6 +53,7 @@ class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentNotValidException::class)
     fun validation(e: MethodArgumentNotValidException, req: HttpServletRequest): ResponseEntity<ApiError> {
         val fields = e.bindingResult.fieldErrors.associate { it.field to (it.defaultMessage ?: "不合法") }
+        log.warn("API 400 VALIDATION path={} fields={}", req.requestURI, fields)
         val body = ApiError("VALIDATION", "请求字段不合法", req.requestURI, fields)
         return ResponseEntity.badRequest().body(body)
     }
@@ -63,15 +64,20 @@ class GlobalExceptionHandler {
 
     /** catch-all 兜底(spec 0051):未归类异常 → INTERNAL 通用体,不泄栈与内部信息。 */
     @ExceptionHandler(Exception::class)
-    fun internal(e: Exception, req: HttpServletRequest): ResponseEntity<ApiError> {
-        log.error("未捕获异常 path={}", req.requestURI, e)
-        return error(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL", "内部错误", req)
-    }
+    fun internal(e: Exception, req: HttpServletRequest): ResponseEntity<ApiError> =
+        error(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL", "内部错误", req, e)
 
+    /** 0055:失败请求必须落 log——5xx ERROR 带栈,4xx WARN 一行;不开 debug 也能查。 */
     private fun error(
         status: HttpStatus,
         code: String,
         message: String,
         req: HttpServletRequest,
-    ): ResponseEntity<ApiError> = ResponseEntity.status(status).body(ApiError(code, message, req.requestURI))
+        e: Throwable? = null,
+    ): ResponseEntity<ApiError> {
+        val line = "API {} {} path={} msg={}"
+        if (status.is5xxServerError) log.error(line, status, code, req.requestURI, message, e)
+        else log.warn(line, status, code, req.requestURI, message)
+        return ResponseEntity.status(status).body(ApiError(code, message, req.requestURI))
+    }
 }
