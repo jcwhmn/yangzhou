@@ -11,7 +11,7 @@ class AuthApiTest : AbstractApiTest() {
     @Test
     fun `bootstrap 创建首个用户并返回 token`() {
         val response = rest.post().uri("/api/auth/bootstrap")
-            .body(mapOf("username" to "me", "password" to "secret"))
+            .body(mapOf("username" to "me", "password" to "secret123"))
             .exchange()
 
         response.expectStatus().isCreated()
@@ -23,21 +23,21 @@ class AuthApiTest : AbstractApiTest() {
     @Test
     fun `重复 bootstrap 返回 409`() {
         rest.post().uri("/api/auth/bootstrap")
-            .body(mapOf("username" to "me", "password" to "secret"))
+            .body(mapOf("username" to "me", "password" to "secret123"))
             .exchange().expectStatus().isCreated()
 
         rest.post().uri("/api/auth/bootstrap")
-            .body(mapOf("username" to "other", "password" to "secret"))
+            .body(mapOf("username" to "other", "password" to "secret123"))
             .exchange().expectStatus().isEqualTo(409)
     }
 
     @Test
     fun `登录成功返回 token,密码错误 401 且消息笼统`() {
         rest.post().uri("/api/auth/bootstrap")
-            .body(mapOf("username" to "me", "password" to "secret"))
+            .body(mapOf("username" to "me", "password" to "secret123"))
             .exchange()
 
-        assertEquals("me", login("me", "secret")["username"].asText())
+        assertEquals("me", login("me", "secret123")["username"].asText())
 
         rest.post().uri("/api/auth/login")
             .body(mapOf("username" to "me", "password" to "wrong"))

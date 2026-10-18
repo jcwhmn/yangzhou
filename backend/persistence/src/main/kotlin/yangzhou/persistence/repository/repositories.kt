@@ -36,7 +36,11 @@ import java.util.UUID
 import java.time.Instant
 import java.time.LocalDate
 
-interface WorkspaceRepository : CrudRepository<Workspace, Long>
+interface WorkspaceRepository : CrudRepository<Workspace, Long> {
+    /** D6(spec 0052):bootstrap 并发占位锁(事务级 advisory lock,事务提交自动释放);包一层 select 使行可映射。 */
+    @org.springframework.data.jdbc.repository.query.Query("select 0 as locked where (select pg_advisory_xact_lock(hashtext('bootstrap'))) is null")
+    fun lockBootstrap(): Int?
+}
 
 interface MemberRepository : CrudRepository<Member, Long> {
     fun findByUsername(username: String): Member?
@@ -122,6 +126,7 @@ interface ItemRepository : CrudRepository<Item, Long> {
     fun findByAssigneeObjectIdAndDeletedAtIsNull(assigneeObjectId: UUID): List<Item>
     fun findByProjectIdAndExternalRef(projectId: Long, externalRef: String): Item?
     fun existsByParentObjectId(parentObjectId: UUID): Boolean
+    fun findByObjectIdIn(objectIds: Collection<UUID>): List<Item>
 }
 
 interface ProjectRepoRepository : CrudRepository<ProjectRepo, Long> {
@@ -350,7 +355,7 @@ interface SearchRepository : Repository<Item, Long> {
             p.key || '-' || i.number AS number, i.title, s.name AS status
             FROM item i JOIN project p ON i.project_id = p.id
             LEFT JOIN status s ON i.status_object_id = s.object_id
-            WHERE (i.title ILIKE :q OR i.description ILIKE :q OR (p.key || '-' || i.number::text) ILIKE :q)
+            WHERE (i.title ILIKE :q ESCAPE '\' OR i.description ILIKE :q ESCAPE '\' OR (p.key || '-' || i.number::text) ILIKE :q ESCAPE '\')
             AND i.deleted_at IS NULL
             ORDER BY p.key, i.number
             LIMIT 50""",

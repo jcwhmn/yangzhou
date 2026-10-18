@@ -17,6 +17,6 @@ class AuthController(private val authService: AuthService) {
         ResponseEntity.status(HttpStatus.CREATED).body(authService.bootstrap(request.username, request.password))
 
     @PostMapping("/auth/login")
-    fun login(@Valid @RequestBody request: BootstrapRequest): ResponseEntity<AuthService.TokenResponse> =
+    fun login(@Valid @RequestBody request: LoginRequest): ResponseEntity<AuthService.TokenResponse> =
         ResponseEntity.ok(authService.login(request.username, request.password))
 }

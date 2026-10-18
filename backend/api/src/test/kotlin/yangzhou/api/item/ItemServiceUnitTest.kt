@@ -63,13 +63,13 @@ class ItemServiceUnitTest {
     private val requirementRepo = mockk<RequirementRepository>(relaxed = true)
     private val definitions = mockk<AttributeDefinitionRepository>(relaxed = true)
     private val membersRepo = mockk<MemberRepository>(relaxed = true)
-    private val groupRepo = mockk<ItemGroupRepository>(relaxed = true)
-    private val groupMembers = mockk<ItemGroupMemberRepository>(relaxed = true)
+    private val groups = mockk<ItemGroupRepository>(relaxed = true)
+    private val memberships = mockk<ItemGroupMemberRepository>(relaxed = true)
 
     private val allMocks = arrayOf(
         projects, itemRepo, statuses, numbering, memberService, historyRepo, activityRepo,
         workflow, projectMembers, notificationService, feasibilityService, itemTree,
-        requirementRepo, definitions, membersRepo, groupRepo, groupMembers,
+requirementRepo, definitions, membersRepo,
     )
 
     private val service = ItemService(
@@ -89,11 +89,11 @@ class ItemServiceUnitTest {
         gitRefs = mockk(relaxed = true),
         feasibilityService = feasibilityService,
         dependencyService = mockk(relaxed = true),
-        groups = groupRepo,
-        memberships = groupMembers,
+groups = groups,
+memberships = memberships,
         notificationService = notificationService,
-        groupRepo = groupRepo,
-        groupMembers = groupMembers,
+
+
         memberHistory = mockk(relaxed = true),
         clock = Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC),
     )
@@ -143,6 +143,7 @@ class ItemServiceUnitTest {
             if (row.deletedAt == null) listOf(row) else emptyList()
         }
         every { projects.findByKey("CHE") } returns project
+        every { projects.findById(projectId) } returns java.util.Optional.of(project) // D3:projectOf 直取(spec 0052)
         every { projects.findAll() } returns listOf(project)
         every { statuses.findByProjectIdOrderByPosition(projectId) } returns listOf(startStatus, doneStatus)
         every { memberService.current() } returns me
@@ -150,7 +151,7 @@ class ItemServiceUnitTest {
         every { historyRepo.save(any()) } answers { firstArg() }
         every { requirementRepo.save(any()) } answers { firstArg() }
         every { requirementRepo.findByItemIdIn(any()) } returns emptyList()
-        every { groupMembers.findByItemIdIn(any()) } returns emptyList()
+        every { memberships.findByItemIdIn(any()) } returns emptyList()
     }
 
     // ---------- create ----------
@@ -248,8 +249,8 @@ class ItemServiceUnitTest {
             val freeItem = newItem().copy(id = 996, objectId = UUID.randomUUID(), number = 39, title = "空闲")
             stubRows(row, finalItem, inSprint, freeItem)
             val sprint = ItemGroup(id = 7, projectId = projectId, name = "Sprint 42", type = "sprint", status = "active")
-            every { groupMembers.findByItemIdIn(any()) } returns listOf(ItemGroupMember(groupId = 7, itemId = 997))
-            every { groupRepo.findAllById(setOf(7L)) } returns listOf(sprint)
+            every { memberships.findByItemIdIn(any()) } returns listOf(ItemGroupMember(groupId = 7, itemId = 997))
+            every { groups.findAllById(setOf(7L)) } returns listOf(sprint)
 
             val dtos = service.list("CHE", backlogOnly = true)
 
@@ -570,6 +571,7 @@ class ItemServiceUnitTest {
             val orphan = newItem().copy(id = 997, objectId = UUID.randomUUID(), number = 39, parentObjectId = null, deletedAt = root.deletedAt)
             every { itemRepo.findByObjectId(itemOid) } returns root // child 的父(已删)
             every { itemRepo.findByDeletedAtIsNotNullOrderByDeletedAtDesc() } returns listOf(root, child, orphan)
+            every { itemRepo.findByObjectIdIn(any()) } returns listOf(root) // Q4:批量取父(spec 0052)
 
             val dtos = service.recycleBin()
 

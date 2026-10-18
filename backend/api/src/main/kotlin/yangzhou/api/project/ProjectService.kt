@@ -2,6 +2,7 @@ package yangzhou.api.project
 
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Pattern
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import yangzhou.api.support.ConflictException
@@ -31,6 +32,8 @@ class ProjectService(
     private val deletions: ProjectDeletionRepository,
 ) {
 
+    private val log = LoggerFactory.getLogger(ProjectService::class.java)
+
     data class StatusDto(val statusId: UUID, val name: String, val icon: String?, val isStart: Boolean, val isFinal: Boolean, val position: Int)
     data class ProjectDto(
         val projectId: UUID,
@@ -53,7 +56,11 @@ class ProjectService(
     }
 
     fun list(): List<ProjectDto> =
-        projects.findAll().map { it.key }.mapNotNull { runCatching { get(it) }.getOrNull() }
+        projects.findAll().map { it.key }.mapNotNull { key ->
+            runCatching { get(key) }
+                .onFailure { log.warn("项目组装失败,列表中跳过 key={}", key, it) }
+                .getOrNull()
+        }
 
     fun get(key: String): ProjectDto {
         val project = projects.findByKey(key) ?: throw NotFoundException("项目不存在:$key")
