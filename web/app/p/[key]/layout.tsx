@@ -9,11 +9,12 @@ import { api, API_BASE } from "@/lib/api";
 import { t } from "@/lib/texts";
 import { MilestoneManager, type Milestone } from "@/components/MilestoneManager";
 import { ReleaseManager, type Release } from "@/components/ReleaseManager";
-import { Download as DownloadIcon, GitHub as GitHubIcon, Group as GroupIcon, Tune as TuneIcon } from "@mui/icons-material";
+import { Category as CategoryIcon, Download as DownloadIcon, GitHub as GitHubIcon, Group as GroupIcon, Tune as TuneIcon } from "@mui/icons-material";
 import type { Signal } from "@/components/Verdict";
 import { WorkflowEditor } from "@/components/WorkflowEditor";
 import { ProjectMembersPanel } from "@/components/ProjectMembersPanel";
 import { GithubSettingsPanel } from "@/components/GithubSettingsPanel";
+import { GroupTypesPanel } from "@/components/GroupTypesPanel";
 import { DateInput } from "@/components/DateInput";
 
 type Sprint = { sprintId: string; name: string; status: string };
@@ -41,6 +42,7 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
   const [wfOpen, setWfOpen] = useState(false);
   const [membersOpen, setMembersOpen] = useState(false);
   const [ghOpen, setGhOpen] = useState(false);
+  const [gtypeOpen, setGtypeOpen] = useState(false);
 
   const loadSprints = () => {
     // CI 冷 JVM 偶发连接重置(status -1):失败隔 1s 重试一次
@@ -133,7 +135,10 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
           <IconButton size="small" aria-label={t.membersPanel.button} onClick={() => setMembersOpen(true)}>
             <GroupIcon fontSize="small" />
           </IconButton>
-          <IconButton size="small" aria-label={t.gh.button} onClick={() => setGhOpen(true)}>
+          <IconButton size="small" aria-label={t.groupTypes.title} onClick={() => setGtypeOpen(true)}>
+<CategoryIcon fontSize="small" />
+</IconButton>
+<IconButton size="small" aria-label={t.gh.button} onClick={() => setGhOpen(true)}>
             <GitHubIcon fontSize="small" />
           </IconButton>
           <IconButton size="small" aria-label="导出" onClick={() => exportXlsx(String(key))}>
@@ -335,6 +340,11 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
         projectKey={String(key)}
         open={ghOpen}
         onClose={() => setGhOpen(false)}
+      />
+      <GroupTypesPanel
+        projectKey={String(key)}
+        open={gtypeOpen}
+        onClose={() => setGtypeOpen(false)}
       />
     </Box>
   );

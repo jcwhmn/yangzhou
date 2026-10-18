@@ -433,6 +433,72 @@ Authorization: Bearer {{token}}
 GET {{host}}/api/projects/{{pkey}}/backlog
 Authorization: Bearer {{token}}
 
+### ============ 11b. GroupType / 通用组(YPJ-48,spec 0056;自定义类型走最小语义) ============
+
+### 类型列表(新项目应含内建 sprint/release)
+GET {{host}}/api/projects/{{pkey}}/group-types
+Authorization: Bearer {{token}}
+
+### 建自定义类型 quarter(handler 存变量 gtypeKey)
+POST {{host}}/api/projects/{{pkey}}/group-types
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "typeKey": "quarter",
+  "name": "季度"
+}
+
+> {%
+  client.global.set("gtypeKey", response.body.typeKey);
+%}
+
+### 改类型名
+PATCH {{host}}/api/projects/{{pkey}}/group-types/{{gtypeKey}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "季度(改)"
+}
+
+### 建通用组(handler 存变量 groupIdCustom)
+POST {{host}}/api/projects/{{pkey}}/groups
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "typeKey": "{{gtypeKey}}",
+  "name": "2026-Q1",
+  "startDate": "2026-01-01",
+  "endDate": "2026-03-31"
+}
+
+> {%
+  client.global.set("groupIdCustom", response.body.groupId);
+%}
+
+### 通用组列表
+GET {{host}}/api/projects/{{pkey}}/groups?type={{gtypeKey}}
+Authorization: Bearer {{token}}
+
+### 改通用组(状态 active)
+PATCH {{host}}/api/projects/{{pkey}}/groups/{{groupIdCustom}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "status": "active"
+}
+
+### 删通用组
+DELETE {{host}}/api/projects/{{pkey}}/groups/{{groupIdCustom}}
+Authorization: Bearer {{token}}
+
+### 删自定义类型
+DELETE {{host}}/api/projects/{{pkey}}/group-types/{{gtypeKey}}
+Authorization: Bearer {{token}}
+
 ### 建 Milestone(handler 存变量 milestoneId;targetDate 可选,格式 yyyy-MM-dd)
 POST {{host}}/api/projects/{{pkey}}/milestones
 Authorization: Bearer {{token}}
@@ -958,7 +1024,7 @@ Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-  "key": "POOLNEG",
+  "key": "PN{{run}}",
   "name": "池负例"
 }
 

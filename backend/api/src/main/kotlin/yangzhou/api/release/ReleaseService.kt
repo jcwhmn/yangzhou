@@ -47,6 +47,7 @@ class ReleaseService(
     private val itemService: ItemService,
     private val memberHistory: ItemGroupMemberHistoryRepository,
     private val clock: Clock,
+    private val groupTypes: yangzhou.persistence.repository.ItemGroupTypeRepository,
 ) {
 
     data class ReleaseDto(
@@ -110,13 +111,15 @@ class ReleaseService(
     /** 事后补建:status='released' + releasedDate 直接创建(§8.2)。 */
     @Transactional
     fun create(key: String, request: CreateReleaseRequest): ReleaseDto {
+        val p = project(key)
+        groupTypes.findByProjectIdAndTypeKey(p.id!!, "release") ?: throw ConflictException("项目缺少 release 类型")
         val name = request.name?.trim().takeUnless { it.isNullOrEmpty() } ?: throw BadRequestException("name 必填")
         val status = request.status ?: "planned"
         if (status !in statusValues) throw BadRequestException("status 只能是 planned/released")
         val releasedDate = request.releasedDate?.takeIf { it.isNotEmpty() }?.let { parseDate(it, "releasedDate") }
         val saved = groups.save(
             ItemGroup(
-                projectId = project(key).id!!,
+                projectId = p.id!!,
                 type = "release",
                 name = name,
                 status = status,

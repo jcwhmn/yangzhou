@@ -202,6 +202,18 @@ export const t = {
     anyway: "仍然指派",
     unmetWarning: "存在未满足项(缺能力/差距/未评级),指派后请关注。",
   },
+  groupTypes: {
+    title: "分组类型管理",
+    hint: "项目分组的类型(如 季度/周);内建类型不可删除,sprint/release 请用对应功能。",
+    typeKey: "typeKey(小写字母开头)",
+    name: "名称",
+    create: "新增",
+    builtin: "内建",
+    deleteBtn: "删除类型",
+    empty: "暂无类型。",
+    failed: "操作失败",
+    close: "关闭",
+  },
   gh: {
     patTitle: "GitHub PAT(workspace 级)",
     patHint: "fine-grained token,勾选所需仓库;contents:write + pulls:read。保存后只显示尾 4 位。",

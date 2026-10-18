@@ -428,6 +428,25 @@ data class ItemGroup(
     var updatedBy: Long? = null,
 )
 
+/** V35 YPJ-48:项目级 group 类型运行时定义(PRD §6);builtin 种子 sprint/release,自定义类型走最小语义。 */
+@Table("item_group_type")
+data class ItemGroupType(
+    @Id val id: Long? = null,
+    val objectId: UUID = UUID.randomUUID(),
+    val projectId: Long,
+    val typeKey: String,
+    val name: String,
+    val builtin: Boolean = false,
+    @CreatedDate
+    var createdAt: Instant = Instant.now(),
+    @LastModifiedDate
+    var updatedAt: Instant = Instant.now(),
+    @CreatedBy
+    var createdBy: Long? = null,
+    @LastModifiedBy
+    var updatedBy: Long? = null,
+)
+
 /** item × group 多对多;不变量「至多一个 planned/active sprint」在 SprintService 保证(见 spec 0010 裁决 2);release 归属同理单选(release 端点语义,spec 0012)。 */
 @Table("item_group_member")
 data class ItemGroupMember(
