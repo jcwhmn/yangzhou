@@ -16,5 +16,5 @@ export const config = {
   /** 后端 API(用例的 API 预置/清理直连;页面请求走前端代理) */
   apiURL: process.env.E2E_API_URL ?? "http://localhost:8080",
   username: process.env.E2E_USERNAME ?? "me",
-  password: process.env.E2E_PASSWORD ?? "secret",
+  password: process.env.E2E_PASSWORD ?? "secret123",
 };

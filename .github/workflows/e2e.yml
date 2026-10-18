@@ -46,7 +46,7 @@ jobs:
           for i in $(seq 1 60); do
             code=$(curl -s -o /dev/null -w "%{http_code}" -X POST http://localhost:8080/api/auth/bootstrap \
               -H "Content-Type: application/json" \
-              -d '{"username":"me","password":"secret"}') || code=000
+              -d '{"username":"me","password":"secret123"}') || code=000
             [ "$code" = "200" ] || [ "$code" = "409" ] && break
             sleep 2
           done
