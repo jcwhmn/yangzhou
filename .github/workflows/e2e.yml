@@ -13,7 +13,7 @@ jobs:
       postgres:
         image: postgres:17-alpine
         env:
-          POSTGRES_DB: yangzhou
+          POSTGRES_DB: yangzhou_test
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
         ports:
