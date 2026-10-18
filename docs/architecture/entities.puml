@@ -209,4 +209,12 @@ note right of Item
   对外展示为 "{key}-{number}"(如 CHE-1)。
   type ∈ {task, bug, goal, story}。
 end note
+note right of Member
+  spec 0051 audit 四元组:21 张含
+  updated_at 的表均有 created_at/
+  updated_at/created_by/updated_by
+  (@EnableJdbcAuditing 统一写入;
+  by 存 member.id bigint,无 FK;
+  append-only/日志表除外)。
+end note
 @enduml

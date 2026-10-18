@@ -10,7 +10,7 @@ spring:
 
 server:
   error:
-    include-message: always
+    include-message: never
 
 yangzhou:
   jwt:

@@ -6,6 +6,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Tag
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.test.context.ActiveProfiles
 import org.springframework.boot.test.web.server.LocalServerPort
 import org.springframework.http.HttpHeaders
 import org.springframework.jdbc.core.JdbcTemplate
@@ -20,6 +21,7 @@ import kotlin.test.assertEquals
  * 容器为 JVM 级单例,跨测试类复用;每测试自清全部表。
  */
 @Tag("integration")
+@ActiveProfiles("test")
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 abstract class AbstractApiTest {
 

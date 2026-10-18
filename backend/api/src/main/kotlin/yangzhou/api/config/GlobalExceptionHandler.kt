@@ -1,6 +1,7 @@
 package yangzhou.api.config
 
 import jakarta.servlet.http.HttpServletRequest
+import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.authentication.BadCredentialsException
@@ -20,6 +21,8 @@ data class ApiError(
 
 @RestControllerAdvice
 class GlobalExceptionHandler {
+
+    private val log = LoggerFactory.getLogger(GlobalExceptionHandler::class.java)
 
     @ExceptionHandler(NotFoundException::class)
     fun notFound(e: NotFoundException, req: HttpServletRequest) =
@@ -52,6 +55,17 @@ class GlobalExceptionHandler {
         val fields = e.bindingResult.fieldErrors.associate { it.field to (it.defaultMessage ?: "不合法") }
         val body = ApiError("VALIDATION", "请求字段不合法", req.requestURI, fields)
         return ResponseEntity.badRequest().body(body)
+    }
+
+    @ExceptionHandler(org.springframework.web.HttpRequestMethodNotSupportedException::class)
+    fun methodNotSupported(e: org.springframework.web.HttpRequestMethodNotSupportedException, req: HttpServletRequest) =
+        error(HttpStatus.METHOD_NOT_ALLOWED, "METHOD_NOT_ALLOWED", "不支持的请求方法", req)
+
+    /** catch-all 兜底(spec 0051):未归类异常 → INTERNAL 通用体,不泄栈与内部信息。 */
+    @ExceptionHandler(Exception::class)
+    fun internal(e: Exception, req: HttpServletRequest): ResponseEntity<ApiError> {
+        log.error("未捕获异常 path={}", req.requestURI, e)
+        return error(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL", "内部错误", req)
     }
 
     private fun error(
