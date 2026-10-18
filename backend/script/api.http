@@ -916,7 +916,7 @@ Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-  "key": "DEL{{$timestamp}}",
+  "key": "DEL{{run}}",
   "name": "删除演练"
 }
 
@@ -949,4 +949,3 @@ Authorization: Bearer {{token}}
 ### 查无命中(空数组,200 非报错)
 GET {{host}}/api/search?q=不存在的词xyz
 Authorization: Bearer {{token}}
-
