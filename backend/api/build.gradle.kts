@@ -34,6 +34,8 @@ tasks.withType<Test> {
 }
 
 tasks.test {
+    // YPJ-70: 单测类级并行(无 DB/共享态,安全);fork 数 = 半数核夹 2..4,更多只费 JVM 启动
+    maxParallelForks = maxOf(2, minOf(4, Runtime.getRuntime().availableProcessors() / 2))
     useJUnitPlatform {
         excludeTags("integration")
     }
