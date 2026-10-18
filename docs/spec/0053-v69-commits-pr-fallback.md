@@ -72,4 +72,8 @@ Issue 工作流第 5 步(合并后)补回「删远程分支」:`gh pr merge --sq
 
 ## 4. As-built
 
-(完工后补)
+按 §2 实现,无设计偏离。两点补充:
+
+1. 测试 fake 实际补了 **3 处**(§2.1 只列了 2):`TimeSuggestionApiTest.FakeSuggestGateway` 也实现 `GithubGateway`,接口新增方法必须补齐
+2. `FakeCommitGateway` 顺势补了可注入的 `prs`/`prCommits`,供降级用例驱动
+3. 分支创建前提交的过滤断言沿用既有用例(fake 忽略 since 模拟 GitHub 不过滤),未重复写
