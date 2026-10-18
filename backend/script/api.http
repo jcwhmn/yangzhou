@@ -437,9 +437,11 @@ Authorization: Bearer {{token}}
 
 ### 类型列表(新项目应含内建 sprint/release)
 GET {{host}}/api/projects/{{pkey}}/group-types
+Authorization: Bearer {{token}}
 
 ### 建自定义类型 quarter(handler 存变量 gtypeKey)
 POST {{host}}/api/projects/{{pkey}}/group-types
+Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
@@ -453,6 +455,7 @@ Content-Type: application/json
 
 ### 改类型名
 PATCH {{host}}/api/projects/{{pkey}}/group-types/{{gtypeKey}}
+Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
@@ -461,6 +464,7 @@ Content-Type: application/json
 
 ### 建通用组(handler 存变量 groupIdCustom)
 POST {{host}}/api/projects/{{pkey}}/groups
+Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
@@ -476,9 +480,11 @@ Content-Type: application/json
 
 ### 通用组列表
 GET {{host}}/api/projects/{{pkey}}/groups?type={{gtypeKey}}
+Authorization: Bearer {{token}}
 
 ### 改通用组(状态 active)
 PATCH {{host}}/api/projects/{{pkey}}/groups/{{groupIdCustom}}
+Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
@@ -487,9 +493,11 @@ Content-Type: application/json
 
 ### 删通用组
 DELETE {{host}}/api/projects/{{pkey}}/groups/{{groupIdCustom}}
+Authorization: Bearer {{token}}
 
 ### 删自定义类型
 DELETE {{host}}/api/projects/{{pkey}}/group-types/{{gtypeKey}}
+Authorization: Bearer {{token}}
 
 ### 建 Milestone(handler 存变量 milestoneId;targetDate 可选,格式 yyyy-MM-dd)
 POST {{host}}/api/projects/{{pkey}}/milestones
@@ -1016,7 +1024,7 @@ Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-  "key": "POOLNEG",
+  "key": "PN{{$uuidSuffix}}",
   "name": "池负例"
 }
 
