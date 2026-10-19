@@ -13,6 +13,8 @@ import {
   ListItemText,
   Stack,
   Table,
+  ToggleButton,
+  ToggleButtonGroup,
   TableBody,
   TableCell,
   TableContainer,
@@ -21,10 +23,11 @@ import {
   Typography,
 } from "@mui/material";
 import { PageShell } from "@/components/PageShell";
+import { BarChart } from "@mui/x-charts/BarChart";
 import { LineChart } from "@mui/x-charts/LineChart";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { t } from "@/lib/texts";
 import { AssignPopover } from "@/components/AssignPopover";
@@ -64,6 +67,8 @@ export default function SprintPage() {
   const [busy, setBusy] = useState(false);
   const [allSprints, setAllSprints] = useState<Sprint[]>([]);
   const [confirmFlow, setConfirmFlow] = useState<null | "start" | "complete">(null);
+  // YPJ-73:图表视图切换(燃専数据不足时显示空态而非整块消失)
+  const [chartView, setChartView] = useState<"burndown" | "byStatus" | "byAssignee">("burndown");
   // YPJ-46:burndown(剩余 vs 理想线);端点要求 sprint 有起止日期
   const [bd, setBd] = useState<{ ideal: { date: string; remaining: number }[]; actual: { date: string; remaining: number }[] } | null>(null);
 
@@ -231,14 +236,39 @@ export default function SprintPage() {
             </Typography>
           )}
 
-          {bd && bd.actual.length > 1 && (
-            <LineChart
-              height={260}
-              xAxis={[{ scaleType: "time", data: bd.actual.map((p) => new Date(p.date)) }]}
-              series={[
-                { label: t.flow.remaining, data: bd.actual.map((p) => p.remaining), showMark: false },
-                { label: t.flow.ideal, data: bd.ideal.map((p) => p.remaining), showMark: false },
-              ]}
+          <Stack direction="row" justifyContent="flex-end" sx={{ mb: 1 }}>
+            <ToggleButtonGroup
+              size="small"
+              exclusive
+              value={chartView}
+              onChange={(_, v) => v && setChartView(v)}
+            >
+              <ToggleButton value="burndown">{t.sprintCharts.burndown}</ToggleButton>
+              <ToggleButton value="byStatus">{t.sprintCharts.byStatus}</ToggleButton>
+              <ToggleButton value="byAssignee">{t.sprintCharts.byAssignee}</ToggleButton>
+            </ToggleButtonGroup>
+          </Stack>
+          {chartView === "burndown" &&
+            (bd && bd.actual.length > 1 ? (
+              <LineChart
+                height={260}
+                xAxis={[{ scaleType: "time", data: bd.actual.map((p) => new Date(p.date)) }]}
+                series={[
+                  { label: t.flow.remaining, data: bd.actual.map((p) => p.remaining), showMark: false },
+                  { label: t.flow.ideal, data: bd.ideal.map((p) => p.remaining), showMark: false },
+                ]}
+                sx={{ mb: 2 }}
+              />
+            ) : (
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 2 }}>
+                {t.sprintCharts.burndownEmpty}
+              </Typography>
+            ))}
+          {chartView !== "burndown" && items !== null && items.length > 0 && (
+            <ChartBy
+              view={chartView}
+              items={items}
+              statusOrder={statuses.map((s) => s.name)}
               sx={{ mb: 2 }}
             />
           )}
@@ -351,5 +381,39 @@ export default function SprintPage() {
         </>
       )}
     </PageShell>
+  );
+}
+
+// YPJ-73:sprint 页图表——按状态/按负责人的 item 计数(横向条形,数据全来自页内 items)
+function ChartBy({
+  view,
+  items,
+  statusOrder,
+  ...rest
+}: {
+  view: "byStatus" | "byAssignee";
+  items: Item[];
+  statusOrder: string[];
+} & { sx?: object }) {
+  const rows = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const i of items) {
+      const k = view === "byStatus" ? i.status : (i.assignee ?? t.sprintCharts.unassigned);
+      counts.set(k, (counts.get(k) ?? 0) + 1);
+    }
+    const order =
+      view === "byStatus"
+        ? [...statusOrder, ...counts.keys()].filter((k, idx, a) => counts.has(k) && a.indexOf(k) === idx)
+        : [...counts.keys()].sort();
+    return order.map((name) => ({ name, count: counts.get(name)! }));
+  }, [view, items, statusOrder]);
+  return (
+    <BarChart
+      height={260}
+      layout="horizontal"
+      yAxis={[{ scaleType: "band", data: rows.map((r) => r.name) }]}
+      series={[{ label: t.sprintCharts.count, data: rows.map((r) => r.count) }]}
+      {...rest}
+    />
   );
 }
