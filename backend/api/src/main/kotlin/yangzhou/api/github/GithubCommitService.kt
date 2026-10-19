@@ -70,7 +70,7 @@ class GithubCommitService(
 
     /** 分支查空 → PR 回溯:返回 (PR 号, 过滤后 commits);未命中 PR 或全被 since 过滤 → null。 */
     private fun fetchPrCommits(ref: ItemGitRef, token: String): Pair<Int, List<RepoCommit>>? {
-        val pr = runCatching { gateway.listPullRequests(ref.repo, token).firstOrNull { it.headRef == ref.ref } }
+        val pr = runCatching { gateway.findPrByHead(ref.repo, ref.ref, token) }
             .getOrElse { e -> wrap(e) } ?: return null
         val commits = runCatching { gateway.listPullRequestCommits(ref.repo, pr.number, token) }
             .getOrElse { e -> wrap(e) }
@@ -81,6 +81,8 @@ class GithubCommitService(
 
     private fun wrap(e: Throwable): Nothing {
         if (e is VcsApiException) throw BadRequestException("GitHub API 错误(${e.status}):先检查 PAT/仓库名")
+        // 网络层失败(超时/连接重置)原样抛会兆成 500 INTERNAL;翻译成可操作错误让用户重试(YPJ-52 实测)
+        if (e is java.io.IOException) throw BadRequestException("GitHub 暂时不可达(网络错误),请稍后重试")
         throw e
     }
 }

@@ -36,6 +36,14 @@ class GithubAdapter(private val mapper: ObjectMapper) : VcsGateway {
         mapper.readTree(get(repo, "/pulls?state=all&sort=updated&direction=desc&per_page=50", token))
             .map { toRepoPr(it) }
 
+    // head=owner:branch 平台侧过滤,不受首页窗口限制(老 PR 也能回溯,YPJ-52)
+    override fun findPrByHead(repo: String, headRef: String, token: String): RepoPr? {
+        val owner = repo.substringBefore('/')
+        return mapper.readTree(get(repo, "/pulls?state=all&head=$owner:$headRef&per_page=1", token))
+            .map { toRepoPr(it) }
+            .firstOrNull()
+    }
+
     // ponytail: 只取第一页 per_page=20——按需查看量级足够,翻页等真实需要再加
     override fun listCommits(repo: String, sha: String, since: Instant?, token: String): List<RepoCommit> =
         try {

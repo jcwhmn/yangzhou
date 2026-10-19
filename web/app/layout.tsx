@@ -1,7 +1,7 @@
 import { CssBaseline } from "@mui/material";
 import type { Metadata } from "next";
 import { Providers } from "@/components/Providers";
-import { AppNav } from "@/components/AppNav";
+import { AppNav } from "@/components/AppNavClient";
 
 export const metadata: Metadata = { title: "扬州 yangzhou" };
 

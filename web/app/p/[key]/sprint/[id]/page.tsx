@@ -99,6 +99,8 @@ export default function SprintPage() {
         body: JSON.stringify({ status }),
       });
       setSprint(s);
+      // YPJ-74:通知 sidebar 重拉 sprints(状态/排序即时同步)
+      window.dispatchEvent(new Event("sprints-changed"));
     } catch (e) {
       setError(e instanceof Error ? e.message : "更新失败");
     }
