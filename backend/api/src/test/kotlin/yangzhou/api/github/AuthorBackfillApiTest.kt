@@ -41,7 +41,7 @@ class AuthorBackfillApiTest : AbstractApiTest() {
         val itemId = createItem(authed, "CHE", "x")["itemId"].asText()
 
         // PR author = xiaoli-gh(小李)→ 自动 assign
-        fake.prs["octo/r"] = listOf(GithubPr(1, "CHE-1-feat", "open", "https://github.com/octo/r/pull/1", "xiaoli-gh"))
+        fake.prs["octo/r"] = listOf(RepoPr(1, "CHE-1-feat", "open", "https://github.com/octo/r/pull/1", "xiaoli-gh"))
         syncService.syncAll()
 
         val detail = json.readTree(
@@ -62,7 +62,7 @@ class AuthorBackfillApiTest : AbstractApiTest() {
             .body(mapOf("repo" to "octo/r")).exchange().expectStatus().isCreated()
         val itemId = createItem(authed, "CHE", "x")["itemId"].asText()
 
-        fake.prs["octo/r"] = listOf(GithubPr(1, "CHE-1-x", "open", null, "unknown-ghost"))
+        fake.prs["octo/r"] = listOf(RepoPr(1, "CHE-1-x", "open", null, "unknown-ghost"))
         syncService.syncAll()
 
         val detail = json.readTree(

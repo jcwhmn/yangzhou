@@ -8,9 +8,7 @@ import org.springframework.transaction.annotation.Transactional
 import yangzhou.api.support.ConflictException
 import yangzhou.api.support.NotFoundException
 import yangzhou.api.workspace.WorkspaceService
-import yangzhou.api.github.EVENT_BRANCH_CREATED
-import yangzhou.api.github.EVENT_PR_MERGED
-import yangzhou.api.github.EVENT_PR_OPENED
+import yangzhou.api.github.VcsEvent
 import yangzhou.persistence.Project
 import yangzhou.persistence.ProjectWorkflowRule
 import yangzhou.persistence.Status
@@ -179,15 +177,11 @@ class ProjectService(
 
     data class GanttDto(val rows: List<GanttRow>)
 
-    /** YPJ-36:默认规则 3 槽(branch→In Progress、pr_open→In Review、pr_merged→Done);closed_unmerged 留空=人管(票面裁决)。按名字映射,非标 workflow 缺列自然少种。 */
+    /** YPJ-40 方案 A:默认规则按语义推导(branch→首个非 start、pr_open→次个非 start(无则不种=人管)、pr_merged→首个 final、unmerged 恒不种);标准 V7 五列下与旧按名映射结果一致。 */
     private fun seedDefaultRules(projectId: Long, saved: List<Status>) {
-        val byName = saved.associateBy { it.name }
-        mapOf(EVENT_BRANCH_CREATED to "In Progress", EVENT_PR_OPENED to "In Review", EVENT_PR_MERGED to "Done")
-            .forEach { (event, statusName) ->
-                byName[statusName]?.let {
-                    workflowRules.save(ProjectWorkflowRule(projectId = projectId, eventType = event, statusObjectId = it.objectId))
-                }
-            }
+        defaultRuleSeeds(saved).forEach { (event, status) ->
+            workflowRules.save(ProjectWorkflowRule(projectId = projectId, eventType = event.wire, statusObjectId = status.objectId))
+        }
     }
 
     private fun defaultStatuses(projectId: Long) = listOf( // V7:5 列(评审环节天然有位置);存量项目不动
@@ -197,6 +191,16 @@ class ProjectService(
         Status(projectId = projectId, name = "QA", position = 3),
         Status(projectId = projectId, name = "Done", isFinal = true, position = 4),
     )
+
+    companion object {
+        /** YPJ-40 方案 A 的推导核心(纯函数,单测直测):branch→首个非 start、pr_open→次个非 start(无则不种=人管)、pr_merged→首个 final;缺失即不种,非标 workflow 开箱有定义。 */
+        fun defaultRuleSeeds(statuses: List<Status>): List<Pair<VcsEvent, Status>> = buildList {
+            val nonStart = statuses.filter { !it.isStart }
+            nonStart.firstOrNull()?.let { add(VcsEvent.BRANCH_CREATED to it) }
+            nonStart.getOrNull(1)?.let { add(VcsEvent.PR_OPENED to it) }
+            statuses.firstOrNull { it.isFinal }?.let { add(VcsEvent.PR_MERGED to it) }
+        }
+    }
 }
 
 data class CreateProjectRequest(

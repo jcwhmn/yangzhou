@@ -14,25 +14,25 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-class FakeCommitGateway : GithubGateway {
-    var failWith: GithubApiException? = null
-    val commits = mutableMapOf<String, List<GithubCommit>>() // key = repo@sha
-    val prCommits = mutableMapOf<Int, List<GithubCommit>>() // key = PR 号
-    var prs: Map<String, List<GithubPr>> = emptyMap() // key = repo
+class FakeCommitGateway : VcsGateway {
+    var failWith: VcsApiException? = null
+    val commits = mutableMapOf<String, List<RepoCommit>>() // key = repo@sha
+    val prCommits = mutableMapOf<Int, List<RepoCommit>>() // key = PR 号
+    var prs: Map<String, List<RepoPr>> = emptyMap() // key = repo
     var lastSince: Instant? = null
 
     override fun listBranches(repo: String, token: String): List<String> = emptyList()
-    override fun listPullRequests(repo: String, token: String): List<GithubPr> = prs[repo].orEmpty()
+    override fun listPullRequests(repo: String, token: String): List<RepoPr> = prs[repo].orEmpty()
     override fun createBranch(repo: String, branch: String, fromBranch: String, token: String) {}
 
     // 故意不 honor since(模拟 GitHub 不过滤)——服务侧兜底过滤由 YPJ-42 测试验证
-    override fun listCommits(repo: String, sha: String, since: Instant?, token: String): List<GithubCommit> {
+    override fun listCommits(repo: String, sha: String, since: Instant?, token: String): List<RepoCommit> {
         failWith?.let { throw it }
         lastSince = since
         return commits["$repo@$sha"].orEmpty()
     }
 
-    override fun listPullRequestCommits(repo: String, number: Int, token: String): List<GithubCommit> {
+    override fun listPullRequestCommits(repo: String, number: Int, token: String): List<RepoCommit> {
         failWith?.let { throw it }
         return prCommits[number].orEmpty()
     }
@@ -90,7 +90,7 @@ class GithubCommitsApiTest : AbstractApiTest() {
         val itemId = setup()
         seedBranchRef(itemId)
         fake.commits["octo/r@CHE-1-x"] = listOf(
-            GithubCommit("abc1234full", "YPJ-7: 加功能", "me", "2026-10-06T12:00:00Z", "https://github.com/octo/r/commit/abc1234full"),
+            RepoCommit("abc1234full", "YPJ-7: 加功能", "me", "2026-10-06T12:00:00Z", "https://github.com/octo/r/commit/abc1234full"),
         )
 
         val res = body(getCommits(itemId))
@@ -116,8 +116,8 @@ class GithubCommitsApiTest : AbstractApiTest() {
         val itemId = setup()
         seedBranchRef(itemId) // created_at = 2026-10-01
         fake.commits["octo/r@CHE-1-x"] = listOf(
-            GithubCommit("old111full", "YPJ-7: 历史提交", "me", "2026-09-20T12:00:00Z", null),
-            GithubCommit("new222full", "YPJ-42: 新提交", "me", "2026-10-06T12:00:00Z", null),
+            RepoCommit("old111full", "YPJ-7: 历史提交", "me", "2026-09-20T12:00:00Z", null),
+            RepoCommit("new222full", "YPJ-42: 新提交", "me", "2026-10-06T12:00:00Z", null),
         )
 
         val res = body(getCommits(itemId))
@@ -132,10 +132,10 @@ class GithubCommitsApiTest : AbstractApiTest() {
         val itemId = setup()
         seedBranchRef(itemId) // created_at = 2026-10-01
         fake.commits.clear() // 分支已删:listCommits 空 → 走 PR
-        fake.prs = mapOf("octo/r" to listOf(GithubPr(7, "CHE-1-x", "merged")))
+        fake.prs = mapOf("octo/r" to listOf(RepoPr(7, "CHE-1-x", "merged")))
         fake.prCommits[7] = listOf(
-            GithubCommit("old333full", "基线提交", "me", "2026-09-20T12:00:00Z", null),
-            GithubCommit("new444full", "YPJ-69: 降级取回", "me", "2026-10-06T12:00:00Z", "https://github.com/octo/r/pull/7/commits/new444full"),
+            RepoCommit("old333full", "基线提交", "me", "2026-09-20T12:00:00Z", null),
+            RepoCommit("new444full", "YPJ-69: 降级取回", "me", "2026-10-06T12:00:00Z", "https://github.com/octo/r/pull/7/commits/new444full"),
         )
 
         val res = body(getCommits(itemId))
@@ -151,7 +151,7 @@ class GithubCommitsApiTest : AbstractApiTest() {
     fun `分支与 PR 均无提交——空数组不报错`() {
         val itemId = setup()
         seedBranchRef(itemId)
-        fake.prs = mapOf("octo/r" to listOf(GithubPr(8, "other-branch", "open")))
+        fake.prs = mapOf("octo/r" to listOf(RepoPr(8, "other-branch", "open")))
 
         val res = body(getCommits(itemId))
 
@@ -181,7 +181,7 @@ class GithubCommitsApiTest : AbstractApiTest() {
     fun `GitHub 失败——400 带状态码提示而非 500`() {
         val itemId = setup()
         seedBranchRef(itemId)
-        fake.failWith = GithubApiException(401, "unauthorized")
+        fake.failWith = VcsApiException(401, "unauthorized")
         val res = authed.get().uri("/api/items/$itemId/commits").exchange()
             .expectStatus().isBadRequest()
             .expectBody(String::class.java).returnResult().responseBody!!

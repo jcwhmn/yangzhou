@@ -35,7 +35,7 @@ class GithubSyncService(
     private val members: yangzhou.persistence.repository.MemberRepository,
     private val projectMembers: yangzhou.api.projectmember.ProjectMemberService,
     private val notificationService: yangzhou.api.notification.NotificationService,
-    private val gateway: GithubGateway,
+    private val gateway: VcsGateway,
 ) {
     companion object {
         private val log = LoggerFactory.getLogger(GithubSyncService::class.java)
@@ -57,7 +57,7 @@ class GithubSyncService(
             val project = projects.findById(mount.projectId).orElse(null) ?: continue
             try {
                 syncRepo(project, mount.repo, token)
-            } catch (e: GithubApiException) {
+            } catch (e: VcsApiException) {
                 if (e.status == 401) log.warn("GitHub 认证失败(401),请检查 workspace PAT:{}", mount.repo)
                 else log.warn("GitHub API 失败({}):{}", e.status, mount.repo)
             } catch (e: Exception) {
@@ -73,7 +73,7 @@ class GithubSyncService(
             val item = items.findByProjectIdAndNumber(project.id!!, m.groupValues[2].toInt()) ?: continue
             if (gitRefs.findByRepoAndKindAndRef(repo, KIND_BRANCH, name) != null) continue
             gitRefs.save(ItemGitRef(itemId = item.id!!, kind = KIND_BRANCH, repo = repo, ref = name))
-            applyEvent(project, item.id!!, EVENT_BRANCH_CREATED, "branch $name")
+            applyEvent(project, item.id!!, VcsEvent.BRANCH_CREATED.wire, "branch $name")
         }
 
         for (pr in gateway.listPullRequests(repo, token)) {
@@ -110,9 +110,9 @@ class GithubSyncService(
     }
 
     private fun eventForState(state: String) = when (state) {
-        "open" -> EVENT_PR_OPENED
-        "merged" -> EVENT_PR_MERGED
-        else -> EVENT_PR_CLOSED_UNMERGED
+        "open" -> VcsEvent.PR_OPENED.wire
+        "merged" -> VcsEvent.PR_MERGED.wire
+        else -> VcsEvent.PR_CLOSED_UNMERGED.wire
     }
 
     /** 防呆:未配映射忽略;当前 final 封口;只按 position 前进;WIP 超限跳过并留痕。S3 建分支后也走此管道。 */
