@@ -406,6 +406,14 @@ export const t = {
     done: "已完成",
     scope: "范围",
   },
+  sprintCharts: {
+    burndown: "燃尽",
+    byStatus: "状态分布",
+    byAssignee: "成员负载",
+    burndownEmpty: "Sprint 开始次日生成燃尽数据,当前点数不足。",
+    unassigned: "未指派",
+    count: "item 数",
+  },
   projectNav: {
     overview: "Overview",
     flow: "Flow",
