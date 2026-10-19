@@ -10,6 +10,10 @@ interface VcsGateway {
     fun listBranches(repo: String, token: String): List<String>
     fun listPullRequests(repo: String, token: String): List<RepoPr>
 
+    /** 按 head 分支定位 PR(open/merged/closed 全量);无 → null。默认实现遍历列表,真实现用平台 head 过滤(不受首页窗口限制)。 */
+    fun findPrByHead(repo: String, headRef: String, token: String): RepoPr? =
+        listPullRequests(repo, token).firstOrNull { it.headRef == headRef }
+
     /** 从 fromBranch 建新分支;已存在 → GithubApiException(422)。 */
     fun createBranch(repo: String, branch: String, fromBranch: String, token: String)
 

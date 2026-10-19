@@ -16,6 +16,7 @@ import kotlin.test.assertTrue
 
 class FakeCommitGateway : VcsGateway {
     var failWith: VcsApiException? = null
+    var ioError: java.io.IOException? = null
     val commits = mutableMapOf<String, List<RepoCommit>>() // key = repo@sha
     val prCommits = mutableMapOf<Int, List<RepoCommit>>() // key = PR 号
     var prs: Map<String, List<RepoPr>> = emptyMap() // key = repo
@@ -27,6 +28,7 @@ class FakeCommitGateway : VcsGateway {
 
     // 故意不 honor since(模拟 GitHub 不过滤)——服务侧兜底过滤由 YPJ-42 测试验证
     override fun listCommits(repo: String, sha: String, since: Instant?, token: String): List<RepoCommit> {
+        ioError?.let { throw it }
         failWith?.let { throw it }
         lastSince = since
         return commits["$repo@$sha"].orEmpty()
@@ -186,5 +188,16 @@ class GithubCommitsApiTest : AbstractApiTest() {
             .expectStatus().isBadRequest()
             .expectBody(String::class.java).returnResult().responseBody!!
         assertTrue(res.contains("401"))
+    }
+
+    @Test
+    fun `GitHub 网络错误——400 可重试提示而非 500(YPJ-52 实测)`() {
+        val itemId = setup()
+        seedBranchRef(itemId)
+        fake.ioError = java.io.IOException("connection reset")
+        val res = authed.get().uri("/api/items/$itemId/commits").exchange()
+            .expectStatus().isBadRequest()
+            .expectBody(String::class.java).returnResult().responseBody!!
+        assertTrue(res.contains("暂时不可达"))
     }
 }
