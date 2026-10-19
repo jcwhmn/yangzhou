@@ -7,7 +7,7 @@ import org.springframework.jdbc.core.JdbcTemplate
 import yangzhou.api.AbstractApiTest
 import yangzhou.api.github.FakeGatewayConfig
 import yangzhou.api.github.FakeGithubGateway
-import yangzhou.api.github.GithubPr
+import yangzhou.api.github.RepoPr
 import yangzhou.api.github.GithubSyncService
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -78,7 +78,7 @@ class NotificationApiTest : AbstractApiTest() {
         createItem(authed, "CHE", "x")["itemId"].asText() // CHE-1,createdBy = me
 
         // GitHub 事件(actor null)→ 我(createdBy)收通知,不排除任何人
-        fake.prs["octo/r"] = listOf(GithubPr(7, "CHE-1-x", "open", "https://github.com/octo/r/pull/7"))
+        fake.prs["octo/r"] = listOf(RepoPr(7, "CHE-1-x", "open", "https://github.com/octo/r/pull/7"))
         syncService.syncAll()
 
         val list = json.readTree(

@@ -27,7 +27,7 @@ class GithubBranchService(
     private val activityRepo: ItemActivityRepository,
     private val workspaceService: WorkspaceService,
     private val syncService: GithubSyncService,
-    private val gateway: GithubGateway,
+    private val gateway: VcsGateway,
 ) {
 
     data class BranchDto(val repo: String, val branch: String, val url: String)
@@ -46,7 +46,7 @@ class GithubBranchService(
 
         try {
             gateway.createBranch(mount.repo, branch, base, token)
-        } catch (e: GithubApiException) {
+        } catch (e: VcsApiException) {
             if (e.status == 422) throw ConflictException("分支已存在:$branch")
             if (e.status == 404) throw BadRequestException("基线分支不存在:$base")
             throw BadRequestException("GitHub API 错误(${e.status}):先检查 PAT/仓库名")
@@ -57,7 +57,7 @@ class GithubBranchService(
         activityRepo.save(
             ItemActivity(itemId = item.id!!, kind = "github_branch_created", newValue = "分支 $branch(${mount.repo})"),
         )
-        syncService.applyEvent(project, item.id!!, EVENT_BRANCH_CREATED, "branch $branch")
+        syncService.applyEvent(project, item.id!!, VcsEvent.BRANCH_CREATED.wire, "branch $branch")
         return BranchDto(mount.repo, branch, url)
     }
 

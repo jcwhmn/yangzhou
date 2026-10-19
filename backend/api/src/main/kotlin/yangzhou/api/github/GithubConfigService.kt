@@ -18,11 +18,7 @@ import java.time.Instant
 import java.util.UUID
 
 /** GitHub 事件类型(V6 四槽;扩展=加枚举值+CHECK)。 */
-const val EVENT_BRANCH_CREATED = "branch_created"
-const val EVENT_PR_OPENED = "pr_opened"
-const val EVENT_PR_MERGED = "pr_merged"
-const val EVENT_PR_CLOSED_UNMERGED = "pr_closed_unmerged"
-val GITHUB_EVENT_TYPES = listOf(EVENT_BRANCH_CREATED, EVENT_PR_OPENED, EVENT_PR_MERGED, EVENT_PR_CLOSED_UNMERGED)
+val GITHUB_EVENT_TYPES = VcsEvent.entries.map { it.wire }
 
 /**
  * V6-S1 配置面:workspace PAT / 项目仓库挂载 / 事件→状态映射。

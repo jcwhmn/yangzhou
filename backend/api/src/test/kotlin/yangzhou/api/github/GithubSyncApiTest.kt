@@ -13,11 +13,11 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-class FakeGithubGateway : GithubGateway {
+class FakeGithubGateway : VcsGateway {
     var branches: MutableMap<String, List<String>> = mutableMapOf()
-    var prs: MutableMap<String, List<GithubPr>> = mutableMapOf()
+    var prs: MutableMap<String, List<RepoPr>> = mutableMapOf()
     var failWith: Exception? = null
-    var createError: GithubApiException? = null
+    var createError: VcsApiException? = null
     val created = mutableListOf<Triple<String, String, String>>() // repo, branch, from
 
     override fun listBranches(repo: String, token: String): List<String> {
@@ -25,7 +25,7 @@ class FakeGithubGateway : GithubGateway {
         return branches[repo].orEmpty()
     }
 
-    override fun listPullRequests(repo: String, token: String): List<GithubPr> {
+    override fun listPullRequests(repo: String, token: String): List<RepoPr> {
         failWith?.let { throw it }
         return prs[repo].orEmpty()
     }
@@ -36,9 +36,9 @@ class FakeGithubGateway : GithubGateway {
         created.add(Triple(repo, branch, fromBranch))
     }
 
-    override fun listCommits(repo: String, sha: String, since: java.time.Instant?, token: String): List<GithubCommit> = emptyList()
+    override fun listCommits(repo: String, sha: String, since: java.time.Instant?, token: String): List<RepoCommit> = emptyList()
 
-    override fun listPullRequestCommits(repo: String, number: Int, token: String): List<GithubCommit> = emptyList()
+    override fun listPullRequestCommits(repo: String, number: Int, token: String): List<RepoCommit> = emptyList()
 }
 
 @TestConfiguration(proxyBeanMethods = false)
@@ -132,24 +132,24 @@ class GithubSyncApiTest : AbstractApiTest() {
     fun `pr 生命周期 open→merged——final 封口——无关 head 忽略`() {
         val itemId = setup()
 
-        fake.prs["octo/r"] = listOf(GithubPr(1, "CHE-1-x", "open", "https://github.com/octo/r/pull/1"))
+        fake.prs["octo/r"] = listOf(RepoPr(1, "CHE-1-x", "open", "https://github.com/octo/r/pull/1"))
         syncService.syncAll()
         assertEquals("In Review", statusOf(itemId))
 
-        fake.prs["octo/r"] = listOf(GithubPr(1, "CHE-1-x", "merged", "https://github.com/octo/r/pull/1"))
+        fake.prs["octo/r"] = listOf(RepoPr(1, "CHE-1-x", "merged", "https://github.com/octo/r/pull/1"))
         syncService.syncAll()
         assertEquals("Done", statusOf(itemId))
 
         // 已 final,后续事件封口
-        fake.prs["octo/r"] = listOf(GithubPr(1, "CHE-1-x", "closed", "https://github.com/octo/r/pull/1"))
+        fake.prs["octo/r"] = listOf(RepoPr(1, "CHE-1-x", "closed", "https://github.com/octo/r/pull/1"))
         syncService.syncAll()
         assertEquals("Done", statusOf(itemId))
 
         // 无关分支的 PR 不产生任何移动
         val before = activities(itemId).filter { it["kind"].asText() == "github_status_changed" }.size
         fake.prs["octo/r"] = listOf(
-            GithubPr(2, "feature/whatever", "open"),
-            GithubPr(1, "CHE-1-x", "merged", "https://github.com/octo/r/pull/1"),
+            RepoPr(2, "feature/whatever", "open"),
+            RepoPr(1, "CHE-1-x", "merged", "https://github.com/octo/r/pull/1"),
         )
         syncService.syncAll()
         assertEquals(before, activities(itemId).filter { it["kind"].asText() == "github_status_changed" }.size)
@@ -167,11 +167,11 @@ class GithubSyncApiTest : AbstractApiTest() {
             .exchange().expectStatus().isCreated()
         val itemId = createItem(authed, "CHE", "x")["itemId"].asText()
 
-        fake.prs["octo/r"] = listOf(GithubPr(1, "CHE-1-x", "open", "https://github.com/octo/r/pull/1"))
+        fake.prs["octo/r"] = listOf(RepoPr(1, "CHE-1-x", "open", "https://github.com/octo/r/pull/1"))
         syncService.syncAll()
         assertEquals("In Review", statusOf(itemId))
 
-        fake.prs["octo/r"] = listOf(GithubPr(1, "CHE-1-x", "merged", "https://github.com/octo/r/pull/1"))
+        fake.prs["octo/r"] = listOf(RepoPr(1, "CHE-1-x", "merged", "https://github.com/octo/r/pull/1"))
         syncService.syncAll()
         assertEquals("Done", statusOf(itemId))
 
@@ -203,7 +203,7 @@ class GithubSyncApiTest : AbstractApiTest() {
     fun `网关失败不炸同步——下一轮继续`() {
         val itemId = setup()
 
-        fake.failWith = GithubApiException(401, "unauthorized")
+        fake.failWith = VcsApiException(401, "unauthorized")
         syncService.syncAll() // 不抛
         assertEquals("To Do", statusOf(itemId))
 

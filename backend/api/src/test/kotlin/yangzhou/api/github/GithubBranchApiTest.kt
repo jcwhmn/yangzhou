@@ -96,13 +96,13 @@ class GithubBranchApiTest : AbstractApiTest() {
     fun `重复分支 422 映射 409——repo 不属于该项目 400——PAT 缺失 400——分支名非法 400`() {
         val (authed, repoId, itemId) = setupProject()
 
-        fake.createError = GithubApiException(422, "Reference already exists")
+        fake.createError = VcsApiException(422, "Reference already exists")
         create(authed, itemId, repoId).expectStatus().isEqualTo(409)
-        fake.createError = GithubApiException(404, "base not found")
+        fake.createError = VcsApiException(404, "base not found")
         create(authed, itemId, repoId, base = "ghost").expectStatus().isBadRequest()
 
         // 其余 GitHub 错误(如 401 PAT 失效)映射可操作 400(原裸抛 500,YPJ-27)
-        fake.createError = GithubApiException(401, "Bad credentials")
+        fake.createError = VcsApiException(401, "Bad credentials")
         create(authed, itemId, repoId).expectStatus().isBadRequest()
 
         // repo 不属于该项目

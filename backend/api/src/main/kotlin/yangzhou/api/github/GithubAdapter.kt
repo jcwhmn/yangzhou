@@ -11,7 +11,7 @@ import java.net.http.HttpResponse
 
 /** 真实现:java.net.http + Jackson 手写,不加依赖(spec 定案)。 */
 @Component
-class RealGithubGateway(private val mapper: ObjectMapper) : GithubGateway {
+class GithubAdapter(private val mapper: ObjectMapper) : VcsGateway {
 
     private val http: HttpClient = HttpClient.newHttpClient()
 
@@ -23,7 +23,7 @@ class RealGithubGateway(private val mapper: ObjectMapper) : GithubGateway {
             .GET()
             .build()
         val response = http.send(request, HttpResponse.BodyHandlers.ofString())
-        if (response.statusCode() >= 300) throw GithubApiException(response.statusCode(), "GitHub API ${response.statusCode()} on $path")
+        if (response.statusCode() >= 300) throw VcsApiException(response.statusCode(), "GitHub API ${response.statusCode()} on $path")
         return response.body()
     }
 
@@ -32,31 +32,31 @@ class RealGithubGateway(private val mapper: ObjectMapper) : GithubGateway {
         mapper.readTree(get(repo, "/branches?per_page=100", token))
             .map { it.get("name").asString() }
 
-    override fun listPullRequests(repo: String, token: String): List<GithubPr> =
+    override fun listPullRequests(repo: String, token: String): List<RepoPr> =
         mapper.readTree(get(repo, "/pulls?state=all&sort=updated&direction=desc&per_page=50", token))
-            .map { toGithubPr(it) }
+            .map { toRepoPr(it) }
 
     // ponytail: 只取第一页 per_page=20——按需查看量级足够,翻页等真实需要再加
-    override fun listCommits(repo: String, sha: String, since: Instant?, token: String): List<GithubCommit> =
+    override fun listCommits(repo: String, sha: String, since: Instant?, token: String): List<RepoCommit> =
         try {
             val sinceQ = if (since != null) "&since=" + DateTimeFormatter.ISO_INSTANT.format(since) else ""
             mapper.readTree(get(repo, "/commits?sha=$sha$sinceQ&per_page=20", token))
                 .map { parseCommit(it) }
-        } catch (e: GithubApiException) {
+        } catch (e: VcsApiException) {
             if (e.status == 404) emptyList() else throw e // ref 已删 → 视为无提交
         }
 
     // ponytail: pulls commits 无 since 参数,过滤交给调用方;第一页 per_page=100 同量级假设
-    override fun listPullRequestCommits(repo: String, number: Int, token: String): List<GithubCommit> =
+    override fun listPullRequestCommits(repo: String, number: Int, token: String): List<RepoCommit> =
         try {
             mapper.readTree(get(repo, "/pulls/$number/commits?per_page=100", token))
                 .map { parseCommit(it) }
-        } catch (e: GithubApiException) {
+        } catch (e: VcsApiException) {
             if (e.status == 404) emptyList() else throw e
         }
 
     private fun parseCommit(c: tools.jackson.databind.JsonNode) =
-        GithubCommit(
+        RepoCommit(
             sha = c.get("sha").asString(),
             message = c.path("commit").path("message").asString().lineSequence().firstOrNull().orEmpty(),
             author = c.path("author").path("login").asString(null)
@@ -67,8 +67,8 @@ class RealGithubGateway(private val mapper: ObjectMapper) : GithubGateway {
 
     companion object {
         /** 列表载荷无 merged 布尔,只有 merged_at(dogfood JCW-113 抓到的 NPE):非空即已合并。 */
-        fun toGithubPr(pr: tools.jackson.databind.JsonNode): GithubPr =
-            GithubPr(
+        fun toRepoPr(pr: tools.jackson.databind.JsonNode): RepoPr =
+            RepoPr(
                 number = pr.get("number").asInt(),
                 headRef = pr.get("head").get("ref").asString(),
                 state = when {
@@ -92,6 +92,6 @@ class RealGithubGateway(private val mapper: ObjectMapper) : GithubGateway {
             .POST(HttpRequest.BodyPublishers.ofString(body))
             .build()
         val response = http.send(request, HttpResponse.BodyHandlers.ofString())
-        if (response.statusCode() >= 300) throw GithubApiException(response.statusCode(), "GitHub API ${response.statusCode()} on git/refs")
+        if (response.statusCode() >= 300) throw VcsApiException(response.statusCode(), "GitHub API ${response.statusCode()} on git/refs")
     }
 }

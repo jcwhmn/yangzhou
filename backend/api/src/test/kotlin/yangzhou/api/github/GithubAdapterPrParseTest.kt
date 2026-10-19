@@ -5,7 +5,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /** JCW-113 dogfood 抓到的真 bug:列表载荷无 merged 布尔,只有 merged_at。 */
-class RealGithubGatewayPrParseTest {
+class GithubAdapterPrParseTest {
 
     private val mapper = ObjectMapper()
 
@@ -18,7 +18,7 @@ class RealGithubGatewayPrParseTest {
               {"number":3,"state":"closed","merged_at":null,"head":{"ref":"CHE-1-c"},"html_url":"https://github.com/o/r/pull/3"}
             ]
         """.trimIndent()
-        val prs = mapper.readTree(payload).map { RealGithubGateway.toGithubPr(it) }
+        val prs = mapper.readTree(payload).map { GithubAdapter.toRepoPr(it) }
         assertEquals("open", prs[0].state)
         assertEquals("merged", prs[1].state)
         assertEquals("closed", prs[2].state)

@@ -9,27 +9,27 @@ import org.springframework.context.annotation.Primary
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.web.servlet.client.RestTestClient
 import yangzhou.api.AbstractApiTest
-import yangzhou.api.github.GithubApiException
-import yangzhou.api.github.GithubCommit
-import yangzhou.api.github.GithubGateway
-import yangzhou.api.github.GithubPr
+import yangzhou.api.github.VcsApiException
+import yangzhou.api.github.RepoCommit
+import yangzhou.api.github.VcsGateway
+import yangzhou.api.github.RepoPr
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-class FakeSuggestGateway : GithubGateway {
-    var failWith: GithubApiException? = null
-    val commits = mutableMapOf<String, List<GithubCommit>>()
+class FakeSuggestGateway : VcsGateway {
+    var failWith: VcsApiException? = null
+    val commits = mutableMapOf<String, List<RepoCommit>>()
 
     override fun listBranches(repo: String, token: String): List<String> = emptyList()
-    override fun listPullRequests(repo: String, token: String): List<GithubPr> = emptyList()
+    override fun listPullRequests(repo: String, token: String): List<RepoPr> = emptyList()
     override fun createBranch(repo: String, branch: String, fromBranch: String, token: String) {}
-    override fun listCommits(repo: String, sha: String, since: java.time.Instant?, token: String): List<GithubCommit> {
+    override fun listCommits(repo: String, sha: String, since: java.time.Instant?, token: String): List<RepoCommit> {
         failWith?.let { throw it }
         return commits["$repo@$sha"].orEmpty()
     }
 
-    override fun listPullRequestCommits(repo: String, number: Int, token: String): List<GithubCommit> = emptyList()
+    override fun listPullRequestCommits(repo: String, number: Int, token: String): List<RepoCommit> = emptyList()
 }
 
 @TestConfiguration(proxyBeanMethods = false)
@@ -83,9 +83,9 @@ class TimeSuggestionApiTest : AbstractApiTest() {
         val itemId = setup()
         seedBranchRef(itemId)
         fake.commits["octo/r@cwjiang/YPJ-8-x"] = listOf(
-            GithubCommit("c2", "末次提交", "me", "2026-10-07T18:00:00Z", null),
-            GithubCommit("c1", "首次提交", "me", "2026-10-07T09:30:00Z", null),
-            GithubCommit("c3", "中间提交", "me", "2026-10-07T12:00:00Z", null),
+            RepoCommit("c2", "末次提交", "me", "2026-10-07T18:00:00Z", null),
+            RepoCommit("c1", "首次提交", "me", "2026-10-07T09:30:00Z", null),
+            RepoCommit("c3", "中间提交", "me", "2026-10-07T12:00:00Z", null),
         )
 
         val res = body(getSuggestions(itemId))
@@ -104,7 +104,7 @@ class TimeSuggestionApiTest : AbstractApiTest() {
         val itemId = setup()
         seedBranchRef(itemId)
         fake.commits["octo/r@cwjiang/YPJ-8-x"] = listOf(
-            GithubCommit("c1", "唯一提交", "me", "2026-10-07T09:30:00Z", null),
+            RepoCommit("c1", "唯一提交", "me", "2026-10-07T09:30:00Z", null),
         )
         assertEquals(0, body(getSuggestions(itemId)).size())
     }

@@ -8,7 +8,7 @@ import org.springframework.test.web.servlet.client.RestTestClient
 import yangzhou.api.AbstractApiTest
 import yangzhou.api.github.FakeGatewayConfig
 import yangzhou.api.github.FakeGithubGateway
-import yangzhou.api.github.GithubPr
+import yangzhou.api.github.RepoPr
 import yangzhou.api.github.GithubSyncService
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -111,7 +111,7 @@ class ItemStatusHistoryApiTest : AbstractApiTest() {
         assertEquals(statusRowId("To Do"), (rows[0]["to_status_id"] as Number).toLong())
 
         // PR open → In Review(github 行,actor 为空 = 系统)
-        fake.prs["octo/r"] = listOf(GithubPr(1, "CHE-1-x", "open", "https://github.com/octo/r/pull/1"))
+        fake.prs["octo/r"] = listOf(RepoPr(1, "CHE-1-x", "open", "https://github.com/octo/r/pull/1"))
         syncService.syncAll()
         val afterOpen = history()
         assertEquals(2, afterOpen.size)
@@ -121,12 +121,12 @@ class ItemStatusHistoryApiTest : AbstractApiTest() {
         assertEquals(statusRowId("In Review"), (afterOpen[1]["to_status_id"] as Number).toLong())
 
         // merged → Done
-        fake.prs["octo/r"] = listOf(GithubPr(1, "CHE-1-x", "merged", "https://github.com/octo/r/pull/1"))
+        fake.prs["octo/r"] = listOf(RepoPr(1, "CHE-1-x", "merged", "https://github.com/octo/r/pull/1"))
         syncService.syncAll()
         assertEquals(3, history().size)
 
         // 已 final:再 sync 封口,零新增
-        fake.prs["octo/r"] = listOf(GithubPr(1, "CHE-1-x", "closed", "https://github.com/octo/r/pull/1"))
+        fake.prs["octo/r"] = listOf(RepoPr(1, "CHE-1-x", "closed", "https://github.com/octo/r/pull/1"))
         syncService.syncAll()
         assertEquals(3, history().size)
     }
@@ -143,7 +143,7 @@ class ItemStatusHistoryApiTest : AbstractApiTest() {
             .body(mapOf("title" to "hist-w", "statusItemId" to statusId("In Review")))
             .exchange().expectStatus().isCreated()
 
-        fake.prs["octo/r"] = listOf(GithubPr(1, "CHE-1-x", "open", "https://github.com/octo/r/pull/1"))
+        fake.prs["octo/r"] = listOf(RepoPr(1, "CHE-1-x", "open", "https://github.com/octo/r/pull/1"))
         syncService.syncAll()
 
         // 迁移被 WIP 拦下:hist-x 仍只有 created 行

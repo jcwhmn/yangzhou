@@ -21,7 +21,7 @@ class GithubCommitService(
     private val projectRepos: ProjectRepoRepository,
     private val gitRefs: ItemGitRefRepository,
     private val workspaceService: WorkspaceService,
-    private val gateway: GithubGateway,
+    private val gateway: VcsGateway,
 ) {
     data class CommitDto(
         val sha: String,
@@ -62,14 +62,14 @@ class GithubCommitService(
         }
     }
 
-    private fun fetchBranchCommits(ref: ItemGitRef, token: String): List<GithubCommit> =
+    private fun fetchBranchCommits(ref: ItemGitRef, token: String): List<RepoCommit> =
         runCatching { gateway.listCommits(ref.repo, ref.ref, ref.createdAt, token) }
             .getOrElse { e -> wrap(e) }
             // 响应侧兜底:GitHub since 按 commit date 过滤,边缘仍可能有漏网(date 缺失则保留,宁多勿漏)
             .filter { it.date == null || runCatching { Instant.parse(it.date) >= ref.createdAt }.getOrDefault(true) }
 
     /** 分支查空 → PR 回溯:返回 (PR 号, 过滤后 commits);未命中 PR 或全被 since 过滤 → null。 */
-    private fun fetchPrCommits(ref: ItemGitRef, token: String): Pair<Int, List<GithubCommit>>? {
+    private fun fetchPrCommits(ref: ItemGitRef, token: String): Pair<Int, List<RepoCommit>>? {
         val pr = runCatching { gateway.listPullRequests(ref.repo, token).firstOrNull { it.headRef == ref.ref } }
             .getOrElse { e -> wrap(e) } ?: return null
         val commits = runCatching { gateway.listPullRequestCommits(ref.repo, pr.number, token) }
@@ -80,7 +80,7 @@ class GithubCommitService(
     }
 
     private fun wrap(e: Throwable): Nothing {
-        if (e is GithubApiException) throw BadRequestException("GitHub API 错误(${e.status}):先检查 PAT/仓库名")
+        if (e is VcsApiException) throw BadRequestException("GitHub API 错误(${e.status}):先检查 PAT/仓库名")
         throw e
     }
 }
