@@ -58,7 +58,7 @@ class AuthService(
 
 data class BootstrapRequest(
     @field:NotBlank val username: String,
-    @field:NotBlank @field:Size(min = 8, message = "密码至少 8 位") val password: String,
+    @field:NotBlank val password: String,
 )
 
 /** 登录不复用 BootstrapRequest:密码长度策略只管创建,存量短密码也要能登录(401 而非 400)。 */
