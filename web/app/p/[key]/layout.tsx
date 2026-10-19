@@ -64,6 +64,14 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
 
+  // YPJ-74:sprint 页改状态后广播 sprints-changed,sidebar 即时重拉(不再等下次挂载)
+  useEffect(() => {
+    const onSprintsChanged = () => loadSprints();
+    window.addEventListener("sprints-changed", onSprintsChanged);
+    return () => window.removeEventListener("sprints-changed", onSprintsChanged);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+
   async function createSprint() {
     try {
       await api(`/api/projects/${key}/sprints`, {
