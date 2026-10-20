@@ -39,7 +39,7 @@ private fun usage() {
           items create <KEY> <标题> [--desc 文本] [--sprint 名称|UUID] [--req 属性[>=N]]... [--json]   建 item(需求可分级)
           items list <KEY> [--json]                    项目 item 列表
           items move <ITEM_ID> <状态名>                改状态(经 workflow 校验)
-          items branch <KEY-N> <分支名> [--base <基线>]   在挂载仓库建分支并关联 item(基线默认 main)
+          items branch <KEY-N> <分支名> [--base <基线>] [--items YPJ-B,YPJ-C]   # 从票走补挂(主票建分支)
           sprints list <KEY> [--json]                       列 sprint(id/名称/状态/起止)
           caps set <属性> [1-4]                        自评能力(不带数字=未评级)
           caps rm <属性>                               移除能力
@@ -385,7 +385,17 @@ private fun run(args: List<String>) {
         "items branch" -> {
             val itemId = resolveItemId(api, rest.getOrNull(0) ?: error("缺少 item ID(支持 YPJ-58 或 UUID)"))
             val name = rest.getOrNull(1) ?: error("缺少分支名,如 cwjiang/YPJ-27-yz-wrapper")
-            val base = if (rest.getOrNull(2) == "--base") rest.getOrNull(3) ?: error("--base 需要值") else "main"
+            var base = "main"
+            var alsoItems: List<String> = emptyList()
+            var ai = 2
+            while (ai < rest.size) {
+                when (rest[ai]) {
+                    "--base" -> { base = rest.getOrNull(ai + 1) ?: error("--base 需要值"); ai += 2 }
+                    "--items" -> { alsoItems = (rest.getOrNull(ai + 1) ?: error("--items 需要值")).split(',', '、').map { it.trim() }.filter { it.isNotEmpty() }; ai += 2 }
+                    else -> error("未知参数:${rest[ai]}")
+                }
+            }
+            
             val item = api.json("GET", "/api/items/$itemId")
             val projectKey = item["number"].asString().substringBefore("-")
             val repos = api.json("GET", "/api/projects/$projectKey/repos")
@@ -393,6 +403,15 @@ private fun run(args: List<String>) {
                 ?: error("项目未挂载仓库(先在 web 或 API 挂 repo)")
             val body = api.json("POST", "/api/items/$itemId/branches", mapOf("repoId" to repoId, "baseBranch" to base, "name" to name))
             println("分支已建:${body["branch"].asString()}(${body["repo"].asString()})")
+            for (extra in alsoItems) {
+                val extraId = resolveItemId(api, extra)
+                try {
+                    api.json("POST", "/api/items/$extraId/git-refs", mapOf("repo" to body["repo"].asString(), "ref" to body["branch"].asString()))
+                    println("已补挂:$extra")
+                } catch (e: Exception) {
+                    println("补挂失败:$extra(${e.message})")
+                }
+            }
         }
 
         "caps set" -> {

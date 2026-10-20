@@ -357,7 +357,7 @@ data class ProjectRepo(
     var updatedBy: Long? = null,
 )
 
-/** V6:item↔GitHub 分支/PR 链接;uk(repo,kind,ref) 是轮询幂等锚点。 */
+/** V6:item↔GitHub 分支/PR 链接;YPJ-39 起分支/PR 可挂多票(uk 每票唯一)。 */
 @Table("item_git_ref")
 data class ItemGitRef(
     @Id val id: Long? = null,

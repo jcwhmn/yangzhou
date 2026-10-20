@@ -19,7 +19,7 @@ import java.time.Instant
 
 /**
  * V6-S2 轮询同步:GitHub 分支/PR → item_git_ref 关联 + 按项目映射自动移列。
- * 幂等锚点 = item_git_ref 的 uk(repo,kind,ref);防呆:只前进/final 封口/WIP 超限跳过留痕。
+ * 幂等锚点 = item_git_ref 的每票 uk(item,repo,kind,ref)(YPJ-39 多对多);防呆:只前进/final 封口/WIP 超限跳过留痕。
  */
 @Service
 class GithubSyncService(
@@ -68,45 +68,58 @@ class GithubSyncService(
 
     private fun syncRepo(project: Project, repo: String, token: String) {
         for (name in gateway.listBranches(repo, token)) {
-            val m = ITEM_KEY.find(name) ?: continue
-            if (m.groupValues[1] != project.key) continue
-            val item = items.findByProjectIdAndNumber(project.id!!, m.groupValues[2].toInt()) ?: continue
-            if (gitRefs.findByRepoAndKindAndRef(repo, KIND_BRANCH, name) != null) continue
+            val item = headItem(project, name) ?: continue
+            if (gitRefs.findByRepoAndKindAndRef(repo, KIND_BRANCH, name).isNotEmpty()) continue
             gitRefs.save(ItemGitRef(itemId = item.id!!, kind = KIND_BRANCH, repo = repo, ref = name))
             applyEvent(project, item.id!!, VcsEvent.BRANCH_CREATED.wire, "branch $name")
         }
 
         for (pr in gateway.listPullRequests(repo, token)) {
-            val m = ITEM_KEY.find(pr.headRef) ?: continue
-            if (m.groupValues[1] != project.key) continue
-            val item = items.findByProjectIdAndNumber(project.id!!, m.groupValues[2].toInt()) ?: continue
-            val existing = gitRefs.findByRepoAndKindAndRef(repo, KIND_PR, pr.number.toString())
+            val existingRows = gitRefs.findByRepoAndKindAndRef(repo, KIND_PR, pr.number.toString())
             when {
-                existing == null -> {
-                    gitRefs.save(
-                        ItemGitRef(itemId = item.id!!, kind = KIND_PR, repo = repo, ref = pr.number.toString(), url = pr.url, state = pr.state),
-                    )
-                    // V10-S5:PR author → github_username 映射成员 → 池内自动 assign(未配置池/找不到则留痕跳过)
-                    val wsId = projects.findById(project.id).orElse(null)?.workspaceId ?: 0L
-                    if (item.assigneeObjectId == null && pr.authorLogin != null) {
-                        val authorMember = members.findByWorkspaceIdAndGithubUsername(wsId, pr.authorLogin)
-                        if (authorMember != null && authorMember.id != null) {
-                            val authorId = authorMember.id
-                            runCatching { projectMembers.assertAssignable(project.id!!, authorId!!) }
-                            .onFailure { log.warn("PR 自动指派跳过(作者不在指派池?),事件照常应用: {}", it.message) }
-                                .onSuccess {
-                                    items.save(item.copy(assigneeObjectId = authorMember.objectId))
-                                }
-                        }
+                existingRows.isNotEmpty() -> {
+                    // YPJ-39:PR 行按票各持一行,状态更新扇出到全部行
+                    for (row in existingRows) {
+                        if (row.state == pr.state) continue
+                        gitRefs.save(row.copy(state = pr.state, updatedAt = Instant.now()))
+                        applyEvent(project, row.itemId, eventForState(pr.state), "pr #${pr.number} ${pr.url.orEmpty()}")
                     }
-                    applyEvent(project, item.id!!, eventForState(pr.state), "pr #${pr.number} ${pr.url.orEmpty()}")
                 }
-                existing.state != pr.state -> {
-                    gitRefs.save(existing.copy(state = pr.state, updatedAt = Instant.now()))
-                    applyEvent(project, item.id!!, eventForState(pr.state), "pr #${pr.number} ${pr.url.orEmpty()}")
+                else -> {
+                    // YPJ-39:PR 扇出——head 分支挂多票则各落一行;分支未入册回退 head 内嵌键(既有行为)
+                    val targets = gitRefs.findByRepoAndKindAndRef(repo, KIND_BRANCH, pr.headRef)
+                        .mapNotNull { items.findById(it.itemId).orElse(null) }
+                        .distinctBy { it.id }
+                        .ifEmpty { listOfNotNull(headItem(project, pr.headRef)) }
+                    for (item in targets) {
+                        gitRefs.save(
+                            ItemGitRef(itemId = item.id!!, kind = KIND_PR, repo = repo, ref = pr.number.toString(), url = pr.url, state = pr.state),
+                        )
+                        // V10-S5:PR author → github_username 映射成员 → 池内自动 assign(未配置池/找不到则留痕跳过)
+                        val wsId = projects.findById(project.id).orElse(null)?.workspaceId ?: 0L
+                        if (item.assigneeObjectId == null && pr.authorLogin != null) {
+                            val authorMember = members.findByWorkspaceIdAndGithubUsername(wsId, pr.authorLogin)
+                            if (authorMember != null && authorMember.id != null) {
+                                val authorId = authorMember.id
+                                runCatching { projectMembers.assertAssignable(project.id!!, authorId!!) }
+                                    .onFailure { log.warn("PR 自动指派跳过(作者不在指派池?),事件照常应用: {}", it.message) }
+                                    .onSuccess {
+                                        items.save(item.copy(assigneeObjectId = authorMember.objectId))
+                                    }
+                            }
+                        }
+                        applyEvent(project, item.id!!, eventForState(pr.state), "pr #${pr.number} ${pr.url.orEmpty()}")
+                    }
                 }
             }
         }
+    }
+
+    /** head/分支名内嵌 item 键解析(YPJ-39 自 PR 循环抽出复用):跨项目/解析不出返回 null。 */
+    private fun headItem(project: Project, name: String): Item? {
+        val m = ITEM_KEY.find(name) ?: return null
+        if (m.groupValues[1] != project.key) return null
+        return items.findByProjectIdAndNumber(project.id!!, m.groupValues[2].toInt())
     }
 
     private fun eventForState(state: String) = when (state) {

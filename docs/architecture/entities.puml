@@ -198,8 +198,8 @@ note right of ProjectWorkflowRule
   GitHub 事件永不知道状态名。
 end note
 note right of ItemGitRef
-  uk(repo, kind, ref) 是轮询
-  幂等锚点(V6-S2 用)。
+  uk(item, repo, kind, ref) 每票唯一
+  是轮询幂等锚点(YPJ-39/V37 起,分支可挂多票)。
 end note
 note bottom of StatusTransition
   迁移表无行 = 自由迁移(V1 默认);

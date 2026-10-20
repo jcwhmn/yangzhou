@@ -139,7 +139,12 @@ interface ProjectRepoRepository : CrudRepository<ProjectRepo, Long> {
 
 interface ItemGitRefRepository : CrudRepository<ItemGitRef, Long> {
     fun findByItemId(itemId: Long): List<ItemGitRef>
-    fun findByRepoAndKindAndRef(repo: String, kind: String, ref: String): ItemGitRef?
+    fun findByRepoAndKindAndRef(repo: String, kind: String, ref: String): List<ItemGitRef>
+
+    /** YPJ-39:补挂行继承锚点行的入册时刻(@CreatedDate 审计会覆盖实体显式值,落库后校正)。 */
+    @Modifying
+    @Query("update item_git_ref set created_at = :createdAt where id = :id")
+    fun updateCreatedAt(id: Long, createdAt: java.time.Instant): Int
 }
 
 interface ProjectWorkflowRuleRepository : CrudRepository<ProjectWorkflowRule, Long> {
