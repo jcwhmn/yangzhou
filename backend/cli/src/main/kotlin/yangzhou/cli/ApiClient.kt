@@ -48,7 +48,8 @@ class ApiClient private constructor(
             )
 
             val response = try {
-                post("/api/auth/bootstrap").let { r -> if (r.statusCode() == 409) post("/api/auth/login") else r }
+                // 存量服务器 bootstrap 带 8 位下限:400(非 409)也要回退 login,否则短密码被卡死(YPJ-68)
+                post("/api/auth/bootstrap").let { r -> if (r.statusCode() == 409 || r.statusCode() == 400) post("/api/auth/login") else r }
             } catch (e: java.io.IOException) {
                 throw IllegalStateException("无法连接 API 服务器:$normalized(确认服务器已启动、端口正确)", e)
             }
