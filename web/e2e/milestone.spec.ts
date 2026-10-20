@@ -67,9 +67,12 @@ test("Milestone 管理对话框——建/推进/编辑/删除 @smoke", async ({ 
 test("Milestone 空态与侧边栏只读展示", async ({ page, projectKey }) => {
   await page.goto(`/p/${projectKey}`);
   await expect(page.getByText("暂无 Milestone")).toBeVisible();
-  await page.getByRole("button", { name: "管理", exact: true }).click();
+  // goto 后 hydration 竞态可能吞掉点击,重试到弹层可见为止(同 release.spec)
   const dialog = page.getByRole("dialog");
-  await expect(dialog.getByText("暂无 Milestone")).toBeVisible();
+  await expect(async () => {
+    await page.getByRole("button", { name: "管理", exact: true }).click();
+    await expect(dialog.getByText("暂无 Milestone")).toBeVisible();
+  }).toPass({ timeout: 10_000 });
   await dialog.getByRole("button", { name: "关闭" }).click();
   await expect(dialog).toBeHidden();
 });
