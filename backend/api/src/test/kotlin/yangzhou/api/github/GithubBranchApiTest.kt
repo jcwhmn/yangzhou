@@ -19,6 +19,9 @@ class GithubBranchApiTest : AbstractApiTest() {
     @Autowired
     lateinit var fake: FakeGithubGateway
 
+    @Autowired
+    lateinit var syncService: GithubSyncService
+
     @org.junit.jupiter.api.BeforeEach
     fun resetFake() {
         fake.branches = mutableMapOf(); fake.prs = mutableMapOf()
@@ -131,4 +134,54 @@ class GithubBranchApiTest : AbstractApiTest() {
         val (authed, _, itemId) = setupProject()
         create(authed, itemId, UUID.randomUUID().toString()).expectStatus().isNotFound()
     }
+
+    @Test
+    fun `YPJ-39 attach——另一票补挂同一分支,两票详情均带该分支`() {
+        val (authed, repoId, itemId1) = setupProject()
+        val itemId2 = createItem(authed, "CHE", "second")["itemId"].asText()
+        create(authed, itemId1, repoId, "feat/CHE-1-x", "main").expectStatus().isCreated()
+
+        authed.post().uri("/api/items/$itemId2/git-refs")
+            .body(mapOf("repo" to "octo/r", "ref" to "feat/CHE-1-x"))
+            .exchange().expectStatus().isOk()
+
+        val refs = gitRefsOf(authed, itemId2)
+        assertTrue(refs.any { it["kind"].asText() == "branch" && it["ref"].asText() == "feat/CHE-1-x" && it["repo"].asText() == "octo/r" })
+        // 主票原关联仍在(多对多不挤掉既有行)
+        assertTrue(gitRefsOf(authed, itemId1).any { it["ref"].asText() == "feat/CHE-1-x" })
+    }
+
+    @Test
+    fun `YPJ-39 attach 负例——404 未入册、409 重复、409 PR 行`() {
+        val (authed, repoId, itemId1) = setupProject()
+        create(authed, itemId1, repoId, "feat/CHE-1-y", "main").expectStatus().isCreated()
+
+        // 404:分支未入册
+        authed.post().uri("/api/items/$itemId1/git-refs")
+            .body(mapOf("repo" to "octo/r", "ref" to "nope"))
+            .exchange().expectStatus().isNotFound()
+
+        // 409:同票重复补挂
+        val itemId2 = createItem(authed, "CHE", "second")["itemId"].asText()
+        authed.post().uri("/api/items/$itemId2/git-refs")
+            .body(mapOf("repo" to "octo/r", "ref" to "feat/CHE-1-y"))
+            .exchange().expectStatus().isOk()
+        authed.post().uri("/api/items/$itemId2/git-refs")
+            .body(mapOf("repo" to "octo/r", "ref" to "feat/CHE-1-y"))
+            .exchange().expectStatus().isEqualTo(409)
+
+        // 409:ref 是 PR 号(PR 行经 sync 落库)
+        fake.prs["octo/r"] = listOf(RepoPr(9, "feat/CHE-1-y", "open", null))
+        syncService.syncAll()
+        authed.post().uri("/api/items/$itemId2/git-refs")
+            .body(mapOf("repo" to "octo/r", "ref" to "9"))
+            .exchange().expectStatus().isEqualTo(409)
+    }
+
+    private fun gitRefsOf(authed: RestTestClient, itemId: String) =
+        json.readTree(
+            authed.get().uri("/api/items/$itemId").exchange()
+                .expectStatus().isOk().expectBody(String::class.java).returnResult().responseBody!!,
+        )["gitRefs"]
+
 }

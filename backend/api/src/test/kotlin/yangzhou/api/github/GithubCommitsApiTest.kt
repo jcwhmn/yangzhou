@@ -153,6 +153,7 @@ class GithubCommitsApiTest : AbstractApiTest() {
     fun `分支与 PR 均无提交——空数组不报错`() {
         val itemId = setup()
         seedBranchRef(itemId)
+        fake.commits.clear() // fake 不随 cleanDatabase 复位;别依赖用例序
         fake.prs = mapOf("octo/r" to listOf(RepoPr(8, "other-branch", "open")))
 
         val res = body(getCommits(itemId))
@@ -200,4 +201,28 @@ class GithubCommitsApiTest : AbstractApiTest() {
             .expectBody(String::class.java).returnResult().responseBody!!
         assertTrue(res.contains("暂时不可达"))
     }
+
+    @Test
+    fun `YPJ-39 共享分支——两票各自 commits 均可拉`() {
+        val itemId1 = setup()
+        seedBranchRef(itemId1) // 先入册 CHE-1-x,再对另一票补挂
+        val itemId2 = createItem(authed, "CHE", "second")["itemId"].asText()
+        authed.post().uri("/api/items/$itemId2/git-refs")
+            .body(mapOf("repo" to "octo/r", "ref" to "CHE-1-x"))
+            .exchange().expectStatus().isOk()
+                fake.commits["octo/r@CHE-1-x"] = listOf(
+            RepoCommit("abc123full", "YPJ-7: 加功能", "me", "2026-10-06T12:00:00Z", "https://github.com/octo/r/commit/abc123full"),
+        )
+
+        for (id in listOf(itemId1, itemId2)) {
+            val res = json.readTree(
+                authed.get().uri("/api/items/$id/commits").exchange()
+                    .expectStatus().isOk().expectBody(String::class.java).returnResult().responseBody!!,
+            )
+            assertEquals(1, res.size())
+            assertEquals(1, res[0]["commits"].size())
+            assertEquals("abc123full", res[0]["commits"][0]["sha"].asText())
+        }
+    }
+
 }

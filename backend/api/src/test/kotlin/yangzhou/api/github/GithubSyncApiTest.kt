@@ -216,4 +216,33 @@ class GithubSyncApiTest : AbstractApiTest() {
         syncService.syncAll()
         assertEquals("In Progress", statusOf(itemId))
     }
+
+    @Test
+    fun `YPJ-39 PR 扇出——head 分支挂多票各落一行,状态更新扇出全部行`() {
+        val itemId1 = setup()
+        val itemId2 = createItem(authed, "CHE", "second")["itemId"].asText()
+        fake.branches["octo/r"] = listOf("CHE-1-feat-x")
+        syncService.syncAll()
+        authed.post().uri("/api/items/$itemId2/git-refs")
+            .body(mapOf("repo" to "octo/r", "ref" to "CHE-1-feat-x"))
+            .exchange().expectStatus().isOk()
+
+        fake.prs["octo/r"] = listOf(RepoPr(7, "CHE-1-feat-x", "open", "https://github.com/octo/r/pull/7"))
+        syncService.syncAll()
+        assertEquals(2, prRows().size)
+        assertTrue(prRows().all { it["state"] == "open" })
+
+        fake.prs["octo/r"] = listOf(RepoPr(7, "CHE-1-feat-x", "merged", "https://github.com/octo/r/pull/7"))
+        syncService.syncAll()
+        assertEquals(2, prRows().size)
+        assertTrue(prRows().all { it["state"] == "merged" })
+        assertEquals(2, prRows().map { it["oid"] }.toSet().size)
+    }
+
+    private fun prRows(): List<Map<String, Any>> =
+        jdbc.queryForList(
+            "select ir.item_id, i.object_id as oid, ir.state from item_git_ref ir " +
+                "join item i on i.id = ir.item_id where ir.kind = 'pr'",
+        )
+
 }

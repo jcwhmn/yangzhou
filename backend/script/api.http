@@ -648,6 +648,44 @@ Content-Type: application/json
   "name": "ypj-27-scratch"
 }
 
+> {%
+    client.global.set("attachRepo", response.body.repo);
+    client.global.set("attachRef", response.body.branch);
+%}
+
+
+### YPJ-39 建从票(供下方补挂;handler 存 itemId2)
+POST {{host}}/api/projects/{{pkey}}/items
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "YPJ-39 从票"
+}
+
+> {%
+    client.global.set("itemId2", response.body.itemId);
+%}
+
+### YPJ-39 补挂既有分支到从票(纯库操作不走 GitHub;404 未入册 / 409 重复、PR 行、跨项目未挂载)
+### repo/branch 由上方建分支请求回填;须先跑建分支
+### 建分支 409=分支已存在(换名或沿用);只要建分支成功过一次,回填变量即在
+POST {{host}}/api/items/{{itemId2}}/git-refs
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "repo": "{{attachRepo}}",
+  "ref": "{{attachRef}}"
+}
+
+> {%
+    if (response.status === 200) {
+      client.global.set("attachRepo", response.body.repo);
+      client.global.set("attachRef", response.body.branch);
+    }
+%}
+
 ### 按需拉取 item 分支的提交历史(不落库不依赖轮询;无 PAT/无挂载 400 可操作报错)
 GET {{host}}/api/items/{{itemId}}/commits
 Authorization: Bearer {{token}}
@@ -1088,3 +1126,33 @@ Content-Type: application/json
 ### [预期 400] 路径参数类型不合法——number 打 UUID 端点(spec 0059,曾 500)
 GET {{host}}/api/items/YPJ-1
 Authorization: Bearer {{token}}
+
+### [预期 404] 补挂未入册分支(只可补挂 yangzhou 已关联的分支;repo 取建分支回填的实际挂载仓)
+POST {{host}}/api/items/{{itemId}}/git-refs
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "repo": "{{attachRepo}}",
+  "ref": "no-such-branch"
+}
+
+### [预期 409] 重复补挂(同票同分支连发两次,第二次中)
+POST {{host}}/api/items/{{itemId2}}/git-refs
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "repo": "{{attachRepo}}",
+  "ref": "{{attachRef}}"
+}
+
+### [预期 409] PR 行不可补挂(ref 是 PR 号而非分支;需该 PR 已被轮询入册,未入册则 404)
+POST {{host}}/api/items/{{itemId}}/git-refs
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "repo": "{{attachRepo}}",
+  "ref": "1001"
+}

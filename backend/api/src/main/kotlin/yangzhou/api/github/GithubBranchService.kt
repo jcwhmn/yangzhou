@@ -61,6 +61,31 @@ class GithubBranchService(
         return BranchDto(mount.repo, branch, url)
     }
 
+
+    /** YPJ-39:既有分支补挂多票(纯库操作,不调 gateway;只收库内已有行)。 */
+    @Transactional
+    fun attach(itemId: UUID, repo: String, ref: String): BranchDto {
+        val item = items.findByObjectId(itemId) ?: throw NotFoundException("item 不存在")
+        if (!projectRepos.existsByProjectIdAndRepo(item.projectId, repo)) {
+            throw BadRequestException("仓库未挂载到该项目:$repo")
+        }
+        val branch = requireValidBranch(ref, "分支名")
+        val rows = gitRefs.findByRepoAndKindAndRef(repo, "branch", branch)
+        if (rows.isEmpty()) {
+            if (gitRefs.findByRepoAndKindAndRef(repo, "pr", branch).isNotEmpty()) {
+                throw ConflictException("PR 行不可补挂:$repo#$branch")
+            }
+            throw NotFoundException("分支未入册:$repo#$branch(只可补挂 yangzhou 已关联的分支)")
+        }
+        if (rows.any { it.itemId == item.id }) throw ConflictException("该票已挂此分支:$branch")
+        val anchor = rows.first()
+        val saved = gitRefs.save(
+            ItemGitRef(itemId = item.id!!, kind = "branch", repo = repo, ref = branch, url = anchor.url, state = anchor.state, createdAt = anchor.createdAt),
+        )
+        // 审计会覆盖实体显式 createdAt,落库后校正为锚点行时刻(commits 的 since 过滤依赖它)
+        gitRefs.updateCreatedAt(saved.id!!, anchor.createdAt)
+        return BranchDto(repo, branch, anchor.url.orEmpty())
+    }
     private fun requireValidBranch(raw: String, label: String): String {
         val n = raw.trim()
         if (n.isEmpty()) throw BadRequestException("$label 不能为空")
@@ -77,4 +102,10 @@ data class CreateBranchRequest(
     @field:NotNull val repoId: UUID?,
     @field:NotBlank val baseBranch: String,
     @field:NotBlank val name: String,
+)
+
+
+data class AttachGitRefRequest(
+    @field:NotBlank val repo: String,
+    @field:NotBlank val ref: String,
 )
