@@ -21,7 +21,8 @@ export default defineConfig({
     { name: "auth", testMatch: /auth\.spec\.ts/, fullyParallel: false },
     { name: "e2e", testIgnore: /auth\.spec\.ts/, dependencies: ["auth"] },
   ],
-  workers: process.env.CI ? 2 : 4,
+  // 本地 8:48C 实测曲线 8=甜点、16 过载出超时(spec 0061 §4);用例数 >100 再复盘是否加
+  workers: process.env.CI ? 2 : 8,
   use: {
     baseURL: config.baseURL,
     locale: "zh-CN",

@@ -122,8 +122,10 @@ test("draft 不外泄:编辑中 data-value 不变,提交才变(§3.1/§3.2)", as
   await page.keyboard.press("1"); // 月段 1_(等待位)
   await expect(g).toHaveAttribute("data-value", ""); // 编辑中不外泄
   await page.keyboard.press("2"); // 12 → 跳日段
-  await dd.press("Home"); // fill 逐位从位首起,避免 click 落点在段中
-  await dd.fill("20");
+  await dd.press("Home");
+  // 键盘写入而非 fill:预填日段=今天,每月 20 号时 fill("20") 同值覆写被 React value-tracker 去重,
+  // onChange 不派发 → §7.1 跳段不触发 → 年段无焦点、blur no-op(2026-10-20 实证);keydown 路径无此坑
+  await dd.pressSequentially("20");
   await expect(g).toHaveAttribute("data-value", ""); // 仍不外泄
   await seg(page, "开始日期", "年").blur(); // fill("20") 跳年段(§7.1),从年段离开触发 commit
   const t = new Date();
