@@ -1,6 +1,6 @@
 # 0062 — YPJ-39 branch×item 多对多:共享分支补挂、PR 扇出、yz log 按票可拉
 
-> 状态:**已实现(PR 待审;api.http 手测全过,集成/构建绿)**
+> 状态:**As-built(已合入 main,PR #133;YPJ-39 Done)**
 > 票:YPJ-39(V23 功能件)· 影响:persistence(V37 迁移)· api(github 切片)· cli(`yz items branch`)
 
 ## 1. 需求
@@ -89,3 +89,7 @@ item↔Git 关联现行 **1:1**:`item_git_ref` 的 `uk_item_git_ref_repo_kind_re
 | TC2 | 历史补挂(模拟 PR#100):主票已有分支,api.http 调 `POST /items/{从票}/git-refs` | 从票详情见分支;sync 后 PR 行落;log 通 |
 | TC3 | 负例三条(未入册/重复/pr 行) | 404 / 409 / 409,错误形状统一 |
 | TC4 | 回归:单票建分支、commits 照旧 | 全绿 |
+
+## As-built
+
+实现与 spec 一致(每票 uk、attach 端点、sync 扇出、CLI `--items`、api.http 三负例),无偏差项。实现中新增一处 spec 详设已记的机制:补挂行的 createdAt 需在 save 后经 `ItemGitRefRepository.updateCreatedAt`(@Modifying,ADR-0004 授权扩展点)校正——@CreatedDate 审计无条件覆盖实体显式值,实测坐落(commits 的 since 过滤依赖入册时刻)。验证:gradle build 绿;github 集成 27 例全绿(新增 4 例);api.http 手测全过(建从票→补挂 200→负例 404/409)。收尾:PR #133 合入 main,远端/本地分支已删。
