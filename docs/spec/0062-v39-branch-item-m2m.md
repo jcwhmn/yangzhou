@@ -1,6 +1,6 @@
 # 0062 — YPJ-39 branch×item 多对多:共享分支补挂、PR 扇出、yz log 按票可拉
 
-> 状态:**草案(等用户过目后编码)**
+> 状态:**已实现(PR 待审;api.http 手测全过,集成/构建绿)**
 > 票:YPJ-39(V23 功能件)· 影响:persistence(V37 迁移)· api(github 切片)· cli(`yz items branch`)
 
 ## 1. 需求
