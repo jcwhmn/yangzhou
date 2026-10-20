@@ -1,6 +1,6 @@
 # 0061 — YPJ-52 E2E 并行 flake 收尾:repeat-each=3 高频跑归因,修实锤、记档偶发
 
-> 状态:**已修复,TC1/TC2 用户已跑全绿(2026-10-20),待 PR**
+> 状态:**As-built(已合入 main,PR #132;YPJ-52 Done,2026-10-20)**
 > 票:YPJ-52(V22 收尾最后一张)· 影响:web/e2e 两用例 + workers 默认值(纯测试侧,零组件/零后端改动)
 
 ## 1. 需求
@@ -86,3 +86,7 @@ E2E 全量并行跑时历史上有「不同用例轮换失败」的 flake 现象
 - 天花板:auth 相位串行独占 ~76s(共享 me.last_project_key,设计使然)+ 单进程 next SSR/单实例后端在 16 并发饱和;16 两头都输。
 - 收益:8 workers 时长 ~12%↓,更重要的是日常负载翻倍、更贴近 flake 猎捕姿态。
 - **复盘阈值:总用例数 >100 时重跑本曲线**(8/12/16 × repeat-each=3),全绿才升档。起步固定成本(auth 串行 + webServer)不随用例数增长,用例翻倍后占比减半、负载结构重排,届时上限可能上移。
+
+## As-built
+
+实现与 spec 一致:根因 A 日段改 `pressSequentially`(键盘路径)、根因 B 照 `release.spec.ts` 先例 click+`toPass` 重试、本地 workers 默认 4→8(`playwright.config.ts`)。无偏差项:调查期「记档已知残留清单」最终为空——repeat-each=3 两次全绿(4w ~210s / 8w ~185s)且 TC1/TC2 用户复跑全绿,无归因不出或未复现的残留。复盘阈值(用例 >100 重跑 workers 曲线)记于 §4。收尾:PR #132 squash 合入 main,远程/本地分支已删。
