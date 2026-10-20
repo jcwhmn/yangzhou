@@ -70,4 +70,4 @@ sprint 页(YPJ-46 引入)现有唯一图表 = 燃尽 LineChart,渲染条件 `bd.
 
 ## As-built
 
-(完工后补)
+实现与 spec 一致:单文件改动(page.tsx)+ texts.ts 文案段。微调:状态分布与成员负载合并为单个 `ChartBy` 组件(view 参数派生行数据),未分两个组件;切换器置于图表区上方右侧独立行。手工 4 例过(用户 build/debug),e2e 全量过。美观度欠账已记 PR,归全站 UI 调优。

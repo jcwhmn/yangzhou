@@ -64,4 +64,4 @@ V34(spec 0051)已给 20 张业务表铺 `created_by/updated_by`(bigint nullable 
 
 ## As-built
 
-(完工后补)
+实现与 spec 一致(V36 三加列、TimeEntry 四元组+注解)。微调:工时**无更新端点**,集成测试 update 路径断言改走 `stop`(自动停旧写 ended_at,同样触发 auditing);测试名《创建与 stop 更新——审计列落当前成员》。用户验证:clean build 绿、api.http 全过、flyway 36 条(V36 已应用)、time_entry 三新列确认。

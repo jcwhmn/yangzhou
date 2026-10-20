@@ -64,4 +64,4 @@
 
 ## As-built
 
-(完工后补)
+实现与 spec 一致(Main.kt flags/两新分支、ApiClient 400 回退、GlobalExceptionHandler 新映射、api.http 负例)。自验:6 位密码直登 8081 成功、sprints list 正常;手工用例全过(建 YPJ-76 冒烟票验证 --desc/--sprint 与负例候选、400 映射正确;冒烟票待 Web 回收站删)。CLI 无自动化测试(spec 已声明)。
