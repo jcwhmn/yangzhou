@@ -330,7 +330,14 @@ data class TimeEntry(
     val endedAt: Instant? = null,
     val minutes: Int? = null,
     val note: String? = null,
-    val createdAt: Instant = Instant.now(),
+    @CreatedDate
+    var createdAt: Instant = Instant.now(),
+    @LastModifiedDate
+    var updatedAt: Instant? = null,
+    @CreatedBy
+    var createdBy: Long? = null,
+    @LastModifiedBy
+    var updatedBy: Long? = null,
 )
 
 /** V6:项目挂载的 GitHub 仓库(monorepo 1 个,前后端分离/微服务多个);无 default 标记。 */
