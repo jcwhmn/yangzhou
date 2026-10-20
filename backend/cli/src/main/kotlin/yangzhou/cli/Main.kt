@@ -36,10 +36,11 @@ private fun usage() {
           projects create <KEY> [名称]                 建项目(自动带三态 workflow)
           projects delete <KEY>... [--force]           删项目(多 KEY,可直接粘贴 login 列表;默认预览,--force 物理删)
           projects list [--json]                       项目列表
-          items create <KEY> <标题> [--req 属性[>=N]]... [--json]   建 item(需求可分级)
+          items create <KEY> <标题> [--desc 文本] [--sprint 名称|UUID] [--req 属性[>=N]]... [--json]   建 item(需求可分级)
           items list <KEY> [--json]                    项目 item 列表
           items move <ITEM_ID> <状态名>                改状态(经 workflow 校验)
           items branch <KEY-N> <分支名> [--base <基线>]   在挂载仓库建分支并关联 item(基线默认 main)
+          sprints list <KEY> [--json]                       列 sprint(id/名称/状态/起止)
           caps set <属性> [1-4]                        自评能力(不带数字=未评级)
           caps rm <属性>                               移除能力
           caps list [--json]                           能力清单
@@ -316,6 +317,19 @@ private fun run(args: List<String>) {
             if (failed > 0) error("$failed/${keys.size} 个项目失败")
         }
 
+        "sprints list" -> {
+            val key = rest.getOrNull(0) ?: error("缺少项目 KEY")
+            val body = api.json("GET", "/api/projects/$key/sprints")
+            if (flags.containsKey("json")) return printRaw(body.toString())
+            if (body.size() == 0) return println("(无 sprint)")
+            println("sprintId                            名称             状态       起止")
+            body.forEach { s ->
+                val sd = if (s["startDate"].isNull || s["startDate"].isMissingNode) "—" else s["startDate"].asString()
+                val ed = if (s["endDate"].isNull || s["endDate"].isMissingNode) "—" else s["endDate"].asString()
+                println("%-36s %-16s %-10s %s ~ %s".format(s["sprintId"].asString(), s["name"].asString(), s["status"].asString(), sd, ed))
+            }
+        }
+
         "items create" -> {
             val key = rest.getOrNull(0) ?: error("缺少项目 KEY")
             val title = rest.getOrNull(1) ?: error("缺少标题")
@@ -328,7 +342,12 @@ private fun run(args: List<String>) {
             val body = api.json(
                 "POST",
                 "/api/projects/$key/items",
-                mapOf("title" to title, "requirements" to requirements),
+                mapOf(
+                    "title" to title,
+                    "description" to flags["desc"],
+                    "sprintId" to flags["sprint"]?.let { resolveSprintId(api, key, it) },
+                    "requirements" to requirements,
+                ),
             )
             printJson(body, flags)
             println("已创建 ${body["number"].asString()}:${body["title"].asString()}")
@@ -414,6 +433,17 @@ private fun memberIdByDisplayName(api: ApiClient, name: String): String? {
         if (m["displayName"].asString() == name) found = m["memberId"].asString()
     }
     return found
+}
+
+/** --sprint 引用:UUID 直过;否则按项目 sprint 名称精确匹配(0/多匹配报错列候选)。 */
+private fun resolveSprintId(api: ApiClient, key: String, ref: String): String {
+    if (Regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$").matches(ref)) return ref
+    val sprints = api.json("GET", "/api/projects/$key/sprints")
+    val names = sprints.joinToString("/") { it["name"].asString() }
+    val hits = sprints.filter { it["name"].asString() == ref }
+    if (hits.size == 1) return hits[0]["sprintId"].asString()
+    if (hits.isEmpty()) error("项目 $key 无名为「$ref」的 sprint(可用:$names)")
+    error("sprint 名「$ref」不唯一,请用 UUID:${hits.joinToString("/") { it["sprintId"].asString() }}")
 }
 
 /** KEY-N(如 CHE-1)→ itemId;直接给 UUID 也认。 */

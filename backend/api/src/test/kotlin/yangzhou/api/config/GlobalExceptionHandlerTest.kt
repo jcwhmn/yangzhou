@@ -60,4 +60,14 @@ class GlobalExceptionHandlerTest {
         assertTrue(ev.formattedMessage.contains("/api/test"))
         assertNull(ev.throwableProxy)
     }
+
+    @Test
+    fun `路径参数类型不匹配 - 400 BAD_REQUEST`() {
+        val e = org.springframework.web.method.annotation.MethodArgumentTypeMismatchException(
+            "YPJ-1", java.util.UUID::class.java, "itemId", null, null,
+        )
+        val res = handler.typeMismatch(e, req)
+        assertEquals(400, res.statusCode.value())
+        assertEquals("BAD_REQUEST", res.body!!.code)
+    }
 }

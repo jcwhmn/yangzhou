@@ -1084,3 +1084,7 @@ Content-Type: application/json
 {
   "assigneeItemId": "{{poolnegMember}}"
 }
+
+### [预期 400] 路径参数类型不合法——number 打 UUID 端点(spec 0059,曾 500)
+GET {{host}}/api/items/YPJ-1
+Authorization: Bearer {{token}}

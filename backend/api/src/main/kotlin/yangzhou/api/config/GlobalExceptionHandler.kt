@@ -62,6 +62,10 @@ class GlobalExceptionHandler {
     fun methodNotSupported(e: org.springframework.web.HttpRequestMethodNotSupportedException, req: HttpServletRequest) =
         error(HttpStatus.METHOD_NOT_ALLOWED, "METHOD_NOT_ALLOWED", "不支持的请求方法", req)
 
+    @ExceptionHandler(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException::class)
+    fun typeMismatch(e: org.springframework.web.method.annotation.MethodArgumentTypeMismatchException, req: HttpServletRequest) =
+        error(HttpStatus.BAD_REQUEST, "BAD_REQUEST", "路径参数类型不合法", req)
+
     /** catch-all 兜底(spec 0051):未归类异常 → INTERNAL 通用体,不泄栈与内部信息。 */
     @ExceptionHandler(Exception::class)
     fun internal(e: Exception, req: HttpServletRequest): ResponseEntity<ApiError> =
