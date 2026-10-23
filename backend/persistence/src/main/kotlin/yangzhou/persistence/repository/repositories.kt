@@ -11,6 +11,7 @@ import yangzhou.persistence.ItemActivity
 import yangzhou.persistence.ChecklistItem
 import yangzhou.persistence.ItemStatusHistory
 import yangzhou.persistence.ItemDependency
+import yangzhou.persistence.Attachment
 import yangzhou.persistence.ItemGitRef
 import yangzhou.persistence.Item
 import yangzhou.persistence.Member
@@ -147,6 +148,11 @@ interface ItemGitRefRepository : CrudRepository<ItemGitRef, Long> {
     fun updateCreatedAt(id: Long, createdAt: java.time.Instant): Int
 }
 
+/** YPJ-50:附件元数据;objectKey 唯一,行随 item 硬删级联。 */
+interface AttachmentRepository : CrudRepository<Attachment, Long> {
+    fun findByItemId(itemId: Long): List<Attachment>
+    fun findByObjectIdAndItemId(objectId: UUID, itemId: Long): Attachment?
+}
 interface ProjectWorkflowRuleRepository : CrudRepository<ProjectWorkflowRule, Long> {
     fun findByProjectId(projectId: Long): List<ProjectWorkflowRule>
     fun findByProjectIdAndEventType(projectId: Long, eventType: String): ProjectWorkflowRule?

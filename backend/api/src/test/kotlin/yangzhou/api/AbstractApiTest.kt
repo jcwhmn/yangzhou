@@ -56,7 +56,7 @@ abstract class AbstractApiTest {
             "item_group_type", "item_group_member_history", "item_group_member", "item_group", "milestone",
             "item_dependency", "item_activity", "item_status_history", "checklist_item", "comment", "favorite",
             "notification", "status_transition",
-            "requirement", "item", "status", "project_member", "project",
+            "attachment", "requirement", "item", "status", "project_member", "project",
             "capability", "attribute_definition", "team_member", "team", "member", "workspace",
         ).forEach { jdbc.execute("delete from $it") }
         rest = RestTestClient.bindToServer().baseUrl("http://localhost:$port").build()

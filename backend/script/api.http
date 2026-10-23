@@ -1127,6 +1127,60 @@ Content-Type: application/json
 GET {{host}}/api/items/YPJ-1
 Authorization: Bearer {{token}}
 
+### ============================================================
+### ============ 18. 附件(YPJ-50;presign 直传,字节不经后端) ============
+### ============================================================
+
+### 注册附件元数据并取上传 URL(handler 存 attachmentId;uploadUrl 用 curl 直传:
+###   curl -X PUT -H "Content-Type: application/pdf" --upload-file 本地文件 "<uploadUrl>")
+POST {{host}}/api/items/{{itemId}}/attachments
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "filename": "spec-0063.pdf",
+  "contentType": "application/pdf",
+  "sizeBytes": 102400
+}
+
+> {%
+    client.global.set("attachmentId", response.body.attachmentId);
+%}
+
+### 附件列表
+GET {{host}}/api/items/{{itemId}}/attachments
+Authorization: Bearer {{token}}
+
+### 取下载 URL(curl -o 取回:"<downloadUrl>")
+GET {{host}}/api/items/{{itemId}}/attachments/{{attachmentId}}/download-url
+Authorization: Bearer {{token}}
+
+### 删除附件(行删 + 存储对象删;204)
+DELETE {{host}}/api/items/{{itemId}}/attachments/{{attachmentId}}
+Authorization: Bearer {{token}}
+
+### [预期 400] 超限(sizeBytes > max-size-mb,默认 20MB)
+POST {{host}}/api/items/{{itemId}}/attachments
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "filename": "big.pdf",
+  "contentType": "application/pdf",
+  "sizeBytes": 999999999999
+}
+
+### [预期 400] 非法扩展(白名单外)
+POST {{host}}/api/items/{{itemId}}/attachments
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "filename": "virus.exe",
+  "contentType": "application/x-msdownload",
+  "sizeBytes": 1024
+}
+
 ### [预期 404] 补挂未入册分支(只可补挂 yangzhou 已关联的分支;repo 取建分支回填的实际挂载仓)
 POST {{host}}/api/items/{{itemId}}/git-refs
 Authorization: Bearer {{token}}

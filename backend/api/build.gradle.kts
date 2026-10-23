@@ -18,6 +18,12 @@ dependencies {
 
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-scalar:2.8.13")
     implementation("org.apache.poi:poi-ooxml:5.3.0")
+    implementation("software.amazon.awssdk:s3:2.57.0") {
+        exclude(group = "software.amazon.awssdk", module = "apache-client")
+        exclude(group = "software.amazon.awssdk", module = "apache5-client")
+        exclude(group = "org.apache.httpcomponents.client5", module = "httpclient5")
+    }
+    implementation("software.amazon.awssdk:url-connection-client:2.57.0")
 
     implementation("io.jsonwebtoken:jjwt-api:0.12.6")
     runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.6")
