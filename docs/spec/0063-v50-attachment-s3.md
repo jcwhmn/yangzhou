@@ -134,3 +134,15 @@ create index ix_attachment_item on attachment(item_id);
 | TC5 | 回归:gradle build 绿 + 既有 api.http 区块抽样 | 全绿 |
 
 > 集成测试不需要 RustFS(FakeObjectStorage),CI 可跑;TC0-TC4 才需要真实例。
+
+
+## As-built(2026-10-23,PR #134 合入 438cab7)
+
+- 状态:已实现合并;用户手测(可选联调项)口头通过。YPJ-50 → Done。
+- 实际落点与设计一致:V38 `attachment` 表;`attachment/` 垂直切片(ObjectStorage seam + S3ObjectStorage + DisabledObjectStorage + Service/Controller 四端点);`AttachmentProperties`(`yangzhou.attachment.*`)全 env 化,默认指 RustFS localhost:9000/yangzhou;api.http 区块 18(含负例);entities.puml 同步;cleanDatabase 加 attachment。
+- 实现期偏差(相对原设计):
+  1. AWS SDK 定版 **2.57.0**(非 2.31.x);presigner 输入类改名 `Put/GetObjectPresignRequest`。
+  2. s3 依赖**排除** apache-client/apache5-client/httpclient5——传递引入的 httpclient5 会污染 RestTestClient 连接池,裸 exchange() 泄漏连接致集成测试 180s 挂死;presigner 不需要 HTTP 客户端。
+  3. 审计坑:`@CreatedDate` 无条件覆盖实体显式值 → createdAt 经 `@Modifying` update 校正(同 YPJ-39 先例)。
+- known-limit(承设计):上传无服务端确认回调,列表无上传状态;DELETE 对象删除 best-effort(失败仅 WARN,行删不回滚)。
+- 测试:单测 4 + 集成 2(FakeObjectStorage,CI 可跑);`gradle build --no-daemon` 绿;ijhttp 全跑过。
