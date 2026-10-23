@@ -1,6 +1,6 @@
 # 0063 — YPJ-50 item 附件:S3 兼容抽象(presign)+ RustFS 驱动
 
-> 状态:**草案(等用户过目后编码)**
+> 状态:**已实现(PR 待审;api.http 手测与 RustFS 联调中,集成/构建绿)**
 > 票:YPJ-50(V23 功能件)· 影响:persistence(V38 迁移)· api(新 attachment 切片)· api.http
 
 ## 1. 需求

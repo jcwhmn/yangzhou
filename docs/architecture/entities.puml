@@ -50,6 +50,12 @@ class ItemGitRef {
   url: String?
   state: String?
 }
+class Attachment {
+  filename: String
+  contentType: String
+  sizeBytes: Long
+  objectKey: String
+}
 class ProjectWorkflowRule {
   eventType: String
 }
@@ -153,6 +159,7 @@ ItemGroup "1" *-- "*" ItemGroupMember
 ItemGroup "1" *-- "*" ItemGroupMemberHistory
 ProjectWorkflowRule "*" --> "1" Status : 目标列
 Item "1" *-- "*" ItemGitRef : 分支/PR 链接
+Item "1" *-- "*" Attachment : 附件
 Item "1" *-- "*" ItemStatusHistory : 状态流水
 ItemStatusHistory "*" --> "0..1" Status : from
 ItemStatusHistory "*" --> "1" Status : to

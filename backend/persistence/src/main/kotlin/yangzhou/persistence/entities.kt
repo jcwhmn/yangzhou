@@ -513,3 +513,23 @@ data class ProjectView(
     @LastModifiedBy
     var updatedBy: Long? = null,
 )
+
+/** YPJ-50:item 附件元数据;字节在 S3 兼容存储(presign 直传直取),objectKey 即桶内路径。 */
+@Table("attachment")
+data class Attachment(
+    @Id val id: Long? = null,
+    val objectId: UUID = UUID.randomUUID(),
+    val itemId: Long,
+    val filename: String,
+    val contentType: String,
+    val sizeBytes: Long,
+    val objectKey: String,
+    @CreatedDate
+    var createdAt: Instant = Instant.now(),
+    @LastModifiedDate
+    var updatedAt: Instant = Instant.now(),
+    @CreatedBy
+    var createdBy: Long? = null,
+    @LastModifiedBy
+    var updatedBy: Long? = null,
+)
