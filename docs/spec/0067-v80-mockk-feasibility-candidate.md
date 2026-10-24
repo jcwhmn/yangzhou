@@ -37,3 +37,10 @@ api service 层 mockk 单测第一批:feasibility + candidate 的装配/分支�
 |---|---|---|
 | TC1 | `gradle :api:test --tests "*FeasibilityServiceUnitTest" --tests "*CandidateServiceUnitTest"` | 全绿 |
 | TC2 | `gradle build --no-daemon` | 全绿(含既有单测回归) |
+
+
+## As-built(2026-10-24,PR #138 合入)
+
+- 按设计落地:FeasibilityServiceUnitTest 12 例 + CandidateServiceUnitTest 6 例;零 main 改动。
+- 实现期固化进用例的三个发现:①引擎 level > min = surplus(非 satisfied);②recomputeProjectSignal 写回的是 project.copy(),断言须打在 save 实参;③mockk 泛型 save<S> relaxed 返回占位对象会 CCE,须显式 `val arg: T = firstArg()`(ItemServiceUnitTest P0 坑同源)。
+- 验证:两单测类绿;用户 gradle clean build 绿;8080/8081 bootRun 正常。
