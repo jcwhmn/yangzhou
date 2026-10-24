@@ -41,3 +41,10 @@
 | TC1 | F: `docker compose down`(不带 -v)→ 仓内 `dev-infra.ps1 up` | rustfs 容器起,9000/9001 可达 |
 | TC2 | 传一张附件(yangzhou 附件功能)→ `dev-infra.ps1 down` → `up` | 附件仍可下载(卷数据未丢) |
 | TC3 | 8080/8081 bootRun | 不受影响,正常连 postgres(localhost:5432)与 rustfs |
+
+## As-built(2026-10-24,PR #143)
+
+- 实现=设计原样:`infra/compose/docker-compose.yaml`(rustfs 平移,头注释声明外部 postgres)、`script/dev-infra.ps1`(up/down/status)、AGENTS.md 两分法新约定
+- 过程修复:ps1 补 UTF-8 BOM(PowerShell 5.1 无 BOM 按 GBK 解码,中文串解析错)——后续含中文的 ps1 一律带 BOM
+- 用户实测:F: 侧 down → 仓内 up 切换成功,附件数据无缝(卷沿用);TC1~TC3 全过
+- 偏离记录:无
