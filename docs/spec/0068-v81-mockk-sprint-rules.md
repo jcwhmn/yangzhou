@@ -30,3 +30,10 @@ SprintService 的规则分支 mockk 单测:assignItem 成员指派/替换语义(
 |---|---|---|
 | TC1 | `gradle :api:test --tests "*SprintServiceUnitTest"` | 全绿 |
 | TC2 | `gradle build --no-daemon` | 全绿 |
+
+
+## As-built(2026-10-24,PR #139 合入)
+
+- 按设计落地:SprintServiceUnitTest 11 例(assignItem 8 + update 3);零 main 改动。
+- mockk 坑三条(已注释):clearMocks 勿碰非 mock fixedClock;relaxed 对未知 UUID 造非空占位(显式压 null);ItemGroupMember.createdAt 默认 now() 破坏 data class 相等(钉 EPOCH)。
+- 验证:单测绿;用户 gradle clean build 绿;8080/8081 bootRun 正常。
