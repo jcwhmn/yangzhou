@@ -50,3 +50,11 @@
 - 看板卡片:编号 Chip 前加父编号 Link(caption/primary);页面 Item 类型补 parentItemId/parentNumber(看板数据源走 ItemDto,字段已在)
 - 否决:父标题上卡片/详情——自身标题已占主要视觉,active-sprint 过滤下父条目可能不在看板数据里,点链接即达(YAGNI)
 - 手测:开 YPJ-80 详情 → 头部见 YPJ-38 chip,点击达 YPJ-38;看板 YPJ-80 卡片编号前见 YPJ-38 › 链接
+
+## As-built(2026-10-24,PR #142)
+
+- 实现=第 5 节终态:详情页「子条目」主页面直排区块(页签栏上方,原七区块页签不动)+ 行内新建;详情页父前缀链接(`YPJ-38 ›` body2/primary + 实心编号 Chip);看板卡片父编号 caption link;sprint/table/backlog 编号列父前缀
+- 后端仅 `ItemDto.parentNumber` 派生字段(list 用同项目全量行内映射填充,get 查父行);零 schema/端点变更
+- 测试:ItemsApiTest 集成用例「列表与详情返回父编号前缀」;`gradle test`/`integrationTest` 绿;tsc 干净;e2e 全过(api.http 并跑时 item-assign:127 一例负载 flake,单跑复现即消)
+- 过程沉淀:开工票须挂当前 sprint 入 AGENTS.md(2026-10-24 定);YPJ-80~82 漏挂 sprint 已补(数据修正)
+- 偏离记录:无(两处用户拍板修订均已在增量节记录)
