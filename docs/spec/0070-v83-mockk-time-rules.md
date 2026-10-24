@@ -28,3 +28,10 @@ listForItem/summary 装配、commitsForItem 拉取链路(集成覆盖)。
 |---|---|---|
 | TC1 | `gradle :api:test --tests "*TimeEntryServiceUnitTest"` | 全绿 |
 | TC2 | `gradle build --no-daemon` | 全绿 |
+
+
+## As-built(2026-10-24,PR #141 合入 52cb8cc)
+
+- 按设计落地:TimeEntryServiceUnitTest 14 例(create 8 + stop 4 + buildSuggestions 2);零 main 改动。
+- 语义修正:终止记录(startedAt+endedAt)自动算时长(minutes=时长,非 null)。
+- 验证:单测绿;用户 gradle clean build 绿;8080/8081 bootRun 正常。
