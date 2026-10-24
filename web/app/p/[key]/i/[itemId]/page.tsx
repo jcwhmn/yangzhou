@@ -39,6 +39,7 @@ type Item = {
   status: string;
   assignee: string | null;
   parentItemId: string | null;
+  parentNumber?: string | null;
   externalRef: string | null;
   requirements: { attribute: string; minLevel: number | null }[];
   startDate: string | null;
@@ -481,6 +482,16 @@ export default function ItemDetailPage() {
         </Typography>
       </Link>
       <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
+        {item.parentNumber && (
+          <Chip
+            size="small"
+            variant="outlined"
+            label={item.parentNumber}
+            component={Link}
+            href={`/p/${key}/i/${item.parentItemId}`}
+            clickable
+          />
+        )}
         <Chip label={item.number} />
         {feasibility && <SignalChip signal={feasibility.signal} />}
         {item.assignee ? (

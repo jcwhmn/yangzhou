@@ -43,3 +43,10 @@
 - 前端:sprint/table/backlog 三页编号列显示 `父编号 › 编号`;三页 Item type 加 `parentNumber?`
 - 测试:ItemsApiTest 新增「列表与详情返回父编号前缀」(集成轨;merge 前本地 `gradle integrationTest`)
 - 手测:看板/sprint/backlog 打开含子条目项目,子条目行编号列应显示 `YPJ-38 › YPJ-80` 形态;无父条目行不受影响
+
+## 5. 增量(2026-10-24 三次拍板:父条目链接)
+
+- 详情页:头部编号 Chip 前加父编号 Chip(outlined/clickable,链接父详情);数据用 get() 已有的 parentNumber/parentItemId,零后端改动
+- 看板卡片:编号 Chip 前加父编号 Link(caption/primary);页面 Item 类型补 parentItemId/parentNumber(看板数据源走 ItemDto,字段已在)
+- 否决:父标题上卡片/详情——自身标题已占主要视觉,active-sprint 过滤下父条目可能不在看板数据里,点链接即达(YAGNI)
+- 手测:开 YPJ-80 详情 → 头部见 YPJ-38 chip,点击达 YPJ-38;看板 YPJ-80 卡片编号前见 YPJ-38 › 链接
