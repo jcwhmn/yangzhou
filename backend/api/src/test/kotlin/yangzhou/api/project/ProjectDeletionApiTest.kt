@@ -1,4 +1,4 @@
-package yangzhou.api.project
+package yangzhou.api.business.project
 
 import java.util.UUID
 import kotlin.test.assertEquals

@@ -1,4 +1,4 @@
-package yangzhou.api.grouptype
+package yangzhou.api.business.grouptype
 
 import com.fasterxml.jackson.databind.JsonNode
 import org.springframework.test.web.servlet.client.RestTestClient

@@ -1,4 +1,4 @@
-package yangzhou.api.github
+package yangzhou.api.business.github
 
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.jdbc.core.JdbcTemplate

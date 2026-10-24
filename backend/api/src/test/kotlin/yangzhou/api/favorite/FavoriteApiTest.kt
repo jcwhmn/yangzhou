@@ -1,4 +1,4 @@
-package yangzhou.api.favorite
+package yangzhou.api.business.favorite
 
 import yangzhou.api.AbstractApiTest
 import kotlin.test.Test

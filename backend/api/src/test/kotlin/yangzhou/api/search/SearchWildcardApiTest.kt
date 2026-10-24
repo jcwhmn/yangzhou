@@ -1,4 +1,4 @@
-package yangzhou.api.search
+package yangzhou.api.business.search
 
 import org.springframework.test.web.servlet.client.RestTestClient
 import yangzhou.api.AbstractApiTest

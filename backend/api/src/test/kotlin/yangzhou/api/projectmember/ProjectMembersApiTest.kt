@@ -1,4 +1,4 @@
-package yangzhou.api.projectmember
+package yangzhou.api.business.projectmember
 
 import org.springframework.test.web.servlet.client.RestTestClient
 import yangzhou.api.AbstractApiTest

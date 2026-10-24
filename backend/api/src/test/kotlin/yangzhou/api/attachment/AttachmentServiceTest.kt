@@ -1,10 +1,10 @@
-package yangzhou.api.attachment
+package yangzhou.api.business.attachment
 
 import io.mockk.every
 import io.mockk.mockk
 import org.junit.jupiter.api.Test
 import yangzhou.api.config.AttachmentProperties
-import yangzhou.api.support.BadRequestException
+import yangzhou.api.error.BadRequestException
 import yangzhou.persistence.Item
 import yangzhou.persistence.repository.AttachmentRepository
 import yangzhou.persistence.repository.ItemRepository

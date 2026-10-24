@@ -1,4 +1,4 @@
-package yangzhou.api.search
+package yangzhou.api.business.search
 
 import kotlin.test.assertEquals
 import org.junit.jupiter.api.Test

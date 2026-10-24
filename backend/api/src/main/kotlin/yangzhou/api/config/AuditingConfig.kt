@@ -5,7 +5,7 @@ import org.springframework.context.annotation.Configuration
 import org.springframework.data.auditing.DateTimeProvider
 import org.springframework.data.domain.AuditorAware
 import org.springframework.data.jdbc.repository.config.EnableJdbcAuditing
-import yangzhou.api.member.MemberService
+import yangzhou.api.business.member.MemberService
 import java.time.Clock
 import java.time.OffsetDateTime
 import java.util.Optional

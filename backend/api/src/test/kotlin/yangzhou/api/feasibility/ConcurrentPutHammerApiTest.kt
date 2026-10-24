@@ -1,4 +1,4 @@
-package yangzhou.api.feasibility
+package yangzhou.api.business.feasibility
 
 import yangzhou.api.AbstractApiTest
 import java.net.URI

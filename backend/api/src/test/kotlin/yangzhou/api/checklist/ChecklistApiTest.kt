@@ -1,4 +1,4 @@
-package yangzhou.api.checklist
+package yangzhou.api.business.checklist
 
 import yangzhou.api.AbstractApiTest
 import kotlin.test.Test

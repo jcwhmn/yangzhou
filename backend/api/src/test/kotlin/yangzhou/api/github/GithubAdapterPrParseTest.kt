@@ -1,4 +1,4 @@
-package yangzhou.api.github
+package yangzhou.api.business.github
 
 import tools.jackson.databind.ObjectMapper
 import kotlin.test.Test

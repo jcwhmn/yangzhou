@@ -1,4 +1,4 @@
-package yangzhou.api.project
+package yangzhou.api.business.project
 
 import yangzhou.api.AbstractApiTest
 import kotlin.test.Test

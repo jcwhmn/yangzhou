@@ -1,4 +1,4 @@
-package yangzhou.api.github
+package yangzhou.api.business.github
 
 import com.fasterxml.jackson.databind.JsonNode
 import org.springframework.beans.factory.annotation.Autowired

@@ -1,4 +1,4 @@
-package yangzhou.api.metrics
+package yangzhou.api.business.metrics
 
 import yangzhou.persistence.ItemGroupMemberHistory
 import yangzhou.persistence.repository.MetricsHistoryRow

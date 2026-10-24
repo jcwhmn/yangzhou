@@ -1,4 +1,4 @@
-package yangzhou.api.dependency
+package yangzhou.api.business.dependency
 
 import yangzhou.api.AbstractApiTest
 import kotlin.test.Test

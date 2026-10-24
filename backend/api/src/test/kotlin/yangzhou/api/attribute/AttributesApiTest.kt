@@ -1,4 +1,4 @@
-package yangzhou.api.attribute
+package yangzhou.api.business.attribute
 
 import org.springframework.test.web.servlet.client.RestTestClient
 import yangzhou.api.AbstractApiTest

@@ -1,4 +1,4 @@
-package yangzhou.api.attachment
+package yangzhou.api.business.attachment
 
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.TestConfiguration

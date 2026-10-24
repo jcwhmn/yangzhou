@@ -1,4 +1,4 @@
-package yangzhou.api.metrics
+package yangzhou.api.business.metrics
 
 import com.fasterxml.jackson.databind.JsonNode
 import org.springframework.beans.factory.annotation.Autowired
