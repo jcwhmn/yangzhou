@@ -97,3 +97,9 @@ yangzhou.api
 | TC3 | `gradle build --no-daemon`(单测) | 全绿 |
 | TC4 | 本地 `gradle integrationTest` | 全绿 |
 | TC5 | web/ 下 E2E 全量跑法(照 AGENTS 标准) | 全绿 |
+
+
+## As-built(2026-10-23,PR #135 合入 aa5c6bc)
+
+- 按设计落地,无实现期偏差;唯一遗留:测试侧目录/包声明未镜像(spec 既有裁决「测试文件本身不移动」),已立票专门处理。
+- 验证:gradle build(单测)绿;integrationTest --rerun 全量绿;E2E 全量 145 requests 0 failed;ijhttp api.http 过;8080/8081 bootRun 正常。
