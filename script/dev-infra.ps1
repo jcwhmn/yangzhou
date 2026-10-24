@@ -1,4 +1,4 @@
-# YPJ-77:本机基础设施一键起停(仅项目独用服务;postgres 为外部共享实例,不归本脚本管)
+﻿# YPJ-77:本机基础设施一键起停(仅项目独用服务;postgres 为外部共享实例,不归本脚本管)
 # 用法: .\script\dev-infra.ps1 up|down|status
 param(
     [Parameter(Mandatory = $true)]
