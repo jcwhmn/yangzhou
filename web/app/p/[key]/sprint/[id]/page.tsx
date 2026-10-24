@@ -37,6 +37,7 @@ type Sprint = { sprintId: string; name: string; status: string; startDate: strin
 type Item = {
   itemId: string;
   number: string;
+  parentNumber?: string | null;
   title: string;
   status: string;
   assignee: string | null;
@@ -290,7 +291,7 @@ export default function SprintPage() {
                     <TableRow key={it.itemId} hover>
                       <TableCell>
                         <Link href={`/p/${key}/i/${it.itemId}?from=sprint-${id}`}>
-                          <Typography variant="body2" sx={{ whiteSpace: "nowrap" }}>{it.number}</Typography>
+                          <Typography variant="body2" sx={{ whiteSpace: "nowrap" }}>{(it.parentNumber ? it.parentNumber + " › " : "") + it.number}</Typography>
                         </Link>
                       </TableCell>
                       <TableCell>

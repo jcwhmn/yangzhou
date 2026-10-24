@@ -64,6 +64,7 @@ class ItemService(
         val status: String,
         val assignee: String?,
         val parentItemId: UUID?,
+        val parentNumber: String? = null,
         val externalRef: String?,
         val requirements: List<RequirementDto>,
         val gitRefs: List<GitRefDto> = emptyList(),
@@ -150,7 +151,9 @@ class ItemService(
         val projectItems = itemRepo.findByProjectIdAndDeletedAtIsNullOrderByNumber(project.id!!)
         val ctx = buildCtx(project, projectItems)
         val visible = if (backlogOnly) projectItems.filter { it.statusObjectId !in ctx.finalIds && it.id !in ctx.currentSprint } else projectItems
-        return visible.map { ctx.toDto(it) }
+        // YPJ-84 决策 2:父前缀标识(同项目全量行内可解析,直接查表)
+        val numberById = projectItems.associate { it.objectId to "${project.key}-${it.number}" }
+        return visible.map { ctx.toDto(it).copy(parentNumber = it.parentObjectId?.let(numberById::get)) }
     }
 
     fun get(itemId: UUID): ItemDto {
@@ -158,7 +161,9 @@ class ItemService(
         val project = projectOf(item.projectId)
         val ctx = buildCtx(project, listOf(item))
         // 已软删 item 不在 list()(回收站预览语义):toDto 内加 [已删除] 前缀
+        val parentNumber = item.parentObjectId?.let { itemRepo.findByObjectId(it) }?.let { "${project.key}-${it.number}" }
         return ctx.toDto(item).copy(
+            parentNumber = parentNumber,
             gitRefs = gitRefs.findByItemId(item.id!!).map {
                 GitRefDto(it.kind, it.repo, it.ref, it.url, it.state)
             },

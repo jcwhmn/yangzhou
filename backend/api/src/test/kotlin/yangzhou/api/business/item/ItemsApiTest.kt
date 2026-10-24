@@ -330,4 +330,25 @@ class ItemsApiTest : AbstractApiTest() {
         assertEquals(404, r.status.value(), r.responseBody)
         assertEquals(before, countItems56(authed, "KBF"))
     }
+
+    @Test
+    fun `列表与详情返回父编号前缀(YPJ-84)`() {
+        val authed = bootstrapAndAuth()
+        createProject(authed, "PRE")
+        val parent = createItem(authed, "PRE", "父条目")
+        val child = createItem(authed, "PRE", "子条目")
+        authed.patch().uri("/api/items/${child["itemId"].asText()}")
+            .body(mapOf("parentItemId" to parent["itemId"].asText()))
+            .exchange()
+            .expectStatus().isOk()
+        val listBody = authed.get().uri("/api/projects/PRE/items").exchange()
+            .expectStatus().isOk()
+            .expectBody(String::class.java).returnResult().responseBody!!
+        val childRow = json.readTree(listBody).first { it["itemId"].asText() == child["itemId"].asText() }
+        assertEquals("PRE-1", childRow["parentNumber"].asText())
+        val gotBody = authed.get().uri("/api/items/${child["itemId"].asText()}").exchange()
+            .expectStatus().isOk()
+            .expectBody(String::class.java).returnResult().responseBody!!
+        assertEquals("PRE-1", json.readTree(gotBody)["parentNumber"].asText())
+    }
 }

@@ -34,3 +34,12 @@
 |---|---|---|
 | TC1 | 打开 YPJ-38 详情,页签栏上方 | 子条目区块列出 YPJ-80~83,状态 chip 正确,点击跳对应详情 |
 | TC2 | 区块内新建「测试子条目」 | 列表即时多一行,详情页编号跳转正常;TC1 数据清理 |
+
+## 4. 增量(2026-10-24 二次拍板:列表父前缀标识)
+
+用户决策:① 子条目「加到 sprint 里」——现有语义已支持(sprint items = 已指派 items 全量过滤,子 item 指派后即出现;backlog 选择器也不过滤子条目),无需后端改语义;② 三列表页(sprint/table/backlog)补父前缀标识。
+
+- 后端:`ItemDto` 新增 `parentNumber: String? = null`;`list()` 用同项目全量行内映射填充,`get()` 查父行填充;零 schema 变更(纯派生字段)
+- 前端:sprint/table/backlog 三页编号列显示 `父编号 › 编号`;三页 Item type 加 `parentNumber?`
+- 测试:ItemsApiTest 新增「列表与详情返回父编号前缀」(集成轨;merge 前本地 `gradle integrationTest`)
+- 手测:看板/sprint/backlog 打开含子条目项目,子条目行编号列应显示 `YPJ-38 › YPJ-80` 形态;无父条目行不受影响

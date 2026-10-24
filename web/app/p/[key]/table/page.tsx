@@ -31,6 +31,7 @@ import { AssignPopover } from "@/components/AssignPopover";
 type Status = { statusId: string; name: string; position: number };
 type Item = {
   itemId: string;
+  parentNumber?: string | null;
   number: string;
   title: string;
   status: string;
@@ -327,7 +328,7 @@ export default function TableViewPage() {
                     <TableCell key={c.id}>
                       {c.id === "number" ? (
                         <Link href={`/p/${key}/i/${it.itemId}?from=table`}>
-                          <Typography variant="body2" sx={{ whiteSpace: "nowrap" }}>{it.number}</Typography>
+                          <Typography variant="body2" sx={{ whiteSpace: "nowrap" }}>{(it.parentNumber ? it.parentNumber + " › " : "") + it.number}</Typography>
                         </Link>
                       ) : c.id === "title" ? (
                         <Link href={`/p/${key}/i/${it.itemId}?from=table`}>
