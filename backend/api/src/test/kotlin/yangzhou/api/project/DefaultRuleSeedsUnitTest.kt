@@ -1,6 +1,6 @@
-package yangzhou.api.project
+package yangzhou.api.business.project
 
-import yangzhou.api.github.VcsEvent
+import yangzhou.api.business.github.VcsEvent
 import yangzhou.persistence.Status
 import kotlin.test.Test
 import kotlin.test.assertEquals

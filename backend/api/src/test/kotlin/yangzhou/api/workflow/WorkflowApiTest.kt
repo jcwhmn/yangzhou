@@ -1,4 +1,4 @@
-package yangzhou.api.workflow
+package yangzhou.api.business.workflow
 
 import yangzhou.api.AbstractApiTest
 import kotlin.test.Test

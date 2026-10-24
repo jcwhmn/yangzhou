@@ -1,11 +1,11 @@
-package yangzhou.api.grouptype
+package yangzhou.api.business.grouptype
 
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
-import yangzhou.api.support.BadRequestException
-import yangzhou.api.support.ConflictException
-import yangzhou.api.support.NotFoundException
+import yangzhou.api.error.BadRequestException
+import yangzhou.api.error.ConflictException
+import yangzhou.api.error.NotFoundException
 import yangzhou.persistence.ItemGroup
 import yangzhou.persistence.ItemGroupType
 import yangzhou.persistence.Project

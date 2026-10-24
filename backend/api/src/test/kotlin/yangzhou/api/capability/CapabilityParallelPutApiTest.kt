@@ -1,4 +1,4 @@
-package yangzhou.api.capability
+package yangzhou.api.business.capability
 
 import yangzhou.api.AbstractApiTest
 import java.net.URI

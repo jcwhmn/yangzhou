@@ -1,5 +1,7 @@
 package yangzhou.api.config
 
+import yangzhou.api.error.GlobalExceptionHandler
+
 import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.Logger
 import ch.qos.logback.classic.spi.ILoggingEvent
@@ -8,7 +10,7 @@ import io.mockk.every
 import io.mockk.mockk
 import jakarta.servlet.http.HttpServletRequest
 import org.slf4j.LoggerFactory
-import yangzhou.api.support.ConflictException
+import yangzhou.api.error.ConflictException
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test

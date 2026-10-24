@@ -1,4 +1,4 @@
-package yangzhou.api.candidate
+package yangzhou.api.business.candidate
 
 import yangzhou.api.AbstractApiTest
 import kotlin.test.Test

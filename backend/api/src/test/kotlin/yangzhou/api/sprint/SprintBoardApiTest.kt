@@ -1,4 +1,4 @@
-package yangzhou.api.sprint
+package yangzhou.api.business.sprint
 
 import yangzhou.api.AbstractApiTest
 import kotlin.test.Test

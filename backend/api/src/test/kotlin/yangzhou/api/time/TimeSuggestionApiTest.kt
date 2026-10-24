@@ -1,4 +1,4 @@
-package yangzhou.api.time
+package yangzhou.api.business.time
 
 import com.fasterxml.jackson.databind.JsonNode
 import org.springframework.beans.factory.annotation.Autowired
@@ -9,10 +9,10 @@ import org.springframework.context.annotation.Primary
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.web.servlet.client.RestTestClient
 import yangzhou.api.AbstractApiTest
-import yangzhou.api.github.VcsApiException
-import yangzhou.api.github.RepoCommit
-import yangzhou.api.github.VcsGateway
-import yangzhou.api.github.RepoPr
+import yangzhou.api.business.github.VcsApiException
+import yangzhou.api.business.github.RepoCommit
+import yangzhou.api.business.github.VcsGateway
+import yangzhou.api.business.github.RepoPr
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

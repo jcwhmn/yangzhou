@@ -1,4 +1,4 @@
-package yangzhou.api.view
+package yangzhou.api.business.view
 
 import com.fasterxml.jackson.databind.JsonNode
 import org.springframework.test.web.servlet.client.RestTestClient

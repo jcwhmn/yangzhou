@@ -1,4 +1,4 @@
-package yangzhou.api.item
+package yangzhou.api.business.item
 
 import com.fasterxml.jackson.databind.JsonNode
 import org.springframework.beans.factory.annotation.Autowired
@@ -6,10 +6,10 @@ import org.springframework.context.annotation.Import
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.web.servlet.client.RestTestClient
 import yangzhou.api.AbstractApiTest
-import yangzhou.api.github.FakeGatewayConfig
-import yangzhou.api.github.FakeGithubGateway
-import yangzhou.api.github.RepoPr
-import yangzhou.api.github.GithubSyncService
+import yangzhou.api.business.github.FakeGatewayConfig
+import yangzhou.api.business.github.FakeGithubGateway
+import yangzhou.api.business.github.RepoPr
+import yangzhou.api.business.github.GithubSyncService
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull

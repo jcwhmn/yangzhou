@@ -1,4 +1,4 @@
-package yangzhou.api.attribute
+package yangzhou.api.business.attribute
 
 import yangzhou.api.AbstractApiTest
 import kotlin.test.Test

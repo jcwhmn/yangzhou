@@ -1,13 +1,13 @@
-package yangzhou.api.item
+package yangzhou.api.business.item
 
 import io.mockk.clearMocks
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
-import yangzhou.api.support.BadRequestException
-import yangzhou.api.support.ConflictException
-import yangzhou.api.support.NotFoundException
+import yangzhou.api.error.BadRequestException
+import yangzhou.api.error.ConflictException
+import yangzhou.api.error.NotFoundException
 import yangzhou.persistence.Item
 import yangzhou.persistence.ItemActivity
 import yangzhou.persistence.ItemGroup
@@ -52,13 +52,13 @@ class ItemServiceUnitTest {
     private val itemRepo = mockk<ItemRepository>(relaxed = true)
     private val statuses = mockk<StatusRepository>(relaxed = true)
     private val numbering = mockk<ItemNumberRepository>(relaxed = true)
-    private val memberService = mockk<yangzhou.api.member.MemberService>(relaxed = true)
+    private val memberService = mockk<yangzhou.api.business.member.MemberService>(relaxed = true)
     private val historyRepo = mockk<ItemStatusHistoryRepository>(relaxed = true)
     private val activityRepo = mockk<ItemActivityRepository>(relaxed = true)
-    private val workflow = mockk<yangzhou.api.workflow.WorkflowService>(relaxed = true)
-    private val projectMembers = mockk<yangzhou.api.projectmember.ProjectMemberService>(relaxed = true)
-    private val notificationService = mockk<yangzhou.api.notification.NotificationService>(relaxed = true)
-    private val feasibilityService = mockk<yangzhou.api.feasibility.FeasibilityService>(relaxed = true)
+    private val workflow = mockk<yangzhou.api.business.workflow.WorkflowService>(relaxed = true)
+    private val projectMembers = mockk<yangzhou.api.business.projectmember.ProjectMemberService>(relaxed = true)
+    private val notificationService = mockk<yangzhou.api.business.notification.NotificationService>(relaxed = true)
+    private val feasibilityService = mockk<yangzhou.api.business.feasibility.FeasibilityService>(relaxed = true)
     private val itemTree = mockk<ItemTreeRepository>(relaxed = true)
     private val requirementRepo = mockk<RequirementRepository>(relaxed = true)
     private val definitions = mockk<AttributeDefinitionRepository>(relaxed = true)

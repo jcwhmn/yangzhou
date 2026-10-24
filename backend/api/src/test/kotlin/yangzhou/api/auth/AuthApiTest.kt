@@ -1,4 +1,4 @@
-package yangzhou.api.auth
+package yangzhou.api.business.auth
 
 import org.springframework.test.web.servlet.client.RestTestClient
 import yangzhou.api.AbstractApiTest

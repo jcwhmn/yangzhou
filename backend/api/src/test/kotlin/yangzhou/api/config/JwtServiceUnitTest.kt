@@ -1,5 +1,7 @@
 package yangzhou.api.config
 
+import yangzhou.api.security.JwtService
+
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith

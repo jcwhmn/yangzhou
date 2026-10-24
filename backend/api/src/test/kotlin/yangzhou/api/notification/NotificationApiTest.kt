@@ -1,14 +1,14 @@
-package yangzhou.api.notification
+package yangzhou.api.business.notification
 
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.context.annotation.Import
 import org.springframework.jdbc.core.JdbcTemplate
 import yangzhou.api.AbstractApiTest
-import yangzhou.api.github.FakeGatewayConfig
-import yangzhou.api.github.FakeGithubGateway
-import yangzhou.api.github.RepoPr
-import yangzhou.api.github.GithubSyncService
+import yangzhou.api.business.github.FakeGatewayConfig
+import yangzhou.api.business.github.FakeGithubGateway
+import yangzhou.api.business.github.RepoPr
+import yangzhou.api.business.github.GithubSyncService
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

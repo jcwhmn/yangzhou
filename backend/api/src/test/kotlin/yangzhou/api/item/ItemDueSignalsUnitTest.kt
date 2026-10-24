@@ -1,4 +1,4 @@
-package yangzhou.api.item
+package yangzhou.api.business.item
 
 import java.time.LocalDate
 import kotlin.test.Test

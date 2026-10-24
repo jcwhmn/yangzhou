@@ -1,4 +1,4 @@
-package yangzhou.api.time
+package yangzhou.api.business.time
 
 import yangzhou.api.AbstractApiTest
 import kotlin.test.Test
