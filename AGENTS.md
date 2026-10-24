@@ -69,7 +69,7 @@ docs/      adr/ · spec/ · architecture/(puml 类图) · requirement/(PRD) · p
 - 实体主构造直接声明 `id` / `objectId` / `createdAt` / `updatedAt`;`objectId` 在 Kotlin 生成
 - 对外只暴露公共 ID(`projectId` / `itemId`),永不暴露内部数字 id;FK 用 `object_id` UUID 列
 - migration 用 SQL identity + 命名约束;枚举 = Kotlin enum + VARCHAR + CHECK 约束
-- 本机 Postgres 由共享 compose 提供(`F:/code/docker-compose/postgresql`),不建项目本地 compose;测试库 `yangzhou_test`
+- **基础设施两分法(2026-10-24 拍板,废除旧「不建项目本地 compose」约定)**:**postgres = 外部共享实例**(提供方 `F:/code/docker-compose/postgresql`,localhost:5432 不变,库 `yangzhou`/`yangzhou_test`)——多项目共用,**不在本项目 compose 定义**;**项目独用服务**(rustfs,及后续 redis/prometheus/grafana)定义进 `infra/compose/docker-compose.yaml`,起停用 `script/dev-infra.ps1`(up/down/status,postgres 不归它管);测试库 `yangzhou_test`
 
 ## 测试
 
@@ -97,7 +97,7 @@ docs/      adr/ · spec/ · architecture/(puml 类图) · requirement/(PRD) · p
 - JDK 25(LTS)。后端在 `backend/`:`gradle build`(含测试)/ `gradle :domain:run`(引擎 Demo,输出与 prototype S1–S7 可比对)。
 - `./gradlew` 同效;首次需下载发行包,国内网络慢属已知,用本地 gradle 即可。
 - CI(GitHub Actions):`backend.yml` 跑 `gradle test`(纯单元,免 Docker;spec 0014);`nightly.yml` 每日全量兜底(含集成,红了必修);`e2e.yml` web/backend 变更起 bootRun + Playwright 整跑 E2E
-- 本机开发库:`yangzhou`(共享 compose,已建);bootRun 用 `gradle :api:bootRun`。
+- 本机开发库:`yangzhou`(外部共享 postgres,已建);bootRun 用 `gradle :api:bootRun`;rustfs 起停 `script/dev-infra.ps1`。
 - **不要猜前端或后端是否已运行,需要运行环境的,告知需要的运行环境,命令,从我这里确认**。
 - **双 profile 并存**(2026-10-06 起):8080 常跑 **test profile**(库 `yangzhou_test`,E2E 用);**PM 日常实例 = default profile**(库 `yangzhou`,dogfood 项目 YPJ),约定端口 **8081**:`gradle :api:bootRun --args='--server.port=8081'`。CLI `yz` 的 session(`~/.yangzhou/session.json`)指向谁就写谁的库——动 PM 数据前确认 server 指向 default 实例。
 - PM 实例部署形态(已拍板):本机常驻即可;Postgres 备份手工期(`pg_dump`),自动化另票。
