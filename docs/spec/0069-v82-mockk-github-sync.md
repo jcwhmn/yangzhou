@@ -30,3 +30,10 @@ PR author 映射细节(V10-S5,集成覆盖)、轮询调度器。
 |---|---|---|
 | TC1 | `gradle :api:test --tests "*GithubSyncServiceUnitTest"` | 全绿 |
 | TC2 | `gradle build --no-daemon` | 全绿 |
+
+
+## As-built(2026-10-24,PR #140 合入)
+
+- 按设计落地:GithubSyncServiceUnitTest 14 例(applyEvent 7 + syncAll 7);零 main 改动。
+- 坑三条(已注释):relaxed 对无全默认构造 data class 返回 null(Status 须显式 stub);ITEM_KEY regex 大小写敏感;泛型 save P0 坑(activityRepo)。
+- 验证:单测绿;用户 gradle clean build 绿;8080/8081 bootRun 正常。
