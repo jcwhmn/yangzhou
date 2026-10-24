@@ -1,0 +1,25 @@
+# yangzhou 项目独用基础设施(YPJ-77,spec 0072)
+#
+# ── 外部共享依赖(不在本文件定义)──────────────────────────────
+# postgres:多项目共享实例,提供方 F:/code/docker-compose/postgresql
+#   地址 localhost:5432 · 库 yangzhou(日常)/ yangzhou_test(测试)
+#   刻意不在此定义:不能起第二个实例、不改端口、定义重复即双真相源
+#
+# 本文件只定义 yangzhou 独用服务;后续 redis/prometheus/grafana 按需加在下方。
+services:
+  rustfs:
+    image: rustfs/rustfs:1.0.3
+    container_name: rustfs
+    restart: unless-stopped
+    environment:
+      RUSTFS_ACCESS_KEY: rustfsadmin
+      RUSTFS_SECRET_KEY: rustfsadmin
+    ports:
+      - "9000:9000" # S3 兼容 API(yangzhou 附件存储)
+      - "9001:9001" # web 控制台
+    volumes:
+      - rustfs_data:/data
+      - rustfs_logs:/logs
+volumes:
+  rustfs_data:
+  rustfs_logs:
