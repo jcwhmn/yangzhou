@@ -32,3 +32,9 @@ YPJ-71 只平移了 main 侧;test 侧目录/包声明仍停在 `yangzhou.api.<sl
 |---|---|---|
 | TC1 | `gradle build --no-daemon`(单测) | 全绿 |
 | TC2 | `gradle integrationTest --rerun` | 全绿 |
+
+
+## As-built(2026-10-24,PR #136 合入 4023241)
+
+- 比设计更小:package 声明 YPJ-71 批量替换时已改为 `business.*`,本票实际只挪目录 + 3 个 config 测试类归位(security/error/general)。
+- 验证:gradle build(单测)绿;integrationTest --rerun 全量绿。
