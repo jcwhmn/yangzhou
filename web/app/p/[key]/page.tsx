@@ -29,6 +29,8 @@ import type { Signal } from "@/components/Verdict";
 type Status = { statusId: string; name: string; icon: string | null; isStart: boolean; isFinal: boolean; position: number };
 type Item = {
   itemId: string;
+  parentItemId?: string | null;
+  parentNumber?: string | null;
   number: string;
   title: string;
   status: string;
@@ -309,6 +311,13 @@ export default function BoardPage() {
                       <CardContent sx={{ py: 1.5, "&:last-child": { pb: 1.5 } }}>
                         <Stack spacing={0.5}>
                           <Stack direction="row" spacing={1} alignItems="center">
+                            {it.parentNumber && (
+                              <Link href={`/p/${key}/i/${it.parentItemId}`} style={{ textDecoration: "none" }}>
+                                <Typography variant="caption" color="primary" sx={{ whiteSpace: "nowrap" }}>
+                                  {it.parentNumber} ›
+                                </Typography>
+                              </Link>
+                            )}
                             <Chip label={it.number} size="small" variant="outlined" />
                             {it.feasSignal && it.feasSignal !== "GREEN" && (
                               <Chip

@@ -23,6 +23,7 @@ import { AssignPopover } from "@/components/AssignPopover";
 
 type Item = {
   itemId: string;
+  parentNumber?: string | null;
   number: string;
   title: string;
   status: string;
@@ -101,7 +102,7 @@ export default function BacklogPage() {
                 <TableRow key={it.itemId} hover>
                   <TableCell>
                     <Link href={`/p/${key}/i/${it.itemId}?from=backlog`}>
-                      <Typography variant="body2" sx={{ whiteSpace: "nowrap" }}>{it.number}</Typography>
+                      <Typography variant="body2" sx={{ whiteSpace: "nowrap" }}>{(it.parentNumber ? it.parentNumber + " › " : "") + it.number}</Typography>
                     </Link>
                   </TableCell>
                   <TableCell>
