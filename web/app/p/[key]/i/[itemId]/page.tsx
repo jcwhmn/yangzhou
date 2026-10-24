@@ -188,6 +188,8 @@ export default function ItemDetailPage() {
   const [depAddOpen, setDepAddOpen] = useState(false);
   const [checklist, setChecklist] = useState<Checklist | null>(null);
   const [newCheckText, setNewCheckText] = useState("");
+  const [subitems, setSubitems] = useState<Item[] | null>(null);
+  const [newSubTitle, setNewSubTitle] = useState("");
   const [tab, setTab] = useState(0);
   const [back, setBack] = useState(() => resolveBack(null, key));
 
@@ -230,9 +232,35 @@ export default function ItemDetailPage() {
       .catch(() => {});
   }, [key, itemId]);
 
+  // YPJ-84:子条目 = 直接 children,复用全量列表客户端过滤(不加后端端点,spec 0071)
+  const loadSubitems = useCallback(async () => {
+    if (!itemId) return;
+    try {
+      const list = await api<Item[]>(`/api/projects/${key}/items`);
+      setSubitems(list.filter((i) => i.parentItemId === itemId));
+    } catch {
+      // 同依赖区:页签内列表,加载失败静默
+    }
+  }, [key, itemId]);
+
   useEffect(() => {
     load().catch((e) => setError(e.message));
-  }, [load]);
+    loadSubitems();
+  }, [load, loadSubitems]);
+
+  async function addSubitem() {
+    if (!newSubTitle.trim()) return;
+    try {
+      await api(`/api/projects/${key}/items`, {
+        method: "POST",
+        body: JSON.stringify({ title: newSubTitle.trim(), parentItemId: itemId }),
+      });
+      setNewSubTitle("");
+      await loadSubitems();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "创建失败");
+    }
+  }
 
   const flashSaved = () => {
     setSaved(true);
@@ -662,7 +690,7 @@ export default function ItemDetailPage() {
         </Box>
       )}
 
-      {/* 七区块横向页签:评论/日志/判定/需求/依赖+清单/工时/GitHub,顺序即昨日所定(YPJ-11;恢复 YPJ-6 曾一度去页签的形态) */}
+      {/* 八区块横向页签:评论/日志/判定/需求/子条目/依赖+清单/工时/GitHub(子条目 YPJ-84 独立成页签,排在依赖+清单之前) */}
 
       {tab === 3 && (
       <Box>
@@ -695,6 +723,43 @@ export default function ItemDetailPage() {
       />
 
       {tab === 4 && (
+        <Box>
+          <Typography variant="h6" sx={{ mb: 1 }}>
+            子条目
+          </Typography>
+          {(subitems ?? []).length === 0 ? (
+            <Typography variant="caption" color="text.secondary">
+              (无子条目)
+            </Typography>
+          ) : (
+            <Stack spacing={0.5}>
+              {(subitems ?? []).map((s) => (
+                <Stack key={s.itemId} direction="row" spacing={1} alignItems="center">
+                  <Chip size="small" variant="outlined" label={s.number} />
+                  <Link href={`/p/${key}/i/${s.itemId}`}>
+                    <Typography variant="body2" noWrap sx={{ maxWidth: 360 }}>{s.title}</Typography>
+                  </Link>
+                  <Chip size="small" label={s.status} color={s.overdue ? "error" : "default"} />
+                </Stack>
+              ))}
+            </Stack>
+          )}
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
+            <TextField
+              size="small"
+              placeholder="加一个子条目…"
+              value={newSubTitle}
+              onChange={(e) => setNewSubTitle(e.target.value)}
+              sx={{ width: 300 }}
+            />
+            <Button size="small" variant="outlined" onClick={addSubitem} disabled={!newSubTitle.trim()}>
+              添加
+            </Button>
+          </Stack>
+        </Box>
+      )}
+
+      {tab === 5 && (
         <>
       <Box>
         <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
@@ -762,7 +827,7 @@ export default function ItemDetailPage() {
         </>
       )}
 
-      {tab === 5 && (
+      {tab === 6 && (
       <Box>
         <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
           <Typography variant="h6">{t.time.section}</Typography>
@@ -851,7 +916,7 @@ export default function ItemDetailPage() {
       </Box>
       )}
 
-      {tab === 6 && (
+      {tab === 7 && (
       <Box>
         <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
           <Typography variant="h6">{t.gh.gitRefs}</Typography>
