@@ -602,6 +602,42 @@ export default function ItemDetailPage() {
         </Stack>
       </Stack>
 
+      {/* 子条目:主页面直排区块,置于页签栏上方(YPJ-84;核心功能不做页签,2026-10-24 用户拍板) */}
+      <Box sx={{ mt: 3 }}>
+        <Typography variant="h6" sx={{ mb: 1 }}>
+          子条目
+        </Typography>
+        {(subitems ?? []).length === 0 ? (
+          <Typography variant="caption" color="text.secondary">
+            (无子条目)
+          </Typography>
+        ) : (
+          <Stack spacing={0.5}>
+            {(subitems ?? []).map((s) => (
+              <Stack key={s.itemId} direction="row" spacing={1} alignItems="center">
+                <Chip size="small" variant="outlined" label={s.number} />
+                <Link href={`/p/${key}/i/${s.itemId}`}>
+                  <Typography variant="body2" noWrap sx={{ maxWidth: 360 }}>{s.title}</Typography>
+                </Link>
+                <Chip size="small" label={s.status} color={s.overdue ? "error" : "default"} />
+              </Stack>
+            ))}
+          </Stack>
+        )}
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
+          <TextField
+            size="small"
+            placeholder="加一个子条目…"
+            value={newSubTitle}
+            onChange={(e) => setNewSubTitle(e.target.value)}
+            sx={{ width: 300 }}
+          />
+          <Button size="small" variant="outlined" onClick={addSubitem} disabled={!newSubTitle.trim()}>
+            添加
+          </Button>
+        </Stack>
+      </Box>
+
       <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="scrollable" sx={{ mt: 3, mb: 2, minHeight: 32 }}>
         {t.item.detailTabs.map((label) => (
           <Tab key={label} label={label} sx={{ minHeight: 32, py: 0.5 }} />
@@ -690,7 +726,7 @@ export default function ItemDetailPage() {
         </Box>
       )}
 
-      {/* 八区块横向页签:评论/日志/判定/需求/子条目/依赖+清单/工时/GitHub(子条目 YPJ-84 独立成页签,排在依赖+清单之前) */}
+      {/* 七区块横向页签:评论/日志/判定/需求/依赖+清单/工时/GitHub(子条目为主页面直排区块,不在页签内,YPJ-84) */}
 
       {tab === 3 && (
       <Box>
@@ -723,43 +759,6 @@ export default function ItemDetailPage() {
       />
 
       {tab === 4 && (
-        <Box>
-          <Typography variant="h6" sx={{ mb: 1 }}>
-            子条目
-          </Typography>
-          {(subitems ?? []).length === 0 ? (
-            <Typography variant="caption" color="text.secondary">
-              (无子条目)
-            </Typography>
-          ) : (
-            <Stack spacing={0.5}>
-              {(subitems ?? []).map((s) => (
-                <Stack key={s.itemId} direction="row" spacing={1} alignItems="center">
-                  <Chip size="small" variant="outlined" label={s.number} />
-                  <Link href={`/p/${key}/i/${s.itemId}`}>
-                    <Typography variant="body2" noWrap sx={{ maxWidth: 360 }}>{s.title}</Typography>
-                  </Link>
-                  <Chip size="small" label={s.status} color={s.overdue ? "error" : "default"} />
-                </Stack>
-              ))}
-            </Stack>
-          )}
-          <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
-            <TextField
-              size="small"
-              placeholder="加一个子条目…"
-              value={newSubTitle}
-              onChange={(e) => setNewSubTitle(e.target.value)}
-              sx={{ width: 300 }}
-            />
-            <Button size="small" variant="outlined" onClick={addSubitem} disabled={!newSubTitle.trim()}>
-              添加
-            </Button>
-          </Stack>
-        </Box>
-      )}
-
-      {tab === 5 && (
         <>
       <Box>
         <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
@@ -827,7 +826,7 @@ export default function ItemDetailPage() {
         </>
       )}
 
-      {tab === 6 && (
+      {tab === 5 && (
       <Box>
         <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
           <Typography variant="h6">{t.time.section}</Typography>
@@ -916,7 +915,7 @@ export default function ItemDetailPage() {
       </Box>
       )}
 
-      {tab === 7 && (
+      {tab === 6 && (
       <Box>
         <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
           <Typography variant="h6">{t.gh.gitRefs}</Typography>
