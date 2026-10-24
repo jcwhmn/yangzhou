@@ -50,6 +50,7 @@ export default function LoginPage() {
               label={t.login.username}
               value={username}
               onChange={(e) => setUsername(e.target.value)}
+              InputLabelProps={{ shrink: true }}
               autoFocus
               required
             />
@@ -58,6 +59,7 @@ export default function LoginPage() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              InputLabelProps={{ shrink: true }}
               required
             />
             {error && (
