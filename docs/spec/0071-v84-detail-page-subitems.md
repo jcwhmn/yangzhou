@@ -46,7 +46,7 @@
 
 ## 5. 增量(2026-10-24 三次拍板:父条目链接)
 
-- 详情页:头部编号 Chip 前加父编号 Chip(outlined/clickable,链接父详情);数据用 get() 已有的 parentNumber/parentItemId,零后端改动
+- 详情页:头部编号 Chip 前加父编号前缀链接(body2/primary,`YPJ-38 ›` 形态,与列表页一致;初版 outlined Chip 双 chip 并排被用户质疑易混,改为前缀链接保层级方向)——数据用 get() 已有的 parentNumber/parentItemId,零后端改动
 - 看板卡片:编号 Chip 前加父编号 Link(caption/primary);页面 Item 类型补 parentItemId/parentNumber(看板数据源走 ItemDto,字段已在)
 - 否决:父标题上卡片/详情——自身标题已占主要视觉,active-sprint 过滤下父条目可能不在看板数据里,点链接即达(YAGNI)
 - 手测:开 YPJ-80 详情 → 头部见 YPJ-38 chip,点击达 YPJ-38;看板 YPJ-80 卡片编号前见 YPJ-38 › 链接

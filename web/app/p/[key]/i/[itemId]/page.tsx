@@ -483,14 +483,11 @@ export default function ItemDetailPage() {
       </Link>
       <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
         {item.parentNumber && (
-          <Chip
-            size="small"
-            variant="outlined"
-            label={item.parentNumber}
-            component={Link}
-            href={`/p/${key}/i/${item.parentItemId}`}
-            clickable
-          />
+          <Link href={`/p/${key}/i/${item.parentItemId}`} style={{ textDecoration: "none" }}>
+            <Typography variant="body2" color="primary" sx={{ whiteSpace: "nowrap" }}>
+              {item.parentNumber} ›
+            </Typography>
+          </Link>
         )}
         <Chip label={item.number} />
         {feasibility && <SignalChip signal={feasibility.signal} />}
