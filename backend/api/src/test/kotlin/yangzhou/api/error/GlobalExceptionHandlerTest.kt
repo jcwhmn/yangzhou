@@ -1,4 +1,4 @@
-package yangzhou.api.config
+package yangzhou.api.error
 
 import yangzhou.api.error.GlobalExceptionHandler
 

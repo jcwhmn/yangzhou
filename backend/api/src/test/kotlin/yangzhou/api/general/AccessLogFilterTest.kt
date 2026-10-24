@@ -1,4 +1,4 @@
-package yangzhou.api.config
+package yangzhou.api.general
 
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith

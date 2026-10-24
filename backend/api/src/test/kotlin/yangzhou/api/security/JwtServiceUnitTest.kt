@@ -1,4 +1,4 @@
-package yangzhou.api.config
+package yangzhou.api.security
 
 import yangzhou.api.security.JwtService
 
