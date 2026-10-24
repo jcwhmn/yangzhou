@@ -86,6 +86,12 @@ export default function OverviewPage() {
     load();
   }, [load]);
 
+  // YPJ-90:CLI/他端建 sprint 后本页不刷新 → 照看板页 30s 轮询
+  useEffect(() => {
+    const t = setInterval(() => load(), 30000);
+    return () => clearInterval(t);
+  }, [load]);
+
   const isFinal = (s: string) => statuses.find((st) => st.name === s)?.isFinal === true;
   const mine = items.filter((i) => i.assignee !== null && i.assignee === me && !isFinal(i.status));
   const risks = items.filter((i) => i.overdue || i.blocked);
