@@ -136,6 +136,7 @@ interface ProjectRepoRepository : CrudRepository<ProjectRepo, Long> {
     fun findByProjectIdAndRepo(projectId: Long, repo: String): ProjectRepo?
     fun findByObjectId(objectId: UUID): ProjectRepo?
     fun existsByProjectIdAndRepo(projectId: Long, repo: String): Boolean
+    fun findByRepo(repo: String): List<ProjectRepo>
 }
 
 interface ItemGitRefRepository : CrudRepository<ItemGitRef, Long> {
