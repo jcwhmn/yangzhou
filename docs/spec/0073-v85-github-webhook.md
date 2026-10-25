@@ -70,4 +70,5 @@ POST /api/github/webhook
   - `ProjectRepoRepository` 新增派生查询 `findByRepo(repo): List<ProjectRepo>`(无自定义 SQL,按测试规矩不另写 repository 集成测试)
 - 测试:单测 `WebhookSignatureTest`(4 例)+ 集成 `GithubWebhookApiTest`(5 例:403×2 / 200 ignored×2 / 202×1;202 用例不配 PAT,不触外网)
 - `gradle build` 绿;`api.http` 第 12 节按序号新增正例 + 负例区 2 条
+- 追加(手测实锤):GitHub webhook 10s 超时,syncRepo 全量拉取会超 → 改为控制器内单线程 daemon executor 后台执行,命中即回 202;spec 1 节「同步调用可接受」假设作废
 - 待办(非本票):8081/8080 启动均需 env `YANGZHOU_GITHUB_WEBHOOK_SECRET`;GitHub 仓库侧 webhook 由用户经 `gh api` 配置(funnel URL + secret,events: push/pull_request)
