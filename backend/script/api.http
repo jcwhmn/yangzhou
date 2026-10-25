@@ -654,6 +654,31 @@ Content-Type: application/json
 %}
 
 
+### YPJ-85 webhook(匿名;签名 = sha256=hex(HMAC-SHA256(secret, rawBody)),secret 启动时 env 注入)
+# 正例:命中挂载仓(pkey 已挂 octo/r)→ 202 {"status":"accepted"};未配 PAT 也 202(仅 WARN 跳过同步)
+POST {{host}}/api/github/webhook
+X-GitHub-Event: push
+X-Hub-Signature-256: sha256=0000000000000000000000000000000000000000000000000000000000000000
+Content-Type: application/json
+
+{"repository":{"full_name":"octo/r"}}
+
+### [预期 403] 签名错/缺(未配 secret 或签名不符,一律 403)
+POST {{host}}/api/github/webhook
+X-GitHub-Event: push
+X-Hub-Signature-256: sha256=deadbeef
+Content-Type: application/json
+
+{"repository":{"full_name":"octo/r"}}
+
+### [预期 200] 忽略未知事件({"status":"ignored"};未知 repo 同样 200 ignored)
+POST {{host}}/api/github/webhook
+X-GitHub-Event: issues
+X-Hub-Signature-256: sha256=0000000000000000000000000000000000000000000000000000000000000000
+Content-Type: application/json
+
+{"repository":{"full_name":"octo/r"}}
+
 ### YPJ-39 建从票(供下方补挂;handler 存 itemId2)
 POST {{host}}/api/projects/{{pkey}}/items
 Authorization: Bearer {{token}}

@@ -66,7 +66,7 @@ class GithubSyncService(
         }
     }
 
-    private fun syncRepo(project: Project, repo: String, token: String) {
+    internal fun syncRepo(project: Project, repo: String, token: String) {
         for (name in gateway.listBranches(repo, token)) {
             val item = headItem(project, name) ?: continue
             if (gitRefs.findByRepoAndKindAndRef(repo, KIND_BRANCH, name).isNotEmpty()) continue
