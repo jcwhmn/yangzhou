@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 import tools.jackson.databind.ObjectMapper
+import java.util.concurrent.Executors
 import yangzhou.persistence.repository.ProjectRepoRepository
 import yangzhou.persistence.repository.ProjectRepository
 import yangzhou.persistence.repository.WorkspaceRepository
@@ -46,12 +47,17 @@ class GithubWebhookController(
             log.warn("webhook 命中挂载 {} 但 workspace 未配置 PAT,跳过同步", repo)
             return ResponseEntity.accepted().body(mapOf("status" to "accepted"))
         }
-        for (mount in mounts) {
-            val project = projects.findById(mount.projectId).orElse(null) ?: continue
-            try {
-                syncService.syncRepo(project, mount.repo, token)
-            } catch (e: Exception) {
-                log.warn("webhook 同步失败,等下轮兜底:{}:{}", mount.repo, e.message)
+        // GitHub webhook 10s 超时:syncRepo 全量拉 branches+PRs 可能超时 → 后台执行,立即 202
+        val targets = mounts.mapNotNull { m ->
+            projects.findById(m.projectId).orElse(null)?.let { m.repo to it }
+        }
+        executor.submit {
+            for ((r, project) in targets) {
+                try {
+                    syncService.syncRepo(project, r, token)
+                } catch (e: Exception) {
+                    log.warn("webhook 同步失败,等下轮兜底:{}:{}", r, e.message)
+                }
             }
         }
         return ResponseEntity.accepted().body(mapOf("status" to "accepted"))
@@ -59,5 +65,8 @@ class GithubWebhookController(
 
     companion object {
         private val EVENTS = setOf("push", "pull_request")
+        private val executor = Executors.newSingleThreadExecutor { r ->
+            Thread(r, "github-webhook-sync").apply { isDaemon = true }
+        }
     }
 }
