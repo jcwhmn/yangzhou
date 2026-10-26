@@ -39,7 +39,7 @@ docs/      adr/ · spec/ · architecture/(puml 类图) · requirement/(PRD) · p
 - 外科手术式改动,不顺手重构无关代码。
 - 最简可行实现,不加投机抽象。
 - 非平凡行为变更必须带测试。
-- 声称完成前跑通相关验证;后端以 `./gradlew build --no-daemon` 绿 + bootRun 能启动为准(临时端口验证,起后即停)。
+- 声称完成前跑通相关验证;后端以 `./gradlew build` + `./gradlew integrationTest` 绿 + bootRun 能启动为准(临时端口验证,起后即停;integrationTest 需 Docker,CI 兕底 nightly)。
 - 大输出/多命令优先 context-mode 批处理工具,Bash 仅琐碎命令。
 - `api` 模块:业务垂直切片收敛 `yangzhou.api.business.<slice>`(project / item / attribute / …,实体+DTO+service+controller 同包);非业务归位 `config`(装配)/ `security` / `general` / `error`(ADR-0005)。
 
@@ -73,7 +73,7 @@ docs/      adr/ · spec/ · architecture/(puml 类图) · requirement/(PRD) · p
 
 ## 测试
 
-写/改后端测试、新建迁移、动 AbstractApiTest、跑 gradle 验证 → **先读 skill `.agents/skills/backend-testing/SKILL.md`**(双轨/单元与集成边界/新表同步 cleanDatabase 清单/需求矩阵/Clock 注入/跑法)。速记硬规则:唯一 seam = REST API 黑盒,集成必须 extends `AbstractApiTest`;CI 只跑单元,集成 merge 前本人本地 `gradle integrationTest`(nightly 兜底)。
+写/改后端测试、新建迁移、动 AbstractApiTest、跑 gradle 验证 → **先读 skill `.agents/skills/backend-testing/SKILL.md`**(双轨/单元与集成边界/新表同步 cleanDatabase 清单/需求矩阵/Clock 注入/跑法)。速记硬规则:**单元 `src/test` 与集成 `src/integrationTest` 物理二分(YPJ-100/spec 0078),目录即边界**;唯一 seam = REST API 黑盒,集成必须 extends `AbstractApiTest`;CI 只跑单元,集成 merge 前本人本地 `gradle integrationTest`(nightly 兜底);`gradle build` 不跑集成(已与 check 解耦)。
 
 ## E2E(web/;Playwright,并行按用例隔离)
 
@@ -94,7 +94,7 @@ docs/      adr/ · spec/ · architecture/(puml 类图) · requirement/(PRD) · p
 
 ## 构建与运行
 
-- JDK 25(LTS)。后端在 `backend/`:`gradle build`(含测试)/ `gradle :domain:run`(引擎 Demo,输出与 prototype S1–S7 可比对)。
+- JDK 25(LTS)。后端在 `backend/`:`gradle build`(单元测试,不含集成)/ `gradle integrationTest`(集成,需 Docker)/ `gradle :domain:run`(引擎 Demo,输出与 prototype S1–S7 可比对)。
 - `./gradlew` 同效;首次需下载发行包,国内网络慢属已知,用本地 gradle 即可。
 - CI(GitHub Actions):`backend.yml` 跑 `gradle test`(纯单元,免 Docker;spec 0014);`nightly.yml` 每日全量兜底(含集成,红了必修);`e2e.yml` web/backend 变更起 bootRun + Playwright 整跑 E2E
 - 本机开发库:`yangzhou`(外部共享 postgres,已建);bootRun 用 `gradle :api:bootRun`;rustfs 起停 `script/dev-infra.ps1`。

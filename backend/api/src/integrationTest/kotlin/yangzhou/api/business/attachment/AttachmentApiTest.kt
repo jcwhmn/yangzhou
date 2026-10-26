@@ -1,11 +1,8 @@
 package yangzhou.api.business.attachment
 
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.context.TestConfiguration
 import org.junit.jupiter.api.BeforeEach
-import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
-import org.springframework.context.annotation.Primary
 import org.springframework.test.web.servlet.client.RestTestClient
 import yangzhou.api.AbstractApiTest
 import java.util.UUID
@@ -13,34 +10,7 @@ import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 
-class FakeObjectStorage : ObjectStorage {
-    val puts = mutableListOf<Pair<String, String>>() // key to contentType
-    val gets = mutableListOf<String>()
-    val deletes = mutableListOf<String>()
-
-    override fun presignPut(key: String, contentType: String): String {
-        puts += key to contentType
-        return "http://fake/put/$key"
-    }
-
-    override fun presignGet(key: String): String {
-        gets += key
-        return "http://fake/get/$key"
-    }
-
-    override fun delete(key: String) {
-        deletes += key
-    }
-}
-
-@TestConfiguration(proxyBeanMethods = false)
-class FakeStorageConfig {
-    @Bean
-    @Primary
-    fun fakeObjectStorage(): FakeObjectStorage = FakeObjectStorage()
-}
-
-/** YPJ-50:附件端点黑盒(fake storage seam + Testcontainers 真 DB;presign 参数断言在 fake)。 */
+/** YPJ-50:附件端点黑盒(fake storage seam + Testcontainers 真 DB;presign 参数断言在 fake)。fake 在单测侧 FakeObjectStorage.kt,集成 classpath 复用。 */
 @Import(FakeStorageConfig::class)
 class AttachmentApiTest : AbstractApiTest() {
 

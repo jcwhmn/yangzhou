@@ -2,7 +2,6 @@ package yangzhou.api.business.view
 
 import com.fasterxml.jackson.databind.JsonNode
 import org.springframework.test.web.servlet.client.RestTestClient
-import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import yangzhou.api.AbstractApiTest
 import java.util.UUID
@@ -10,7 +9,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /** YPJ-47 视图配置(spec 0045):CRUD 主链 + 同名 409 + 非法 JSON 400 + 他项目视图 404。 */
-@Tag("integration")
 class ViewsApiTest : AbstractApiTest() {
 
     private lateinit var authed: RestTestClient

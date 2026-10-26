@@ -5,6 +5,19 @@ plugins {
     id("io.spring.dependency-management")
 }
 
+sourceSets {
+    create("integrationTest") {
+        compileClasspath += sourceSets.main.get().output + sourceSets["test"].output
+        runtimeClasspath += sourceSets.main.get().output + sourceSets["test"].output
+    }
+}
+val integrationTestImplementation by configurations.getting {
+    extendsFrom(configurations.testImplementation.get())
+}
+val integrationTestRuntimeOnly by configurations.getting {
+    extendsFrom(configurations.testRuntimeOnly.get(), configurations.runtimeOnly.get())
+}
+
 dependencies {
     implementation(project(":domain"))
     implementation(project(":persistence"))
@@ -42,9 +55,8 @@ tasks.withType<Test> {
 tasks.test {
     // YPJ-70: 单测类级并行(无 DB/共享态,安全);fork 数 = 半数核夹 2..4,更多只费 JVM 启动
     maxParallelForks = maxOf(2, minOf(4, Runtime.getRuntime().availableProcessors() / 2))
-    useJUnitPlatform {
-        excludeTags("integration")
-    }
+    // YPJ-100: src/test 已物理二分为纯单元,不再需要 tag 过滤(spec 0078)
+    useJUnitPlatform()
     testLogging {
         events("failed")
         exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
@@ -54,20 +66,16 @@ tasks.test {
 
 val integrationTest by tasks.registering(Test::class) {
     group = "verification"
-    description = "Integration tests (Spring Boot + Testcontainers, needs Docker; spec 0014)"
-    testClassesDirs = sourceSets["test"].output.classesDirs
-    classpath = sourceSets["test"].runtimeClasspath
-    useJUnitPlatform {
-        includeTags("integration")
-    }
+    description = "Integration tests (Spring Boot + Testcontainers, needs Docker; spec 0014/0078)"
+    testClassesDirs = sourceSets["integrationTest"].output.classesDirs
+    classpath = sourceSets["integrationTest"].runtimeClasspath
+    useJUnitPlatform()
     shouldRunAfter(tasks.test)
+    // 集成串行:共享 Testcontainers 容器 + 清表节奏,不并行
+    systemProperty("junit.jupiter.execution.parallel.enabled", "false")
     testLogging {
         events("failed")
         exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
         showStandardStreams = true
     }
-}
-
-tasks.named("check") {
-    dependsOn(integrationTest)
 }
