@@ -63,6 +63,8 @@ permissions: { contents: write }
 3. `gradle :api:test` 全绿(VersionController 单测:有值/占位兜底)
 4. workflow 验证:PR 合并后 Actions 出现 date-tag run;`git tag -l "v2026*"` 见新 tag;同日二次 merge 得 `.2` 后缀(workflow_dispatch 可先手动验证)
 
-## 4. As-built(完工后补)
+## 4. As-built(2026-10-26,PR 待审)
 
-- TODO
+- 偏离 spec 一处:`/api/version` 在 SecurityConfig **permitAll**(spec 未提)——版本号要在登录页也可见,走带 auth 的 api() 会触发 401 跳转死循环风险;版本号非敏感,直接放行。
+- Gradle 注入实现细节:`expand` 占位符是 `${version}`(非 `__VERSION__`);`git describe --match "v*"` 只认日期 tag(yz-v* 不算);configuration cache 下 `filesMatching` lambda 不得捕获脚本实例(顶层 val 需局部化),踩了两坑记录在此。
+- 验证实测:单元/集成/全 build 全绿;本仓尚无 v* tag → version.txt 当前为 `dev`,首个 date-tag 合入后即显示日期版本;web tsc 无新增报错(基线 5 个 e2e 历史报错与本票无关)。
