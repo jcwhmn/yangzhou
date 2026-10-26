@@ -6,15 +6,15 @@ description: yangzhou 后端测试规矩(Kotlin/Spring + Testcontainers)。写/�
 # Backend Testing
 
 后端测试分两个世界,规矩不同;混用是本仓坏测试的第一来源。机制真相源是
-`backend/api/src/test/kotlin/yangzhou/api/AbstractApiTest.kt`,本文是规矩的真相源;
+`backend/api/src/integrationTest/kotlin/yangzhou/api/AbstractApiTest.kt`,本文是规矩的真相源;
 AGENTS.md 只留指针与速记。AGENTS「过程」节的两条总则在此重申为地基:
 非平凡行为变更必须带测试;声称完成前跑通相关验证。
 
-## 双轨(2026-10-09 定)
+## 双轨(2026-10-09 定;YPJ-100/spec 0078 起物理二分)
 
 | | 单元测试 | 集成测试 |
 |---|-----------|------------------|
-| 位置 | `src/test/kotlin/...` | 同目录,靠基类 `@Tag("integration")` 归轨 |
+| 位置 | `src/test/kotlin/...` | `src/integrationTest/kotlin/...`(物理二分,目录即边界;越界引用编译期报错) |
 | CI 跑? | **是**——`gradle test`(免 Docker) | 否——merge 前本人本地 `gradle integrationTest`;nightly workflow 全量兜底,红了必修 |
 | Spring? | 永不起 | 全量 `@SpringBootTest`(经 AbstractApiTest) |
 | 数据库? | 不碰 | Testcontainers 真 Postgres |
@@ -33,7 +33,7 @@ AGENTS.md 只留指针与速记。AGENTS「过程」节的两条总则在此重�
 目标:service+repository+Flyway+PostgreSQL+HTTP 全链路黑盒。**必须 extends
 AbstractApiTest**,基类给的不要自造:
 
-- `@Tag("integration")` 归轨 + Testcontainers 真 Postgres(容器管理全在基类)。
+- Testcontainers 真 Postgres(容器管理全在基类)。
 - `@BeforeEach cleanDatabase()`——固定表清单按 FK 依赖序 delete,每测试起点全净。
 - `bootstrapAndAuth()`(引导工作区并返回已认证 RestTestClient)、
   `createProject(authed, key)`、`createItem(authed, key, title)` 等 helper。
@@ -78,7 +78,7 @@ flake 温床——本仓 e2e 的 globalSetup 清库就是历史教训的产物,�
 gradle test                                              # CI 同款,纯单元
 gradle integrationTest --tests "yangzhou.api.project.ProjectsApiTest"   # 单类,快反馈
 gradle integrationTest                                   # 全量,merge 前本人必跑
-gradle build --no-daemon                                 # DoD:声称完成前须绿
+gradle build --no-daemon                                 # 只含单元;DoD = build + integrationTest 双绿(YPJ-100 起 check 不再拖集成)
 ```
 
 集成测试起不来,先查 Docker(Testcontainers 依赖它),再查容器残留
