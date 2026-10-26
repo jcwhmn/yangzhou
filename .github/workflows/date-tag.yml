@@ -1,0 +1,36 @@
+name: date-tag
+
+# YPJ-101(spec 0079):main 每次合入自动打日期版本 tag vYYYY.MM.DD[.N]。
+# 仅做版本标记,不触发 CLI 发版(release-yz 走 yz-v* 前缀,互不干扰)。
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: date-tag
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Compute next date tag
+        id: tag
+        run: |
+          TODAY=$(date -u +%Y.%m.%d)
+          COUNT=$(git tag -l "v$TODAY" "v$TODAY.*" | wc -l)
+          if [ "$COUNT" -eq 0 ]; then TAG="v$TODAY"; else TAG="v$TODAY.$((COUNT+1))"; fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "date tag: $TAG"
+      - name: Create and push tag
+        run: |
+          git tag "${{ steps.tag.outputs.tag }}"
+          git push origin "${{ steps.tag.outputs.tag }}"

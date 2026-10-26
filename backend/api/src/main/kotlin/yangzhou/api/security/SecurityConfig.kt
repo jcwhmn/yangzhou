@@ -25,7 +25,7 @@ class SecurityConfig(
         .csrf { it.disable() }
         .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
         .authorizeHttpRequests {
-            it.requestMatchers("/api/auth/bootstrap", "/api/auth/login", "/api/github/webhook", "/error", "/scalar/**", "/v3/api-docs/**").permitAll()
+            it.requestMatchers("/api/auth/bootstrap", "/api/auth/login", "/api/github/webhook", "/api/version", "/error", "/scalar/**", "/v3/api-docs/**").permitAll()
                 .anyRequest().authenticated()
         }
         .addFilterBefore(accessLogFilter, org.springframework.security.web.authentication.logout.LogoutFilter::class.java)

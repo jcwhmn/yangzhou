@@ -1235,3 +1235,7 @@ Content-Type: application/json
   "repo": "{{attachRepo}}",
   "ref": "1001"
 }
+
+### 版本号(YPJ-101;构建期 git tag 注入,无 tag=dev)
+GET {{host}}/api/version
+Authorization: Bearer {{token}}

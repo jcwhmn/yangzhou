@@ -441,4 +441,8 @@ export const t = {
       completed: "已完成",
     },
   },
+  footer: {
+    copyright: "© Jiang Chuanwei",
+    versionFallback: "dev",
+  },
 };
