@@ -402,6 +402,23 @@ data class ProjectWorkflowRule(
     var updatedBy: Long? = null,
 )
 
+@Table("item_attribute")
+data class ItemAttribute(
+    @Id val id: Long? = null,
+    val objectId: UUID = UUID.randomUUID(),
+    val itemId: Long,
+    val attributeDefinitionId: Long,
+    val value: String,
+    @CreatedDate
+    var createdAt: Instant = Instant.now(),
+    @LastModifiedDate
+    var updatedAt: Instant = Instant.now(),
+    @CreatedBy
+    var createdBy: Long? = null,
+    @LastModifiedBy
+    var updatedBy: Long? = null,
+)
+
 @Table("requirement")
 data class Requirement(
     @Id val id: Long? = null,

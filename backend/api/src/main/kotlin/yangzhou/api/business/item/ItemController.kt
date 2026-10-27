@@ -55,6 +55,15 @@ class ItemController(
         request.requirements.map { ItemService.RequirementDto(it.attribute.trim(), it.minLevel) },
     )
 
+    @PutMapping("/items/{itemId}/attributes")
+    fun replaceAttributes(
+        @PathVariable itemId: UUID,
+        @RequestBody request: ReplaceItemAttributesRequest,
+    ): ItemService.ItemDto = service.replaceAttributes(
+        itemId,
+        request.values.map { ItemService.ItemAttributeDto(it.attribute.trim(), it.value) },
+    )
+
     @PutMapping("/items/{itemId}/assignee")
     fun assign(
         @PathVariable itemId: UUID,

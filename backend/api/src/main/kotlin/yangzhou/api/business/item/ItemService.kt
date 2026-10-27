@@ -34,6 +34,7 @@ class ItemService(
     private val itemRepo: ItemRepository,
     private val statuses: StatusRepository,
     private val requirementRepo: RequirementRepository,
+    private val itemAttributes: yangzhou.persistence.repository.ItemAttributeRepository,
     private val definitions: AttributeDefinitionRepository,
     private val numbering: ItemNumberRepository,
     private val itemTree: ItemTreeRepository,
@@ -54,6 +55,7 @@ class ItemService(
 ) {
 
     data class RequirementDto(val attribute: String, val minLevel: Int?)
+    data class ItemAttributeDto(val attribute: String, val value: String)
     data class GitRefDto(val kind: String, val repo: String, val ref: String, val url: String?, val state: String?)
     data class ItemDto(
         val itemId: UUID,
@@ -67,6 +69,7 @@ class ItemService(
         val parentNumber: String? = null,
         val externalRef: String?,
         val requirements: List<RequirementDto>,
+        val attributes: List<ItemAttributeDto> = emptyList(),
         val gitRefs: List<GitRefDto> = emptyList(),
         val assigneeColor: String? = null,
         val dueSoon: Boolean = false,
@@ -153,7 +156,14 @@ class ItemService(
         val visible = if (backlogOnly) projectItems.filter { it.statusObjectId !in ctx.finalIds && it.id !in ctx.currentSprint } else projectItems
         // YPJ-84 决策 2:父前缀标识(同项目全量行内可解析,直接查表)
         val numberById = projectItems.associate { it.objectId to "${project.key}-${it.number}" }
-        return visible.map { ctx.toDto(it).copy(parentNumber = it.parentObjectId?.let(numberById::get)) }
+        val attrsByItem = itemAttributes.findByItemIdIn(visible.mapNotNull { it.id }).groupBy { it.itemId }
+        val attrNames = definitions.findAllById(attrsByItem.values.flatten().map { it.attributeDefinitionId }).associate { it.id!! to it.name }
+        return visible.map {
+            ctx.toDto(it).copy(
+                parentNumber = it.parentObjectId?.let(numberById::get),
+                attributes = attrsByItem[it.id].orEmpty().map { a -> ItemAttributeDto(attrNames[a.attributeDefinitionId] ?: "?", a.value) },
+            )
+        }
     }
 
     fun get(itemId: UUID): ItemDto {
@@ -167,6 +177,7 @@ class ItemService(
             gitRefs = gitRefs.findByItemId(item.id!!).map {
                 GitRefDto(it.kind, it.repo, it.ref, it.url, it.state)
             },
+            attributes = toAttrDtos(itemAttributes.findByItemId(item.id!!)),
         )
     }
 
@@ -278,6 +289,43 @@ class ItemService(
         // YPJ-26:不单独先锁本 item 行——与并发重算的编号序扫描成环(40P01);信号由下方按编号序的扫全量覆盖
         feasibilityService.recomputeProjectSignal(project.id!!) // V9-S1
         return get(item.objectId)
+    }
+
+    /** item 自定义属性整表替换(spec 0082);仅 custom 词表;描述性,永不进匹配引擎。 */
+    @Transactional
+    fun replaceAttributes(itemId: UUID, values: List<ItemAttributeDto>): ItemDto {
+        val item = itemRepo.findByObjectId(itemId) ?: throw NotFoundException("item 不存在")
+        val project = projectOf(item.projectId)
+        val rowId = item.id!!
+        val resolved = resolveAttributes(project.workspaceId, values)
+        itemAttributes.deleteByItemId(rowId)
+        resolved.forEach { (defId, value) ->
+            itemAttributes.save(yangzhou.persistence.ItemAttribute(itemId = rowId, attributeDefinitionId = defId, value = value))
+        }
+        val summary = values.joinToString(";") { it.attribute + "=" + it.value }
+        logActivity(rowId, "attribute_changed", null, summary.ifEmpty { "(清空)" }, actorId())
+        return get(item.objectId)
+    }
+
+    private fun toAttrDtos(rows: List<yangzhou.persistence.ItemAttribute>): List<ItemAttributeDto> {
+        if (rows.isEmpty()) return emptyList()
+        val names = definitions.findAllById(rows.map { it.attributeDefinitionId }).associate { it.id!! to it.name }
+        return rows.map { ItemAttributeDto(names[it.attributeDefinitionId] ?: "?", it.value) }
+    }
+
+    private fun resolveAttributes(workspaceId: Long, values: List<ItemAttributeDto>): List<Pair<Long, String>> {
+        val seen = HashSet<String>()
+        return values.map { v ->
+            val name = v.attribute.trim()
+            if (!seen.add(name)) throw BadRequestException("item 属性重复:$name")
+            val value = v.value.trim()
+            if (value.isEmpty()) throw BadRequestException("属性值不能为空:$name")
+            if (value.length > 500) throw BadRequestException("属性值超长(≤500):$name")
+            val def = definitions.findByWorkspaceIdAndName(workspaceId, name)
+                ?: throw NotFoundException("词表中没有属性:$name(先建 custom 类属性)")
+            if (def.kind != "custom") throw BadRequestException("仅 custom 类词表可挂 item 属性:${def.name}")
+            def.id!! to value
+        }
     }
 
     /** 指派/取消(assigneeItemId=null 取消);成员不存在 404;池外指派 409(0047:空池=无人可指派)。 */
@@ -495,6 +543,10 @@ data class CreateItemRequest(
 data class AssigneeRequest(val assigneeItemId: UUID? = null)
 
 data class ReplaceRequirementsRequest(val requirements: List<RequirementInput> = emptyList())
+
+data class ReplaceItemAttributesRequest(val values: List<AttributeValueInput> = emptyList())
+
+data class AttributeValueInput(val attribute: String, val value: String)
 
 data class UpdateItemRequest(
     val title: String? = null,

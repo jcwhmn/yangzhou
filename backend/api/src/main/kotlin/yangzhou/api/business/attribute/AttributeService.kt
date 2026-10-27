@@ -111,13 +111,13 @@ class AttributeService(
         try {
             definitions.delete(entity)
         } catch (_: DataIntegrityViolationException) {
-            throw ConflictException("属性仍被能力或需求引用,无法删除")
+            throw ConflictException("属性仍被能力、需求或 item 属性引用,无法删除")
         }
     }
 
     private fun validateKind(kind: String) {
-        if (kind !in setOf("skill", "label", "category")) {
-            throw BadRequestException("kind 只能是 skill、label 或 category:$kind")
+        if (kind !in setOf("skill", "label", "category", "custom")) {
+            throw BadRequestException("kind 只能是 skill、label、category 或 custom:$kind")
         }
     }
 
