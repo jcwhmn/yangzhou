@@ -47,7 +47,9 @@ class SprintServiceUnitTest {
 
     private val savedRows = mutableListOf<ItemGroupMember>()
 
+    private val leaderGuard = mockk<yangzhou.api.guard.LeaderGuard>(relaxed = true)
     private val service = SprintService(
+        leaderGuard,
         projects, groups, memberships, itemRepo, itemService, memberHistory, clock, groupTypes,
     )
 

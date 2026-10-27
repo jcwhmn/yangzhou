@@ -12,6 +12,7 @@ import yangzhou.persistence.repository.ItemGroupMemberHistoryRepository
 import yangzhou.persistence.repository.ItemGroupMemberRepository
 import yangzhou.persistence.repository.ItemGroupRepository
 import yangzhou.persistence.repository.ItemGroupTypeRepository
+import yangzhou.api.guard.LeaderGuard
 import yangzhou.persistence.repository.ProjectRepository
 import java.time.Instant
 import java.time.LocalDate
@@ -24,6 +25,7 @@ import java.util.UUID
  */
 @Service
 class GroupTypeService(
+    private val leaderGuard: LeaderGuard,
     private val projects: ProjectRepository,
     private val types: ItemGroupTypeRepository,
     private val groups: ItemGroupRepository,
@@ -100,6 +102,7 @@ class GroupTypeService(
 
     @Transactional
     fun createType(key: String, request: CreateGroupTypeRequest): GroupTypeDto {
+        leaderGuard.requireLeader(key)
         val typeKey = request.typeKey?.trim().takeUnless { it.isNullOrEmpty() }
             ?: throw BadRequestException("typeKey 必填")
         if (!Regex("[a-z][a-z0-9-]{1,19}").matches(typeKey)) {
@@ -116,6 +119,7 @@ class GroupTypeService(
 
     @Transactional
     fun updateType(key: String, typeKey: String, request: UpdateGroupTypeRequest): GroupTypeDto {
+        leaderGuard.requireLeader(key)
         val t = types.findByProjectIdAndTypeKey(project(key).id!!, typeKey)
             ?: throw NotFoundException("group 类型不存在:$typeKey")
         val name = request.name?.trim().takeUnless { it.isNullOrEmpty() }
@@ -126,6 +130,7 @@ class GroupTypeService(
     /** builtin 不可删;类型下仍有组即删除会丢组,409 拒绝(先删组或改类型)。 */
     @Transactional
     fun deleteType(key: String, typeKey: String) {
+        leaderGuard.requireLeader(key)
         val pid = project(key).id!!
         val t = types.findByProjectIdAndTypeKey(pid, typeKey)
             ?: throw NotFoundException("group 类型不存在:$typeKey")
@@ -147,6 +152,7 @@ class GroupTypeService(
 
     @Transactional
     fun createGroup(key: String, request: CreateGroupRequest): GroupDto {
+        leaderGuard.requireLeader(key)
         val typeKey = request.typeKey?.trim().takeUnless { it.isNullOrEmpty() }
             ?: throw BadRequestException("typeKey 必填")
         val t = customType(key, typeKey)
@@ -168,6 +174,7 @@ class GroupTypeService(
 
     @Transactional
     fun updateGroup(key: String, groupId: UUID, request: UpdateGroupRequest): GroupDto {
+        leaderGuard.requireLeader(key)
         val g = findGroup(key, groupId)
         val name = request.name?.trim()
         if (name != null && name.isEmpty()) throw BadRequestException("name 不能为空")
@@ -195,6 +202,7 @@ class GroupTypeService(
     /** 自定义组删除:membership 是展示性组织,级联删(含留痕行);release 的「成员即交付历史」语义不适用于自定义组。 */
     @Transactional
     fun deleteGroup(key: String, groupId: UUID) {
+        leaderGuard.requireLeader(key)
         val g = findGroup(key, groupId)
         val gid = g.id!!
         memberships.findByGroupId(gid).forEach { m ->

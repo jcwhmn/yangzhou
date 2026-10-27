@@ -12,6 +12,7 @@ import yangzhou.persistence.repository.ItemGroupMemberRepository
 import yangzhou.persistence.repository.ItemGroupMemberHistoryRepository
 import yangzhou.persistence.repository.ItemGroupRepository
 import yangzhou.persistence.repository.ItemRepository
+import yangzhou.api.guard.LeaderGuard
 import yangzhou.persistence.repository.ProjectRepository
 import java.time.Clock
 import java.time.Instant
@@ -25,6 +26,7 @@ import java.util.UUID
  */
 @Service
 class SprintService(
+    private val leaderGuard: LeaderGuard,
     private val projects: ProjectRepository,
     private val groups: ItemGroupRepository,
     private val memberships: ItemGroupMemberRepository,
@@ -84,6 +86,7 @@ class SprintService(
 
     @Transactional
     fun create(key: String, request: CreateSprintRequest): SprintDto {
+        leaderGuard.requireLeader(key)
         val name = request.name?.trim().takeUnless { it.isNullOrEmpty() } ?: throw BadRequestException("name 必填")
         val p = project(key)
         groupTypes.findByProjectIdAndTypeKey(p.id!!, "sprint") ?: throw ConflictException("项目缺少 sprint 类型")
@@ -102,6 +105,7 @@ class SprintService(
 
     @Transactional
     fun update(key: String, groupId: UUID, request: UpdateSprintRequest): SprintDto {
+        leaderGuard.requireLeader(key)
         val g = find(key, groupId)
         val name = request.name?.trim()
         if (name != null && name.isEmpty()) throw BadRequestException("name 不能为空")
@@ -129,6 +133,7 @@ class SprintService(
     /** 仅空 sprint 可删(裁决 6):有 membership 即历史/在途事实,删了就丢,409 拒绝。 */
     @Transactional
     fun delete(key: String, groupId: UUID) {
+        leaderGuard.requireLeader(key)
         val g = find(key, groupId)
         if (memberships.existsByGroupId(g.id!!)) throw ConflictException("sprint 非空,请先移出 items")
         groups.delete(g)

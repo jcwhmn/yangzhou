@@ -31,7 +31,8 @@ class GroupTypeServiceUnitTest {
     private val memberships = mockk<ItemGroupMemberRepository>(relaxed = true)
     private val memberHistory = mockk<ItemGroupMemberHistoryRepository>(relaxed = true)
 
-    private val service = GroupTypeService(projects, types, groups, memberships, memberHistory)
+    private val leaderGuard = mockk<yangzhou.api.guard.LeaderGuard>(relaxed = true)
+    private val service = GroupTypeService(leaderGuard, projects, types, groups, memberships, memberHistory)
 
     private val project = Project(workspaceId = 1L, key = "P", name = "P").let { it.copy(id = 7L) }
     private fun type(key: String, builtin: Boolean = false) =

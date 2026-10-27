@@ -25,7 +25,8 @@ class ProjectMemberServiceUnitTest {
     private val projects = mockk<ProjectRepository>(relaxed = true)
     private val members = mockk<MemberRepository>(relaxed = true)
     private val projectMembers = mockk<ProjectMemberRepository>(relaxed = true)
-    private val service = ProjectMemberService(projects, members, projectMembers)
+    private val leaderGuard = mockk<yangzhou.api.guard.LeaderGuard>(relaxed = true)
+    private val service = ProjectMemberService(leaderGuard, projects, members, projectMembers)
 
     private val project = Project(id = 1L, workspaceId = 9L, key = "CHE", name = "CHE")
     private val member = Member(

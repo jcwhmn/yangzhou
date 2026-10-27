@@ -13,6 +13,7 @@ import yangzhou.persistence.repository.ItemGroupMemberRepository
 import yangzhou.persistence.repository.ItemGroupRepository
 import yangzhou.persistence.repository.ItemRepository
 import yangzhou.persistence.repository.MilestoneRepository
+import yangzhou.api.guard.LeaderGuard
 import yangzhou.persistence.repository.ProjectRepository
 import jakarta.validation.constraints.NotBlank
 import java.time.Clock
@@ -39,6 +40,7 @@ data class UpdateReleaseRequest(
 
 @Service
 class ReleaseService(
+    private val leaderGuard: LeaderGuard,
     private val projects: ProjectRepository,
     private val groups: ItemGroupRepository,
     private val groupMembers: ItemGroupMemberRepository,
@@ -111,6 +113,7 @@ class ReleaseService(
     /** 事后补建:status='released' + releasedDate 直接创建(§8.2)。 */
     @Transactional
     fun create(key: String, request: CreateReleaseRequest): ReleaseDto {
+        leaderGuard.requireLeader(key)
         val p = project(key)
         groupTypes.findByProjectIdAndTypeKey(p.id!!, "release") ?: throw ConflictException("项目缺少 release 类型")
         val name = request.name?.trim().takeUnless { it.isNullOrEmpty() } ?: throw BadRequestException("name 必填")
@@ -133,6 +136,7 @@ class ReleaseService(
 
     @Transactional
     fun update(key: String, releaseId: UUID, request: UpdateReleaseRequest): ReleaseDto {
+        leaderGuard.requireLeader(key)
         val g = find(key, releaseId)
         if (g.status == "released") {
             val touched = request.name != null || request.targetDate != null || request.status != null ||
@@ -170,6 +174,7 @@ class ReleaseService(
     /** 非空不可删(成员关系即交付历史,对齐 spec 0010 裁决 6)。 */
     @Transactional
     fun delete(key: String, releaseId: UUID) {
+        leaderGuard.requireLeader(key)
         val g = find(key, releaseId)
         if (groupMembers.existsByGroupId(g.id!!)) throw ConflictException("release 非空,先移出 items(成员关系即交付历史)")
         groups.delete(g)

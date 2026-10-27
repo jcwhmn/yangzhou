@@ -37,7 +37,9 @@ class ReleaseServiceUnitTest {
     private val memberHistory = mockk<ItemGroupMemberHistoryRepository>(relaxed = true)
     private val clock = Clock.fixed(Instant.parse("2026-10-25T00:00:00Z"), ZoneOffset.UTC)
     private val groupTypes = mockk<ItemGroupTypeRepository>(relaxed = true)
+    private val leaderGuard = mockk<yangzhou.api.guard.LeaderGuard>(relaxed = true)
     private val service = ReleaseService(
+        leaderGuard,
         projects, groups, groupMembers, milestones, itemRepo, itemService, memberHistory, clock, groupTypes,
     )
 
