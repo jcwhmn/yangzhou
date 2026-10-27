@@ -8,6 +8,7 @@ import yangzhou.persistence.AttributeDefinition
 import yangzhou.persistence.Capability
 import yangzhou.persistence.Comment
 import yangzhou.persistence.ItemActivity
+import yangzhou.persistence.ItemAttribute
 import yangzhou.persistence.ChecklistItem
 import yangzhou.persistence.ItemStatusHistory
 import yangzhou.persistence.ItemDependency
@@ -197,6 +198,12 @@ interface FavoriteRepository : CrudRepository<Favorite, Long> {
     fun deleteByMemberIdAndProjectId(memberId: Long, projectId: Long)
 }
 
+interface ItemAttributeRepository : CrudRepository<ItemAttribute, Long> {
+    fun findByItemId(itemId: Long): List<ItemAttribute>
+    fun findByItemIdIn(itemIds: Collection<Long>): List<ItemAttribute>
+    fun deleteByItemId(itemId: Long)
+}
+
 interface RequirementRepository : CrudRepository<Requirement, Long> {
     fun findByItemId(itemId: Long): List<Requirement>
     fun findByItemIdIn(itemIds: Collection<Long>): List<Requirement>
@@ -374,7 +381,8 @@ interface SearchRepository : Repository<Item, Long> {
             p.key || '-' || i.number AS number, i.title, s.name AS status
             FROM item i JOIN project p ON i.project_id = p.id
             LEFT JOIN status s ON i.status_object_id = s.object_id
-            WHERE (i.title ILIKE :q ESCAPE '\' OR i.description ILIKE :q ESCAPE '\' OR (p.key || '-' || i.number::text) ILIKE :q ESCAPE '\')
+            WHERE (i.title ILIKE :q ESCAPE '\' OR i.description ILIKE :q ESCAPE '\' OR (p.key || '-' || i.number::text) ILIKE :q ESCAPE '\'
+                OR EXISTS (SELECT 1 FROM item_attribute ia WHERE ia.item_id = i.id AND ia.value ILIKE :q ESCAPE '\'))
             AND i.deleted_at IS NULL
             ORDER BY p.key, i.number
             LIMIT 50""",

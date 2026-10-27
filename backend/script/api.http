@@ -99,6 +99,20 @@ Content-Type: application/json
     client.global.set("attrB", response.body.name);
  %}
 
+### 建 custom 属性(YPJ-103,item 自定义属性用;handler 存变量 attrCustom)
+POST {{host}}/api/attributes
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "模块{{run}}",
+  "kind": "custom"
+}
+
+> {
+    client.global.set("attrCustom", response.body.name);
+ %}
+
 ### 属性列表
 GET {{host}}/api/attributes
 Authorization: Bearer {{token}}
@@ -279,6 +293,17 @@ Content-Type: application/json
   "requirements": [
     { "attribute": "{{attrB}}", "minLevel": 2 },
     { "attribute": "{{attrA}}", "minLevel": null }
+  ]
+}
+
+### 整体替换 item 自定义属性(YPJ-103;仅 custom 类词表,值≤500 文本)
+PUT {{host}}/api/items/{{itemId}}/attributes
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "values": [
+    { "attribute": "{{attrCustom}}", "value": "支付网关" }
   ]
 }
 
@@ -1241,6 +1266,29 @@ Content-Type: application/json
 {
   "repo": "{{attachRepo}}",
   "ref": "1001"
+}
+
+### [预期 400] 非 custom 词表挂 item 属性(YPJ-103)
+PUT {{host}}/api/items/{{itemId}}/attributes
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "values": [
+    { "attribute": "{{attrA}}", "value": "x" }
+  ]
+}
+
+### [预期 400] 同词表重复挂(YPJ-103)
+PUT {{host}}/api/items/{{itemId}}/attributes
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "values": [
+    { "attribute": "{{attrCustom}}", "value": "a" },
+    { "attribute": "{{attrCustom}}", "value": "b" }
+  ]
 }
 
 ### 版本号(YPJ-101;构建期 git tag 注入,无 tag=dev)
