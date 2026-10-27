@@ -227,6 +227,13 @@ Content-Type: application/json
   "memberId": "{{meId}}"
 }
 
+### 设 leader(YPJ-102;创建者已是 leader,幂等确认)
+PUT {{host}}/api/projects/{{pkey}}/members/{{meId}}/role
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{"role":"leader"}
+
 ### ============ 7. Item ============
 
 ### 建 item(要求属性B≥2;handler 存变量 itemId)
@@ -1239,3 +1246,10 @@ Content-Type: application/json
 ### 版本号(YPJ-101;构建期 git tag 注入,无 tag=dev)
 GET {{host}}/api/version
 Authorization: Bearer {{token}}
+
+### [预期 409] 唯一 leader 自撤(YPJ-102;先设好接任者)
+PUT {{host}}/api/projects/{{pkey}}/members/{{meId}}/role
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{"role":"member"}

@@ -32,6 +32,10 @@ class GlobalExceptionHandler {
     fun conflict(e: ConflictException, req: HttpServletRequest) =
         error(HttpStatus.CONFLICT, "CONFLICT", e.message ?: "冲突", req)
 
+    @ExceptionHandler(ForbiddenException::class)
+    fun forbidden(e: ForbiddenException, req: HttpServletRequest) =
+        error(HttpStatus.FORBIDDEN, "FORBIDDEN", e.message ?: "无权操作", req)
+
     @ExceptionHandler(org.springframework.http.converter.HttpMessageNotReadableException::class)
     fun notReadable(e: org.springframework.http.converter.HttpMessageNotReadableException, req: HttpServletRequest): ResponseEntity<ApiError> {
         return error(HttpStatus.BAD_REQUEST, "BAD_REQUEST", "请求体不合法", req)

@@ -1,12 +1,14 @@
 package yangzhou.api.business.projectmember
 
 import jakarta.validation.Valid
+import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.NotNull
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
@@ -29,6 +31,12 @@ class ProjectMemberController(private val service: ProjectMemberService) {
     @DeleteMapping("/projects/{key}/members/{memberId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun remove(@PathVariable key: String, @PathVariable memberId: UUID) = service.remove(key, memberId)
+
+    @PutMapping("/projects/{key}/members/{memberId}/role")
+    fun setRole(@PathVariable key: String, @PathVariable memberId: UUID, @Valid @RequestBody request: SetRoleRequest): ProjectMemberService.MemberDto =
+        service.setRole(key, memberId, request.role)
 }
 
 data class AddProjectMemberRequest(@field:NotNull val memberId: UUID)
+
+data class SetRoleRequest(@field:NotBlank val role: String)

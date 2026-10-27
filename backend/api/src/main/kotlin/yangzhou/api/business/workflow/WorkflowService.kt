@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import yangzhou.api.error.ConflictException
 import yangzhou.api.error.NotFoundException
+import yangzhou.api.guard.LeaderGuard
 import yangzhou.persistence.Status
 import yangzhou.persistence.StatusTransition
 import yangzhou.persistence.repository.ProjectRepository
@@ -19,6 +20,7 @@ import java.util.UUID
  */
 @Service
 class WorkflowService(
+    private val leaderGuard: LeaderGuard,
     private val projects: ProjectRepository,
     private val statuses: StatusRepository,
     private val transitions: StatusTransitionRepository,
@@ -40,6 +42,7 @@ class WorkflowService(
     @Transactional
     fun createStatus(projectKey: String, name: String, icon: String?, isStart: Boolean, isFinal: Boolean, position: Int?): StatusDto {
         val project = projects.findByKey(projectKey) ?: throw NotFoundException("项目不存在:$projectKey")
+        leaderGuard.requireLeader(project.id!!)
         val projectId = project.id!!
         val existing = statuses.findByProjectIdOrderByPosition(projectId)
         if (existing.any { it.name == name }) throw ConflictException("状态名已存在:$name")
@@ -59,6 +62,7 @@ class WorkflowService(
     @Transactional
     fun updateStatus(statusId: UUID, name: String?, icon: String?, isStart: Boolean?, isFinal: Boolean?, position: Int?): StatusDto {
         val status = statuses.findByObjectId(statusId) ?: throw NotFoundException("状态不存在")
+        leaderGuard.requireLeader(status.projectId)
         try {
             val updated = statuses.save(
                 status.copy(
@@ -78,6 +82,7 @@ class WorkflowService(
     @Transactional
     fun deleteStatus(statusId: UUID) {
         val status = statuses.findByObjectId(statusId) ?: throw NotFoundException("状态不存在")
+        leaderGuard.requireLeader(status.projectId)
         try {
             statuses.delete(status) // 关联迁移行由 FK 级联清除
         } catch (_: DataIntegrityViolationException) {
@@ -99,6 +104,7 @@ class WorkflowService(
     @Transactional
     fun replaceTransitions(projectKey: String, list: List<TransitionDto>): List<TransitionDto> {
         val project = projects.findByKey(projectKey) ?: throw NotFoundException("项目不存在:$projectKey")
+        leaderGuard.requireLeader(project.id!!)
         val projectId = project.id!!
         val byName = statuses.findByProjectIdOrderByPosition(projectId).associateBy { it.name }
         list.forEach { t ->

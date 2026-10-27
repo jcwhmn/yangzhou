@@ -10,6 +10,7 @@ import yangzhou.api.business.workspace.WorkspaceService
 import yangzhou.persistence.ProjectRepo
 import yangzhou.persistence.ProjectWorkflowRule
 import yangzhou.persistence.repository.ProjectRepoRepository
+import yangzhou.api.guard.LeaderGuard
 import yangzhou.persistence.repository.ProjectRepository
 import yangzhou.persistence.repository.ProjectWorkflowRuleRepository
 import yangzhou.persistence.repository.StatusRepository
@@ -26,6 +27,7 @@ val GITHUB_EVENT_TYPES = VcsEvent.entries.map { it.wire }
  */
 @Service
 class GithubConfigService(
+    private val leaderGuard: LeaderGuard,
     private val workspaces: WorkspaceRepository,
     private val projects: ProjectRepository,
     private val repos: ProjectRepoRepository,
@@ -71,6 +73,7 @@ class GithubConfigService(
 
     @Transactional
     fun addRepo(projectKey: String, repo: String): RepoDto {
+        leaderGuard.requireLeader(projectKey)
         val project = requireProject(projectKey)
         val trimmed = repo.trim()
         if (!Regex("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$").matches(trimmed)) {
@@ -85,6 +88,7 @@ class GithubConfigService(
 
     @Transactional
     fun deleteRepo(projectKey: String, repoId: UUID) {
+        leaderGuard.requireLeader(projectKey)
         val project = requireProject(projectKey)
         val repo = repos.findByObjectId(repoId) ?: throw NotFoundException("仓库挂载不存在")
         if (repo.projectId != project.id) throw NotFoundException("仓库挂载不存在")
@@ -109,6 +113,7 @@ class GithubConfigService(
 
     @Transactional
     fun replaceRules(projectKey: String, input: List<RuleInput>): List<RuleDto> {
+        leaderGuard.requireLeader(projectKey)
         val project = requireProject(projectKey)
         val validStatuses = statuses.findByProjectIdOrderByPosition(project.id!!).associateBy { it.objectId }
         input.forEach { rule ->

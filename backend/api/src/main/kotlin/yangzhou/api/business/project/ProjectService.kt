@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import yangzhou.api.error.ConflictException
 import yangzhou.api.error.NotFoundException
+import yangzhou.api.guard.LeaderGuard
 import yangzhou.api.business.workspace.WorkspaceService
 import yangzhou.api.business.github.VcsEvent
 import yangzhou.persistence.Project
@@ -22,6 +23,7 @@ import java.util.UUID
 /** Project = 编号(key-N)+ workflow + 视图容器(ADR-0001)。 */
 @Service
 class ProjectService(
+    private val leaderGuard: LeaderGuard,
     private val projects: ProjectRepository,
     private val statuses: StatusRepository,
     private val workflowRules: ProjectWorkflowRuleRepository,
@@ -54,7 +56,12 @@ class ProjectService(
         val saved = defaultStatuses(project.id!!).map { statuses.save(it) }
         seedDefaultRules(project.id!!, saved)
         // 0047:创建者自动入池(池=合法指派范围,保证创建者至少能给自己指派)
-        projectMembers.save(yangzhou.persistence.ProjectMember(projectId = project.id!!, memberId = members.current().id!!))
+        // 0047+R1(spec 0081):创建者自动入池,且为项目 leader
+        projectMembers.save(
+            yangzhou.persistence.ProjectMember(
+                projectId = project.id!!, memberId = members.current().id!!, role = yangzhou.persistence.ProjectMember.ROLE_LEADER,
+            ),
+        )
         // 0056:内建 group 类型种子(sprint/release);既有项目由 V35 迁移种子
         listOf("sprint" to "Sprint", "release" to "Release").forEach { (k, n) ->
             groupTypes.save(yangzhou.persistence.ItemGroupType(projectId = project.id!!, typeKey = k, name = n, builtin = true))
@@ -108,6 +115,7 @@ class ProjectService(
     /** YPJ-60:物理删除项目及全部从属数据(含回收站软删 item);FK 依赖序见 spec 0046。 */
     @Transactional
     fun delete(key: String) {
+        leaderGuard.requireLeader(key)
         val project = projects.findByKey(key) ?: throw NotFoundException("项目不存在:$key")
         val pid = project.id ?: error("no id")
         deletions.purgeRequirements(pid)

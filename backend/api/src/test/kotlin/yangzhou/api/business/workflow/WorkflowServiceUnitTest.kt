@@ -25,7 +25,8 @@ class WorkflowServiceUnitTest {
     private val projects = mockk<ProjectRepository>(relaxed = true)
     private val statuses = mockk<StatusRepository>(relaxed = true)
     private val transitions = mockk<StatusTransitionRepository>(relaxed = true)
-    private val service = WorkflowService(projects, statuses, transitions)
+    private val leaderGuard = mockk<yangzhou.api.guard.LeaderGuard>(relaxed = true)
+    private val service = WorkflowService(leaderGuard, projects, statuses, transitions)
 
     private val project = Project(id = 1L, workspaceId = 9L, key = "CHE", name = "CHE")
     private val todo = Status(id = 1L, projectId = 1L, name = "To Do", position = 0)

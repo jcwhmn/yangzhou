@@ -189,6 +189,7 @@ data class ProjectMember(
     val objectId: UUID = UUID.randomUUID(),
     val projectId: Long,
     val memberId: Long,
+    val role: String = ROLE_MEMBER,
     @CreatedDate
     var createdAt: Instant = Instant.now(),
     @LastModifiedDate
@@ -197,7 +198,12 @@ data class ProjectMember(
     var createdBy: Long? = null,
     @LastModifiedBy
     var updatedBy: Long? = null,
-)
+) {
+    companion object {
+        const val ROLE_MEMBER = "member"
+        const val ROLE_LEADER = "leader"
+    }
+}
 
 @Table("status")
 data class Status(
