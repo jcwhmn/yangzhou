@@ -40,13 +40,13 @@ class CandidateServiceUnitTest {
 
     private val service = CandidateService(items, members, memberService, workspaceService, feasibility, projectMembers)
 
-    private val item = Item(id = 1L, objectId = UUID.randomUUID(), projectId = 100L, number = 7, title = "任务", statusObjectId = UUID.randomUUID())
+    private val item = Item(id = 1L, objectId = UUID(0, 1), projectObjectId = UUID(0, 100), number = 7, title = "任务", statusObjectId = UUID.randomUUID())
     private val domainItem = DomainItem("YPJ-7", "任务", listOf(yangzhou.domain.Requirement(Attribute("kotlin"), 2)))
 
     // 三成员:A 胜任(kotlin 3)、C 差距(kotlin 1)、B 池外被过滤
-    private val alice = Member(id = 1L, objectId = UUID.randomUUID(), workspaceId = 1L, username = "alice", passwordHash = null, displayName = "Alice")
-    private val carol = Member(id = 3L, objectId = UUID.randomUUID(), workspaceId = 1L, username = "carol", passwordHash = "h", displayName = "Carol")
-    private val bob = Member(id = 2L, objectId = UUID.randomUUID(), workspaceId = 1L, username = "bob", passwordHash = "h", displayName = "Bob")
+    private val alice = Member(id = 1L, objectId = UUID(0, 1), workspaceObjectId = UUID(0, 1), username = "alice", passwordHash = null, displayName = "Alice")
+    private val carol = Member(id = 3L, objectId = UUID(0, 3), workspaceObjectId = UUID(0, 1), username = "carol", passwordHash = "h", displayName = "Carol")
+    private val bob = Member(id = 2L, objectId = UUID(0, 2), workspaceObjectId = UUID(0, 1), username = "bob", passwordHash = "h", displayName = "Bob")
 
     private val aliceDomain = DomainMember("Alice", listOf(DomainCapability(Attribute("kotlin"), 3)))
     private val carolDomain = DomainMember("Carol", listOf(DomainCapability(Attribute("kotlin"), 1)))
@@ -56,9 +56,9 @@ class CandidateServiceUnitTest {
         clearMocks(items, members, memberService, workspaceService, feasibility, projectMembers)
         every { items.findByObjectId(item.objectId) } returns item
         every { feasibility.itemToDomain(item) } returns domainItem
-        every { members.findByWorkspaceId(1L) } returns listOf(alice, bob, carol)
-        every { workspaceService.required() } returns yangzhou.persistence.Workspace(id = 1L)
-        every { projectMembers.restrictedPool(100L) } returns setOf(1L, 3L) // B(2L) 池外
+        every { members.findByWorkspaceObjectId(UUID(0, 1)) } returns listOf(alice, bob, carol)
+        every { workspaceService.required() } returns yangzhou.persistence.Workspace(id = 1L, objectId = UUID(0, 1))
+        every { projectMembers.restrictedPool(UUID(0, 100)) } returns setOf(UUID(0, 1), UUID(0, 3)) // B(UUID(0, 2)) 池外
         every { feasibility.domainMemberOf(alice) } returns aliceDomain
         every { feasibility.domainMemberOf(carol) } returns carolDomain
         every { feasibility.domainMemberOf(bob) } returns DomainMember("Bob", emptyList())
@@ -106,7 +106,7 @@ class CandidateServiceUnitTest {
 
         @Test
         fun `missing 成员 - 无 capability 仍可入池(池只看成员集合)`() {
-            every { projectMembers.restrictedPool(100L) } returns setOf(1L, 2L, 3L)
+            every { projectMembers.restrictedPool(UUID(0, 100)) } returns setOf(UUID(0, 1), UUID(0, 2), UUID(0, 3))
             every { feasibility.domainMemberOf(bob) } returns DomainMember("Bob", emptyList())
 
             val result = service.candidates(item.objectId)

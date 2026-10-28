@@ -40,16 +40,16 @@ internal fun endOfDayUtc(d: LocalDate): Instant = d.plusDays(1).atStartOfDay(Zon
 internal fun weekStartUtc(d: LocalDate): LocalDate = d.minusDays((d.dayOfWeek.value - 1).toLong())
 
 /** 每 item 首次进入 final 的时刻(重开后再完成不重复计);rows 须按 createdAt 升序。 */
-internal fun completionTs(rows: List<MetricsHistoryRow>, finalIds: Set<Long>): Instant? =
-    rows.firstOrNull { it.toStatusId in finalIds }?.createdAt
+internal fun completionTs(rows: List<MetricsHistoryRow>, finalIds: Set<UUID>): Instant? =
+    rows.firstOrNull { it.toStatusObjectId in finalIds }?.createdAt
 
 /** 每 item 首次离开 start 状态的时刻;从未离开返回 null。 */
-internal fun cycleStartTs(rows: List<MetricsHistoryRow>, startIds: Set<Long>): Instant? =
-    rows.firstOrNull { it.fromStatusId != null && it.fromStatusId in startIds }?.createdAt
+internal fun cycleStartTs(rows: List<MetricsHistoryRow>, startIds: Set<UUID>): Instant? =
+    rows.firstOrNull { it.fromStatusObjectId != null && it.fromStatusObjectId in startIds }?.createdAt
 
-/** item 在时刻 t 所处状态(最后一条 ≤t 的 toStatusId;t 早于首条 history 返回 null)。 */
-internal fun statusAt(rows: List<MetricsHistoryRow>, t: Instant): Long? =
-    rows.lastOrNull { it.createdAt <= t }?.toStatusId
+/** item 在时刻 t 所处状态(最后一条 ≤t 的 toStatusObjectId;t 早于首条 history 返回 null)。 */
+internal fun statusAt(rows: List<MetricsHistoryRow>, t: Instant): UUID? =
+    rows.lastOrNull { it.createdAt <= t }?.toStatusObjectId
 
 internal fun daysBetween(a: Instant, b: Instant): Double = Duration.between(a, b).toMillis() / 86_400_000.0
 
@@ -187,8 +187,8 @@ class MetricsService(
         val items = repo.items(key)
         val statusByObjectId = statuses.associateBy { it.statusObjectId }
         val members = repo.assignees(key).associateBy { it.memberObjectId }
-        val countByStatusId = items.groupingBy { statusByObjectId.getValue(it.statusObjectId).statusId }.eachCount()
-        val byStatus = statuses.map { s -> StatusCountDto(s.statusObjectId, s.name, s.isStart, s.isFinal, countByStatusId[s.statusId] ?: 0) }
+        val countByStatusId = items.groupingBy { statusByObjectId.getValue(it.statusObjectId).statusObjectId }.eachCount()
+        val byStatus = statuses.map { s -> StatusCountDto(s.statusObjectId, s.name, s.isStart, s.isFinal, countByStatusId[s.statusObjectId] ?: 0) }
         // YPJ-46:byAssignee 附 WIP 按 status 堆叠(Flow 页 WIP 条形)
         val byAssignee = items.groupBy { it.assigneeObjectId }
             .map { (oid, its) ->
@@ -199,16 +199,16 @@ class MetricsService(
             }
             .sortedWith(compareBy(nullsLast<String>()) { it.displayName })
         val byType = items.groupingBy { it.type }.eachCount().map { TypeCountDto(it.key, it.value) }.sortedBy { it.type }
-        val backlogSize = statuses.filter { it.isStart }.sumOf { countByStatusId[it.statusId] ?: 0 }
-        val done = statuses.filter { it.isFinal }.sumOf { countByStatusId[it.statusId] ?: 0 }
+        val backlogSize = statuses.filter { it.isStart }.sumOf { countByStatusId[it.statusObjectId] ?: 0 }
+        val done = statuses.filter { it.isFinal }.sumOf { countByStatusId[it.statusObjectId] ?: 0 }
         return WorkloadResponse(mapOf("workload" to D_BACKLOG), backlogSize, items.size - backlogSize - done, done, byStatus, byAssignee, byType)
     }
 
-    fun throughput(key: String, fromS: String?, toS: String?, bucket: String, groupId: UUID?): ThroughputResponse {
+    fun throughput(key: String, fromS: String?, toS: String?, bucket: String, groupObjectId: UUID?): ThroughputResponse {
         requireProject(key)
         if (bucket != "day" && bucket != "week") throw BadRequestException("bucket 仅支持 day|week")
         val (from, to) = window(fromS, toS)
-        val completions = completions(key, memberItemIds(key, groupId)).filter { it.second in from..to }
+        val completions = completions(key, memberItemObjectIds(key, groupObjectId)).filter { it.second in from..to }
         val step = if (bucket == "week") 7L else 1L
         val fromD = utcDate(from)
         val toD = utcDate(to)
@@ -228,11 +228,11 @@ class MetricsService(
         requireProject(key)
         val (from, to) = window(fromS, toS)
         val statuses = repo.statuses(key)
-        val finalIds = statuses.filter { it.isFinal }.map { it.statusId }.toSet()
-        val startIds = statuses.filter { it.isStart }.map { it.statusId }.toSet()
-        val byItem = repo.history(key).groupBy { it.itemId }
+        val finalIds = statuses.filter { it.isFinal }.map { it.statusObjectId }.toSet()
+        val startIds = statuses.filter { it.isStart }.map { it.statusObjectId }.toSet()
+        val byItem = repo.history(key).groupBy { it.itemObjectId }
         val flows = repo.items(key).mapNotNull { item ->
-            val rows = byItem[item.itemId] ?: return@mapNotNull null
+            val rows = byItem[item.itemObjectId] ?: return@mapNotNull null
             val done = completionTs(rows, finalIds) ?: return@mapNotNull null
             if (done !in from..to) return@mapNotNull null
             val cycle = cycleStartTs(rows, startIds)?.let { daysBetween(it, done) }
@@ -255,9 +255,9 @@ class MetricsService(
         requireProject(key)
         val (from, to) = window(fromS, toS)
         val statuses = repo.statuses(key)
-        val statusById = statuses.associateBy { it.statusId }
+        val statusById = statuses.associateBy { it.statusObjectId }
         val items = repo.items(key)
-        val byItem = repo.history(key).groupBy { it.itemId }
+        val byItem = repo.history(key).groupBy { it.itemObjectId }
         val firstRow = byItem.values.minOfOrNull { rows -> rows.minOf { it.createdAt } } ?: from
         var d = maxOf(utcDate(from), utcDate(firstRow))
         val last = minOf(utcDate(to), utcDate(clock.instant()))
@@ -266,7 +266,7 @@ class MetricsService(
             val t = endOfDayUtc(d)
             val counts = mutableMapOf<String, Int>()
             items.forEach { item ->
-                val sid = statusAt(byItem[item.itemId] ?: emptyList(), t) ?: return@forEach
+                val sid = statusAt(byItem[item.itemObjectId] ?: emptyList(), t) ?: return@forEach
                 val oid = statusById[sid]?.statusObjectId ?: return@forEach
                 counts.merge(oid.toString(), 1, Int::plus)
             }
@@ -286,22 +286,22 @@ class MetricsService(
         val statuses = repo.statuses(key)
         val statusByObjectId = statuses.associateBy { it.statusObjectId }
         val items = repo.items(key)
-        val byItem = repo.history(key).groupBy { it.itemId }
+        val byItem = repo.history(key).groupBy { it.itemObjectId }
         val aging = items.mapNotNull { item ->
             val s = statusByObjectId[item.statusObjectId] ?: return@mapNotNull null
             if (s.isStart || s.isFinal) return@mapNotNull null
-            val enteredAt = byItem[item.itemId]?.maxOf { it.createdAt } ?: item.createdAt
+            val enteredAt = byItem[item.itemObjectId]?.maxOf { it.createdAt } ?: item.createdAt
             AgingItemDto(item.itemObjectId, item.number, item.title, s.statusObjectId, s.name, enteredAt.toString(), daysBetween(enteredAt, now))
         }.sortedByDescending { it.ageDays }
-        val countByStatusId = items.groupingBy { statusByObjectId.getValue(it.statusObjectId).statusId }.eachCount()
+        val countByStatusId = items.groupingBy { statusByObjectId.getValue(it.statusObjectId).statusObjectId }.eachCount()
         val queueWidth = statuses.filter { !it.isFinal }
-            .map { s -> StatusCountDto(s.statusObjectId, s.name, s.isStart, s.isFinal, countByStatusId[s.statusId] ?: 0) }
+            .map { s -> StatusCountDto(s.statusObjectId, s.name, s.isStart, s.isFinal, countByStatusId[s.statusObjectId] ?: 0) }
         return AgingResponse(mapOf("aging" to D_AGING), aging, queueWidth)
     }
 
-    fun burndown(key: String, groupId: UUID): BurndownResponse {
+    fun burndown(key: String, groupObjectId: UUID): BurndownResponse {
         requireProject(key)
-        val (g, memberJoinTs, completions) = sprintData(key, groupId)
+        val (g, memberJoinTs, completions) = sprintData(key, groupObjectId)
         val start = g.startDate ?: throw BadRequestException("sprint 须有起止日期")
         val end = g.endDate ?: throw BadRequestException("sprint 须有起止日期")
         val seriesEnd = minOf(end, utcDate(clock.instant()))
@@ -321,16 +321,16 @@ class MetricsService(
         )
     }
 
-    fun burnup(key: String, groupId: UUID): BurnupResponse {
+    fun burnup(key: String, groupObjectId: UUID): BurnupResponse {
         requireProject(key)
-        val (g, _, completions) = sprintData(key, groupId)
-        val episodes = memberHistory.findByGroupId(g.groupId) // YPJ-54:scope 线消费留痕重放
+        val (g, _, completions) = sprintData(key, groupObjectId)
+        val episodes = memberHistory.findByGroupObjectId(g.groupObjectId) // YPJ-54:scope 线消费留痕重放
         val start = g.startDate ?: throw BadRequestException("sprint 须有起止日期")
         val end = g.endDate ?: throw BadRequestException("sprint 须有起止日期")
         val seriesEnd = minOf(end, utcDate(clock.instant()))
         fun dates(): List<LocalDate> = if (seriesEnd.isBefore(start)) emptyList() else start.datesUntil(seriesEnd.plusDays(1)).toList()
         val done = dates().map { d -> BurnupDonePointDto(d.toString(), completions.count { !it.isAfter(endOfDayUtc(d)) }) }
-        val scope = dates().map { d -> ScopePointDto(d.toString(), coveringItemIds(episodes, endOfDayUtc(d)).size) }
+        val scope = dates().map { d -> ScopePointDto(d.toString(), coveringItemObjectIds(episodes, endOfDayUtc(d)).size) }
         return BurnupResponse(
             definitions = mapOf("burnup" to D_BURNUP),
             groupId = g.groupObjectId, name = g.name, done = done, scope = scope,
@@ -338,16 +338,16 @@ class MetricsService(
     }
 
     /** M11(Y54):sprint 成员 scope 变化——开始/结束在册数与期间加/离次数(spec 0041);口径同 burnup,要求起止日期。 */
-    fun scopeChange(key: String, groupId: UUID): ScopeChangeResponse {
+    fun scopeChange(key: String, groupObjectId: UUID): ScopeChangeResponse {
         requireProject(key)
-        val g = findGroup(key, groupId)
+        val g = findGroup(key, groupObjectId)
         val start = g.startDate ?: throw BadRequestException("sprint 须有起止日期")
         val end = g.endDate ?: throw BadRequestException("sprint 须有起止日期")
-        val episodes = memberHistory.findByGroupId(g.groupId)
+        val episodes = memberHistory.findByGroupObjectId(g.groupObjectId)
         val from = start.atStartOfDay(ZoneOffset.UTC).toInstant()
         val to = endOfDayUtc(end)
-        val original = coveringItemIds(episodes, from).size
-        val final = coveringItemIds(episodes, to).size
+        val original = coveringItemObjectIds(episodes, from).size
+        val final = coveringItemObjectIds(episodes, to).size
         val adds = episodes.count { it.addedAt >= from && it.addedAt <= to }
         val removes = episodes.count { e -> e.removedAt?.let { it in from..to } == true }
         return ScopeChangeResponse(
@@ -362,16 +362,16 @@ class MetricsService(
         requireProject(key)
         val (from, to) = window(fromS, toS)
         val statuses = repo.statuses(key)
-        val finalIds = statuses.filter { it.isFinal }.map { it.statusId }.toSet()
-        val byItem = repo.history(key).groupBy { it.itemId }
+        val finalIds = statuses.filter { it.isFinal }.map { it.statusObjectId }.toSet()
+        val byItem = repo.history(key).groupBy { it.itemObjectId }
         var completed = 0
         var reopened = 0
         repo.items(key).forEach { item ->
-            val rows = byItem[item.itemId] ?: return@forEach
+            val rows = byItem[item.itemObjectId] ?: return@forEach
             val firstFinal = completionTs(rows, finalIds) ?: return@forEach
             if (firstFinal !in from..to) return@forEach
             completed++
-            if (rows.any { it.fromStatusId != null && it.fromStatusId in finalIds && it.createdAt.isAfter(firstFinal) }) reopened++
+            if (rows.any { it.fromStatusObjectId != null && it.fromStatusObjectId in finalIds && it.createdAt.isAfter(firstFinal) }) reopened++
         }
         val rate = if (completed == 0) null else reopened.toDouble() / completed
         return ReopenRateResponse(
@@ -383,14 +383,14 @@ class MetricsService(
     fun velocity(key: String): VelocityResponse {
         requireProject(key)
         val sprints = repo.groups(key, "sprint").filter { it.startDate != null && it.endDate != null }
-        val members = repo.groupMembers(key).groupBy { it.groupId }
+        val members = repo.groupMembers(key).groupBy { it.groupObjectId }
         val compByItem = completions(key, null).toMap()
         val rows = sprints.map { g ->
             val from = g.startDate!!.atStartOfDay(ZoneOffset.UTC).toInstant()
             val to = endOfDayUtc(g.endDate!!)
             VelocitySprintDto(
                 g.groupObjectId, g.name, g.startDate.toString(), g.endDate.toString(),
-                members[g.groupId].orEmpty().count { m -> compByItem[m.itemId]?.let { it in from..to } == true },
+                members[g.groupObjectId].orEmpty().count { m -> compByItem[m.itemObjectId]?.let { it in from..to } == true },
             )
         }
         return VelocityResponse(mapOf("velocity" to D_VELOCITY), rows)
@@ -414,33 +414,33 @@ class MetricsService(
     private fun parseInstant(s: String): Instant =
         try { Instant.parse(s) } catch (e: DateTimeParseException) { throw BadRequestException("时间须为 ISO-8601 Instant:$s") }
 
-    /** groupId 限定时的成员 item 内部 id 集;null = 全项目。 */
-    private fun memberItemIds(key: String, groupId: UUID?): Set<Long>? {
-        if (groupId == null) return null
-        val g = findGroup(key, groupId)
-        return repo.groupMembers(key).filter { it.groupId == g.groupId }.map { it.itemId }.toSet()
+    /** groupObjectId 限定时的成员 item 内部 id 集;null = 全项目。 */
+    private fun memberItemObjectIds(key: String, groupObjectId: UUID?): Set<UUID>? {
+        if (groupObjectId == null) return null
+        val g = findGroup(key, groupObjectId)
+        return repo.groupMembers(key).filter { it.groupObjectId == g.groupObjectId }.map { it.itemObjectId }.toSet()
     }
 
-    /** (item 内部 id, 首次完成时刻);itemIdFilter=null 取全项目。 */
-    private fun completions(key: String, itemIdFilter: Set<Long>?): List<Pair<Long, Instant>> {
-        val finalIds = repo.statuses(key).filter { it.isFinal }.map { it.statusId }.toSet()
-        val items = repo.items(key).filter { itemIdFilter == null || it.itemId in itemIdFilter }
-        val byItem = repo.history(key).groupBy { it.itemId }
-        return items.mapNotNull { item -> completionTs(byItem[item.itemId] ?: emptyList(), finalIds)?.let { item.itemId to it } }
+    /** (item 内部 id, 首次完成时刻);itemObjectIdFilter=null 取全项目。 */
+    private fun completions(key: String, itemObjectIdFilter: Set<UUID>?): List<Pair<UUID, Instant>> {
+        val finalIds = repo.statuses(key).filter { it.isFinal }.map { it.statusObjectId }.toSet()
+        val items = repo.items(key).filter { itemObjectIdFilter == null || it.itemObjectId in itemObjectIdFilter }
+        val byItem = repo.history(key).groupBy { it.itemObjectId }
+        return items.mapNotNull { item -> completionTs(byItem[item.itemObjectId] ?: emptyList(), finalIds)?.let { item.itemObjectId to it } }
     }
 
-    private fun findGroup(key: String, groupId: UUID): MetricsGroupRow =
-        repo.groups(key, null).find { it.groupObjectId == groupId } ?: throw NotFoundException("sprint 不存在:$groupId")
+    private fun findGroup(key: String, groupObjectId: UUID): MetricsGroupRow =
+        repo.groups(key, null).find { it.groupObjectId == groupObjectId } ?: throw NotFoundException("sprint 不存在:$groupObjectId")
 
     /** (group, 各成员加入时刻, 各成员首次完成时刻)。 */
-    private fun sprintData(key: String, groupId: UUID): Triple<MetricsGroupRow, List<Instant>, List<Instant>> {
-        val g = findGroup(key, groupId)
-        val members = repo.groupMembers(key).filter { it.groupId == g.groupId }
-        val compByItem = completions(key, members.map { it.itemId }.toSet()).toMap()
-        return Triple(g, members.map { it.createdAt }, members.mapNotNull { compByItem[it.itemId] })
+    private fun sprintData(key: String, groupObjectId: UUID): Triple<MetricsGroupRow, List<Instant>, List<Instant>> {
+        val g = findGroup(key, groupObjectId)
+        val members = repo.groupMembers(key).filter { it.groupObjectId == g.groupObjectId }
+        val compByItem = completions(key, members.map { it.itemObjectId }.toSet()).toMap()
+        return Triple(g, members.map { it.createdAt }, members.mapNotNull { compByItem[it.itemObjectId] })
     }
 }
 
-/** YPJ-54:episode 覆盖判定——added_at ≤ t 且(未离组或 removed_at > t);返回 distinct itemId 集。 */
-internal fun coveringItemIds(episodes: List<ItemGroupMemberHistory>, t: Instant): Set<Long> =
-    episodes.filter { e -> e.addedAt <= t && (e.removedAt?.let { it > t } ?: true) }.map { it.itemId }.toSet()
+/** YPJ-54:episode 覆盖判定——added_at ≤ t 且(未离组或 removed_at > t);返回 distinct itemObjectId 集。 */
+internal fun coveringItemObjectIds(episodes: List<ItemGroupMemberHistory>, t: Instant): Set<UUID> =
+    episodes.filter { e -> e.addedAt <= t && (e.removedAt?.let { it > t } ?: true) }.map { it.itemObjectId }.toSet()

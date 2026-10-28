@@ -27,7 +27,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.util.UUID
 
-/** Item:项目内递增编号(key-N)、type 属性、parentId 同质树、自由迁移(ADR-0002)。 */
+/** Item:项目内递增编号(key-N)、type 属性、parentObjectId 同质树、自由迁移(ADR-0002)。 */
 @Service
 class ItemService(
     private val projects: ProjectRepository,
@@ -100,26 +100,26 @@ class ItemService(
     ): ItemDto {
         val project = projects.findByKey(projectKey) ?: throw NotFoundException("项目不存在:$projectKey")
         if (type !in setOf("task", "bug", "goal", "story")) throw BadRequestException("type 非法:$type")
-        val projectId = project.id!!
+        val projectObjectId = project.objectId!!
 
-        val number = numbering.nextNumber(projectId) // 原子取号,行锁防并发重号
+        val number = numbering.nextNumber(projectObjectId) // 原子取号,行锁防并发重号
 
         val status = when {
-            statusItemId != null -> statuses.findByProjectIdAndObjectId(projectId, statusItemId)
+            statusItemId != null -> statuses.findByProjectObjectIdAndObjectId(projectObjectId, statusItemId)
                 ?: throw BadRequestException("状态不属于该项目")
-            else -> statuses.findByProjectIdOrderByPosition(projectId)
+            else -> statuses.findByProjectObjectIdOrderByPosition(projectObjectId)
                 .let { list -> list.filter { it.isStart }.minByOrNull { it.position } ?: list.firstOrNull() }
                 ?: throw ConflictException("项目无状态")
         }
 
         parentItemId?.let {
             val parent = itemRepo.findByObjectId(it) ?: throw BadRequestException("父 item 不存在")
-            if (parent.projectId != project.id) throw BadRequestException("父 item 不属于该项目")
+            if (parent.projectObjectId != project.objectId) throw BadRequestException("父 item 不属于该项目")
         }
 
         val item = itemRepo.save(
             Item(
-                projectId = projectId,
+                projectObjectId = projectObjectId,
                 number = number,
                 title = title,
                 description = description,
@@ -127,57 +127,57 @@ class ItemService(
                 parentObjectId = parentItemId,
                 externalRef = externalRef,
                 statusObjectId = status.objectId,
-                createdBy = memberService.current().id!!,
+                createdByObjectId = memberService.current().objectId!!,
             ),
         )
-        val itemId = item.id!!
-        resolveRequirements(project.workspaceId, requirements).forEach { (defId, minLevel) ->
-            requirementRepo.save(Requirement(itemId = itemId, attributeDefinitionId = defId, minLevel = minLevel))
+        val itemId = item.objectId!!
+        resolveRequirements(project.workspaceObjectId, requirements).forEach { (defId, minLevel) ->
+            requirementRepo.save(Requirement(itemObjectId = itemId, attributeDefinitionObjectId = defId, minLevel = minLevel))
         }
-        logActivity(itemId, "created", null, title, memberService.current().id!!)
+        logActivity(itemId, "created", null, title, memberService.current().objectId!!)
         historyRepo.save(
-            ItemStatusHistory(itemId = itemId, toStatusId = status.id!!, source = "created", actorMemberId = memberService.current().id!!),
+            ItemStatusHistory(itemObjectId = itemId, toStatusObjectId = status.objectId!!, source = "created", actorMemberObjectId = memberService.current().objectId!!),
         )
-        feasibilityService.recomputeProjectSignal(projectId) // V9-S1
+        feasibilityService.recomputeProjectSignal(projectObjectId) // V9-S1
         if (sprintId != null) { // YPJ-56:创建时初始归属,校验同 assignItem(sprint 归属该项目;completed 拒);同事务,负例下 item 不落库
-            val sprint = groups.findByProjectIdAndObjectId(projectId, sprintId)
+            val sprint = groups.findByProjectObjectIdAndObjectId(projectObjectId, sprintId)
                 ?: throw NotFoundException("sprint 不存在")
             if (sprint.status == "completed") throw ConflictException("sprint 已完成,不能指派")
-            memberships.save(ItemGroupMember(groupId = sprint.id!!, itemId = itemId))
-            memberHistory.recordAdd(sprint.id!!, itemId, clock.instant()) // YPJ-54 留痕(同事务,负例不落库语义不变)
+            memberships.save(ItemGroupMember(groupObjectId = sprint.objectId!!, itemObjectId = itemId))
+            memberHistory.recordAdd(sprint.objectId!!, itemId, clock.instant()) // YPJ-54 留痕(同事务,负例不落库语义不变)
         }
         return get(item.objectId)
     }
 
     fun list(projectKey: String, backlogOnly: Boolean = false): List<ItemDto> {
         val project = projects.findByKey(projectKey) ?: throw NotFoundException("项目不存在:$projectKey")
-        val projectItems = itemRepo.findByProjectIdAndDeletedAtIsNullOrderByNumber(project.id!!)
+        val projectItems = itemRepo.findByProjectObjectIdAndDeletedAtIsNullOrderByNumber(project.objectId!!)
         val ctx = buildCtx(project, projectItems)
-        val visible = if (backlogOnly) projectItems.filter { it.statusObjectId !in ctx.finalIds && it.id !in ctx.currentSprint } else projectItems
+        val visible = if (backlogOnly) projectItems.filter { it.statusObjectId !in ctx.finalIds && it.objectId !in ctx.currentSprint } else projectItems
         // YPJ-84 决策 2:父前缀标识(同项目全量行内可解析,直接查表)
         val numberById = projectItems.associate { it.objectId to "${project.key}-${it.number}" }
-        val attrsByItem = itemAttributes.findByItemIdIn(visible.mapNotNull { it.id }).groupBy { it.itemId }
-        val attrNames = definitions.findAllById(attrsByItem.values.flatten().map { it.attributeDefinitionId }).associate { it.id!! to it.name }
+        val attrsByItem = itemAttributes.findByItemObjectIdIn(visible.mapNotNull { it.objectId }).groupBy { it.itemObjectId }
+        val attrNames = definitions.findAllByObjectIdIn(attrsByItem.values.flatten().map { it.attributeDefinitionObjectId }).associate { it.objectId!! to it.name }
         return visible.map {
             ctx.toDto(it).copy(
                 parentNumber = it.parentObjectId?.let(numberById::get),
-                attributes = attrsByItem[it.id].orEmpty().map { a -> ItemAttributeDto(attrNames[a.attributeDefinitionId] ?: "?", a.value) },
+                attributes = attrsByItem[it.objectId].orEmpty().map { a -> ItemAttributeDto(attrNames[a.attributeDefinitionObjectId] ?: "?", a.value) },
             )
         }
     }
 
     fun get(itemId: UUID): ItemDto {
         val item = itemRepo.findByObjectId(itemId) ?: throw NotFoundException("item 不存在")
-        val project = projectOf(item.projectId)
+        val project = projectOf(item.projectObjectId)
         val ctx = buildCtx(project, listOf(item))
         // 已软删 item 不在 list()(回收站预览语义):toDto 内加 [已删除] 前缀
         val parentNumber = item.parentObjectId?.let { itemRepo.findByObjectId(it) }?.let { "${project.key}-${it.number}" }
         return ctx.toDto(item).copy(
             parentNumber = parentNumber,
-            gitRefs = gitRefs.findByItemId(item.id!!).map {
+            gitRefs = gitRefs.findByItemObjectId(item.objectId!!).map {
                 GitRefDto(it.kind, it.repo, it.ref, it.url, it.state)
             },
-            attributes = toAttrDtos(itemAttributes.findByItemId(item.id!!)),
+            attributes = toAttrDtos(itemAttributes.findByItemObjectId(item.objectId!!)),
         )
     }
 
@@ -194,18 +194,18 @@ class ItemService(
         priorityText: String? = null,
     ): ItemDto {
         val item = itemRepo.findByObjectId(itemId) ?: throw NotFoundException("item 不存在")
-        val project = projectOf(item.projectId)
+        val project = projectOf(item.projectObjectId)
         var current = item
 
-        val projectId = project.id ?: error("no id")
-        val actorId = memberService.current().id!!
+        val projectObjectId = project.objectId ?: error("no id")
+        val actorId = memberService.current().objectId!!
         if (statusItemId != null) {
-            val status = statuses.findByProjectIdAndObjectId(projectId, statusItemId)
+            val status = statuses.findByProjectObjectIdAndObjectId(projectObjectId, statusItemId)
                 ?: throw BadRequestException("状态不属于该项目")
-            val oldStatus = statuses.findByProjectIdOrderByPosition(projectId)
+            val oldStatus = statuses.findByProjectObjectIdOrderByPosition(projectObjectId)
                 .firstOrNull { it.objectId == current.statusObjectId }
             if (oldStatus != null) {
-                workflow.assertTransitionAllowed(projectId, oldStatus.id!!, status.id!!)
+                workflow.assertTransitionAllowed(projectObjectId, oldStatus.objectId!!, status.objectId!!)
             }
             // 开工须有主:离开起点状态前必须已指派(V4-S3)
             if (current.assigneeObjectId == null && oldStatus?.isStart == true && !status.isStart) {
@@ -214,20 +214,20 @@ class ItemService(
             // WIP 限制:目标列已有 item 数 >= 上限 → 409(V5-W1)
             val limit = status.wipLimit
             if (limit != null && limit > 0) {
-                val wipCount = itemRepo.findByProjectIdAndStatusObjectId(projectId, status.objectId).size
+                val wipCount = itemRepo.findByProjectObjectIdAndStatusObjectId(projectObjectId, status.objectId).size
                 if (wipCount >= limit) throw ConflictException("该列 WIP 已满:$wipCount/$limit")
             }
             current = itemRepo.save(current.copy(statusObjectId = status.objectId))
-            logActivity(current.id!!, "status_changed", oldStatus?.name, status.name, actorId)
+            logActivity(current.objectId!!, "status_changed", oldStatus?.name, status.name, actorId)
             if (status.objectId != oldStatus?.objectId) historyRepo.save(
-                ItemStatusHistory(itemId = current.id!!, fromStatusId = oldStatus?.id, toStatusId = status.id!!, source = "manual", actorMemberId = actorId),
+                ItemStatusHistory(itemObjectId = current.objectId!!, fromStatusObjectId = oldStatus?.objectId, toStatusObjectId = status.objectId!!, source = "manual", actorMemberObjectId = actorId),
             )
             notificationService.notifyStatusChange(current, actorId, oldStatus?.name, status.name)
         }
 
         if (parentItemId != null) {
             val parent = itemRepo.findByObjectId(parentItemId) ?: throw BadRequestException("父 item 不存在")
-            if (parent.projectId != project.id) throw BadRequestException("父 item 不属于该项目")
+            if (parent.projectObjectId != project.objectId) throw BadRequestException("父 item 不属于该项目")
             ensureNoCycle(current, parent)
             current = itemRepo.save(current.copy(parentObjectId = parent.objectId))
         }
@@ -237,11 +237,11 @@ class ItemService(
             current = itemRepo.save(current.copy(type = type))
         }
         if (title != null && title != current.title) {
-            logActivity(current.id!!, "title_changed", current.title, title, actorId)
+            logActivity(current.objectId!!, "title_changed", current.title, title, actorId)
             current = itemRepo.save(current.copy(title = title))
         }
         if (description != null && description != current.description) {
-            logActivity(current.id!!, "description_changed", current.description, description, actorId)
+            logActivity(current.objectId!!, "description_changed", current.description, description, actorId)
             current = itemRepo.save(current.copy(description = description))
         }
         // V10-S2 优先级:null = 不变;空串 = 清除;P0-P3 = 设置
@@ -268,7 +268,7 @@ class ItemService(
             if (newStart != current.startDate || newDue != current.dueDate) {
                 val old = "${current.startDate ?: "—"} ~ ${current.dueDate ?: "—"}"
                 current = itemRepo.save(current.copy(startDate = newStart, dueDate = newDue))
-                logActivity(current.id!!, "dates_changed", old, "${newStart ?: "—"} ~ ${newDue ?: "—"}", actorId)
+                logActivity(current.objectId!!, "dates_changed", old, "${newStart ?: "—"} ~ ${newDue ?: "—"}", actorId)
             }
         }
         return get(current.objectId)
@@ -278,16 +278,16 @@ class ItemService(
     @Transactional
     fun replaceRequirements(itemId: UUID, requirements: List<RequirementDto>): ItemDto {
         val item = itemRepo.findByObjectId(itemId) ?: throw NotFoundException("item 不存在")
-        val project = projectOf(item.projectId)
-        val rowId = item.id!!
-        requirementRepo.deleteByItemId(rowId)
-        resolveRequirements(project.workspaceId, requirements).forEach { (defId, minLevel) ->
-            requirementRepo.save(Requirement(itemId = rowId, attributeDefinitionId = defId, minLevel = minLevel))
+        val project = projectOf(item.projectObjectId)
+        val rowId = item.objectId!!
+        requirementRepo.deleteByItemObjectId(rowId)
+        resolveRequirements(project.workspaceObjectId, requirements).forEach { (defId, minLevel) ->
+            requirementRepo.save(Requirement(itemObjectId = rowId, attributeDefinitionObjectId = defId, minLevel = minLevel))
         }
         val summary = requirements.joinToString(";") { r -> r.attribute + (r.minLevel?.let { ">=" + it } ?: "") }
         logActivity(rowId, "requirement_changed", null, summary.ifEmpty { "(清空)" }, actorId())
         // YPJ-26:不单独先锁本 item 行——与并发重算的编号序扫描成环(40P01);信号由下方按编号序的扫全量覆盖
-        feasibilityService.recomputeProjectSignal(project.id!!) // V9-S1
+        feasibilityService.recomputeProjectSignal(project.objectId!!) // V9-S1
         return get(item.objectId)
     }
 
@@ -295,12 +295,12 @@ class ItemService(
     @Transactional
     fun replaceAttributes(itemId: UUID, values: List<ItemAttributeDto>): ItemDto {
         val item = itemRepo.findByObjectId(itemId) ?: throw NotFoundException("item 不存在")
-        val project = projectOf(item.projectId)
-        val rowId = item.id!!
-        val resolved = resolveAttributes(project.workspaceId, values)
-        itemAttributes.deleteByItemId(rowId)
+        val project = projectOf(item.projectObjectId)
+        val rowId = item.objectId!!
+        val resolved = resolveAttributes(project.workspaceObjectId, values)
+        itemAttributes.deleteByItemObjectId(rowId)
         resolved.forEach { (defId, value) ->
-            itemAttributes.save(yangzhou.persistence.ItemAttribute(itemId = rowId, attributeDefinitionId = defId, value = value))
+            itemAttributes.save(yangzhou.persistence.ItemAttribute(itemObjectId = rowId, attributeDefinitionObjectId = defId, value = value))
         }
         val summary = values.joinToString(";") { it.attribute + "=" + it.value }
         logActivity(rowId, "attribute_changed", null, summary.ifEmpty { "(清空)" }, actorId())
@@ -309,11 +309,11 @@ class ItemService(
 
     private fun toAttrDtos(rows: List<yangzhou.persistence.ItemAttribute>): List<ItemAttributeDto> {
         if (rows.isEmpty()) return emptyList()
-        val names = definitions.findAllById(rows.map { it.attributeDefinitionId }).associate { it.id!! to it.name }
-        return rows.map { ItemAttributeDto(names[it.attributeDefinitionId] ?: "?", it.value) }
+        val names = definitions.findAllByObjectIdIn(rows.map { it.attributeDefinitionObjectId }).associate { it.objectId!! to it.name }
+        return rows.map { ItemAttributeDto(names[it.attributeDefinitionObjectId] ?: "?", it.value) }
     }
 
-    private fun resolveAttributes(workspaceId: Long, values: List<ItemAttributeDto>): List<Pair<Long, String>> {
+    private fun resolveAttributes(workspaceObjectId: UUID, values: List<ItemAttributeDto>): List<Pair<UUID, String>> {
         val seen = HashSet<String>()
         return values.map { v ->
             val name = v.attribute.trim()
@@ -321,28 +321,28 @@ class ItemService(
             val value = v.value.trim()
             if (value.isEmpty()) throw BadRequestException("属性值不能为空:$name")
             if (value.length > 500) throw BadRequestException("属性值超长(≤500):$name")
-            val def = definitions.findByWorkspaceIdAndName(workspaceId, name)
+            val def = definitions.findByWorkspaceObjectIdAndName(workspaceObjectId, name)
                 ?: throw NotFoundException("词表中没有属性:$name(先建 custom 类属性)")
             if (def.kind != "custom") throw BadRequestException("仅 custom 类词表可挂 item 属性:${def.name}")
-            def.id!! to value
+            def.objectId!! to value
         }
     }
 
-    /** 指派/取消(assigneeItemId=null 取消);成员不存在 404;池外指派 409(0047:空池=无人可指派)。 */
+    /** 指派/取消(assigneeItemObjectId=null 取消);成员不存在 404;池外指派 409(0047:空池=无人可指派)。 */
     @Transactional
-    fun assign(itemId: UUID, assigneeItemId: UUID?): ItemDto {
+    fun assign(itemId: UUID, assigneeItemObjectId: UUID?): ItemDto {
         val item = itemRepo.findByObjectId(itemId) ?: throw NotFoundException("item 不存在")
-        val actorId = memberService.current().id!!
+        val actorId = memberService.current().objectId!!
         val oldName = item.assigneeObjectId?.let { oid -> members.findByObjectId(oid)?.displayName }
-        if (assigneeItemId != null) {
-            val member = members.findByObjectId(assigneeItemId) ?: throw NotFoundException("成员不存在")
-            projectMembers.assertAssignable(item.projectId, member.id!!)
-            itemRepo.save(item.copy(assigneeObjectId = assigneeItemId))
-            logActivity(item.id!!, "assigned", oldName, member.displayName, actorId)
-            notificationService.notifyAssigned(item, actorId, member.id!!, member.displayName)
+        if (assigneeItemObjectId != null) {
+            val member = members.findByObjectId(assigneeItemObjectId) ?: throw NotFoundException("成员不存在")
+            projectMembers.assertAssignable(item.projectObjectId, member.objectId!!)
+            itemRepo.save(item.copy(assigneeObjectId = assigneeItemObjectId))
+            logActivity(item.objectId!!, "assigned", oldName, member.displayName, actorId)
+            notificationService.notifyAssigned(item, actorId, member.objectId!!, member.displayName)
         } else {
             itemRepo.save(item.copy(assigneeObjectId = null))
-            logActivity(item.id!!, "unassigned", oldName, null, actorId)
+            logActivity(item.objectId!!, "unassigned", oldName, null, actorId)
         }
         return get(item.objectId)
     }
@@ -352,7 +352,7 @@ class ItemService(
     fun delete(itemId: UUID) {
         val item = itemRepo.findByObjectId(itemId) ?: throw NotFoundException("item 不存在")
         softDeleteSubtree(item.id!!, clock.instant()) // 触碰即迁移:原裸 Instant.now() 历史债(spec 0049)
-        feasibilityService.recomputeProjectSignal(item.projectId) // V9-S1
+        feasibilityService.recomputeProjectSignal(item.projectObjectId) // V9-S1
     }
 
     /** 子树软删/恢复(SQL 见 ItemTreeRepository)。 */
@@ -382,9 +382,9 @@ class ItemService(
             val parent = r.parentObjectId?.let { parentById[it] }
             parent == null || parent.deletedAt == null
         }
-        val projectMap = projects.findAll().associateBy { it.id }
+        val projectMap = projects.findAll().associateBy { it.objectId }
         return roots.map { item ->
-            val project = projectMap[item.projectId]
+            val project = projectMap[item.projectObjectId]
             RecycleItemDto(
                 itemId = item.objectId,
                 number = "${project?.key ?: "?"}-${item.number}",
@@ -415,18 +415,29 @@ class ItemService(
         val item = itemRepo.findByObjectId(itemId) ?: throw NotFoundException("item 不存在")
         if (item.deletedAt == null) throw ConflictException("该 item 不在回收站")
         purgeSubtree(item.id!!)
-        feasibilityService.recomputeProjectSignal(item.projectId)
+        feasibilityService.recomputeProjectSignal(item.projectObjectId)
     }
 
-    private fun actorId(): Long = memberService.current().id!!
+    private fun actorId(): UUID = memberService.current().objectId!!
 
-    private fun logActivity(itemId: Long, kind: String, oldValue: String?, newValue: String?, actorId: Long) {
-        activityRepo.save(ItemActivity(itemId = itemId, kind = kind, oldValue = oldValue, newValue = newValue, actorMemberId = actorId))
+    private fun logActivity(itemId: UUID, kind: String, oldValue: String?, newValue: String?, actorId: UUID) {
+        activityRepo.save(ItemActivity(itemObjectId = itemId, kind = kind, oldValue = oldValue, newValue = newValue, actorMemberObjectId = actorId))
     }
 
-    fun activity(itemId: UUID): List<ItemActivity> {
+    /** wire 契约 = HEAD 命名(actorMemberId;值已是 objectId)。web Activity 类型按此消费。 */
+    data class ActivityDto(
+        val objectId: UUID,
+        val kind: String,
+        val oldValue: String?,
+        val newValue: String?,
+        val actorMemberId: UUID?,
+        val createdAt: java.time.Instant,
+    )
+
+    fun activity(itemId: UUID): List<ActivityDto> {
         val item = itemRepo.findByObjectId(itemId) ?: throw NotFoundException("item 不存在")
-        return activityRepo.findByItemIdOrderByCreatedAtDesc(item.id!!)
+        return activityRepo.findByItemObjectIdOrderByCreatedAtDesc(item.objectId!!)
+            .map { ActivityDto(it.objectId, it.kind, it.oldValue, it.newValue, it.actorMemberObjectId, it.createdAt) }
     }
 
     // ---------- 内部 ----------
@@ -444,26 +455,26 @@ class ItemService(
 
 
     /** D3(spec 0052):按 id 直取项目行,替代 findAll().firstOrNull 的整表扫描。 */
-    private fun projectOf(projectId: Long): yangzhou.persistence.Project =
-        projects.findById(projectId).orElseThrow { NotFoundException("项目不存在") }
+    private fun projectOf(projectObjectId: UUID): yangzhou.persistence.Project =
+        projects.findByObjectId(projectObjectId) ?: throw NotFoundException("项目不存在")
 
     /** D3(spec 0052):单项目 item 组装上下文,list()/get() 共享。 */
     private fun buildCtx(project: yangzhou.persistence.Project, projectItems: List<Item>): ItemCtx {
-        val projectId = project.id!!
-        val statusById = statuses.findByProjectIdOrderByPosition(projectId).associateBy { it.objectId }
-        val blockedIds = dependencyService.blockedItemIds(projectId)
-        val attrNames = definitions.findByWorkspaceId(project.workspaceId).associate { it.id!! to it.name }
-        val memberMap = members.findByWorkspaceId(project.workspaceId).associateBy { it.objectId }
-        val itemIds = projectItems.mapNotNull { it.id }
-        val reqs = requirementRepo.findByItemIdIn(itemIds)
-        val ms = memberships.findByItemIdIn(itemIds)
-        val groupById = if (ms.isEmpty()) emptyMap() else groups.findAllById(ms.map { it.groupId }.toSet()).associateBy { it.id!! }
+        val projectObjectId = project.objectId!!
+        val statusById = statuses.findByProjectObjectIdOrderByPosition(projectObjectId).associateBy { it.objectId }
+        val blockedIds = dependencyService.blockedItemObjectIds(projectObjectId)
+        val attrNames = definitions.findByWorkspaceObjectId(project.workspaceObjectId).associate { it.objectId!! to it.name }
+        val memberMap = members.findByWorkspaceObjectId(project.workspaceObjectId).associateBy { it.objectId }
+        val itemObjectIds = projectItems.mapNotNull { it.objectId }
+        val reqs = requirementRepo.findByItemObjectIdIn(itemObjectIds)
+        val ms = memberships.findByItemObjectIdIn(itemObjectIds)
+        val groupById = if (ms.isEmpty()) emptyMap() else groups.findAllByObjectIdIn(ms.map { it.groupObjectId }.toSet()).associateBy { it.objectId!! }
         val currentSprint = ms.mapNotNull { m ->
-            groupById[m.groupId]?.takeIf { it.status != "completed" && it.type == "sprint" }?.let { m.itemId to it }
+            groupById[m.groupObjectId]?.takeIf { it.status != "completed" && it.type == "sprint" }?.let { m.itemObjectId to it }
         }.toMap()
         // V15:release 归属(单选,spec 0012)
         val currentRelease = ms.mapNotNull { m ->
-            groupById[m.groupId]?.takeIf { it.type == "release" }?.let { m.itemId to it }
+            groupById[m.groupObjectId]?.takeIf { it.type == "release" }?.let { m.itemObjectId to it }
         }.toMap()
         return ItemCtx(project, statusById, blockedIds, attrNames, memberMap, reqs, currentSprint, currentRelease)
     }
@@ -471,12 +482,12 @@ class ItemService(
     private inner class ItemCtx(
         val project: yangzhou.persistence.Project,
         val statusById: Map<UUID, yangzhou.persistence.Status>,
-        val blockedIds: Set<Long>,
-        val attrNames: Map<Long, String>,
+        val blockedIds: Set<UUID>,
+        val attrNames: Map<UUID, String>,
         val memberMap: Map<UUID, yangzhou.persistence.Member>,
         val reqs: List<Requirement>,
-        val currentSprint: Map<Long, yangzhou.persistence.ItemGroup>,
-        val currentRelease: Map<Long, yangzhou.persistence.ItemGroup>,
+        val currentSprint: Map<UUID, yangzhou.persistence.ItemGroup>,
+        val currentRelease: Map<UUID, yangzhou.persistence.ItemGroup>,
     ) {
         val finalIds: Set<UUID> = statusById.filterValues { it.isFinal }.keys
         private val statusNames = statusById.mapValues { it.value.name }
@@ -494,35 +505,35 @@ class ItemService(
             overdue = isOverdue(item.dueDate, LocalDate.now(clock), statusById[item.statusObjectId]?.isFinal == true),
             feasSignal = item.feasSignal,
             priority = item.priority,
-            blocked = item.id in blockedIds,
+            blocked = item.objectId in blockedIds,
             assignee = item.assigneeObjectId?.let { memberNames[it] },
             assigneeColor = item.assigneeObjectId?.let { memberMap[it]?.color },
             dueSoon = isDueSoon(item.dueDate, LocalDate.now(clock)),
             createdAt = item.createdAt.toString(),
-            sprintId = currentSprint[item.id]?.objectId,
-            sprintName = currentSprint[item.id]?.name,
-            releaseId = currentRelease[item.id]?.objectId,
-            releaseName = currentRelease[item.id]?.name,
+            sprintId = currentSprint[item.objectId]?.objectId,
+            sprintName = currentSprint[item.objectId]?.name,
+            releaseId = currentRelease[item.objectId]?.objectId,
+            releaseName = currentRelease[item.objectId]?.name,
             externalRef = item.externalRef,
             parentItemId = item.parentObjectId,
-            requirements = reqs.filter { it.itemId == item.id }.map {
-                RequirementDto(attrNames[it.attributeDefinitionId] ?: "?", it.minLevel)
+            requirements = reqs.filter { it.itemObjectId == item.objectId }.map {
+                RequirementDto(attrNames[it.attributeDefinitionObjectId] ?: "?", it.minLevel)
             },
         )
     }
 
     private fun resolveRequirements(
-        workspaceId: Long,
+        workspaceObjectId: UUID,
         requirements: List<RequirementDto>,
-    ): List<Pair<Long, Int?>> {
-        val defs = definitions.findByWorkspaceId(workspaceId)
+    ): List<Pair<UUID, Int?>> {
+        val defs = definitions.findByWorkspaceObjectId(workspaceObjectId)
         return requirements
             .groupBy { it.attribute }
             .map { (name, list) ->
                 if (list.size > 1) throw BadRequestException("需求属性重复:$name 只能出现一次")
                 val def = defs.firstOrNull { it.name == name }
                     ?: throw BadRequestException("词表中没有属性:$name(先建属性)")
-                def.id!! to list.first().minLevel
+                def.objectId!! to list.first().minLevel
             }
     }
 }

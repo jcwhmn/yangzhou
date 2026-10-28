@@ -109,14 +109,14 @@ class TimeEntryApiTest : AbstractApiTest() {
         authed.post().uri("/api/members")
             .body(mapOf("displayName" to "小李"))
             .exchange().expectStatus().isCreated()
-        val xiaoLiId = jdbc.queryForList("select id from member where display_name = '小李'")[0]["id"]
-        val itemId = jdbc.queryForList("select id from item where title = 'x'")[0]["id"]
+        val xiaoLiId = jdbc.queryForList("select object_id from member where display_name = '小李'")[0]["object_id"]
+        val itemId = jdbc.queryForList("select object_id from item where title = 'x'")[0]["object_id"]
         jdbc.update(
-            "insert into time_entry (object_id, item_id, member_id, started_at) values (gen_random_uuid(), ?, ?, now())",
+            "insert into time_entry (object_id, item_object_id, member_object_id, started_at) values (gen_random_uuid(), ?, ?, now())",
             itemId, xiaoLiId,
         )
         val entryId = jdbc.queryForList(
-            "select object_id from time_entry where member_id = ?",
+            "select object_id from time_entry where member_object_id = ?",
             xiaoLiId,
         )[0]["object_id"].toString()
 

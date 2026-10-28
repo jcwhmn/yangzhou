@@ -33,11 +33,11 @@ class GithubBranchService(
     data class BranchDto(val repo: String, val branch: String, val url: String)
 
     @Transactional
-    fun createBranch(itemId: UUID, repoId: UUID, baseBranch: String, name: String): BranchDto {
-        val item = items.findByObjectId(itemId) ?: throw NotFoundException("item 不存在")
-        val project = projects.findById(item.projectId).orElse(null) ?: throw NotFoundException("项目不存在")
+    fun createBranch(itemObjectId: UUID, repoId: UUID, baseBranch: String, name: String): BranchDto {
+        val item = items.findByObjectId(itemObjectId) ?: throw NotFoundException("item 不存在")
+        val project = projects.findByObjectId(item.projectObjectId) ?: throw NotFoundException("项目不存在")
         val mount = projectRepos.findByObjectId(repoId) ?: throw NotFoundException("仓库挂载不存在")
-        if (mount.projectId != item.projectId) throw BadRequestException("仓库不属于该项目")
+        if (mount.projectObjectId != item.projectObjectId) throw BadRequestException("仓库不属于该项目")
 
         val token = workspaceService.required().githubToken
             ?: throw BadRequestException("未配置 workspace GitHub PAT")
@@ -53,20 +53,20 @@ class GithubBranchService(
         }
 
         val url = "https://github.com/${mount.repo}/tree/$branch"
-        gitRefs.save(ItemGitRef(itemId = item.id!!, kind = "branch", repo = mount.repo, ref = branch, url = url))
+        gitRefs.save(ItemGitRef(itemObjectId = item.objectId!!, kind = "branch", repo = mount.repo, ref = branch, url = url))
         activityRepo.save(
-            ItemActivity(itemId = item.id!!, kind = "github_branch_created", newValue = "分支 $branch(${mount.repo})"),
+            ItemActivity(itemObjectId = item.objectId!!, kind = "github_branch_created", newValue = "分支 $branch(${mount.repo})"),
         )
-        syncService.applyEvent(project, item.id!!, VcsEvent.BRANCH_CREATED.wire, "branch $branch")
+        syncService.applyEvent(project, item.objectId!!, VcsEvent.BRANCH_CREATED.wire, "branch $branch")
         return BranchDto(mount.repo, branch, url)
     }
 
 
     /** YPJ-39:既有分支补挂多票(纯库操作,不调 gateway;只收库内已有行)。 */
     @Transactional
-    fun attach(itemId: UUID, repo: String, ref: String): BranchDto {
-        val item = items.findByObjectId(itemId) ?: throw NotFoundException("item 不存在")
-        if (!projectRepos.existsByProjectIdAndRepo(item.projectId, repo)) {
+    fun attach(itemObjectId: UUID, repo: String, ref: String): BranchDto {
+        val item = items.findByObjectId(itemObjectId) ?: throw NotFoundException("item 不存在")
+        if (!projectRepos.existsByProjectObjectIdAndRepo(item.projectObjectId, repo)) {
             throw BadRequestException("仓库未挂载到该项目:$repo")
         }
         val branch = requireValidBranch(ref, "分支名")
@@ -77,10 +77,10 @@ class GithubBranchService(
             }
             throw NotFoundException("分支未入册:$repo#$branch(只可补挂 yangzhou 已关联的分支)")
         }
-        if (rows.any { it.itemId == item.id }) throw ConflictException("该票已挂此分支:$branch")
+        if (rows.any { it.itemObjectId == item.objectId }) throw ConflictException("该票已挂此分支:$branch")
         val anchor = rows.first()
         val saved = gitRefs.save(
-            ItemGitRef(itemId = item.id!!, kind = "branch", repo = repo, ref = branch, url = anchor.url, state = anchor.state, createdAt = anchor.createdAt),
+            ItemGitRef(itemObjectId = item.objectId!!, kind = "branch", repo = repo, ref = branch, url = anchor.url, state = anchor.state, createdAt = anchor.createdAt),
         )
         // 审计会覆盖实体显式 createdAt,落库后校正为锚点行时刻(commits 的 since 过滤依赖它)
         gitRefs.updateCreatedAt(saved.id!!, anchor.createdAt)

@@ -46,19 +46,19 @@ class FeasibilityServiceUnitTest {
         projects, itemRepo, requirementRepo, definitions, capabilities, memberService, workspaceService,
     )
 
-    private val ws = Workspace(id = 1L)
-    private val project = Project(id = 100L, workspaceId = 1L, key = "YPJ", name = "yangzhou")
-    private val me = Member(id = 5L, workspaceId = 1L, username = "me", passwordHash = "x", displayName = "我")
-    private val attrKotlin = AttributeDefinition(id = 10L, workspaceId = 1L, name = "kotlin")
-    private val attrReact = AttributeDefinition(id = 11L, workspaceId = 1L, name = "react")
+    private val ws = Workspace(id = 1L, objectId = UUID(0, 1))
+    private val project = Project(id = 100L, objectId = UUID(0, 100), workspaceObjectId = UUID(0, 1), key = "YPJ", name = "yangzhou")
+    private val me = Member(id = 5L, objectId = UUID(0, 5), workspaceObjectId = UUID(0, 1), username = "me", passwordHash = "x", displayName = "我")
+    private val attrKotlin = AttributeDefinition(id = 10L, objectId = UUID(0, 10), workspaceObjectId = UUID(0, 1), name = "kotlin")
+    private val attrReact = AttributeDefinition(id = 11L, objectId = UUID(0, 11), workspaceObjectId = UUID(0, 1), name = "react")
 
     @BeforeEach
     fun setup() {
         clearMocks(projects, itemRepo, requirementRepo, definitions, capabilities, memberService, workspaceService)
         every { workspaceService.required() } returns ws
-        every { definitions.findByWorkspaceId(1L) } returns listOf(attrKotlin, attrReact)
+        every { definitions.findByWorkspaceObjectId(UUID(0, 1)) } returns listOf(attrKotlin, attrReact)
         every { memberService.current() } returns me
-        every { capabilities.findByMemberId(5L) } returns listOf(Capability(memberId = 5L, attributeDefinitionId = 10L, level = 3))
+        every { capabilities.findByMemberObjectId(UUID(0, 5)) } returns listOf(Capability(memberObjectId = UUID(0, 5), attributeDefinitionObjectId = UUID(0, 10), level = 3))
         every { projects.findAll() } returns listOf(project)
         // 泛型 save 显式回传实参:relaxed 对 <S> 返回占位对象,service 侧链式使用即 CCE
         every { projects.save(any()) } answers { val arg: Project = firstArg(); arg }
@@ -66,17 +66,17 @@ class FeasibilityServiceUnitTest {
     }
 
     private fun item(id: Long, number: Int, vararg reqs: Requirement): Item {
-        val it = Item(id = id, projectId = 100L, number = number, title = "item $number", statusObjectId = UUID.randomUUID())
-        every { requirementRepo.findByItemId(id) } returns reqs.toList()
+        val it = Item(id = id, objectId = UUID(0, id), projectObjectId = UUID(0, 100), number = number, title = "item $number", statusObjectId = UUID.randomUUID())
+        every { requirementRepo.findByItemObjectId(UUID(0, id)) } returns reqs.toList()
         every { itemRepo.findByObjectId(it.objectId) } returns it
         return it
     }
 
-    private fun req(attrId: Long, min: Int?) =
-        Requirement(itemId = 999L, attributeDefinitionId = attrId, minLevel = min)
+    private fun req(attrId: UUID, min: Int?) =
+        Requirement(itemObjectId = UUID(0, 999), attributeDefinitionObjectId = attrId, minLevel = min)
 
-    private fun stubItems(items: List<Item>, projectId: Long = 100L) {
-        every { itemRepo.findByProjectIdAndDeletedAtIsNullOrderByNumber(projectId) } returns items
+    private fun stubItems(items: List<Item>, projectObjectId: UUID = UUID(0, 100)) {
+        every { itemRepo.findByProjectObjectIdAndDeletedAtIsNullOrderByNumber(projectObjectId) } returns items
     }
 
     @Nested
@@ -84,7 +84,7 @@ class FeasibilityServiceUnitTest {
         @Test
         fun `GREEN - 全满足,装配与聚合字段正确`() {
             every { projects.findByKey("YPJ") } returns project
-            stubItems(listOf(item(1L, 1, req(10L, 3))))
+            stubItems(listOf(item(1L, 1, req(UUID(0, 10), 3))))
 
             val result = service.project("YPJ")
 
@@ -100,7 +100,7 @@ class FeasibilityServiceUnitTest {
         @Test
         fun `RED - gap 与 missing 聚合,verdict 映射到 DTO`() {
             every { projects.findByKey("YPJ") } returns project
-            stubItems(listOf(item(1L, 1, req(10L, 4), req(11L, 2))))
+            stubItems(listOf(item(1L, 1, req(UUID(0, 10), 4), req(UUID(0, 11), 2))))
 
             val result = service.project("YPJ")
 
@@ -129,25 +129,25 @@ class FeasibilityServiceUnitTest {
     inner class RecomputeProjectSignal {
         @Test
         fun `worst 聚合 - RED 胜过 GREEN,写回 project_feasSignal`() {
-            every { projects.findById(any()) } returns Optional.of(project)
-            val both = listOf(item(1L, 1, req(10L, 1)), item(2L, 2, req(11L, 2)))
+            every { projects.findByObjectId(any()) } returns (project)
+            val both = listOf(item(1L, 1, req(UUID(0, 10), 1)), item(2L, 2, req(UUID(0, 11), 2)))
             stubItems(both)
 
             val saved = mutableListOf<Project>()
             every { projects.save(any()) } answers { val arg: Project = firstArg(); saved.add(arg); arg }
-            assertEquals("RED", service.recomputeProjectSignal(100L))
+            assertEquals("RED", service.recomputeProjectSignal(UUID(0, 100)))
             assertEquals("RED", saved.single().feasSignal)
         }
 
         @Test
         fun `YELLOW - capability 存在但未评级`() {
-            every { projects.findById(any()) } returns Optional.of(project)
-            every { capabilities.findByMemberId(5L) } returns
-                listOf(Capability(memberId = 5L, attributeDefinitionId = 10L, level = null))
-            val yellow = item(1L, 1, req(10L, 2))
+            every { projects.findByObjectId(any()) } returns (project)
+            every { capabilities.findByMemberObjectId(UUID(0, 5)) } returns
+                listOf(Capability(memberObjectId = UUID(0, 5), attributeDefinitionObjectId = UUID(0, 10), level = null))
+            val yellow = item(1L, 1, req(UUID(0, 10), 2))
             stubItems(listOf(yellow))
 
-            assertEquals("YELLOW", service.recomputeProjectSignal(100L))
+            assertEquals("YELLOW", service.recomputeProjectSignal(UUID(0, 100)))
             val v = service.item(yellow.objectId).verdicts.single()
             assertEquals("unrated", v.kind)
             assertEquals(2, v.required)
@@ -157,9 +157,9 @@ class FeasibilityServiceUnitTest {
         @Test
         fun `无 item - null 且不写回`() {
             stubItems(emptyList())
-            every { projects.findById(any()) } returns Optional.of(project)
+            every { projects.findByObjectId(any()) } returns (project)
 
-            assertNull(service.recomputeProjectSignal(100L))
+            assertNull(service.recomputeProjectSignal(UUID(0, 100)))
         }
     }
 
@@ -167,13 +167,13 @@ class FeasibilityServiceUnitTest {
     inner class RecomputeWorkspace {
         @Test
         fun `按 id 升序重算(YPJ-26 锁序)- 乱序输入也归序`() {
-            val p1 = project.copy(id = 1L)
-            val p2 = project.copy(id = 2L)
+            val p1 = project.copy(id = 1L, objectId = UUID(0, 1))
+            val p2 = project.copy(id = 2L, objectId = UUID(0, 2))
             every { projects.findAll() } returns listOf(p2, p1) // 故意乱序
-            stubItems(emptyList(), 1L)
-            stubItems(emptyList(), 2L)
-            every { projects.findById(1L) } returns Optional.of(p1)
-            every { projects.findById(2L) } returns Optional.of(p2)
+            stubItems(emptyList(), UUID(0, 1))
+            stubItems(emptyList(), UUID(0, 2))
+            every { projects.findByObjectId(UUID(0, 1)) } returns (p1)
+            every { projects.findByObjectId(UUID(0, 2)) } returns (p2)
             val saved = mutableListOf<Project>()
             every { projects.save(any()) } answers {
                 val arg: Project = firstArg() // 泛型 save 坑:显式声明实参类型,坑见 mockk 计划文档 P0
@@ -192,7 +192,7 @@ class FeasibilityServiceUnitTest {
     inner class WorkspaceShortfall {
         @Test
         fun `gap 与 missing 归类聚合,坏项目 404 被吞不炸`() {
-            val i1 = item(1L, 1, req(10L, 4), req(11L, 2))
+            val i1 = item(1L, 1, req(UUID(0, 10), 4), req(UUID(0, 11), 2))
             every { projects.findAll() } returns listOf(project, project.copy(id = 200L, key = "BAD"))
             every { projects.findByKey("YPJ") } returns project
             every { projects.findByKey("BAD") } returns null // project() 抛 404 → runCatching 吞

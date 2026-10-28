@@ -21,7 +21,7 @@ class AttachmentServiceTest {
     private fun service(
         props: AttachmentProperties = AttachmentProperties(enabled = true),
         storage: ObjectStorage = fake,
-        item: Item? = mockk { every { id } returns 1L },
+        item: Item? = mockk { every { id } returns 1L; every { objectId } returns UUID(0, 1) },
     ): AttachmentService {
         val items = mockk<ItemRepository>()
         every { items.findByObjectId(any()) } returns item

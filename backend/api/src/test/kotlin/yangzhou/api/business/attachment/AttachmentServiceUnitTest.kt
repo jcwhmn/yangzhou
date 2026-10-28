@@ -31,7 +31,7 @@ class AttachmentServiceUnitTest {
     )
     private val service = AttachmentService(attachments, items, storage, props)
 
-    private val item = Item(id = 1L, projectId = 1L, number = 1, title = "t", statusObjectId = UUID.randomUUID())
+    private val item = Item(id = 1L, objectId = UUID(0, 1), projectObjectId = UUID(0, 1), number = 1, title = "t", statusObjectId = UUID.randomUUID())
 
     @BeforeEach
     fun setup() {
@@ -83,8 +83,8 @@ class AttachmentServiceUnitTest {
 
         @Test
         fun mappedRows() {
-            val row = Attachment(id = 1L, itemId = 1L, filename = "a.pdf", contentType = "application/pdf", sizeBytes = 9, objectKey = "k")
-            every { attachments.findByItemId(1L) } returns listOf(row)
+            val row = Attachment(id = 1L, objectId = UUID(0, 1), itemObjectId = UUID(0, 1), filename = "a.pdf", contentType = "application/pdf", sizeBytes = 9, objectKey = "k")
+            every { attachments.findByItemObjectId(UUID(0, 1)) } returns listOf(row)
             val dtos = service.list(item.objectId)
             assertEquals(1, dtos.size)
             assertEquals("a.pdf", dtos[0].filename)
@@ -94,11 +94,11 @@ class AttachmentServiceUnitTest {
     @Nested
     inner class DownloadAndDelete {
 
-        private val row = Attachment(id = 1L, itemId = 1L, filename = "a.pdf", contentType = "p", sizeBytes = 9, objectKey = "k1")
+        private val row = Attachment(id = 1L, objectId = UUID(0, 1), itemObjectId = UUID(0, 1), filename = "a.pdf", contentType = "p", sizeBytes = 9, objectKey = "k1")
 
         @BeforeEach
         fun stubRow() {
-            every { attachments.findByObjectIdAndItemId(row.objectId, 1L) } returns row
+            every { attachments.findByObjectIdAndItemObjectId(row.objectId, UUID(0, 1)) } returns row
         }
 
         @Test
@@ -109,9 +109,9 @@ class AttachmentServiceUnitTest {
 
         @Test
         fun crossItemAttachmentIs404() {
-            val other = item.copy(id = 2L)
+            val other = item.copy(id = 2L, objectId = UUID(0, 2))
             every { items.findByObjectId(other.objectId) } returns other
-            every { attachments.findByObjectIdAndItemId(row.objectId, 2L) } returns null
+            every { attachments.findByObjectIdAndItemObjectId(row.objectId, UUID(0, 2)) } returns null
             assertFailsWith<NotFoundException> { service.downloadUrl(other.objectId, row.objectId) }
         }
 

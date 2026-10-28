@@ -1,5 +1,6 @@
 package yangzhou.api.business.project
 
+import java.util.UUID
 import yangzhou.api.business.github.VcsEvent
 import yangzhou.persistence.Status
 import kotlin.test.Test
@@ -10,7 +11,7 @@ import kotlin.test.assertTrue
 class DefaultRuleSeedsUnitTest {
 
     private fun col(name: String, position: Int, isStart: Boolean = false, isFinal: Boolean = false) =
-        Status(projectId = 0, name = name, position = position, isStart = isStart, isFinal = isFinal)
+        Status(projectObjectId = UUID(0, 0), name = name, position = position, isStart = isStart, isFinal = isFinal)
 
     @Test
     fun `标准 V7 五列 - 与旧按名映射一致`() {

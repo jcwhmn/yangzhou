@@ -49,6 +49,35 @@ abstract class AbstractApiTest {
 
     @BeforeEach
     fun cleanDatabase() {
+        // YPJ-106:审计列升级为 FK(member)后与业务 FK 成环,先断审计引用再按序删
+        // 仅 25 张带 created_by_object_id/updated_by_object_id 审计列的表(item 只有 updated_by_object_id)
+        listOf(
+            "project_workflow_rule",
+            "project_view",
+            "item_git_ref",
+            "project_repo",
+            "time_entry",
+            "item_group_type",
+            "item_group",
+            "milestone",
+            "item_status_history",
+            "checklist_item",
+            "comment",
+            "status_transition",
+            "attachment",
+            "item_attribute",
+            "requirement",
+            "status",
+            "project_member",
+            "project",
+            "capability",
+            "attribute_definition",
+            "team_member",
+            "team",
+            "member",
+            "workspace",
+        ).forEach { jdbc.execute("update $it set created_by_object_id = null, updated_by_object_id = null") }
+        jdbc.execute("update item set updated_by_object_id = null")
         listOf(
             "project_workflow_rule", "project_view", "item_git_ref", "project_repo", "time_entry",
             "item_group_type", "item_group_member_history", "item_group_member", "item_group", "milestone",

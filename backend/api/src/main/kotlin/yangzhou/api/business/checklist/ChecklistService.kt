@@ -22,17 +22,17 @@ class ChecklistService(
 
     data class ChecklistDto(val entries: List<EntryDto>, val doneCount: Int, val totalCount: Int)
 
-    fun list(itemId: UUID): ChecklistDto {
-        val item = items.findByObjectId(itemId) ?: throw NotFoundException("item 不存在")
-        return toDto(checklists.findByItemIdOrderByPositionAscIdAsc(item.id!!))
+    fun list(itemObjectId: UUID): ChecklistDto {
+        val item = items.findByObjectId(itemObjectId) ?: throw NotFoundException("item 不存在")
+        return toDto(checklists.findByItemObjectIdOrderByPositionAscIdAsc(item.objectId!!))
     }
 
     @Transactional
-    fun add(itemId: UUID, text: String): EntryDto {
-        val item = items.findByObjectId(itemId) ?: throw NotFoundException("item 不存在")
-        val position = checklists.findByItemIdOrderByPositionAscIdAsc(item.id!!).maxOfOrNull { it.position + 1 } ?: 0
+    fun add(itemObjectId: UUID, text: String): EntryDto {
+        val item = items.findByObjectId(itemObjectId) ?: throw NotFoundException("item 不存在")
+        val position = checklists.findByItemObjectIdOrderByPositionAscIdAsc(item.objectId!!).maxOfOrNull { it.position + 1 } ?: 0
         val saved = checklists.save(
-            ChecklistItem(itemId = item.id!!, text = text.trim(), position = position),
+            ChecklistItem(itemObjectId = item.objectId!!, text = text.trim(), position = position),
         )
         return EntryDto(saved.objectId, saved.text, saved.done)
     }

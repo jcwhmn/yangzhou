@@ -1,5 +1,6 @@
 package yangzhou.api.business.metrics
 
+import java.util.UUID
 import yangzhou.persistence.ItemGroupMemberHistory
 import yangzhou.persistence.repository.MetricsHistoryRow
 import java.time.Instant
@@ -11,15 +12,15 @@ import kotlin.test.assertTrue
 /** 纯计算函数直测(无 Spring;spec 0038 ②)。 */
 class MetricsMathTest {
 
-    private fun row(itemId: Long = 1, from: Long?, to: Long, at: String) =
-        MetricsHistoryRow(itemId = itemId, fromStatusId = from, toStatusId = to, createdAt = Instant.parse(at))
+    private fun row(itemObjectId: UUID = UUID(0, 1), from: UUID?, to: UUID, at: String) =
+        MetricsHistoryRow(itemObjectId = itemObjectId, fromStatusObjectId = from, toStatusObjectId = to, createdAt = Instant.parse(at))
 
     private val h = listOf(
-        row(from = null, to = 10, at = "2026-01-01T09:00:00Z"), // created → To Do(id=10)
-        row(from = 10, to = 20, at = "2026-01-02T09:00:00Z"),   // 离开 start → In Progress(id=20)
-        row(from = 20, to = 30, at = "2026-01-05T09:00:00Z"),   // → Done(id=30, final)
-        row(from = 30, to = 20, at = "2026-01-06T09:00:00Z"),   // 重开 → In Progress
-        row(from = 20, to = 30, at = "2026-01-09T09:00:00Z"),   // 再完成(不重复计)
+        row(from = null, to = UUID(0, 10), at = "2026-01-01T09:00:00Z"), // created → To Do(id=10)
+        row(from = UUID(0, 10), to = UUID(0, 20), at = "2026-01-02T09:00:00Z"),   // 离开 start → In Progress(id=20)
+        row(from = UUID(0, 20), to = UUID(0, 30), at = "2026-01-05T09:00:00Z"),   // → Done(id=30, final)
+        row(from = UUID(0, 30), to = UUID(0, 20), at = "2026-01-06T09:00:00Z"),   // 重开 → In Progress
+        row(from = UUID(0, 20), to = UUID(0, 30), at = "2026-01-09T09:00:00Z"),   // 再完成(不重复计)
     )
 
     @Test
@@ -38,26 +39,26 @@ class MetricsMathTest {
 
     @Test
     fun 完成时刻_取首次进final_重开不重复计() {
-        assertEquals(Instant.parse("2026-01-05T09:00:00Z"), completionTs(h, setOf(30)))
-        assertNull(completionTs(h, setOf(99)))
+        assertEquals(Instant.parse("2026-01-05T09:00:00Z"), completionTs(h, setOf(UUID(0, 30))))
+        assertNull(completionTs(h, setOf(UUID(0, 99))))
     }
 
     @Test
     fun 周期起点_取首次离开start_创建行不计() {
-        assertEquals(Instant.parse("2026-01-02T09:00:00Z"), cycleStartTs(h, setOf(10)))
+        assertEquals(Instant.parse("2026-01-02T09:00:00Z"), cycleStartTs(h, setOf(UUID(0, 10))))
         // 从未离开 start:仅创建行
-        val onlyCreated = listOf(row(from = null, to = 10, at = "2026-01-01T09:00:00Z"))
-        assertNull(cycleStartTs(onlyCreated, setOf(10)))
+        val onlyCreated = listOf(row(from = null, to = UUID(0, 10), at = "2026-01-01T09:00:00Z"))
+        assertNull(cycleStartTs(onlyCreated, setOf(UUID(0, 10))))
     }
 
     @Test
     fun 状态回放_各时点() {
         assertNull(statusAt(h, Instant.parse("2026-01-01T08:00:00Z")))
-        assertEquals(10L, statusAt(h, Instant.parse("2026-01-01T12:00:00Z")))
-        assertEquals(20L, statusAt(h, Instant.parse("2026-01-04T00:00:00Z")))
-        assertEquals(30L, statusAt(h, Instant.parse("2026-01-05T12:00:00Z")))
-        assertEquals(20L, statusAt(h, Instant.parse("2026-01-07T00:00:00Z"))) // 重开中
-        assertEquals(30L, statusAt(h, Instant.parse("2026-01-20T00:00:00Z")))
+        assertEquals(UUID(0, 10), statusAt(h, Instant.parse("2026-01-01T12:00:00Z")))
+        assertEquals(UUID(0, 20), statusAt(h, Instant.parse("2026-01-04T00:00:00Z")))
+        assertEquals(UUID(0, 30), statusAt(h, Instant.parse("2026-01-05T12:00:00Z")))
+        assertEquals(UUID(0, 20), statusAt(h, Instant.parse("2026-01-07T00:00:00Z"))) // 重开中
+        assertEquals(UUID(0, 30), statusAt(h, Instant.parse("2026-01-20T00:00:00Z")))
     }
 
     @Test
@@ -77,13 +78,13 @@ class MetricsMathTest {
     @Test
     fun covering_边界与离组() {
         val t = Instant.parse("2026-10-05T00:00:00Z")
-        assertEquals(emptySet<Long>(), coveringItemIds(emptyList(), t))
+        assertEquals(emptySet<UUID>(), coveringItemObjectIds(emptyList(), t))
         val episodes = listOf(
-            ItemGroupMemberHistory(groupId = 1, itemId = 11, addedAt = t), // 边界:added == t
-            ItemGroupMemberHistory(groupId = 1, itemId = 12, addedAt = Instant.parse("2026-10-04T00:00:00Z"), removedAt = t), // removed == t 不覆盖
-            ItemGroupMemberHistory(groupId = 1, itemId = 13, addedAt = Instant.parse("2026-10-01T00:00:00Z"), removedAt = t.plusMillis(1)),
-            ItemGroupMemberHistory(groupId = 2, itemId = 14, addedAt = t.plusMillis(1)), // 尚未加入
+            ItemGroupMemberHistory(groupObjectId = UUID(0, 1), itemObjectId = UUID(0, 11), addedAt = t), // 边界:added == t
+            ItemGroupMemberHistory(groupObjectId = UUID(0, 1), itemObjectId = UUID(0, 12), addedAt = Instant.parse("2026-10-04T00:00:00Z"), removedAt = t), // removed == t 不覆盖
+            ItemGroupMemberHistory(groupObjectId = UUID(0, 1), itemObjectId = UUID(0, 13), addedAt = Instant.parse("2026-10-01T00:00:00Z"), removedAt = t.plusMillis(1)),
+            ItemGroupMemberHistory(groupObjectId = UUID(0, 2), itemObjectId = UUID(0, 14), addedAt = t.plusMillis(1)), // 尚未加入
         )
-        assertEquals(setOf(11L, 13L), coveringItemIds(episodes, t))
+        assertEquals(setOf(UUID(0, 11), UUID(0, 13)), coveringItemObjectIds(episodes, t))
     }
 }

@@ -26,19 +26,19 @@ class CommentService(
         val createdAt: String,
     )
 
-    fun list(itemId: UUID): List<CommentDto> {
-        val item = itemRepo.findByObjectId(itemId) ?: throw NotFoundException("item 不存在")
+    fun list(itemObjectId: UUID): List<CommentDto> {
+        val item = itemRepo.findByObjectId(itemObjectId) ?: throw NotFoundException("item 不存在")
         val author = memberService.current()
-        return comments.findByItemIdOrderByCreatedAtDesc(item.id!!)
+        return comments.findByItemObjectIdOrderByCreatedAtDesc(item.objectId!!)
             .map { CommentDto(it.objectId, it.body, author.displayName, it.createdAt.toString()) }
     }
 
     @Transactional
-    fun create(itemId: UUID, body: String): CommentDto {
-        val item = itemRepo.findByObjectId(itemId) ?: throw NotFoundException("item 不存在")
+    fun create(itemObjectId: UUID, body: String): CommentDto {
+        val item = itemRepo.findByObjectId(itemObjectId) ?: throw NotFoundException("item 不存在")
         val member = memberService.current()
-        val saved = comments.save(Comment(itemId = item.id!!, authorMemberId = member.id!!, body = body.trim()))
-        notificationService.notifyComment(item, member.id!!, saved.body.take(200))
+        val saved = comments.save(Comment(itemObjectId = item.objectId!!, authorMemberObjectId = member.objectId!!, body = body.trim()))
+        notificationService.notifyComment(item, member.objectId!!, saved.body.take(200))
         return CommentDto(saved.objectId, saved.body, member.displayName, saved.createdAt.toString())
     }
 

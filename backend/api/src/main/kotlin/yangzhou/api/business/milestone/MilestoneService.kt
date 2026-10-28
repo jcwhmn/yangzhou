@@ -51,7 +51,7 @@ class MilestoneService(
 
     private fun find(key: String, milestoneId: UUID): Milestone {
         val p = project(key)
-        return milestones.findByProjectIdAndObjectId(p.id!!, milestoneId) ?: throw NotFoundException("milestone 不存在")
+        return milestones.findByProjectObjectIdAndObjectId(p.objectId!!, milestoneId) ?: throw NotFoundException("milestone 不存在")
     }
 
     private fun Milestone.toDto() = MilestoneDto(
@@ -64,11 +64,11 @@ class MilestoneService(
     /** 排序:in_progress 优先,completed/cancelled 末尾(历史);余按 target_date asc nulls last,再按创建序。 */
     fun list(key: String): List<MilestoneDto> {
         val rank = mapOf("in_progress" to 0, "planned" to 1, "completed" to 2, "cancelled" to 3)
-        return milestones.findByProjectIdOrderByCreatedAt(project(key).id!!)
+        return milestones.findByProjectObjectIdOrderByCreatedAt(project(key).objectId!!)
             .sortedWith(
                 compareBy<Milestone> { rank.getValue(it.status) }
                     .thenBy { it.targetDate ?: LocalDate.MAX }
-                    .thenBy { it.id },
+                    .thenBy { it.objectId },
             )
             .map { it.toDto() }
     }
@@ -79,7 +79,7 @@ class MilestoneService(
         val name = request.name?.trim().takeUnless { it.isNullOrEmpty() } ?: throw BadRequestException("name 必填")
         val saved = milestones.save(
             Milestone(
-                projectId = p.id!!,
+                projectObjectId = p.objectId!!,
                 name = name,
                 targetDate = parseDate(request.targetDate),
             ),
@@ -102,8 +102,8 @@ class MilestoneService(
             throw ConflictException("终态 milestone 不可编辑(历史保留)")
         }
         if (request.status == "in_progress" && m.status != "in_progress") {
-            val currents = milestones.findByProjectIdAndStatus(m.projectId, "in_progress")
-            if (currents.any { it.id != m.id }) throw ConflictException("已有进行中的 milestone(当前节点至多一个,先完成或取消)")
+            val currents = milestones.findByProjectObjectIdAndStatus(m.projectObjectId, "in_progress")
+            if (currents.any { it.objectId != m.objectId }) throw ConflictException("已有进行中的 milestone(当前节点至多一个,先完成或取消)")
         }
         val saved = milestones.save(
             m.copy(

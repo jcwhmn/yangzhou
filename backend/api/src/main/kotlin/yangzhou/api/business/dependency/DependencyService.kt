@@ -37,11 +37,11 @@ class DependencyService(
 
     fun list(itemId: UUID): DependencyListDto {
         val item = items.findByObjectId(itemId) ?: throw NotFoundException("item 不存在")
-        val projectId = item.projectId
-        val project = projects.findById(projectId).orElse(null)
-        val statusById = statuses.findByProjectIdOrderByPosition(projectId).associateBy { it.objectId }
-        val deps = dependencies.findByItemId(item.id!!).map { row ->
-            val target = items.findById(row.dependsOnItemId).orElse(null)
+        val projectObjectId = item.projectObjectId
+        val project = projects.findByObjectId(projectObjectId)
+        val statusById = statuses.findByProjectObjectIdOrderByPosition(projectObjectId).associateBy { it.objectId }
+        val deps = dependencies.findByItemObjectId(item.objectId!!).map { row ->
+            val target = items.findByObjectId(row.dependsOnItemObjectId)
             val status = target?.let { statusById[it.statusObjectId] }
             DependencyDto(
                 dependencyItemId = row.objectId,
@@ -60,14 +60,14 @@ class DependencyService(
         if (itemId == dependsOnItemId) throw BadRequestException("item 不能依赖自己")
         val item = items.findByObjectId(itemId) ?: throw NotFoundException("item 不存在")
         val target = items.findByObjectId(dependsOnItemId) ?: throw BadRequestException("被依赖 item 不存在")
-        if (target.projectId != item.projectId) throw BadRequestException("依赖仅限同项目 item")
-        val itemIdLong = item.id!!
-        val targetIdLong = target.id!!
-        if (dependencies.existsByItemIdAndDependsOnItemId(itemIdLong, targetIdLong)) throw ConflictException("依赖已存在")
-        if (reaches(itemIdLong, targetIdLong)) throw BadRequestException("会产生依赖环")
-        val saved = dependencies.save(ItemDependency(itemId = itemIdLong, dependsOnItemId = targetIdLong))
-        val project = projects.findById(item.projectId).orElse(null)
-        val status = statuses.findByProjectIdOrderByPosition(item.projectId)
+        if (target.projectObjectId != item.projectObjectId) throw BadRequestException("依赖仅限同项目 item")
+        val itemObjectIdLong = item.objectId!!
+        val targetIdLong = target.objectId!!
+        if (dependencies.existsByItemObjectIdAndDependsOnItemObjectId(itemObjectIdLong, targetIdLong)) throw ConflictException("依赖已存在")
+        if (reaches(itemObjectIdLong, targetIdLong)) throw BadRequestException("会产生依赖环")
+        val saved = dependencies.save(ItemDependency(itemObjectId = itemObjectIdLong, dependsOnItemObjectId = targetIdLong))
+        val project = projects.findByObjectId(item.projectObjectId)
+        val status = statuses.findByProjectObjectIdOrderByPosition(item.projectObjectId)
             .firstOrNull { it.objectId == target.statusObjectId }
         return DependencyDto(
             dependencyItemId = saved.objectId,
@@ -86,29 +86,29 @@ class DependencyService(
     }
 
     /** 项目内被阻塞 item 的内部 id 集合(看板列表用;依赖未终态即阻塞,终态自身不算阻塞他人)。 */
-    fun blockedItemIds(projectId: Long): Set<Long> {
-        val projectItems = items.findByProjectIdAndDeletedAtIsNullOrderByNumber(projectId)
-        val itemById = projectItems.associateBy { it.id }
-        val finalByObjectId = statuses.findByProjectIdOrderByPosition(projectId)
+    fun blockedItemObjectIds(projectObjectId: UUID): Set<UUID> {
+        val projectItems = items.findByProjectObjectIdAndDeletedAtIsNullOrderByNumber(projectObjectId)
+        val itemById = projectItems.associateBy { it.objectId }
+        val finalByObjectId = statuses.findByProjectObjectIdOrderByPosition(projectObjectId)
             .associate { it.objectId to it.isFinal }
-        return dependencies.findByItemIdIn(projectItems.mapNotNull { it.id })
+        return dependencies.findByItemObjectIdIn(projectItems.mapNotNull { it.objectId })
             .filter { row ->
-                val target = itemById[row.dependsOnItemId]
+                val target = itemById[row.dependsOnItemObjectId]
                 target != null && finalByObjectId[target.statusObjectId] != true
             }
-            .map { it.itemId }
+            .map { it.itemObjectId }
             .toSet()
     }
 
-    private fun reaches(from: Long, target: Long): Boolean {
+    private fun reaches(from: UUID, target: UUID): Boolean {
         var frontier = listOf(from)
-        val seen = mutableSetOf<Long>()
+        val seen = mutableSetOf<UUID>()
         while (frontier.isNotEmpty()) {
-            val next = mutableListOf<Long>()
+            val next = mutableListOf<UUID>()
             for (node in frontier) {
                 if (node == target) return true
                 if (!seen.add(node)) continue
-                dependencies.findByDependsOnItemId(node).forEach { next.add(it.itemId) }
+                dependencies.findByDependsOnItemObjectId(node).forEach { next.add(it.itemObjectId) }
             }
             frontier = next
         }

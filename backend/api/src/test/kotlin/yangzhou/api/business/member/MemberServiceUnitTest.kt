@@ -47,14 +47,14 @@ class MemberServiceUnitTest {
         comments, itemActivities, itemStatusHistories, timeEntries, projectViews, notifications,
     )
 
-    private val wsId = 9L
+    private val wsId = UUID(0, 9)
     private fun member(
         id: Long? = 5L,
         name: String = "alice",
         passwordHash: String? = null,
         githubUsername: String? = null,
     ) = Member(
-        id = id, workspaceId = wsId, username = null, passwordHash = passwordHash,
+        id = id, objectId = id?.let { UUID(0, it) } ?: UUID.randomUUID(), workspaceObjectId = wsId, username = null, passwordHash = passwordHash,
         displayName = name, githubUsername = githubUsername,
     )
 
@@ -66,7 +66,7 @@ class MemberServiceUnitTest {
             members, capabilities, workspaceService, items, statuses,
             comments, itemActivities, itemStatusHistories, timeEntries, projectViews, notifications,
         )
-        every { workspaceService.required() } returns Workspace(id = wsId)
+        every { workspaceService.required() } returns Workspace(id = 1L, objectId = wsId)
         every { members.findByObjectId(virtual.objectId) } returns virtual
     }
 
@@ -91,15 +91,15 @@ class MemberServiceUnitTest {
 
         @Test
         fun duplicateNameRejected() {
-            every { members.findByWorkspaceId(wsId) } returns listOf(virtual)
+            every { members.findByWorkspaceObjectId(wsId) } returns listOf(virtual)
             assertFailsWith<ConflictException> { service.createVirtual("alice") }
         }
 
         @Test
         fun savedWithPaletteColor() {
-            every { members.findByWorkspaceId(wsId) } returns emptyList()
+            every { members.findByWorkspaceObjectId(wsId) } returns emptyList()
             every { members.findAll() } returns emptyList()
-            every { members.save(any()) } answers { firstArg<Member>().copy(id = 5L) }
+            every { members.save(any()) } answers { firstArg<Member>().copy(id = 5L, objectId = UUID(0, 5)) }
             val dto = service.createVirtual("bob")
             assertEquals("bob", dto.displayName)
             assertEquals(true, dto.virtual)
@@ -119,9 +119,9 @@ class MemberServiceUnitTest {
 
         @Test
         fun activeAssigneeRejected() {
-            val status = Status(projectId = 1L, name = "To Do")
+            val status = Status(projectObjectId = UUID(0, 1), name = "To Do")
             val item = yangzhou.persistence.Item(
-                id = 1L, projectId = 1L, number = 1, title = "t",
+                id = 1L, objectId = UUID(0, 1), projectObjectId = UUID(0, 1), number = 1, title = "t",
                 assigneeObjectId = virtual.objectId, statusObjectId = status.objectId,
             )
             every { items.findByAssigneeObjectIdAndDeletedAtIsNull(virtual.objectId) } returns listOf(item)
@@ -132,21 +132,21 @@ class MemberServiceUnitTest {
         @Test
         fun referencedElsewhereRejected() {
             every { items.findByAssigneeObjectIdAndDeletedAtIsNull(virtual.objectId) } returns emptyList()
-            every { comments.countByAuthorMemberId(5L) } returns 3L
+            every { comments.countByAuthorMemberObjectId(UUID(0, 5)) } returns 3
             assertFailsWith<ConflictException> { service.delete(virtual.objectId) }
         }
 
         @Test
         fun cleanVirtualDeletedWithCapabilities() {
             every { items.findByAssigneeObjectIdAndDeletedAtIsNull(virtual.objectId) } returns emptyList()
-            every { comments.countByAuthorMemberId(5L) } returns 0L
-            every { itemActivities.countByActorMemberId(5L) } returns 0L
-            every { itemStatusHistories.countByActorMemberId(5L) } returns 0L
-            every { timeEntries.countByMemberId(5L) } returns 0L
-            every { projectViews.countByCreatorId(5L) } returns 0L
-            every { notifications.countByActorMemberId(5L) } returns 0L
+            every { comments.countByAuthorMemberObjectId(UUID(0, 5)) } returns 0
+            every { itemActivities.countByActorMemberObjectId(UUID(0, 5)) } returns 0
+            every { itemStatusHistories.countByActorMemberObjectId(UUID(0, 5)) } returns 0
+            every { timeEntries.countByMemberObjectId(UUID(0, 5)) } returns 0
+            every { projectViews.countByCreatorObjectId(UUID(0, 5)) } returns 0
+            every { notifications.countByActorMemberObjectId(UUID(0, 5)) } returns 0
             service.delete(virtual.objectId)
-            verify { capabilities.deleteByMemberId(5L) }
+            verify { capabilities.deleteByMemberObjectId(UUID(0, 5)) }
             verify { members.delete(virtual) }
         }
     }
@@ -162,7 +162,7 @@ class MemberServiceUnitTest {
         @Test
         fun takenByOtherRejected() {
             val other = member(id = 6L, name = "bob", githubUsername = "bob")
-            every { members.findByWorkspaceIdAndGithubUsername(wsId, "bob") } returns other
+            every { members.findByWorkspaceObjectIdAndGithubUsername(wsId, "bob") } returns other
             assertFailsWith<ConflictException> { service.setGithubUsername(virtual.objectId, "bob") }
         }
 
@@ -178,7 +178,7 @@ class MemberServiceUnitTest {
         fun sameNameOnSelfAllowed() {
             val withName = member(githubUsername = "alice")
             every { members.findByObjectId(withName.objectId) } returns withName
-            every { members.findByWorkspaceIdAndGithubUsername(wsId, "alice") } returns withName
+            every { members.findByWorkspaceObjectIdAndGithubUsername(wsId, "alice") } returns withName
             every { members.save(any()) } answers { firstArg() }
             assertEquals("alice", service.setGithubUsername(withName.objectId, "alice").githubUsername)
         }

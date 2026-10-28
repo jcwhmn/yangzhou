@@ -33,17 +33,17 @@ class ProjectMemberService(
         leaderGuard.requireLeader(projectKey)
         val project = projects.findByKey(projectKey) ?: throw NotFoundException("项目不存在:$projectKey")
         val member = members.findByObjectId(memberId) ?: throw NotFoundException("成员不存在")
-        if (projectMembers.existsByProjectIdAndMemberId(project.id!!, member.id!!))
+        if (projectMembers.existsByProjectObjectIdAndMemberObjectId(project.objectId!!, member.objectId!!))
             throw ConflictException("该成员已在项目成员中")
-        projectMembers.save(ProjectMember(projectId = project.id!!, memberId = member.id!!))
+        projectMembers.save(ProjectMember(projectObjectId = project.objectId!!, memberObjectId = member.objectId!!))
         return member.toDto(ProjectMember.ROLE_MEMBER)
     }
 
     /** 按加入顺序(id 自增即加入序)。 */
     fun list(projectKey: String): List<MemberDto> {
         val project = projects.findByKey(projectKey) ?: throw NotFoundException("项目不存在:$projectKey")
-        return projectMembers.findByProjectIdOrderByIdAsc(project.id!!).map {
-            members.findById(it.memberId).orElseThrow().toDto(it.role) // FK 保证成员在
+        return projectMembers.findByProjectObjectIdOrderByIdAsc(project.objectId!!).map {
+            (members.findByObjectId(it.memberObjectId) ?: throw NoSuchElementException("No value present")).toDto(it.role) // FK 保证成员在
         }
     }
 
@@ -52,7 +52,7 @@ class ProjectMemberService(
         leaderGuard.requireLeader(projectKey)
         val project = projects.findByKey(projectKey) ?: throw NotFoundException("项目不存在:$projectKey")
         val member = members.findByObjectId(memberId) ?: throw NotFoundException("成员不存在")
-        val row = projectMembers.findByProjectIdAndMemberId(project.id!!, member.id!!)
+        val row = projectMembers.findByProjectObjectIdAndMemberObjectId(project.objectId!!, member.objectId!!)
             ?: throw NotFoundException("该成员不在项目成员中")
         requireNotLastLeader(row)
         projectMembers.delete(row)
@@ -66,7 +66,7 @@ class ProjectMemberService(
             throw BadRequestException("role 只能是 leader 或 member")
         val project = projects.findByKey(projectKey) ?: throw NotFoundException("项目不存在:$projectKey")
         val member = members.findByObjectId(memberId) ?: throw NotFoundException("成员不存在")
-        val row = projectMembers.findByProjectIdAndMemberId(project.id!!, member.id!!)
+        val row = projectMembers.findByProjectObjectIdAndMemberObjectId(project.objectId!!, member.objectId!!)
             ?: throw NotFoundException("该成员不在项目成员中")
         if (row.role == ProjectMember.ROLE_LEADER && role == ProjectMember.ROLE_MEMBER) requireNotLastLeader(row)
         projectMembers.save(row.copy(role = role))
@@ -75,17 +75,17 @@ class ProjectMemberService(
 
     private fun requireNotLastLeader(row: ProjectMember) {
         if (row.role == ProjectMember.ROLE_LEADER &&
-            projectMembers.findByProjectId(row.projectId).count { it.role == ProjectMember.ROLE_LEADER } <= 1
+            projectMembers.findByProjectObjectId(row.projectObjectId).count { it.role == ProjectMember.ROLE_LEADER } <= 1
         ) throw ConflictException("最后一个 leader 不可降级/移出,先设好接任者")
     }
 
     /** 池规则共用点(0047 严格化):恒返回池内成员 id;空池 = 无人可指派/无候选。 */
-    fun restrictedPool(projectId: Long): Set<Long> =
-        projectMembers.findByProjectId(projectId).mapTo(HashSet()) { it.memberId }
+    fun restrictedPool(projectObjectId: UUID): Set<UUID> =
+        projectMembers.findByProjectObjectId(projectObjectId).mapTo(HashSet()) { it.memberObjectId }
 
     /** 池外指派 fail-fast(409)。 */
-    fun assertAssignable(projectId: Long, memberId: Long) {
-        if (memberId !in restrictedPool(projectId)) throw ConflictException("该成员不在项目成员中")
+    fun assertAssignable(projectObjectId: UUID, memberId: UUID) {
+        if (memberId !in restrictedPool(projectObjectId)) throw ConflictException("该成员不在项目成员中")
     }
 
     private fun Member.toDto(role: String = ProjectMember.ROLE_MEMBER) =

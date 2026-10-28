@@ -20,9 +20,9 @@ class LeaderPermissionApiTest : AbstractApiTest() {
 
     private fun insertMember(username: String, password: String): String {
         val objectId = UUID.randomUUID()
-        val workspaceId = jdbc.queryForObject("select id from workspace limit 1", Long::class.java)!!
+        val workspaceId = jdbc.queryForObject("select object_id from workspace limit 1", java.util.UUID::class.java)!!
         jdbc.update(
-            "insert into member (object_id, workspace_id, username, password_hash, display_name, created_at, updated_at) " +
+            "insert into member (object_id, workspace_object_id, username, password_hash, display_name, created_at, updated_at) " +
                 "values (?, ?, ?, ?, ?, now(), now())",
             objectId, workspaceId, username, encoder.encode(password), username,
         )

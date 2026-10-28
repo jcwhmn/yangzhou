@@ -53,7 +53,7 @@ class NotificationApiTest : AbstractApiTest() {
         // 我的未读 = 0(被排除);小李落一条 status_changed
         assertEquals(0, unreadCount(authed))
         val rows = jdbc.queryForList(
-            "select n.kind, m.display_name from notification n join member m on m.id = n.recipient_member_id where n.kind = 'status_changed'",
+            "select n.kind, m.display_name from notification n join member m on m.object_id = n.recipient_member_object_id where n.kind = 'status_changed'",
         )
         assertEquals(1, rows.size)
         assertEquals("小李", rows[0]["display_name"])

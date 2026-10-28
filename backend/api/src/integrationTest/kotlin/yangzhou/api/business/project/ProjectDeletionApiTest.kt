@@ -117,13 +117,13 @@ class ProjectDeletionApiTest : AbstractApiTest() {
         val mid = json.readTree(m)["memberId"].asText()
         // 单真实用户体系评论作者恒为本人,API 造不出该成员的评论:jdbc 直造(测 service 引用检查)
         val itemId = jdbc.queryForObject(
-            "select id from item where object_id = ?", Long::class.java, UUID.fromString(item["itemId"].asText()),
+            "select object_id from item where object_id = ?", java.util.UUID::class.java, UUID.fromString(item["itemId"].asText()),
         )
         val memberId = jdbc.queryForObject(
-            "select id from member where object_id = ?", Long::class.java, UUID.fromString(mid),
+            "select object_id from member where object_id = ?", java.util.UUID::class.java, UUID.fromString(mid),
         )
         jdbc.update(
-            "insert into comment (object_id, item_id, author_member_id, body) values (?, ?, ?, ?)",
+            "insert into comment (object_id, item_object_id, author_member_object_id, body) values (?, ?, ?, ?)",
             UUID.randomUUID(), itemId, memberId, "脏引用",
         )
 
@@ -132,7 +132,7 @@ class ProjectDeletionApiTest : AbstractApiTest() {
             .expectBody(String::class.java).returnResult().responseBody
         assertTrue(resp!!.contains("引用数据"), "409 消息应带引用计数:$resp")
 
-        jdbc.update("delete from comment where author_member_id = ?", memberId)
+        jdbc.update("delete from comment where author_member_object_id = ?", memberId)
         authed.delete().uri("/api/members/$mid").exchange().expectStatus().isNoContent()
     }
 

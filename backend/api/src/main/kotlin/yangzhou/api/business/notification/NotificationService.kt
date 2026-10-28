@@ -38,40 +38,40 @@ class NotificationService(
 
     // ---------- 触发 ----------
 
-    fun notifyStatusChange(item: Item, actorMemberId: Long?, oldValue: String?, newValue: String?) =
-        notify(item, KIND_STATUS, actorMemberId, oldValue, newValue)
+    fun notifyStatusChange(item: Item, actorMemberObjectId: UUID?, oldValue: String?, newValue: String?) =
+        notify(item, KIND_STATUS, actorMemberObjectId, oldValue, newValue)
 
-    fun notifyAssigned(item: Item, actorMemberId: Long?, assigneeMemberId: Long, assigneeName: String?) {
-        if (actorMemberId != null && actorMemberId == assigneeMemberId) return // 自己指派自己不通知
-        save(assigneeMemberId, item, KIND_ASSIGNED, actorMemberId, null, assigneeName)
+    fun notifyAssigned(item: Item, actorMemberObjectId: UUID?, assigneeMemberObjectId: UUID, assigneeName: String?) {
+        if (actorMemberObjectId != null && actorMemberObjectId == assigneeMemberObjectId) return // 自己指派自己不通知
+        save(assigneeMemberObjectId, item, KIND_ASSIGNED, actorMemberObjectId, null, assigneeName)
     }
 
-    fun notifyComment(item: Item, actorMemberId: Long, excerpt: String) =
-        notify(item, KIND_COMMENTED, actorMemberId, null, excerpt)
+    fun notifyComment(item: Item, actorMemberObjectId: UUID, excerpt: String) =
+        notify(item, KIND_COMMENTED, actorMemberObjectId, null, excerpt)
 
-    private fun notify(item: Item, kind: String, actorMemberId: Long?, oldValue: String?, newValue: String?) {
-        val recipients = baseRecipients(item) - setOfNotNull(actorMemberId)
-        recipients.forEach { save(it, item, kind, actorMemberId, oldValue, newValue) }
+    private fun notify(item: Item, kind: String, actorMemberObjectId: UUID?, oldValue: String?, newValue: String?) {
+        val recipients = baseRecipients(item) - setOfNotNull(actorMemberObjectId)
+        recipients.forEach { save(it, item, kind, actorMemberObjectId, oldValue, newValue) }
     }
 
-    private fun save(recipientMemberId: Long, item: Item, kind: String, actorMemberId: Long?, oldValue: String?, newValue: String?) {
+    private fun save(recipientMemberObjectId: UUID, item: Item, kind: String, actorMemberObjectId: UUID?, oldValue: String?, newValue: String?) {
         notifications.save(
             Notification(
-                recipientMemberId = recipientMemberId,
-                itemId = item.id!!,
+                recipientMemberObjectId = recipientMemberObjectId,
+                itemObjectId = item.objectId!!,
                 kind = kind,
-                actorMemberId = actorMemberId,
+                actorMemberObjectId = actorMemberObjectId,
                 oldValue = oldValue,
                 newValue = newValue,
             ),
         )
     }
 
-    private fun baseRecipients(item: Item): Set<Long> {
-        val ids = mutableSetOf<Long>()
-        item.assigneeObjectId?.let { members.findByObjectId(it)?.id?.let(ids::add) }
-        item.createdBy?.let(ids::add)
-        comments.findByItemId(item.id!!).forEach { ids.add(it.authorMemberId) }
+    private fun baseRecipients(item: Item): Set<UUID> {
+        val ids = mutableSetOf<UUID>()
+        item.assigneeObjectId?.let { members.findByObjectId(it)?.objectId?.let(ids::add) }
+        item.createdByObjectId?.let(ids::add)
+        comments.findByItemObjectId(item.objectId!!).forEach { ids.add(it.authorMemberObjectId) }
         return ids
     }
 
@@ -96,18 +96,18 @@ class NotificationService(
 
     /** 自己的通知;未读在前,最近 50 条;action = 下一列(当前非 final 才有),读时现算。 */
     fun list(): List<NotificationDto> {
-        val meId = memberService.current().id!!
-        val rows = notifications.findByRecipientMemberId(meId)
-            .sortedWith(compareByDescending<Notification> { it.readAt == null }.thenByDescending { it.id })
+        val meId = memberService.current().objectId!!
+        val rows = notifications.findByRecipientMemberObjectId(meId)
+            .sortedWith(compareByDescending<Notification> { it.readAt == null }.thenByDescending { it.objectId })
             .take(50)
         if (rows.isEmpty()) return emptyList()
-        val itemMap = items.findAllById(rows.map { it.itemId }).associateBy { it.id }
-        val actorMap = members.findAllById(rows.mapNotNull { it.actorMemberId }.toSet()).associateBy { it.id }
-        val statusCache = mutableMapOf<Long, List<yangzhou.persistence.Status>>()
+        val itemMap = items.findAllByObjectIdIn(rows.map { it.itemObjectId }).associateBy { it.objectId }
+        val actorMap = members.findAllByObjectIdIn(rows.mapNotNull { it.actorMemberObjectId }.toSet()).associateBy { it.objectId }
+        val statusCache = mutableMapOf<UUID, List<yangzhou.persistence.Status>>()
         return rows.map { n ->
-            val item = itemMap.getValue(n.itemId)
-            val project = projects.findById(item.projectId).orElse(null)
-            val sts = statusCache.getOrPut(item.projectId) { statuses.findByProjectIdOrderByPosition(item.projectId) }
+            val item = itemMap.getValue(n.itemObjectId)
+            val project = projects.findByObjectId(item.projectObjectId)
+            val sts = statusCache.getOrPut(item.projectObjectId) { statuses.findByProjectObjectIdOrderByPosition(item.projectObjectId) }
             val current = sts.firstOrNull { it.objectId == item.statusObjectId }
             val action = if (current != null && !current.isFinal) {
                 sts.filter { it.position > current.position }.minByOrNull { it.position }
@@ -122,7 +122,7 @@ class NotificationService(
                 projectKey = project?.key ?: "?",
                 title = item.title,
                 kind = n.kind,
-                actor = n.actorMemberId?.let { actorMap[it]?.displayName },
+                actor = n.actorMemberObjectId?.let { actorMap[it]?.displayName },
                 oldValue = n.oldValue,
                 newValue = n.newValue,
                 read = n.readAt != null,
@@ -132,21 +132,21 @@ class NotificationService(
         }
     }
 
-    fun unreadCount(): Long = notifications.countByRecipientMemberIdAndReadAtIsNull(memberService.current().id!!)
+    fun unreadCount(): Long = notifications.countByRecipientMemberObjectIdAndReadAtIsNull(memberService.current().objectId!!)
 
     @Transactional
     fun markRead(notificationId: UUID) {
-        val meId = memberService.current().id!!
+        val meId = memberService.current().objectId!!
         val n = notifications.findByObjectId(notificationId) ?: throw NotFoundException("通知不存在")
-        if (n.recipientMemberId != meId) throw NotFoundException("通知不存在")
+        if (n.recipientMemberObjectId != meId) throw NotFoundException("通知不存在")
         if (n.readAt == null) notifications.save(n.copy(readAt = Instant.now()))
     }
 
     @Transactional
     fun readAll() {
-        val meId = memberService.current().id!!
+        val meId = memberService.current().objectId!!
         val now = Instant.now()
-        notifications.findByRecipientMemberId(meId).filter { it.readAt == null }
+        notifications.findByRecipientMemberObjectId(meId).filter { it.readAt == null }
             .forEach { notifications.save(it.copy(readAt = now)) }
     }
 }

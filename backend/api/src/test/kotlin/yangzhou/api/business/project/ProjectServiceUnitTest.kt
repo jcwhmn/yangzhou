@@ -1,5 +1,6 @@
 package yangzhou.api.business.project
 
+import java.util.UUID
 import io.mockk.clearMocks
 import io.mockk.every
 import io.mockk.Ordering
@@ -44,14 +45,14 @@ class ProjectServiceUnitTest {
         deletions, members, projectMembers, groupTypes,
     )
 
-    private val wsId = 9L
-    private val me = Member(id = 5L, workspaceId = wsId, username = "me", passwordHash = "h", displayName = "me")
-    private val che = Project(id = 1L, workspaceId = wsId, key = "CHE", name = "CHE")
+    private val wsId = UUID(0, 9)
+    private val me = Member(id = 5L, objectId = UUID(0, 5), workspaceObjectId = wsId, username = "me", passwordHash = "h", displayName = "me")
+    private val che = Project(id = 1L, objectId = UUID(0, 1), workspaceObjectId = wsId, key = "CHE", name = "CHE")
 
     @BeforeEach
     fun setup() {
         clearMocks(projects, statuses, workflowRules, items, workspaceService, deletions, members, projectMembers, groupTypes)
-        every { workspaceService.required() } returns Workspace(id = wsId)
+        every { workspaceService.required() } returns Workspace(id = 1L, objectId = wsId)
         every { members.current() } returns me
         every { projects.findByKey("CHE") } returns che
     }
@@ -69,12 +70,12 @@ class ProjectServiceUnitTest {
         fun seedsStatusesRulesGroupTypesAndCreatorPool() {
             val fresh = che.copy(id = null)
             every { projects.existsByKey("CHE") } returns false
-            every { projects.save(any()) } returns fresh.copy(id = 1L)
+            every { projects.save(any()) } returns fresh.copy(id = 1L, objectId = UUID(0, 1))
             every { statuses.save(any<Status>()) } answers { firstArg<Status>().copy(id = (firstArg<Status>().position + 1).toLong()) }
             every { workflowRules.save(any<yangzhou.persistence.ProjectWorkflowRule>()) } answers { firstArg<yangzhou.persistence.ProjectWorkflowRule>() }
             every { projectMembers.save(any<yangzhou.persistence.ProjectMember>()) } answers { firstArg() }
             every { groupTypes.save(any<yangzhou.persistence.ItemGroupType>()) } answers { firstArg() }
-            every { statuses.findByProjectIdOrderByPosition(1L) } returns defaultStatuses(1L)
+            every { statuses.findByProjectObjectIdOrderByPosition(UUID(0, 1)) } returns defaultStatuses(UUID(0, 1))
             val saved = service.create("CHE", "CHE")
             assertEquals("CHE", saved.key)
             verify(exactly = 5) { statuses.save(any()) } // V7 五列
@@ -94,8 +95,8 @@ class ProjectServiceUnitTest {
 
         @Test
         fun statusDtosMapped() {
-            val s = Status(id = 1L, projectId = 1L, name = "Done", isFinal = true, position = 4)
-            every { statuses.findByProjectIdOrderByPosition(1L) } returns listOf(s)
+            val s = Status(id = 1L, objectId = UUID(0, 1), projectObjectId = UUID(0, 1), name = "Done", isFinal = true, position = 4)
+            every { statuses.findByProjectObjectIdOrderByPosition(UUID(0, 1)) } returns listOf(s)
             val dto = service.get("CHE")
             assertEquals(1, dto.statuses.size)
             assertEquals(true, dto.statuses[0].isFinal)
@@ -105,7 +106,7 @@ class ProjectServiceUnitTest {
         @Test
         fun listSkipsBrokenProjects() {
             every { projects.findAll() } returns listOf(che)
-            every { statuses.findByProjectIdOrderByPosition(1L) } throws RuntimeException("boom")
+            every { statuses.findByProjectObjectIdOrderByPosition(UUID(0, 1)) } throws RuntimeException("boom")
             assertEquals(emptyList(), service.list()) // 组装失败跳过,不炸整列表
         }
     }
@@ -123,23 +124,23 @@ class ProjectServiceUnitTest {
         fun purgesInFkOrder() {
             service.delete("CHE")
             verify(ordering = Ordering.ORDERED) {
-                deletions.purgeRequirements(1L)
-                deletions.purgeItemGroupMembers(1L)
-                deletions.purgeItems(1L)
-                deletions.purgeItemGroups(1L)
-                deletions.purgeItemGroupTypes(1L)
-                deletions.purgeMilestones(1L)
-                deletions.deleteProject(1L)
+                deletions.purgeRequirements(UUID(0, 1))
+                deletions.purgeItemGroupMembers(UUID(0, 1))
+                deletions.purgeItems(UUID(0, 1))
+                deletions.purgeItemGroups(UUID(0, 1))
+                deletions.purgeItemGroupTypes(UUID(0, 1))
+                deletions.purgeMilestones(UUID(0, 1))
+                deletions.deleteProject(UUID(0, 1))
             }
         }
     }
 
     /** 镜像 ProjectService.defaultStatuses(V7 五列)供 get 组装;种子内容已由 DefaultRuleSeedsUnitTest 守护。 */
-    private fun defaultStatuses(projectId: Long): List<Status> = listOf(
-        Status(projectId = projectId, name = "To Do", position = 0),
-        Status(projectId = projectId, name = "In Progress", position = 1),
-        Status(projectId = projectId, name = "In Review", position = 2),
-        Status(projectId = projectId, name = "QA", position = 3),
-        Status(projectId = projectId, name = "Done", isFinal = true, position = 4),
+    private fun defaultStatuses(projectObjectId: UUID): List<Status> = listOf(
+        Status(projectObjectId = projectObjectId, name = "To Do", position = 0),
+        Status(projectObjectId = projectObjectId, name = "In Progress", position = 1),
+        Status(projectObjectId = projectObjectId, name = "In Review", position = 2),
+        Status(projectObjectId = projectObjectId, name = "QA", position = 3),
+        Status(projectObjectId = projectObjectId, name = "Done", isFinal = true, position = 4),
     )
 }

@@ -59,9 +59,9 @@ class SprintService(
     private fun project(key: String) =
         projects.findByKey(key) ?: throw NotFoundException("项目不存在:$key")
 
-    private fun find(key: String, groupId: UUID): ItemGroup {
+    private fun find(key: String, groupObjectId: UUID): ItemGroup {
         val p = project(key)
-        return groups.findByProjectIdAndObjectId(p.id!!, groupId) ?: throw NotFoundException("sprint 不存在")
+        return groups.findByProjectObjectIdAndObjectId(p.objectId!!, groupObjectId) ?: throw NotFoundException("sprint 不存在")
     }
 
     private fun ItemGroup.toDto() = SprintDto(
@@ -82,17 +82,17 @@ class SprintService(
     }
 
     fun list(key: String): List<SprintDto> =
-        groups.findByProjectIdOrderByCreatedAt(project(key).id!!).map { it.toDto() }
+        groups.findByProjectObjectIdOrderByCreatedAt(project(key).objectId!!).map { it.toDto() }
 
     @Transactional
     fun create(key: String, request: CreateSprintRequest): SprintDto {
         leaderGuard.requireLeader(key)
         val name = request.name?.trim().takeUnless { it.isNullOrEmpty() } ?: throw BadRequestException("name 必填")
         val p = project(key)
-        groupTypes.findByProjectIdAndTypeKey(p.id!!, "sprint") ?: throw ConflictException("项目缺少 sprint 类型")
+        groupTypes.findByProjectObjectIdAndTypeKey(p.objectId!!, "sprint") ?: throw ConflictException("项目缺少 sprint 类型")
         val saved = groups.save(
             ItemGroup(
-                projectId = p.id!!,
+                projectObjectId = p.objectId!!,
                 name = name,
                 startDate = parseDate(request.startDate, "startDate"),
                 endDate = parseDate(request.endDate, "endDate"),
@@ -101,12 +101,12 @@ class SprintService(
         return saved.toDto()
     }
 
-    fun get(key: String, groupId: UUID): SprintDto = find(key, groupId).toDto()
+    fun get(key: String, groupObjectId: UUID): SprintDto = find(key, groupObjectId).toDto()
 
     @Transactional
-    fun update(key: String, groupId: UUID, request: UpdateSprintRequest): SprintDto {
+    fun update(key: String, groupObjectId: UUID, request: UpdateSprintRequest): SprintDto {
         leaderGuard.requireLeader(key)
-        val g = find(key, groupId)
+        val g = find(key, groupObjectId)
         val name = request.name?.trim()
         if (name != null && name.isEmpty()) throw BadRequestException("name 不能为空")
         if (request.status != null && request.status !in statusValues) {
@@ -132,19 +132,19 @@ class SprintService(
 
     /** 仅空 sprint 可删(裁决 6):有 membership 即历史/在途事实,删了就丢,409 拒绝。 */
     @Transactional
-    fun delete(key: String, groupId: UUID) {
+    fun delete(key: String, groupObjectId: UUID) {
         leaderGuard.requireLeader(key)
-        val g = find(key, groupId)
-        if (memberships.existsByGroupId(g.id!!)) throw ConflictException("sprint 非空,请先移出 items")
+        val g = find(key, groupObjectId)
+        if (memberships.existsByGroupObjectId(g.objectId!!)) throw ConflictException("sprint 非空,请先移出 items")
         groups.delete(g)
     }
 
     /** sprint 页 items:含历史行(completed 后仍在其列,裁决 2)。 */
-    fun items(key: String, groupId: UUID): List<ItemService.ItemDto> {
-        val g = find(key, groupId)
-        val rows = memberships.findByGroupId(g.id!!)
+    fun items(key: String, groupObjectId: UUID): List<ItemService.ItemDto> {
+        val g = find(key, groupObjectId)
+        val rows = memberships.findByGroupObjectId(g.objectId!!)
         if (rows.isEmpty()) return emptyList()
-        val objectIds = itemRepo.findAllById(rows.map { it.itemId }).map { it.objectId }.toSet()
+        val objectIds = itemRepo.findAllByObjectIdIn(rows.map { it.itemObjectId }).map { it.objectId }.toSet()
         return itemService.list(key).filter { it.itemId in objectIds }
     }
 
@@ -155,12 +155,12 @@ class SprintService(
 
     /** 看板(YPJ-29):active sprint 的 items 并集;无 active → 全量(降级语义在后端,前端零 sprint 逻辑)。 */
     fun board(key: String): BoardDto {
-        val active = groups.findByProjectIdOrderByCreatedAt(project(key).id!!).filter { it.status == "active" }
+        val active = groups.findByProjectObjectIdOrderByCreatedAt(project(key).objectId!!).filter { it.status == "active" }
         val activeDto = active.map { it.toDto() }
         if (active.isEmpty()) return BoardDto(emptyList(), itemService.list(key))
-        val rows = active.flatMap { memberships.findByGroupId(it.id!!) }
+        val rows = active.flatMap { memberships.findByGroupObjectId(it.objectId!!) }
         if (rows.isEmpty()) return BoardDto(activeDto, emptyList())
-        val objectIds = itemRepo.findAllById(rows.map { it.itemId }.toSet()).map { it.objectId }.toSet()
+        val objectIds = itemRepo.findAllByObjectIdIn(rows.map { it.itemObjectId }.toSet()).map { it.objectId }.toSet()
         return BoardDto(activeDto, itemService.list(key).filter { it.itemId in objectIds })
     }
 
@@ -169,30 +169,30 @@ class SprintService(
      * completed sprint 拒绝指派(历史不可变);sprintId=null = 移出(仅删 planned/active 行)。
      */
     @Transactional
-    fun assignItem(itemId: UUID, sprintId: UUID?): ItemService.ItemDto {
-        val item = itemRepo.findByObjectId(itemId) ?: throw NotFoundException("item 不存在")
-        val rows = memberships.findByItemIdIn(listOf(item.id!!))
+    fun assignItem(itemObjectId: UUID, sprintId: UUID?): ItemService.ItemDto {
+        val item = itemRepo.findByObjectId(itemObjectId) ?: throw NotFoundException("item 不存在")
+        val rows = memberships.findByItemObjectIdIn(listOf(item.objectId!!))
         val rowGroups = if (rows.isEmpty()) emptyMap()
-        else groups.findAllById(rows.map { it.groupId }.toSet()).associateBy { it.id!! }
-        val current = rows.firstOrNull { rowGroups[it.groupId]?.status != "completed" }
+        else groups.findAllByObjectIdIn(rows.map { it.groupObjectId }.toSet()).associateBy { it.objectId!! }
+        val current = rows.firstOrNull { rowGroups[it.groupObjectId]?.status != "completed" }
 
         if (sprintId == null) {
             if (current != null) {
                 memberships.delete(current)
-                memberHistory.recordRemove(current.groupId, current.itemId, clock.instant()) // YPJ-54 留痕
+                memberHistory.recordRemove(current.groupObjectId, current.itemObjectId, clock.instant()) // YPJ-54 留痕
             }
-            return itemService.get(itemId)
+            return itemService.get(itemObjectId)
         }
-        val sprint = groups.findByProjectIdAndObjectId(item.projectId, sprintId)
+        val sprint = groups.findByProjectObjectIdAndObjectId(item.projectObjectId, sprintId)
             ?: throw NotFoundException("sprint 不存在")
         if (sprint.status == "completed") throw ConflictException("sprint 已完成,不能指派")
-        if (current != null && current.groupId == sprint.id) return itemService.get(itemId)
+        if (current != null && current.groupObjectId == sprint.objectId) return itemService.get(itemObjectId)
         if (current != null) {
             memberships.delete(current)
-            memberHistory.recordRemove(current.groupId, current.itemId, clock.instant())
+            memberHistory.recordRemove(current.groupObjectId, current.itemObjectId, clock.instant())
         }
-        memberships.save(ItemGroupMember(groupId = sprint.id!!, itemId = item.id!!))
-        memberHistory.recordAdd(sprint.id!!, item.id!!, clock.instant())
-        return itemService.get(itemId)
+        memberships.save(ItemGroupMember(groupObjectId = sprint.objectId!!, itemObjectId = item.objectId!!))
+        memberHistory.recordAdd(sprint.objectId!!, item.objectId!!, clock.instant())
+        return itemService.get(itemObjectId)
     }
 }

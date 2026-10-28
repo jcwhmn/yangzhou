@@ -28,10 +28,10 @@ class ProjectMemberServiceUnitTest {
     private val leaderGuard = mockk<yangzhou.api.guard.LeaderGuard>(relaxed = true)
     private val service = ProjectMemberService(leaderGuard, projects, members, projectMembers)
 
-    private val project = Project(id = 1L, workspaceId = 9L, key = "CHE", name = "CHE")
+    private val project = Project(id = 1L, objectId = UUID(0, 1), workspaceObjectId = UUID(0, 9), key = "CHE", name = "CHE")
     private val member = Member(
-        id = 5L,
-        workspaceId = 9L,
+        id = 5L, objectId = UUID(0, 5),
+        workspaceObjectId = UUID(0, 9),
         username = null,
         passwordHash = null,
         displayName = "alice",
@@ -61,13 +61,13 @@ class ProjectMemberServiceUnitTest {
 
         @Test
         fun duplicateRejected() {
-            every { projectMembers.existsByProjectIdAndMemberId(1L, 5L) } returns true
+            every { projectMembers.existsByProjectObjectIdAndMemberObjectId(UUID(0, 1), UUID(0, 5)) } returns true
             assertFailsWith<ConflictException> { service.add("CHE", member.objectId) }
         }
 
         @Test
         fun savedAndReturned() {
-            every { projectMembers.existsByProjectIdAndMemberId(1L, 5L) } returns false
+            every { projectMembers.existsByProjectObjectIdAndMemberObjectId(UUID(0, 1), UUID(0, 5)) } returns false
             every { projectMembers.save(any()) } answers { firstArg() }
             val dto = service.add("CHE", member.objectId)
             assertEquals("alice", dto.displayName)
@@ -82,12 +82,12 @@ class ProjectMemberServiceUnitTest {
         @Test
         fun orderedByJoin() {
             val other = member.copy(id = 6L, displayName = "bob")
-            every { projectMembers.findByProjectIdOrderByIdAsc(1L) } returns listOf(
-                ProjectMember(id = 10L, projectId = 1L, memberId = 5L),
-                ProjectMember(id = 11L, projectId = 1L, memberId = 6L),
+            every { projectMembers.findByProjectObjectIdOrderByIdAsc(UUID(0, 1)) } returns listOf(
+                ProjectMember(id = 10L, projectObjectId = UUID(0, 1), memberObjectId = UUID(0, 5)),
+                ProjectMember(id = 11L, projectObjectId = UUID(0, 1), memberObjectId = UUID(0, 6)),
             )
-            every { members.findById(5L) } returns java.util.Optional.of(member)
-            every { members.findById(6L) } returns java.util.Optional.of(other)
+            every { members.findByObjectId(UUID(0, 5)) } returns (member)
+            every { members.findByObjectId(UUID(0, 6)) } returns (other)
             assertEquals(listOf("alice", "bob"), service.list("CHE").map { it.displayName })
         }
     }
@@ -97,14 +97,14 @@ class ProjectMemberServiceUnitTest {
 
         @Test
         fun notInPoolRejected() {
-            every { projectMembers.findByProjectIdAndMemberId(1L, 5L) } returns null
+            every { projectMembers.findByProjectObjectIdAndMemberObjectId(UUID(0, 1), UUID(0, 5)) } returns null
             assertFailsWith<NotFoundException> { service.remove("CHE", member.objectId) }
         }
 
         @Test
         fun rowDeleted() {
-            val row = ProjectMember(id = 10L, projectId = 1L, memberId = 5L)
-            every { projectMembers.findByProjectIdAndMemberId(1L, 5L) } returns row
+            val row = ProjectMember(id = 10L, projectObjectId = UUID(0, 1), memberObjectId = UUID(0, 5))
+            every { projectMembers.findByProjectObjectIdAndMemberObjectId(UUID(0, 1), UUID(0, 5)) } returns row
             service.remove("CHE", member.objectId)
             verify { projectMembers.delete(row) }
         }
@@ -114,18 +114,18 @@ class ProjectMemberServiceUnitTest {
     inner class RestrictedPool {
 
         @Test
-        fun poolMemberIdsOnly() {
-            every { projectMembers.findByProjectId(1L) } returns listOf(
-                ProjectMember(id = 10L, projectId = 1L, memberId = 5L),
-                ProjectMember(id = 11L, projectId = 1L, memberId = 6L),
+        fun poolMemberObjectIdsOnly() {
+            every { projectMembers.findByProjectObjectId(UUID(0, 1)) } returns listOf(
+                ProjectMember(id = 10L, projectObjectId = UUID(0, 1), memberObjectId = UUID(0, 5)),
+                ProjectMember(id = 11L, projectObjectId = UUID(0, 1), memberObjectId = UUID(0, 6)),
             )
-            assertEquals(setOf(5L, 6L), service.restrictedPool(1L))
+            assertEquals(setOf(UUID(0, 5), UUID(0, 6)), service.restrictedPool(UUID(0, 1)))
         }
 
         @Test
         fun outsidePoolNotAssignable() {
-            every { projectMembers.findByProjectId(1L) } returns emptyList()
-            assertFailsWith<ConflictException> { service.assertAssignable(1L, 5L) }
+            every { projectMembers.findByProjectObjectId(UUID(0, 1)) } returns emptyList()
+            assertFailsWith<ConflictException> { service.assertAssignable(UUID(0, 1), UUID(0, 5)) }
         }
     }
 }

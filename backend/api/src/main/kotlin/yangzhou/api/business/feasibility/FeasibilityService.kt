@@ -60,7 +60,7 @@ class FeasibilityService(
     fun project(projectKey: String): ProjectResultDto {
         val project = projects.findByKey(projectKey) ?: throw NotFoundException("项目不存在:$projectKey")
         val member = domainMember()
-        val projectItems = itemRepo.findByProjectIdAndDeletedAtIsNullOrderByNumber(project.id!!)
+        val projectItems = itemRepo.findByProjectObjectIdAndDeletedAtIsNullOrderByNumber(project.objectId!!)
         val domainItems = projectItems.map { itemToDomain(it) }
         val rollup: RollupResult = MatchingEngine.rollupProject(
             yangzhou.domain.Project(project.key, domainItems),
@@ -88,7 +88,7 @@ class FeasibilityService(
 
     fun item(itemId: UUID): ItemResultDto {
         val item = itemRepo.findByObjectId(itemId) ?: throw NotFoundException("item 不存在")
-        val project = projects.findAll().firstOrNull { it.id == item.projectId }
+        val project = projects.findAll().firstOrNull { it.objectId == item.projectObjectId }
             ?: throw NotFoundException("项目不存在")
         val match: MatchResult = MatchingEngine.matchItem(itemToDomain(item), domainMember())
         return ItemResultDto(
@@ -115,14 +115,14 @@ class FeasibilityService(
     }
 
     /** 重算项目:全部 item 冗余 + 聚合到 project(RED>YELLOW>GREEN;无 item = null)。 */
-    fun recomputeProjectSignal(projectId: Long): String? {
-        val projectItems = itemRepo.findByProjectIdAndDeletedAtIsNullOrderByNumber(projectId)
+    fun recomputeProjectSignal(projectObjectId: UUID): String? {
+        val projectItems = itemRepo.findByProjectObjectIdAndDeletedAtIsNullOrderByNumber(projectObjectId)
         var worst: String? = null
         for (it in projectItems) {
             val s = recomputeItemSignal(it)
             worst = if (worst == null || rank.getValue(s) > rank.getValue(worst)) s else worst
         }
-        val project = projects.findById(projectId).orElse(null) ?: return null
+        val project = projects.findByObjectId(projectObjectId) ?: return null
         projects.save(project.copy(feasSignal = worst))
         return worst
     }
@@ -130,14 +130,14 @@ class FeasibilityService(
     /** 兜底重算(V9-Q1):按 key,返回聚合 signal。 */
     fun recomputeByKey(key: String): String? {
         val project = projects.findByKey(key) ?: throw yangzhou.api.error.NotFoundException("项目不存在:\$key")
-        return recomputeProjectSignal(project.id!!)
+        return recomputeProjectSignal(project.objectId!!)
     }
 
     /** capability 变更影响全 workspace:重算所有项目(V9-Q2)。 */
     fun recomputeWorkspace() {
         // YPJ-10:按 id 升序锁定 project 行——并发重算各自按同一全序 UPDATE,消除锁序环
         // (此前 findAll 无序,行锁获取顺序不定 → PostgreSQL 40P01 deadlock → 500,日志实锤)
-        projects.findAll().sortedBy { it.id }.forEach { recomputeProjectSignal(it.id!!) }
+        projects.findAll().sortedBy { it.objectId }.forEach { recomputeProjectSignal(it.objectId!!) }
     }
 
     /** V9-S1 短板聚合(服务端算,替代首页 N 次调用+客户端聚合)。 */
@@ -177,23 +177,23 @@ class FeasibilityService(
 
     /** 装配:任一持久层成员 → 引擎输入(候选服务复用)。 */
     fun domainMemberOf(me: yangzhou.persistence.Member): yangzhou.domain.Member {
-        val attrNames = definitions.findByWorkspaceId(workspaceService.required().id!!).associate { it.id!! to it.name }
-        val caps = capabilities.findByMemberId(me.id!!).mapNotNull { c ->
-            attrNames[c.attributeDefinitionId]?.let { yangzhou.domain.Capability(yangzhou.domain.Attribute(it), c.level) }
+        val attrNames = definitions.findByWorkspaceObjectId(workspaceService.required().objectId!!).associate { it.objectId!! to it.name }
+        val caps = capabilities.findByMemberObjectId(me.objectId!!).mapNotNull { c ->
+            attrNames[c.attributeDefinitionObjectId]?.let { yangzhou.domain.Capability(yangzhou.domain.Attribute(it), c.level) }
         }
         return yangzhou.domain.Member(me.displayName, caps)
     }
 
     fun itemToDomain(item: yangzhou.persistence.Item): yangzhou.domain.Item {
-        val attrs = definitions.findByWorkspaceId(workspaceService.required().id!!).associate { it.id!! to it.name }
-        val reqs = requirementRepo.findByItemId(item.id!!)
+        val attrs = definitions.findByWorkspaceObjectId(workspaceService.required().objectId!!).associate { it.objectId!! to it.name }
+        val reqs = requirementRepo.findByItemObjectId(item.objectId!!)
             .mapNotNull { r ->
-                attrs[r.attributeDefinitionId]?.let {
+                attrs[r.attributeDefinitionObjectId]?.let {
                     yangzhou.domain.Requirement(yangzhou.domain.Attribute(it), r.minLevel)
                 }
             }
-        // domain Item.id 就是「编号」——引擎输出直接可读
-        val project = projects.findAll().firstOrNull { p -> p.id == item.projectId }
+        // domain Item.objectId 就是「编号」——引擎输出直接可读
+        val project = projects.findAll().firstOrNull { p -> p.objectId == item.projectObjectId }
         val number = "${project?.key ?: "?"}-${item.number}"
         return yangzhou.domain.Item(number, item.title, reqs)
     }

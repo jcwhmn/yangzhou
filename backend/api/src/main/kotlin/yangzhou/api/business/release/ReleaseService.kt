@@ -70,12 +70,12 @@ class ReleaseService(
         projects.findByKey(key) ?: throw NotFoundException("项目不存在:$key")
 
     private fun find(key: String, releaseId: UUID): ItemGroup =
-        groups.findByProjectIdAndObjectId(project(key).id!!, releaseId)
+        groups.findByProjectObjectIdAndObjectId(project(key).objectId!!, releaseId)
             ?.takeIf { it.type == "release" }
             ?: throw NotFoundException("release 不存在")
 
     private fun milestoneIn(key: String, milestoneId: UUID) =
-        milestones.findByProjectIdAndObjectId(project(key).id!!, milestoneId)
+        milestones.findByProjectObjectIdAndObjectId(project(key).objectId!!, milestoneId)
             ?: throw NotFoundException("milestone 不存在")
 
     private fun parseDate(text: String, field: String): LocalDate =
@@ -91,23 +91,23 @@ class ReleaseService(
         status = status,
         targetDate = endDate?.toString(),
         releasedDate = releasedDate?.toString(),
-        milestoneId = milestoneId?.let { milestones.findById(it).orElse(null)?.objectId },
+        milestoneId = milestoneObjectId?.let { milestones.findByObjectId(it)?.objectId },
         memberCount = memberCount,
     )
 
     /** 排序:planned 先(target asc nulls last,再创建序);released 后(发布日 desc,最新在前)。 */
     fun list(key: String): List<ReleaseDto> {
-        val pid = project(key).id!!
-        val all = groups.findByProjectIdOrderByCreatedAt(pid).filter { it.type == "release" }
+        val pid = project(key).objectId!!
+        val all = groups.findByProjectObjectIdOrderByCreatedAt(pid).filter { it.type == "release" }
         val counts = if (all.isEmpty()) emptyMap()
-        else groupMembers.findByGroupIdIn(all.map { it.id!! }).groupBy { it.groupId }.mapValues { it.value.size }
+        else groupMembers.findByGroupObjectIdIn(all.map { it.objectId!! }).groupBy { it.groupObjectId }.mapValues { it.value.size }
         val (planned, released) = all.partition { it.status == "planned" }
         return planned.sortedWith(
             compareBy<ItemGroup> { it.endDate ?: LocalDate.MAX }.thenBy { it.createdAt },
-        ).map { it.toDto(counts[it.id] ?: 0) } +
+        ).map { it.toDto(counts[it.objectId] ?: 0) } +
             released.sortedWith(
                 compareByDescending<ItemGroup> { it.releasedDate ?: LocalDate.MIN }.thenBy { it.createdAt },
-            ).map { it.toDto(counts[it.id] ?: 0) }
+            ).map { it.toDto(counts[it.objectId] ?: 0) }
     }
 
     /** 事后补建:status='released' + releasedDate 直接创建(§8.2)。 */
@@ -115,20 +115,20 @@ class ReleaseService(
     fun create(key: String, request: CreateReleaseRequest): ReleaseDto {
         leaderGuard.requireLeader(key)
         val p = project(key)
-        groupTypes.findByProjectIdAndTypeKey(p.id!!, "release") ?: throw ConflictException("项目缺少 release 类型")
+        groupTypes.findByProjectObjectIdAndTypeKey(p.objectId!!, "release") ?: throw ConflictException("项目缺少 release 类型")
         val name = request.name?.trim().takeUnless { it.isNullOrEmpty() } ?: throw BadRequestException("name 必填")
         val status = request.status ?: "planned"
         if (status !in statusValues) throw BadRequestException("status 只能是 planned/released")
         val releasedDate = request.releasedDate?.takeIf { it.isNotEmpty() }?.let { parseDate(it, "releasedDate") }
         val saved = groups.save(
             ItemGroup(
-                projectId = p.id!!,
+                projectObjectId = p.objectId!!,
                 type = "release",
                 name = name,
                 status = status,
                 endDate = request.targetDate?.takeIf { it.isNotEmpty() }?.let { parseDate(it, "targetDate") },
                 releasedDate = releasedDate,
-                milestoneId = request.milestoneId?.let { milestoneIn(key, it).id },
+                milestoneObjectId = request.milestoneId?.let { milestoneIn(key, it).objectId },
             ),
         )
         return saved.toDto(0)
@@ -160,15 +160,15 @@ class ReleaseService(
             else -> parseDate(request.releasedDate, "releasedDate")
         }
         val msReq = request.milestoneId
-        val milestoneId: Long? = when (msReq) {
-            null -> g.milestoneId
+        val milestoneId: UUID? = when (msReq) {
+            null -> g.milestoneObjectId
             "" -> null
-            else -> milestoneIn(key, UUID.fromString(msReq)).id
+            else -> milestoneIn(key, UUID.fromString(msReq)).objectId
         }
         val saved = groups.save(
-            g.copy(name = reqName ?: g.name, status = newStatus, endDate = targetDate, releasedDate = releasedDate, milestoneId = milestoneId, updatedAt = Instant.now()),
+            g.copy(name = reqName ?: g.name, status = newStatus, endDate = targetDate, releasedDate = releasedDate, milestoneObjectId = milestoneId, updatedAt = Instant.now()),
         )
-        return saved.toDto(groupMembers.findByGroupId(saved.id!!).size)
+        return saved.toDto(groupMembers.findByGroupObjectId(saved.objectId!!).size)
     }
 
     /** 非空不可删(成员关系即交付历史,对齐 spec 0010 裁决 6)。 */
@@ -176,34 +176,34 @@ class ReleaseService(
     fun delete(key: String, releaseId: UUID) {
         leaderGuard.requireLeader(key)
         val g = find(key, releaseId)
-        if (groupMembers.existsByGroupId(g.id!!)) throw ConflictException("release 非空,先移出 items(成员关系即交付历史)")
+        if (groupMembers.existsByGroupObjectId(g.objectId!!)) throw ConflictException("release 非空,先移出 items(成员关系即交付历史)")
         groups.delete(g)
     }
 
     /** 拉入/移出(值=指派,null=移出;一个 item 至多属一个 release,端点形状即约束,spec 0012)。 */
     @Transactional
-    fun assignItem(itemId: UUID, releaseId: UUID?): ItemService.ItemDto {
-        val item = itemRepo.findByObjectId(itemId) ?: throw NotFoundException("item 不存在")
-        val rows = groupMembers.findByItemIdIn(listOf(item.id!!))
+    fun assignItem(itemObjectId: UUID, releaseId: UUID?): ItemService.ItemDto {
+        val item = itemRepo.findByObjectId(itemObjectId) ?: throw NotFoundException("item 不存在")
+        val rows = groupMembers.findByItemObjectIdIn(listOf(item.objectId!!))
         val rowGroups = if (rows.isEmpty()) emptyMap()
-        else groups.findAllById(rows.map { it.groupId }.toSet()).associateBy { it.id!! }
-        val current = rows.filter { rowGroups[it.groupId]?.type == "release" }
+        else groups.findAllByObjectIdIn(rows.map { it.groupObjectId }.toSet()).associateBy { it.objectId!! }
+        val current = rows.filter { rowGroups[it.groupObjectId]?.type == "release" }
 
         if (releaseId == null) {
             if (current.isNotEmpty()) {
                 groupMembers.deleteAll(current)
-                current.forEach { memberHistory.recordRemove(it.groupId, it.itemId, clock.instant()) } // YPJ-54 留痕
+                current.forEach { memberHistory.recordRemove(it.groupObjectId, it.itemObjectId, clock.instant()) } // YPJ-54 留痕
             }
-            return itemService.get(itemId)
+            return itemService.get(itemObjectId)
         }
-        val release = groups.findByProjectIdAndObjectId(item.projectId, releaseId)
+        val release = groups.findByProjectObjectIdAndObjectId(item.projectObjectId, releaseId)
             ?.takeIf { it.type == "release" }
             ?: throw NotFoundException("release 不存在")
-        if (current.any { it.groupId == release.id }) return itemService.get(itemId)
+        if (current.any { it.groupObjectId == release.objectId }) return itemService.get(itemObjectId)
         groupMembers.deleteAll(current)
-        current.forEach { memberHistory.recordRemove(it.groupId, it.itemId, clock.instant()) }
-        groupMembers.save(ItemGroupMember(groupId = release.id!!, itemId = item.id!!))
-        memberHistory.recordAdd(release.id!!, item.id!!, clock.instant())
-        return itemService.get(itemId)
+        current.forEach { memberHistory.recordRemove(it.groupObjectId, it.itemObjectId, clock.instant()) }
+        groupMembers.save(ItemGroupMember(groupObjectId = release.objectId!!, itemObjectId = item.objectId!!))
+        memberHistory.recordAdd(release.objectId!!, item.objectId!!, clock.instant())
+        return itemService.get(itemObjectId)
     }
 }

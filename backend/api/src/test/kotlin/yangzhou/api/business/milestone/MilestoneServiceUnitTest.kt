@@ -25,14 +25,14 @@ class MilestoneServiceUnitTest {
     private val milestones = mockk<MilestoneRepository>(relaxed = true)
     private val service = MilestoneService(projects, milestones)
 
-    private val project = Project(id = 1L, workspaceId = 9L, key = "CHE", name = "CHE")
-    private val m = Milestone(id = 1L, projectId = 1L, name = "M1")
+    private val project = Project(id = 1L, objectId = UUID(0, 1), workspaceObjectId = UUID(0, 9), key = "CHE", name = "CHE")
+    private val m = Milestone(id = 1L, objectId = UUID(0, 1), projectObjectId = UUID(0, 1), name = "M1")
 
     @BeforeEach
     fun setup() {
         clearMocks(projects, milestones)
         every { projects.findByKey("CHE") } returns project
-        every { milestones.findByProjectIdAndObjectId(1L, m.objectId) } returns m
+        every { milestones.findByProjectObjectIdAndObjectId(UUID(0, 1), m.objectId) } returns m
     }
 
     @Nested
@@ -72,7 +72,7 @@ class MilestoneServiceUnitTest {
         @Test
         fun terminalMilestoneImmutable() {
             val doneM = m.copy(status = "completed")
-            every { milestones.findByProjectIdAndObjectId(1L, doneM.objectId) } returns doneM
+            every { milestones.findByProjectObjectIdAndObjectId(UUID(0, 1), doneM.objectId) } returns doneM
             assertFailsWith<ConflictException> {
                 service.update("CHE", doneM.objectId, UpdateMilestoneRequest(name = "M1x"))
             }
@@ -83,8 +83,8 @@ class MilestoneServiceUnitTest {
 
         @Test
         fun secondInProgressRejected() {
-            val other = Milestone(id = 2L, projectId = 1L, name = "M0", status = "in_progress")
-            every { milestones.findByProjectIdAndStatus(1L, "in_progress") } returns listOf(other)
+            val other = Milestone(id = 2L, objectId = UUID(0, 2), projectObjectId = UUID(0, 1), name = "M0", status = "in_progress")
+            every { milestones.findByProjectObjectIdAndStatus(UUID(0, 1), "in_progress") } returns listOf(other)
             assertFailsWith<ConflictException> {
                 service.update("CHE", m.objectId, UpdateMilestoneRequest(status = "in_progress"))
             }
@@ -92,7 +92,7 @@ class MilestoneServiceUnitTest {
 
         @Test
         fun legalTransitionSaved() {
-            every { milestones.findByProjectIdAndStatus(1L, "in_progress") } returns emptyList()
+            every { milestones.findByProjectObjectIdAndStatus(UUID(0, 1), "in_progress") } returns emptyList()
             every { milestones.save(any()) } answers { firstArg<Milestone>() }
             val dto = service.update("CHE", m.objectId, UpdateMilestoneRequest(status = "in_progress"))
             assertEquals("in_progress", dto.status)
@@ -105,7 +105,7 @@ class MilestoneServiceUnitTest {
 
         @Test
         fun missingRejected() {
-            every { milestones.findByProjectIdAndObjectId(1L, any()) } returns null
+            every { milestones.findByProjectObjectIdAndObjectId(UUID(0, 1), any()) } returns null
             assertFailsWith<NotFoundException> { service.update("CHE", UUID.randomUUID(), UpdateMilestoneRequest(name = "x")) }
         }
     }

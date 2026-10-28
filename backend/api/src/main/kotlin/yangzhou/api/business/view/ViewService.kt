@@ -30,24 +30,24 @@ class ViewService(
 
     @Transactional(readOnly = true)
     fun list(key: String): List<ViewDto> {
-        val (projectId, memberId) = requireContext(key)
-        return views.findByProjectIdAndCreatorIdOrderByCreatedAt(projectId, memberId).map { toDto(it) }
+        val (projectObjectId, memberObjectId) = requireContext(key)
+        return views.findByProjectObjectIdAndCreatorObjectIdOrderByCreatedAt(projectObjectId, memberObjectId).map { toDto(it) }
     }
 
     @Transactional
     fun create(key: String, request: CreateViewRequest): ViewDto {
-        val (projectId, memberId) = requireContext(key)
+        val (projectObjectId, memberObjectId) = requireContext(key)
         val name = request.name.trim()
         if (name.isEmpty()) throw BadRequestException("视图名不可为空")
         val filters = validated(request.filters, "filters")
         val columns = validated(request.columns, "columns")
-        if (views.existsByProjectIdAndCreatorIdAndName(projectId, memberId, name)) {
+        if (views.existsByProjectObjectIdAndCreatorObjectIdAndName(projectObjectId, memberObjectId, name)) {
             throw ConflictException("同名视图已存在:$name")
         }
         val saved = views.save(
             ProjectView(
-                projectId = projectId,
-                creatorId = memberId,
+                projectObjectId = projectObjectId,
+                creatorObjectId = memberObjectId,
                 name = name,
                 filters = filters.toString(),
                 columns = columns.toString(),
@@ -58,15 +58,15 @@ class ViewService(
 
     @Transactional
     fun update(key: String, viewId: UUID, request: UpdateViewRequest): ViewDto {
-        val (projectId, memberId) = requireContext(key)
+        val (projectObjectId, memberObjectId) = requireContext(key)
         // 只能改自己的:非本人/不存在一律 404(不泄露存在性)
-        val view = views.findByObjectIdAndCreatorId(viewId, memberId) ?: throw NotFoundException("视图不存在")
-        if (view.projectId != projectId) throw NotFoundException("视图不存在")
+        val view = views.findByObjectIdAndCreatorObjectId(viewId, memberObjectId) ?: throw NotFoundException("视图不存在")
+        if (view.projectObjectId != projectObjectId) throw NotFoundException("视图不存在")
         var cur = view
         request.name?.let {
             val name = it.trim()
             if (name.isEmpty()) throw BadRequestException("视图名不可为空")
-            if (name != view.name && views.existsByProjectIdAndCreatorIdAndName(projectId, memberId, name)) {
+            if (name != view.name && views.existsByProjectObjectIdAndCreatorObjectIdAndName(projectObjectId, memberObjectId, name)) {
                 throw ConflictException("同名视图已存在:$name")
             }
             cur = cur.copy(name = name)
@@ -79,18 +79,18 @@ class ViewService(
 
     @Transactional
     fun delete(key: String, viewId: UUID) {
-        val (projectId, memberId) = requireContext(key)
-        val view = views.findByObjectIdAndCreatorId(viewId, memberId) ?: throw NotFoundException("视图不存在")
-        if (view.projectId != projectId) throw NotFoundException("视图不存在")
+        val (projectObjectId, memberObjectId) = requireContext(key)
+        val view = views.findByObjectIdAndCreatorObjectId(viewId, memberObjectId) ?: throw NotFoundException("视图不存在")
+        if (view.projectObjectId != projectObjectId) throw NotFoundException("视图不存在")
         views.delete(view)
     }
 
-    /** 项目存在即可(仓内惯例:项目级端点不做成员校验,单用户产品形态);视图私有性由 creatorId 保证。 */
-    private fun requireContext(key: String): Pair<Long, Long> {
+    /** 项目存在即可(仓内惯例:项目级端点不做成员校验,单用户产品形态);视图私有性由 creatorObjectId 保证。 */
+    private fun requireContext(key: String): Pair<UUID, UUID> {
         val p = projects.findByKey(key) ?: throw NotFoundException("项目不存在:$key")
         val me = memberService.current()
-        val pid = requireNotNull(p.id) { "no id" }
-        val mid = requireNotNull(me.id) { "member no id" }
+        val pid = requireNotNull(p.objectId) { "no id" }
+        val mid = requireNotNull(me.objectId) { "member no id" }
         return pid to mid
     }
 

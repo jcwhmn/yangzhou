@@ -80,7 +80,7 @@ class GroupTypeService(
 
     private fun customType(key: String, typeKey: String): ItemGroupType {
         val p = project(key)
-        val t = types.findByProjectIdAndTypeKey(p.id!!, typeKey)
+        val t = types.findByProjectObjectIdAndTypeKey(p.objectId!!, typeKey)
             ?: throw NotFoundException("group 类型不存在:$typeKey")
         if (t.typeKey in builtinKeys) throw BadRequestException("sprint/release 请用专属端点")
         return t
@@ -98,7 +98,7 @@ class GroupTypeService(
     // ---------- 类型 CRUD ----------
 
     fun listTypes(key: String): List<GroupTypeDto> =
-        types.findByProjectIdOrderByCreatedAt(project(key).id!!).map { it.toDto() }
+        types.findByProjectObjectIdOrderByCreatedAt(project(key).objectId!!).map { it.toDto() }
 
     @Transactional
     fun createType(key: String, request: CreateGroupTypeRequest): GroupTypeDto {
@@ -110,17 +110,17 @@ class GroupTypeService(
         }
         if (typeKey in builtinKeys) throw BadRequestException("typeKey 与内建类型冲突:$typeKey")
         val name = request.name?.trim().takeUnless { it.isNullOrEmpty() } ?: throw BadRequestException("name 必填")
-        val pid = project(key).id!!
-        if (types.existsByProjectIdAndTypeKey(pid, typeKey)) {
+        val pid = project(key).objectId!!
+        if (types.existsByProjectObjectIdAndTypeKey(pid, typeKey)) {
             throw ConflictException("group 类型已存在:$typeKey")
         }
-        return types.save(ItemGroupType(projectId = pid, typeKey = typeKey, name = name)).toDto()
+        return types.save(ItemGroupType(projectObjectId = pid, typeKey = typeKey, name = name)).toDto()
     }
 
     @Transactional
     fun updateType(key: String, typeKey: String, request: UpdateGroupTypeRequest): GroupTypeDto {
         leaderGuard.requireLeader(key)
-        val t = types.findByProjectIdAndTypeKey(project(key).id!!, typeKey)
+        val t = types.findByProjectObjectIdAndTypeKey(project(key).objectId!!, typeKey)
             ?: throw NotFoundException("group 类型不存在:$typeKey")
         val name = request.name?.trim().takeUnless { it.isNullOrEmpty() }
             ?: throw BadRequestException("name 必填")
@@ -131,11 +131,11 @@ class GroupTypeService(
     @Transactional
     fun deleteType(key: String, typeKey: String) {
         leaderGuard.requireLeader(key)
-        val pid = project(key).id!!
-        val t = types.findByProjectIdAndTypeKey(pid, typeKey)
+        val pid = project(key).objectId!!
+        val t = types.findByProjectObjectIdAndTypeKey(pid, typeKey)
             ?: throw NotFoundException("group 类型不存在:$typeKey")
         if (t.builtin) throw ConflictException("内建类型不可删除:$typeKey")
-        if (groups.findByProjectIdOrderByCreatedAt(pid).any { it.type == typeKey }) {
+        if (groups.findByProjectObjectIdOrderByCreatedAt(pid).any { it.type == typeKey }) {
             throw ConflictException("类型下仍有组,请先删除:$typeKey")
         }
         types.delete(t)
@@ -145,7 +145,7 @@ class GroupTypeService(
 
     fun listGroups(key: String, typeKey: String): List<GroupDto> {
         val t = customType(key, typeKey)
-        return groups.findByProjectIdOrderByCreatedAt(project(key).id!!)
+        return groups.findByProjectObjectIdOrderByCreatedAt(project(key).objectId!!)
             .filter { it.type == typeKey }
             .map { it.toDto(typeKey) }
     }
@@ -161,7 +161,7 @@ class GroupTypeService(
         if (status !in groupStatusValues) throw BadRequestException("status 只能是 planned/active/completed")
         val saved = groups.save(
             ItemGroup(
-                projectId = project(key).id!!,
+                projectObjectId = project(key).objectId!!,
                 type = t.typeKey,
                 name = name,
                 status = status,
@@ -204,9 +204,9 @@ class GroupTypeService(
     fun deleteGroup(key: String, groupId: UUID) {
         leaderGuard.requireLeader(key)
         val g = findGroup(key, groupId)
-        val gid = g.id!!
-        memberships.findByGroupId(gid).forEach { m ->
-            memberHistory.findByGroupId(gid).filter { it.itemId == m.itemId }.forEach(memberHistory::delete)
+        val gid = g.objectId!!
+        memberships.findByGroupObjectId(gid).forEach { m ->
+            memberHistory.findByGroupObjectId(gid).filter { it.itemObjectId == m.itemObjectId }.forEach(memberHistory::delete)
             memberships.delete(m)
         }
         groups.delete(g)
@@ -214,7 +214,7 @@ class GroupTypeService(
 
     private fun findGroup(key: String, groupId: UUID): ItemGroup {
         val p = project(key)
-        val g = groups.findByProjectIdAndObjectId(p.id!!, groupId) ?: throw NotFoundException("group 不存在")
+        val g = groups.findByProjectObjectIdAndObjectId(p.objectId!!, groupId) ?: throw NotFoundException("group 不存在")
         if (g.type in builtinKeys) throw BadRequestException("sprint/release 请用专属端点")
         return g
     }

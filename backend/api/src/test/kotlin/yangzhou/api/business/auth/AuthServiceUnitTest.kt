@@ -1,5 +1,6 @@
 package yangzhou.api.business.auth
 
+import java.util.UUID
 import io.mockk.clearMocks
 import io.mockk.every
 import io.mockk.mockk
@@ -30,7 +31,7 @@ class AuthServiceUnitTest {
     private val service = AuthService(members, workspaces, workspaceService, encoder, jwt)
 
     private val me = Member(
-        id = 1L, workspaceId = 9L, username = "me", passwordHash = "hash", displayName = "me",
+        id = 1L, objectId = UUID(0, 1), workspaceObjectId = UUID(0, 9), username = "me", passwordHash = "hash", displayName = "me",
     )
 
     @BeforeEach

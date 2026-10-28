@@ -1,9 +1,8 @@
 @startuml
 hide empty members
-' yangzhou.persistence — schema 实体概念图(V1__core.sql + V2__workflow.sql + V12__github_config.sql)
+' yangzhou.persistence — schema 实体概念图(V1–V40;V41 全量 FK 列迁 object_id,本图只画概念不画 FK 列)
 ' 只画领域字段;infra(id/objectId/createdAt/updatedAt/passwordHash/lastItemNumber)不画;
 ' parentId 不画,反转为父侧 children(List)。真相源是 Flyway schema:改表必须同步此图(AGENTS.md「类图」)。
-hide empty members
 skinparam classAttributeIconSize 0
 
 class Workspace {
@@ -96,7 +95,7 @@ class ItemGroup {
   startDate: LocalDate?
   endDate: LocalDate?
   releasedDate: LocalDate?
-  milestoneId: Long?
+  milestoneObjectId: UUID?
 }
 class ItemGroupType {
   typeKey: String
@@ -113,9 +112,12 @@ class Milestone {
 class Requirement {
   minLevel: Int?
 }
+class ItemAttribute {
+  value: String
+}
 
 class Comment {
-  authorMemberId: Long
+  authorMemberId: UUID
   body: String
 }
 class ItemActivity {
@@ -194,6 +196,8 @@ ItemDependency "*" --> "1" Item : 依赖的 item
 Item "*" *-- "1" Status : 当前状态
 Item "1" *-- "*" Requirement
 Requirement "*" *-- "1" AttributeDefinition
+Item "1" *-- "*" ItemAttribute : 自定义属性(V40)
+ItemAttribute "*" --> "1" AttributeDefinition
 
 StatusTransition "*" --> "from 1" Status
 StatusTransition "*" --> "to 1" Status
@@ -247,7 +251,7 @@ note right of Member
   updated_at 的表均有 created_at/
   updated_at/created_by/updated_by
   (@EnableJdbcAuditing 统一写入;
-  by 存 member.id bigint,无 FK;
+  by 存 member.object_id uuid;V41 起带 FK(RESTRICT),
   append-only/日志表除外)。
 end note
 @enduml

@@ -33,13 +33,13 @@ class StandupService(
     fun standup(memberObjectId: UUID?): StandupDto {
         val member = memberObjectId?.let { members.findByObjectId(it) ?: throw NotFoundException("成员不存在") }
             ?: memberService.current()
-        val memberId = member.id!!
+        val memberObjectId = member.objectId!!
 
         val zone = ZoneId.systemDefault()
         val todayStart = LocalDate.now(zone).atStartOfDay(zone).toInstant()
         val yesterdayStart = todayStart.minus(Duration.ofDays(1))
         val movedYesterday = activities.findByKindAndCreatedAtBetween("status_changed", yesterdayStart, todayStart)
-            .map { it.itemId }.toSet()
+            .map { it.itemObjectId }.toSet()
 
         val done = mutableListOf<StandupItemDto>()
         val today = mutableListOf<StandupItemDto>()
@@ -47,10 +47,10 @@ class StandupService(
 
         projects.findAll().forEach { project ->
             val key = project.key
-            val pid = project.id!!
-            val blockedIds = dependencyService.blockedItemIds(pid)
-            val statusById = statuses.findByProjectIdOrderByPosition(pid).associateBy { it.objectId }
-            items.findByProjectIdAndDeletedAtIsNullOrderByNumber(pid).forEach { item ->
+            val pid = project.objectId!!
+            val blockedIds = dependencyService.blockedItemObjectIds(pid)
+            val statusById = statuses.findByProjectObjectIdOrderByPosition(pid).associateBy { it.objectId }
+            items.findByProjectObjectIdAndDeletedAtIsNullOrderByNumber(pid).forEach { item ->
                 if (item.assigneeObjectId != member.objectId) return@forEach
                 val status = statusById[item.statusObjectId] ?: return@forEach
                 val dto = StandupItemDto(
@@ -60,7 +60,7 @@ class StandupService(
                     title = item.title,
                     statusName = status.name,
                 )
-                val iid = item.id!!
+                val iid = item.objectId!!
                 if (iid in movedYesterday) done.add(dto)
                 if (!status.isFinal) {
                     today.add(dto)

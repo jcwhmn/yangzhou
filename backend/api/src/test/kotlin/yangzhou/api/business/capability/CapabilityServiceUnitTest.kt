@@ -1,5 +1,6 @@
 package yangzhou.api.business.capability
 
+import java.util.UUID
 import io.mockk.clearMocks
 import io.mockk.every
 import io.mockk.mockk
@@ -31,16 +32,16 @@ class CapabilityServiceUnitTest {
     private val feasibilityService = mockk<FeasibilityService>(relaxed = true)
     private val service = CapabilityService(capabilities, definitions, memberService, workspaceService, feasibilityService)
 
-    private val wsId = 9L
-    private val me = Member(id = 5L, workspaceId = wsId, username = null, passwordHash = "h", displayName = "me")
-    private val kotlinDef = AttributeDefinition(id = 3L, workspaceId = wsId, name = "kotlin")
+    private val wsId = UUID(0, 9)
+    private val me = Member(id = 5L, objectId = UUID(0, 5), workspaceObjectId = wsId, username = null, passwordHash = "h", displayName = "me")
+    private val kotlinDef = AttributeDefinition(id = 3L, objectId = UUID(0, 3), workspaceObjectId = wsId, name = "kotlin")
 
     @BeforeEach
     fun setup() {
         clearMocks(capabilities, definitions, memberService, workspaceService, feasibilityService)
-        every { workspaceService.required() } returns Workspace(id = wsId)
+        every { workspaceService.required() } returns Workspace(id = 1L, objectId = wsId)
         every { memberService.current() } returns me
-        every { definitions.findByWorkspaceIdAndName(wsId, "kotlin") } returns kotlinDef
+        every { definitions.findByWorkspaceObjectIdAndName(wsId, "kotlin") } returns kotlinDef
     }
 
     @Nested
@@ -55,14 +56,14 @@ class CapabilityServiceUnitTest {
 
         @Test
         fun unknownAttributeRejected() {
-            every { definitions.findByWorkspaceIdAndName(wsId, "rust") } returns null
+            every { definitions.findByWorkspaceObjectIdAndName(wsId, "rust") } returns null
             assertFailsWith<NotFoundException> { service.upsertFor(me, "rust", 2) }
         }
 
         @Test
         fun existingCapabilityLevelUpdated() {
-            val existing = Capability(id = 1L, memberId = 5L, attributeDefinitionId = 3L, level = 2)
-            every { capabilities.findByMemberIdAndAttributeDefinitionId(5L, 3L) } returns existing
+            val existing = Capability(id = 1L, objectId = UUID(0, 1), memberObjectId = UUID(0, 5), attributeDefinitionObjectId = UUID(0, 3), level = 2)
+            every { capabilities.findByMemberObjectIdAndAttributeDefinitionObjectId(UUID(0, 5), UUID(0, 3)) } returns existing
             every { capabilities.save(any()) } answers { firstArg() }
             val dto = service.upsertFor(me, "kotlin", 4)
             assertEquals(4, dto.level)
@@ -73,7 +74,7 @@ class CapabilityServiceUnitTest {
 
         @Test
         fun newCapabilityCreatedWithNullLevel() {
-            every { capabilities.findByMemberIdAndAttributeDefinitionId(5L, 3L) } returns null
+            every { capabilities.findByMemberObjectIdAndAttributeDefinitionObjectId(UUID(0, 5), UUID(0, 3)) } returns null
             every { capabilities.save(any()) } answers { firstArg() }
             val dto = service.upsertFor(me, "kotlin", null) // presence-only
             assertEquals(null, dto.level)
@@ -85,14 +86,14 @@ class CapabilityServiceUnitTest {
 
         @Test
         fun unknownAttributeRejected() {
-            every { definitions.findByWorkspaceIdAndName(wsId, "rust") } returns null
+            every { definitions.findByWorkspaceObjectIdAndName(wsId, "rust") } returns null
             assertFailsWith<NotFoundException> { service.deleteFor(me, "rust") }
         }
 
         @Test
         fun deletesWhenPresent() {
-            val existing = Capability(id = 1L, memberId = 5L, attributeDefinitionId = 3L, level = 2)
-            every { capabilities.findByMemberIdAndAttributeDefinitionId(5L, 3L) } returns existing
+            val existing = Capability(id = 1L, objectId = UUID(0, 1), memberObjectId = UUID(0, 5), attributeDefinitionObjectId = UUID(0, 3), level = 2)
+            every { capabilities.findByMemberObjectIdAndAttributeDefinitionObjectId(UUID(0, 5), UUID(0, 3)) } returns existing
             service.deleteFor(me, "kotlin")
             verify { capabilities.delete(existing) }
             verify { feasibilityService.recomputeWorkspace() }
@@ -100,7 +101,7 @@ class CapabilityServiceUnitTest {
 
         @Test
         fun absentIsNoop() {
-            every { capabilities.findByMemberIdAndAttributeDefinitionId(5L, 3L) } returns null
+            every { capabilities.findByMemberObjectIdAndAttributeDefinitionObjectId(UUID(0, 5), UUID(0, 3)) } returns null
             service.deleteFor(me, "kotlin")
             verify(exactly = 0) { capabilities.delete(any()) }
         }
@@ -111,12 +112,12 @@ class CapabilityServiceUnitTest {
 
         @Test
         fun namesResolvedOrQuestionMark() {
-            val rustDef = AttributeDefinition(id = 4L, workspaceId = wsId, name = "rust")
-            every { capabilities.findByMemberId(5L) } returns listOf(
-                Capability(id = 1L, memberId = 5L, attributeDefinitionId = 3L, level = 3),
-                Capability(id = 2L, memberId = 5L, attributeDefinitionId = 99L, level = 1),
+            val rustDef = AttributeDefinition(id = 4L, objectId = UUID(0, 4), workspaceObjectId = wsId, name = "rust")
+            every { capabilities.findByMemberObjectId(UUID(0, 5)) } returns listOf(
+                Capability(id = 1L, objectId = UUID(0, 1), memberObjectId = UUID(0, 5), attributeDefinitionObjectId = UUID(0, 3), level = 3),
+                Capability(id = 2L, objectId = UUID(0, 2), memberObjectId = UUID(0, 5), attributeDefinitionObjectId = UUID(0, 99), level = 1),
             )
-            every { definitions.findByWorkspaceId(wsId) } returns listOf(kotlinDef, rustDef)
+            every { definitions.findByWorkspaceObjectId(wsId) } returns listOf(kotlinDef, rustDef)
             val dtos = service.listFor(me)
             assertEquals(listOf("kotlin", "?"), dtos.map { it.attribute })
         }

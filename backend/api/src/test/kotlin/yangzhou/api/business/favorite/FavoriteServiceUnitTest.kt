@@ -26,13 +26,13 @@ class FavoriteServiceUnitTest {
     private val memberService = mockk<MemberService>(relaxed = true)
     private val service = FavoriteService(favorites, projects, memberService)
 
-    private val meId = 5L
-    private val project = Project(id = 1L, workspaceId = 9L, key = "CHE", name = "CHE")
+    private val meId = UUID(0, 5)
+    private val project = Project(id = 1L, objectId = UUID(0, 1), workspaceObjectId = UUID(0, 9), key = "CHE", name = "CHE")
 
     @BeforeEach
     fun setup() {
         clearMocks(favorites, projects, memberService)
-        every { memberService.current().id } returns meId
+        every { memberService.current().objectId } returns meId
         every { projects.findByKey("CHE") } returns project
     }
 
@@ -47,7 +47,7 @@ class FavoriteServiceUnitTest {
 
         @Test
         fun duplicateIsNoop() {
-            every { favorites.existsByMemberIdAndProjectId(meId, 1L) } returns true
+            every { favorites.existsByMemberObjectIdAndProjectObjectId(meId, UUID(0, 1)) } returns true
             val dto = service.add("CHE")
             io.mockk.verify(exactly = 0) { favorites.save(any()) }
             assertEquals("CHE", dto.key)
@@ -55,7 +55,7 @@ class FavoriteServiceUnitTest {
 
         @Test
         fun savedWhenAbsent() {
-            every { favorites.existsByMemberIdAndProjectId(meId, 1L) } returns false
+            every { favorites.existsByMemberObjectIdAndProjectObjectId(meId, UUID(0, 1)) } returns false
             every { favorites.save(any()) } answers { firstArg() }
             service.add("CHE")
             io.mockk.verify { favorites.save(any()) }
@@ -67,15 +67,15 @@ class FavoriteServiceUnitTest {
 
         @Test
         fun absentIsSilent() {
-            every { favorites.findByMemberIdAndProjectId(meId, 1L) } returns null
+            every { favorites.findByMemberObjectIdAndProjectObjectId(meId, UUID(0, 1)) } returns null
             service.remove("CHE")
             io.mockk.verify(exactly = 0) { favorites.delete(any()) }
         }
 
         @Test
         fun rowDeleted() {
-            val row = Favorite(id = 1L, memberId = meId, projectId = 1L)
-            every { favorites.findByMemberIdAndProjectId(meId, 1L) } returns row
+            val row = Favorite(id = 1L, objectId = UUID(0, 1), memberObjectId = meId, projectObjectId = UUID(0, 1))
+            every { favorites.findByMemberObjectIdAndProjectObjectId(meId, UUID(0, 1)) } returns row
             service.remove("CHE")
             verify { favorites.delete(row) }
         }
@@ -86,12 +86,12 @@ class FavoriteServiceUnitTest {
 
         @Test
         fun deletedProjectsSkipped() {
-            every { favorites.findByMemberIdOrderByCreatedAtAsc(meId) } returns listOf(
-                Favorite(id = 1L, memberId = meId, projectId = 1L),
-                Favorite(id = 2L, memberId = meId, projectId = 99L), // 项目已删
+            every { favorites.findByMemberObjectIdOrderByCreatedAtAsc(meId) } returns listOf(
+                Favorite(id = 1L, objectId = UUID(0, 1), memberObjectId = meId, projectObjectId = UUID(0, 1)),
+                Favorite(id = 2L, objectId = UUID(0, 2), memberObjectId = meId, projectObjectId = UUID(0, 99)), // 项目已删
             )
-            every { projects.findById(1L) } returns java.util.Optional.of(project)
-            every { projects.findById(99L) } returns java.util.Optional.empty()
+            every { projects.findByObjectId(UUID(0, 1)) } returns (project)
+            every { projects.findByObjectId(UUID(0, 99)) } returns null
             assertEquals(listOf("CHE"), service.list().map { it.key })
         }
     }

@@ -22,25 +22,25 @@ class FavoriteService(
     @Transactional
     fun add(projectKey: String): FavoriteDto {
         val project = projects.findByKey(projectKey) ?: throw NotFoundException("项目不存在:$projectKey")
-        val meId = memberService.current().id!!
-        val pid = project.id!!
-        if (!favorites.existsByMemberIdAndProjectId(meId, pid)) {
-            favorites.save(Favorite(memberId = meId, projectId = pid))
+        val meId = memberService.current().objectId!!
+        val pid = project.objectId!!
+        if (!favorites.existsByMemberObjectIdAndProjectObjectId(meId, pid)) {
+            favorites.save(Favorite(memberObjectId = meId, projectObjectId = pid))
         }
         return FavoriteDto(project.objectId, project.key, project.name)
     }
 
     @Transactional
     fun remove(projectKey: String) {
-        val meId = memberService.current().id!!
+        val meId = memberService.current().objectId!!
         val project = projects.findByKey(projectKey) ?: throw NotFoundException("项目不存在:$projectKey")
-        favorites.findByMemberIdAndProjectId(meId, project.id!!)?.let { favorites.delete(it) }
+        favorites.findByMemberObjectIdAndProjectObjectId(meId, project.objectId!!)?.let { favorites.delete(it) }
     }
 
     fun list(): List<FavoriteDto> {
-        val meId = memberService.current().id!!
-        return favorites.findByMemberIdOrderByCreatedAtAsc(meId).mapNotNull { f ->
-            projects.findById(f.projectId).orElse(null)?.let { FavoriteDto(it.objectId, it.key, it.name) }
+        val meId = memberService.current().objectId!!
+        return favorites.findByMemberObjectIdOrderByCreatedAtAsc(meId).mapNotNull { f ->
+            projects.findByObjectId(f.projectObjectId)?.let { FavoriteDto(it.objectId, it.key, it.name) }
         }
     }
 }

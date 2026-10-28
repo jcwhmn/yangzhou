@@ -68,7 +68,7 @@ class GithubConfigService(
 
     fun listRepos(projectKey: String): List<RepoDto> =
         requireProject(projectKey).let { p ->
-            repos.findByProjectId(p.id!!).map { RepoDto(it.objectId, it.repo) }
+            repos.findByProjectObjectId(p.objectId!!).map { RepoDto(it.objectId, it.repo) }
         }
 
     @Transactional
@@ -79,10 +79,10 @@ class GithubConfigService(
         if (!Regex("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$").matches(trimmed)) {
             throw BadRequestException("repo 格式应为 owner/name:$trimmed")
         }
-        if (repos.existsByProjectIdAndRepo(project.id!!, trimmed)) {
+        if (repos.existsByProjectObjectIdAndRepo(project.objectId!!, trimmed)) {
             throw ConflictException("仓库已挂载:$trimmed")
         }
-        val saved = repos.save(ProjectRepo(projectId = project.id!!, repo = trimmed))
+        val saved = repos.save(ProjectRepo(projectObjectId = project.objectId!!, repo = trimmed))
         return RepoDto(saved.objectId, saved.repo)
     }
 
@@ -91,7 +91,7 @@ class GithubConfigService(
         leaderGuard.requireLeader(projectKey)
         val project = requireProject(projectKey)
         val repo = repos.findByObjectId(repoId) ?: throw NotFoundException("仓库挂载不存在")
-        if (repo.projectId != project.id) throw NotFoundException("仓库挂载不存在")
+        if (repo.projectObjectId != project.objectId) throw NotFoundException("仓库挂载不存在")
         repos.delete(repo)
     }
 
@@ -101,8 +101,8 @@ class GithubConfigService(
 
     fun listRules(projectKey: String): List<RuleDto> {
         val project = requireProject(projectKey)
-        val byEvent = rules.findByProjectId(project.id!!).associateBy { it.eventType }
-        val statusNames = statuses.findByProjectIdOrderByPosition(project.id!!)
+        val byEvent = rules.findByProjectObjectId(project.objectId!!).associateBy { it.eventType }
+        val statusNames = statuses.findByProjectObjectIdOrderByPosition(project.objectId!!)
             .associate { it.objectId to it.name }
         return GITHUB_EVENT_TYPES.map { event ->
             byEvent[event]?.let {
@@ -115,7 +115,7 @@ class GithubConfigService(
     fun replaceRules(projectKey: String, input: List<RuleInput>): List<RuleDto> {
         leaderGuard.requireLeader(projectKey)
         val project = requireProject(projectKey)
-        val validStatuses = statuses.findByProjectIdOrderByPosition(project.id!!).associateBy { it.objectId }
+        val validStatuses = statuses.findByProjectObjectIdOrderByPosition(project.objectId!!).associateBy { it.objectId }
         input.forEach { rule ->
             if (rule.eventType !in GITHUB_EVENT_TYPES) {
                 throw BadRequestException("未知事件类型:${rule.eventType}")
@@ -127,10 +127,10 @@ class GithubConfigService(
                 throw BadRequestException("状态不属于本项目:${rule.statusId}")
             }
         }
-        rules.deleteByProjectId(project.id!!)
+        rules.deleteByProjectObjectId(project.objectId!!)
         input.forEach { rule ->
             rules.save(
-                ProjectWorkflowRule(projectId = project.id!!, eventType = rule.eventType, statusObjectId = rule.statusId!!),
+                ProjectWorkflowRule(projectObjectId = project.objectId!!, eventType = rule.eventType, statusObjectId = rule.statusId!!),
             )
         }
         return listRules(projectKey)
