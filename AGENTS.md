@@ -41,7 +41,7 @@ docs/      adr/ · spec/ · architecture/(puml 类图) · requirement/(PRD) · p
 - 非平凡行为变更必须带测试。
 - 声称完成前跑通相关验证;后端以 `./gradlew build` + `./gradlew integrationTest` 绿 + bootRun 能启动为准(临时端口验证,起后即停;integrationTest 需 Docker,CI 兕底 nightly)。
 - 大输出/多命令优先 context-mode 批处理工具,Bash 仅琐碎命令。
-- `api` 模块:业务垂直切片收敛 `yangzhou.api.business.<slice>`(project / item / attribute / …,实体+DTO+service+controller 同包);非业务归位 `config`(装配)/ `security` / `general` / `error`(ADR-0005)。
+- `api` 模块:业务垂直切片收敛 `yangzhou.api.business.<slice>`(project / item / attribute / …,实体+DTO+service+controller 同包);非业务归位 `config`(装配)/ `security` / `general` / `error`(ADR-0007)。
 
 ## Issue 工作流(PR 模式;票在 YPJ 项目,2026-10-06 起 Linear 冻结只读)
 

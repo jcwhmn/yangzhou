@@ -61,4 +61,4 @@
 
 - PM 库 `yangzhou` 尚未应用 V41(8081 旧实例在跑);应用前建议 `pg_dump` 备份(docker 容器内执行)。
 - spec 0080(v98)仍未入库,何时提交待用户定。
-- ADR-0005 撞号待理;本票无新 ADR。
+- ADR-0005 撞号已理(api-package-structure → 0007);本票无新 ADR。

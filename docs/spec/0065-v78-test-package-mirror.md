@@ -1,6 +1,6 @@
 # 0065 — YPJ-78 yz-api test 侧包结构镜像重构
 
-> 票:YPJ-78 · 影响:仅 `backend/api/src/test` · 判据同 ADR-0005
+> 票:YPJ-78 · 影响:仅 `backend/api/src/test` · 判据同 ADR-0007
 > 性质:纯移动 + package/import 修正,零行为变更。
 
 ## 1. 需求
@@ -10,7 +10,7 @@ YPJ-71 只平移了 main 侧;test 侧目录/包声明仍停在 `yangzhou.api.<sl
 ### 范围
 
 - test 侧全部切片测试目录/包声明 → `yangzhou.api.business.<slice>`;
-- 原 `config` 包下 3 个测试类按 ADR-0005 归位:`JwtServiceUnitTest` → security、`GlobalExceptionHandlerTest` → error、`AccessLogFilterTest` → general;
+- 原 `config` 包下 3 个测试类按 ADR-0007 归位:`JwtServiceUnitTest` → security、`GlobalExceptionHandlerTest` → error、`AccessLogFilterTest` → general;
 - 其余(`AbstractApiTest`、`support` 等 test 基础设施)不动,除非 import 需修正。
 
 ### 非目标

@@ -13,7 +13,7 @@ api 模块现为「业务切片 + config 大杂烩」扁平结构:30 个业务�
 
 1. 业务切片全部平移进 `yangzhou.api.business.<slice>`;
 2. 非业务代码各归其位:`config` / `general` / `security` / `error` 四包;
-3. 架构决策落 ADR-0005;AGENTS.md「垂直切片」描述同步。
+3. 架构决策落 ADR-0007;AGENTS.md「垂直切片」描述同步。
 
 ### 非目标
 
@@ -48,7 +48,7 @@ yangzhou.api
     └── exceptions.kt                # ← 自 support 移入,support 包删除
 ```
 
-### 归类判据(ADR-0005 正文写清)
+### 归类判据(ADR-0007 正文写清)
 
 - **business**:有对应 REST 资源/业务用例的垂直切片(实体+DTO+service+controller 同包规则不变);
 - **config**:Spring 技术装配(启用某基础设施的 @Configuration / @ConfigurationProperties);
@@ -78,8 +78,8 @@ yangzhou.api
 
 ### 文档
 
-- **新增 `docs/adr/0005-api-package-structure.md`**:五包职责判据 + 上面的边界裁决记录;
-- **AGENTS.md**「api 模块内部按垂直切片组织」→「业务切片收敛 `yangzhou.api.business.<slice>`,非业务归 config/security/general/error(ADR-0005)」;
+- **新增 `docs/adr/0007-api-package-structure.md`**:五包职责判据 + 上面的边界裁决记录;
+- **AGENTS.md**「api 模块内部按垂直切片组织」→「业务切片收敛 `yangzhou.api.business.<slice>`,非业务归 config/security/general/error(ADR-0007)」;
 - spec 本文件完工后补 As-built。
 
 ### 否决的备选
