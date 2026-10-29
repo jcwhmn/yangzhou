@@ -39,14 +39,14 @@ class GithubCommitService(
         val commits: List<CommitDto>,
     )
 
-    fun commitsForItem(itemId: UUID): List<RefCommitsDto> {
-        val item = items.findByObjectId(itemId) ?: throw NotFoundException("item 不存在")
-        val mounts = projectRepos.findByProjectId(item.projectId)
+    fun commitsForItem(itemObjectId: UUID): List<RefCommitsDto> {
+        val item = items.findByObjectId(itemObjectId) ?: throw NotFoundException("item 不存在")
+        val mounts = projectRepos.findByProjectObjectId(item.projectObjectId)
         if (mounts.isEmpty()) throw BadRequestException("项目未挂载 GitHub 仓库(设置 → GitHub)")
         val token = workspaceService.required().githubToken
             ?: throw BadRequestException("未配置 workspace GitHub PAT(设置 → GitHub)")
 
-        val branchRefs = gitRefs.findByItemId(item.id!!).filter { it.kind == "branch" }
+        val branchRefs = gitRefs.findByItemObjectId(item.objectId!!).filter { it.kind == "branch" }
         return branchRefs.map { ref ->
             // 降级链(YPJ-69):分支仍在走原路;空表(分支已删)→ 按 head 分支名匹配 PR 回溯
             val commits = fetchBranchCommits(ref, token)

@@ -34,9 +34,9 @@ class GroupTypeServiceUnitTest {
     private val leaderGuard = mockk<yangzhou.api.guard.LeaderGuard>(relaxed = true)
     private val service = GroupTypeService(leaderGuard, projects, types, groups, memberships, memberHistory)
 
-    private val project = Project(workspaceId = 1L, key = "P", name = "P").let { it.copy(id = 7L) }
+    private val project = Project(workspaceObjectId = UUID(0, 1), key = "P", name = "P").let { it.copy(id = 7L, objectId = UUID(0, 7)) }
     private fun type(key: String, builtin: Boolean = false) =
-        ItemGroupType(projectId = 7L, typeKey = key, name = key, builtin = builtin).let { it.copy(id = 100L) }
+        ItemGroupType(projectObjectId = UUID(0, 7), typeKey = key, name = key, builtin = builtin).let { it.copy(id = 100L, objectId = UUID(0, 100)) }
 
     private fun stubProject() {
         every { projects.findByKey("P") } returns project
@@ -65,7 +65,7 @@ class GroupTypeServiceUnitTest {
     @Test
     fun `重复 typeKey 409`() {
         stubProject()
-        every { types.existsByProjectIdAndTypeKey(7L, "quarter") } returns true
+        every { types.existsByProjectObjectIdAndTypeKey(UUID(0, 7), "quarter") } returns true
         assertFailsWith<ConflictException> {
             service.createType("P", GroupTypeService.CreateGroupTypeRequest("quarter", "季度"))
         }
@@ -74,7 +74,7 @@ class GroupTypeServiceUnitTest {
     @Test
     fun `建类型成功 - 仓库收到正确实体`() {
         stubProject()
-        every { types.existsByProjectIdAndTypeKey(7L, "quarter") } returns false
+        every { types.existsByProjectObjectIdAndTypeKey(UUID(0, 7), "quarter") } returns false
         every { types.save(any<ItemGroupType>()) } answers { firstArg() }
         val dto = service.createType("P", GroupTypeService.CreateGroupTypeRequest("quarter", "季度"))
         assertEquals("quarter", dto.typeKey)
@@ -86,7 +86,7 @@ class GroupTypeServiceUnitTest {
     fun `改名 - builtin 也可改`() {
         stubProject()
         val sprint = type("sprint", builtin = true)
-        every { types.findByProjectIdAndTypeKey(7L, "sprint") } returns sprint
+        every { types.findByProjectObjectIdAndTypeKey(UUID(0, 7), "sprint") } returns sprint
         every { types.save(any<ItemGroupType>()) } answers { firstArg() }
         val dto = service.updateType("P", "sprint", GroupTypeService.UpdateGroupTypeRequest("冲刺"))
         assertEquals("冲刺", dto.name)
@@ -95,16 +95,16 @@ class GroupTypeServiceUnitTest {
     @Test
     fun `删类型 - builtin 409`() {
         stubProject()
-        every { types.findByProjectIdAndTypeKey(7L, "sprint") } returns type("sprint", builtin = true)
+        every { types.findByProjectObjectIdAndTypeKey(UUID(0, 7), "sprint") } returns type("sprint", builtin = true)
         assertFailsWith<ConflictException> { service.deleteType("P", "sprint") }
     }
 
     @Test
     fun `删类型 - 类型下有组 409 且不落删`() {
         stubProject()
-        every { types.findByProjectIdAndTypeKey(7L, "quarter") } returns type("quarter")
-        every { groups.findByProjectIdOrderByCreatedAt(7L) } returns listOf(
-            ItemGroup(projectId = 7L, type = "quarter", name = "Q1"),
+        every { types.findByProjectObjectIdAndTypeKey(UUID(0, 7), "quarter") } returns type("quarter")
+        every { groups.findByProjectObjectIdOrderByCreatedAt(UUID(0, 7)) } returns listOf(
+            ItemGroup(projectObjectId = UUID(0, 7), type = "quarter", name = "Q1"),
         )
         assertFailsWith<ConflictException> { service.deleteType("P", "quarter") }
         verify(exactly = 0) { types.delete(any<ItemGroupType>()) }
@@ -114,8 +114,8 @@ class GroupTypeServiceUnitTest {
     fun `删类型 - 空类型成功`() {
         stubProject()
         val quarter = type("quarter")
-        every { types.findByProjectIdAndTypeKey(7L, "quarter") } returns quarter
-        every { groups.findByProjectIdOrderByCreatedAt(7L) } returns emptyList()
+        every { types.findByProjectObjectIdAndTypeKey(UUID(0, 7), "quarter") } returns quarter
+        every { groups.findByProjectObjectIdOrderByCreatedAt(UUID(0, 7)) } returns emptyList()
         service.deleteType("P", "quarter")
         verify(exactly = 1) { types.delete(quarter) }
     }
@@ -123,7 +123,7 @@ class GroupTypeServiceUnitTest {
     @Test
     fun `类型不存在 404`() {
         stubProject()
-        every { types.findByProjectIdAndTypeKey(7L, "nope") } returns null
+        every { types.findByProjectObjectIdAndTypeKey(UUID(0, 7), "nope") } returns null
         assertFailsWith<NotFoundException> { service.deleteType("P", "nope") }
     }
 
@@ -132,7 +132,7 @@ class GroupTypeServiceUnitTest {
     @Test
     fun `建组 - 内建类型封闭 400`() {
         stubProject()
-        every { types.findByProjectIdAndTypeKey(7L, "sprint") } returns type("sprint", builtin = true)
+        every { types.findByProjectObjectIdAndTypeKey(UUID(0, 7), "sprint") } returns type("sprint", builtin = true)
         assertFailsWith<BadRequestException> {
             service.createGroup("P", GroupTypeService.CreateGroupRequest("sprint", "绕道"))
         }
@@ -141,7 +141,7 @@ class GroupTypeServiceUnitTest {
     @Test
     fun `建组 - status 非法或日期格式坏 400`() {
         stubProject()
-        every { types.findByProjectIdAndTypeKey(7L, "quarter") } returns type("quarter")
+        every { types.findByProjectObjectIdAndTypeKey(UUID(0, 7), "quarter") } returns type("quarter")
         assertFailsWith<BadRequestException> {
             service.createGroup("P", GroupTypeService.CreateGroupRequest("quarter", "Q1", status = "released"))
         }
@@ -153,8 +153,8 @@ class GroupTypeServiceUnitTest {
     @Test
     fun `建组成功 - 缺省 planned,日期可选`() {
         stubProject()
-        every { types.findByProjectIdAndTypeKey(7L, "quarter") } returns type("quarter")
-        every { groups.save(any<ItemGroup>()) } answers { firstArg<ItemGroup>().copy(id = 1L) }
+        every { types.findByProjectObjectIdAndTypeKey(UUID(0, 7), "quarter") } returns type("quarter")
+        every { groups.save(any<ItemGroup>()) } answers { firstArg<ItemGroup>().copy(id = 1L, objectId = UUID(0, 1)) }
         val dto = service.createGroup(
             "P",
             GroupTypeService.CreateGroupRequest("quarter", "2026-Q1", startDate = "2026-01-01", endDate = "2026-03-31"),
@@ -167,9 +167,9 @@ class GroupTypeServiceUnitTest {
     @Test
     fun `改组删组 - 内建类型封闭 400`() {
         stubProject()
-        val oid = UUID.randomUUID()
-        val sprint = ItemGroup(projectId = 7L, type = "sprint", name = "S1").let { it.copy(objectId = oid, id = 5L) }
-        every { groups.findByProjectIdAndObjectId(7L, oid) } returns sprint
+        val oid = UUID(0, 5)
+        val sprint = ItemGroup(projectObjectId = UUID(0, 7), type = "sprint", name = "S1").let { it.copy(objectId = oid, id = 5L) }
+        every { groups.findByProjectObjectIdAndObjectId(UUID(0, 7), oid) } returns sprint
         assertFailsWith<BadRequestException> {
             service.updateGroup("P", oid, GroupTypeService.UpdateGroupRequest(name = "x"))
         }
@@ -179,12 +179,12 @@ class GroupTypeServiceUnitTest {
     @Test
     fun `删组 - 级联清 membership 与留痕行`() {
         stubProject()
-        val oid = UUID.randomUUID()
-        val quarter = ItemGroup(projectId = 7L, type = "quarter", name = "Q1").let { it.copy(objectId = oid, id = 5L) }
-        every { groups.findByProjectIdAndObjectId(7L, oid) } returns quarter
-        val m = yangzhou.persistence.ItemGroupMember(groupId = 5L, itemId = 9L)
-        every { memberships.findByGroupId(5L) } returns listOf(m)
-        every { memberHistory.findByGroupId(5L) } returns emptyList()
+        val oid = UUID(0, 5)
+        val quarter = ItemGroup(projectObjectId = UUID(0, 7), type = "quarter", name = "Q1").let { it.copy(objectId = oid, id = 5L) }
+        every { groups.findByProjectObjectIdAndObjectId(UUID(0, 7), oid) } returns quarter
+        val m = yangzhou.persistence.ItemGroupMember(groupObjectId = UUID(0, 5), itemObjectId = UUID(0, 9))
+        every { memberships.findByGroupObjectId(UUID(0, 5)) } returns listOf(m)
+        every { memberHistory.findByGroupObjectId(UUID(0, 5)) } returns emptyList()
         service.deleteGroup("P", oid)
         verify(exactly = 1) { memberships.delete(m) }
         verify(exactly = 1) { groups.delete(quarter) }

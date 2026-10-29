@@ -49,7 +49,7 @@ class GithubWebhookController(
         }
         // GitHub webhook 10s 超时:syncRepo 全量拉 branches+PRs 可能超时 → 后台执行,立即 202
         val targets = mounts.mapNotNull { m ->
-            projects.findById(m.projectId).orElse(null)?.let { m.repo to it }
+            projects.findByObjectId(m.projectObjectId)?.let { m.repo to it }
         }
         executor.submit {
             for ((r, project) in targets) {

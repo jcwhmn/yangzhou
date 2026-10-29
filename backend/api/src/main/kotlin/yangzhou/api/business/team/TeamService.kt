@@ -32,13 +32,13 @@ class TeamService(
     data class TeamDto(val teamId: UUID, val name: String, val members: List<TeamMemberDto>)
 
     fun list(): List<TeamDto> =
-        teams.findByWorkspaceId(workspaceService.required().id!!).map { toDto(it) }
+        teams.findByWorkspaceObjectId(workspaceService.required().objectId!!).map { toDto(it) }
 
     @Transactional
     fun create(name: String): TeamDto {
-        val workspaceId = workspaceService.required().id!!
-        if (teams.existsByWorkspaceIdAndName(workspaceId, name)) throw ConflictException("分组已存在:$name")
-        val team = teams.save(Team(workspaceId = workspaceId, name = name))
+        val workspaceObjectId = workspaceService.required().objectId!!
+        if (teams.existsByWorkspaceObjectIdAndName(workspaceObjectId, name)) throw ConflictException("分组已存在:$name")
+        val team = teams.save(Team(workspaceObjectId = workspaceObjectId, name = name))
         return TeamDto(team.objectId, team.name, emptyList())
     }
 
@@ -60,10 +60,10 @@ class TeamService(
         val team = teams.findByObjectId(teamId) ?: throw NotFoundException("分组不存在")
         memberService.requireMember(memberId)
         val internalMember = members.findByObjectId(memberId)!!
-        val teamId2 = team.id!!
-        val memberId2 = internalMember.id!!
-        if (!teamMembers.existsByTeamIdAndMemberId(teamId2, memberId2)) {
-            teamMembers.save(TeamMember(teamId = teamId2, memberId = memberId2))
+        val teamObjectId2 = team.objectId!!
+        val memberObjectId2 = internalMember.objectId!!
+        if (!teamMembers.existsByTeamObjectIdAndMemberObjectId(teamObjectId2, memberObjectId2)) {
+            teamMembers.save(TeamMember(teamObjectId = teamObjectId2, memberObjectId = memberObjectId2))
         }
         return toDto(team)
     }
@@ -72,19 +72,19 @@ class TeamService(
     fun removeMember(teamId: UUID, memberId: UUID): TeamDto {
         val team = teams.findByObjectId(teamId) ?: throw NotFoundException("分组不存在")
         val internalMember = members.findByObjectId(memberId) ?: throw NotFoundException("成员不存在")
-        teamMembers.findByTeamId(team.id!!).firstOrNull { it.memberId == internalMember.id }
+        teamMembers.findByTeamObjectId(team.objectId!!).firstOrNull { it.memberObjectId == internalMember.objectId }
             ?.let { teamMembers.delete(it) }
         return toDto(team)
     }
 
     private fun toDto(team: Team): TeamDto {
-        val byInternal = members.findAll().associate { it.id to it }
-        val list = teamMembers.findByTeamId(team.id!!)
+        val byInternal = members.findAll().associate { it.objectId to it }
+        val list = teamMembers.findByTeamObjectId(team.objectId!!)
         return TeamDto(
             teamId = team.objectId,
             name = team.name,
             members = list.mapNotNull { tm ->
-                byInternal[tm.memberId]?.let { TeamMemberDto(it.objectId, it.displayName) }
+                byInternal[tm.memberObjectId]?.let { TeamMemberDto(it.objectId, it.displayName) }
             },
         )
     }

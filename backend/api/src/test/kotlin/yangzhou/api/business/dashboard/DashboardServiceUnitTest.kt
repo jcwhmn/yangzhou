@@ -24,9 +24,9 @@ class DashboardServiceUnitTest {
     private val milestoneService = mockk<MilestoneService>(relaxed = true)
     private val service = DashboardService(projects, standupService, sprintService, milestoneService)
 
-    private val live = Project(id = 1L, workspaceId = 9L, key = "CHE", name = "CHE")
+    private val live = Project(id = 1L, objectId = UUID(0, 1), workspaceObjectId = UUID(0, 9), key = "CHE", name = "CHE")
     private val archived = Project(
-        id = 2L, workspaceId = 9L, key = "OLD", name = "OLD",
+        id = 2L, objectId = UUID(0, 2), workspaceObjectId = UUID(0, 9), key = "OLD", name = "OLD",
         archivedAt = java.time.Instant.now(),
     )
 

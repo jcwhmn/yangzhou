@@ -8,6 +8,7 @@ import org.springframework.data.jdbc.repository.config.EnableJdbcAuditing
 import yangzhou.api.business.member.MemberService
 import java.time.Clock
 import java.time.OffsetDateTime
+import java.util.UUID
 import java.util.Optional
 
 /**
@@ -20,9 +21,9 @@ import java.util.Optional
 class AuditingConfig {
 
     @Bean
-    fun auditorProvider(members: MemberService): AuditorAware<Long> = AuditorAware {
+    fun auditorProvider(members: MemberService): AuditorAware<UUID> = AuditorAware {
         try {
-            Optional.of(members.current().id!!)
+            Optional.of(members.current().objectId)
         } catch (_: Exception) {
             Optional.empty()
         }

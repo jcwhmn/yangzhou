@@ -1,5 +1,6 @@
 package yangzhou.api.business.workspace
 
+import java.util.UUID
 import io.mockk.clearMocks
 import io.mockk.every
 import io.mockk.mockk
@@ -29,7 +30,7 @@ class WorkspaceServiceUnitTest {
     @Test
     fun ensureDefaultCreatesWhenEmpty() {
         every { workspaces.findAll() } returns emptyList()
-        every { workspaces.save(any()) } answers { firstArg<Workspace>().copy(id = 9L) }
+        every { workspaces.save(any()) } answers { firstArg<Workspace>().copy(id = 9L, objectId = UUID(0, 9)) }
         assertEquals(9L, service.ensureDefault().id)
     }
 

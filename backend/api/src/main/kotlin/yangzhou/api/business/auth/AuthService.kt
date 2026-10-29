@@ -32,7 +32,7 @@ class AuthService(
         val workspace = workspaceService.ensureDefault()
         val member = members.save(
             Member(
-                workspaceId = workspace.id!!,
+                workspaceObjectId = workspace.objectId!!,
                 username = username,
                 passwordHash = encoder.encode(password),
                 displayName = username,

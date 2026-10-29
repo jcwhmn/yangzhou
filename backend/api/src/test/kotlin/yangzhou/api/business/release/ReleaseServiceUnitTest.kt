@@ -43,7 +43,7 @@ class ReleaseServiceUnitTest {
         projects, groups, groupMembers, milestones, itemRepo, itemService, memberHistory, clock, groupTypes,
     )
 
-    private val project = Project(id = 1L, workspaceId = 9L, key = "CHE", name = "CHE")
+    private val project = Project(id = 1L, objectId = UUID(0, 1), workspaceObjectId = UUID(0, 9), key = "CHE", name = "CHE")
 
     private fun release(
         id: Long = 1L,
@@ -52,7 +52,7 @@ class ReleaseServiceUnitTest {
         endDate: java.time.LocalDate? = null,
         releasedDate: java.time.LocalDate? = null,
     ) = ItemGroup(
-        id = id, projectId = 1L, type = "release", name = name, status = status,
+        id = id, projectObjectId = UUID(0, 1), type = "release", name = name, status = status,
         endDate = endDate, releasedDate = releasedDate,
     )
 
@@ -67,7 +67,7 @@ class ReleaseServiceUnitTest {
 
         @Test
         fun missingReleaseTypeRejected() {
-            every { groupTypes.findByProjectIdAndTypeKey(1L, "release") } returns null
+            every { groupTypes.findByProjectObjectIdAndTypeKey(UUID(0, 1), "release") } returns null
             assertFailsWith<ConflictException> {
                 service.create("CHE", CreateReleaseRequest("R1"))
             }
@@ -75,13 +75,13 @@ class ReleaseServiceUnitTest {
 
         @Test
         fun blankNameRejected() {
-            every { groupTypes.findByProjectIdAndTypeKey(1L, "release") } returns mockk()
+            every { groupTypes.findByProjectObjectIdAndTypeKey(UUID(0, 1), "release") } returns mockk()
             assertFailsWith<BadRequestException> { service.create("CHE", CreateReleaseRequest("  ")) }
         }
 
         @Test
         fun badStatusRejected() {
-            every { groupTypes.findByProjectIdAndTypeKey(1L, "release") } returns mockk()
+            every { groupTypes.findByProjectObjectIdAndTypeKey(UUID(0, 1), "release") } returns mockk()
             assertFailsWith<BadRequestException> {
                 service.create("CHE", CreateReleaseRequest("R1", status = "done"))
             }
@@ -89,7 +89,7 @@ class ReleaseServiceUnitTest {
 
         @Test
         fun badDateRejected() {
-            every { groupTypes.findByProjectIdAndTypeKey(1L, "release") } returns mockk()
+            every { groupTypes.findByProjectObjectIdAndTypeKey(UUID(0, 1), "release") } returns mockk()
             assertFailsWith<BadRequestException> {
                 service.create("CHE", CreateReleaseRequest("R1", releasedDate = "2026/01/01"))
             }
@@ -104,13 +104,13 @@ class ReleaseServiceUnitTest {
 
         @BeforeEach
         fun stub() {
-            every { groups.findByProjectIdAndObjectId(1L, planned.objectId) } returns planned
-            every { groups.findByProjectIdAndObjectId(1L, released.objectId) } returns released
+            every { groups.findByProjectObjectIdAndObjectId(UUID(0, 1), planned.objectId) } returns planned
+            every { groups.findByProjectObjectIdAndObjectId(UUID(0, 1), released.objectId) } returns released
         }
 
         @Test
         fun missingReleaseRejected() {
-            every { groups.findByProjectIdAndObjectId(1L, any()) } returns null
+            every { groups.findByProjectObjectIdAndObjectId(UUID(0, 1), any()) } returns null
             assertFailsWith<NotFoundException> {
                 service.update("CHE", UUID.randomUUID(), UpdateReleaseRequest(name = "x"))
             }
@@ -143,9 +143,9 @@ class ReleaseServiceUnitTest {
             val r2 = release(id = 2L, name = "soon", endDate = java.time.LocalDate.of(2026, 11, 1))
             val r3 = release(id = 3L, name = "old-rel", status = "released", releasedDate = java.time.LocalDate.of(2026, 9, 1))
             val r4 = release(id = 4L, name = "new-rel", status = "released", releasedDate = java.time.LocalDate.of(2026, 10, 1))
-            every { groups.findByProjectIdOrderByCreatedAt(1L) } returns listOf(r1, r2, r3, r4)
-            every { groupMembers.findByGroupIdIn(any()) } returns emptyList()
-            every { milestones.findById(any()) } returns java.util.Optional.empty()
+            every { groups.findByProjectObjectIdOrderByCreatedAt(UUID(0, 1)) } returns listOf(r1, r2, r3, r4)
+            every { groupMembers.findByGroupObjectIdIn(any()) } returns emptyList()
+            every { milestones.findByObjectId(any()) } returns null
             assertEquals(listOf("soon", "late", "new-rel", "old-rel"), service.list("CHE").map { it.name })
         }
     }

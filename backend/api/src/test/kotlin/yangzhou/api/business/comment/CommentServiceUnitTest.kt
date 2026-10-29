@@ -28,8 +28,8 @@ class CommentServiceUnitTest {
     private val notificationService = mockk<NotificationService>(relaxed = true)
     private val service = CommentService(comments, itemRepo, memberService, notificationService)
 
-    private val item = Item(id = 1L, projectId = 1L, number = 1, title = "t", statusObjectId = UUID.randomUUID())
-    private val me = Member(id = 5L, workspaceId = 9L, username = "me", passwordHash = "h", displayName = "me")
+    private val item = Item(id = 1L, objectId = UUID(0, 1), projectObjectId = UUID(0, 1), number = 1, title = "t", statusObjectId = UUID.randomUUID())
+    private val me = Member(id = 5L, objectId = UUID(0, 5), workspaceObjectId = UUID(0, 9), username = "me", passwordHash = "h", displayName = "me")
 
     @BeforeEach
     fun setup() {
@@ -49,10 +49,10 @@ class CommentServiceUnitTest {
 
         @Test
         fun trimmedBodySavedAndNotified() {
-            every { comments.save(any()) } answers { firstArg<Comment>().copy(id = 1L) }
+            every { comments.save(any()) } answers { firstArg<Comment>().copy(id = 1L, objectId = UUID(0, 1)) }
             val dto = service.create(item.objectId, "  有空格  ")
             assertEquals("有空格", dto.body)
-            verify { notificationService.notifyComment(item, 5L, "有空格") }
+            verify { notificationService.notifyComment(item, UUID(0, 5), "有空格") }
         }
     }
 
@@ -61,9 +61,9 @@ class CommentServiceUnitTest {
 
         @Test
         fun newestFirst() {
-            val c1 = Comment(id = 1L, itemId = 1L, authorMemberId = 5L, body = "first")
-            val c2 = Comment(id = 2L, itemId = 1L, authorMemberId = 5L, body = "second")
-            every { comments.findByItemIdOrderByCreatedAtDesc(1L) } returns listOf(c2, c1)
+            val c1 = Comment(id = 1L, objectId = UUID(0, 1), itemObjectId = UUID(0, 1), authorMemberObjectId = UUID(0, 5), body = "first")
+            val c2 = Comment(id = 2L, objectId = UUID(0, 2), itemObjectId = UUID(0, 1), authorMemberObjectId = UUID(0, 5), body = "second")
+            every { comments.findByItemObjectIdOrderByCreatedAtDesc(UUID(0, 1)) } returns listOf(c2, c1)
             assertEquals(listOf("second", "first"), service.list(item.objectId).map { it.body })
         }
 
@@ -85,7 +85,7 @@ class CommentServiceUnitTest {
 
         @Test
         fun deleted() {
-            val c = Comment(id = 1L, itemId = 1L, authorMemberId = 5L, body = "x")
+            val c = Comment(id = 1L, objectId = UUID(0, 1), itemObjectId = UUID(0, 1), authorMemberObjectId = UUID(0, 5), body = "x")
             every { comments.findByObjectId(c.objectId) } returns c
             service.delete(c.objectId)
             verify { comments.delete(c) }

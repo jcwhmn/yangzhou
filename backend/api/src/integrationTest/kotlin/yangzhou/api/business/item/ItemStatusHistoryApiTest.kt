@@ -53,14 +53,14 @@ class ItemStatusHistoryApiTest : AbstractApiTest() {
     private fun statusId(name: String): String =
         statuses().first { it["name"].asText() == name }["statusId"].asText()
 
-    private fun statusRowId(name: String): Long = jdbc.queryForList(
-        "select id from status where name = ? and project_id = (select id from project where key = 'CHE')",
+    private fun statusRowId(name: String): java.util.UUID = jdbc.queryForList(
+        "select object_id from status where name = ? and project_object_id = (select object_id from project where key = 'CHE')",
         name,
-    )[0]["id"] as Long
+    )[0]["object_id"] as java.util.UUID
 
     private fun history(title: String = "hist-x"): List<Map<String, Any?>> = jdbc.queryForList(
-        "select h.from_status_id, h.to_status_id, h.source, h.actor_member_id " +
-            "from item_status_history h where h.item_id = (select id from item where title = ?) order by h.id",
+        "select h.from_status_object_id, h.to_status_object_id, h.source, h.actor_member_object_id " +
+            "from item_status_history h where h.item_object_id = (select object_id from item where title = ?) order by h.id",
         title,
     )
 
@@ -80,8 +80,8 @@ class ItemStatusHistoryApiTest : AbstractApiTest() {
         val rows = history("hist-m")
         assertEquals(1, rows.size)
         assertEquals("created", rows[0]["source"])
-        assertNull(rows[0]["from_status_id"])
-        assertEquals(statusRowId("In Review"), (rows[0]["to_status_id"] as Number).toLong())
+        assertNull(rows[0]["from_status_object_id"])
+        assertEquals(statusRowId("In Review"), rows[0]["to_status_object_id"])
 
         // In Review → Done(无规则行 = 自由迁移)→ +1 manual
         authed.patch().uri("/api/items/$mid")
@@ -90,8 +90,8 @@ class ItemStatusHistoryApiTest : AbstractApiTest() {
         val after = history("hist-m")
         assertEquals(2, after.size)
         assertEquals("manual", after[1]["source"])
-        assertEquals(statusRowId("In Review"), (after[1]["from_status_id"] as Number).toLong())
-        assertEquals(statusRowId("Done"), (after[1]["to_status_id"] as Number).toLong())
+        assertEquals(statusRowId("In Review"), after[1]["from_status_object_id"])
+        assertEquals(statusRowId("Done"), after[1]["to_status_object_id"])
 
         // 同状态 no-op → 行数不变
         authed.patch().uri("/api/items/$mid")
@@ -108,7 +108,7 @@ class ItemStatusHistoryApiTest : AbstractApiTest() {
         val rows = history()
         assertEquals(1, rows.size)
         assertEquals("created", rows[0]["source"])
-        assertEquals(statusRowId("To Do"), (rows[0]["to_status_id"] as Number).toLong())
+        assertEquals(statusRowId("To Do"), rows[0]["to_status_object_id"])
 
         // PR open → In Review(github 行,actor 为空 = 系统)
         fake.prs["octo/r"] = listOf(RepoPr(1, "CHE-1-x", "open", "https://github.com/octo/r/pull/1"))
@@ -116,9 +116,9 @@ class ItemStatusHistoryApiTest : AbstractApiTest() {
         val afterOpen = history()
         assertEquals(2, afterOpen.size)
         assertEquals("github", afterOpen[1]["source"])
-        assertNull(afterOpen[1]["actor_member_id"])
-        assertEquals(statusRowId("To Do"), (afterOpen[1]["from_status_id"] as Number).toLong())
-        assertEquals(statusRowId("In Review"), (afterOpen[1]["to_status_id"] as Number).toLong())
+        assertNull(afterOpen[1]["actor_member_object_id"])
+        assertEquals(statusRowId("To Do"), afterOpen[1]["from_status_object_id"])
+        assertEquals(statusRowId("In Review"), afterOpen[1]["to_status_object_id"])
 
         // merged → Done
         fake.prs["octo/r"] = listOf(RepoPr(1, "CHE-1-x", "merged", "https://github.com/octo/r/pull/1"))
@@ -136,7 +136,7 @@ class ItemStatusHistoryApiTest : AbstractApiTest() {
         setup()
         jdbc.update(
             "update status set wip_limit = 1 where name = 'In Review' " +
-                "and project_id = (select id from project where key = 'CHE')",
+                "and project_object_id = (select object_id from project where key = 'CHE')",
         )
         // 预置:另一 item 直接建在 In Review,占满 WIP(绕开"开工须有主"守卫)
         authed.post().uri("/api/projects/CHE/items")

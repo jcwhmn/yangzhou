@@ -75,8 +75,8 @@ class GithubCommitsApiTest : AbstractApiTest() {
 
     private fun seedBranchRef(itemId: String, ref: String = "CHE-1-x") {
         jdbc.update(
-            "insert into item_git_ref (object_id, item_id, kind, repo, ref, created_at) " +
-                "values (md5(random()::text || clock_timestamp()::text)::uuid, (select id from item where object_id = ?::uuid), 'branch', 'octo/r', ?, '2026-10-01T00:00:00Z')",
+            "insert into item_git_ref (object_id, item_object_id, kind, repo, ref, created_at) " +
+                "values (md5(random()::text || clock_timestamp()::text)::uuid, (select object_id from item where object_id = ?::uuid), 'branch', 'octo/r', ?, '2026-10-01T00:00:00Z')",
             itemId, ref,
         )
     }

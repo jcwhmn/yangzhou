@@ -241,8 +241,8 @@ class GithubSyncApiTest : AbstractApiTest() {
 
     private fun prRows(): List<Map<String, Any>> =
         jdbc.queryForList(
-            "select ir.item_id, i.object_id as oid, ir.state from item_git_ref ir " +
-                "join item i on i.id = ir.item_id where ir.kind = 'pr'",
+            "select ir.item_object_id, i.object_id as oid, ir.state from item_git_ref ir " +
+                "join item i on i.object_id = ir.item_object_id where ir.kind = 'pr'",
         )
 
 }

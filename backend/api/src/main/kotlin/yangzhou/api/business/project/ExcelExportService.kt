@@ -30,16 +30,16 @@ class ExcelExportService(
 
     fun export(key: String): ExportFile {
         val project = projects.findByKey(key) ?: throw NotFoundException("项目不存在:$key")
-        val projectId = project.id ?: error("no id")
+        val projectObjectId = project.objectId ?: error("no id")
         val gantt = projectService.gantt(key)
-        val allItems = items.findByProjectIdAndDeletedAtIsNullOrderByNumber(projectId)
+        val allItems = items.findByProjectObjectIdAndDeletedAtIsNullOrderByNumber(projectObjectId)
         val itemByObjectId = allItems.associateBy { it.objectId }
-        val memberMap = members.findByWorkspaceId(project.workspaceId).associateBy { it.objectId }
+        val memberMap = members.findByWorkspaceObjectId(project.workspaceObjectId).associateBy { it.objectId }
 
-        val entries = timeEntries.findByItemIdIn(allItems.mapNotNull { it.id })
-        val entryItemMap = allItems.associateBy { it.id }
-        val entryMemberMap = members.findAllById(entries.map { it.memberId }.toSet()).associateBy { it.id }
-        val minutesByItemId = entries.groupBy { it.itemId }
+        val entries = timeEntries.findByItemObjectIdIn(allItems.mapNotNull { it.objectId })
+        val entryItemMap = allItems.associateBy { it.objectId }
+        val entryMemberMap = members.findAllByObjectIdIn(entries.map { it.memberObjectId }.toSet()).associateBy { it.objectId }
+        val minutesByItemObjectId = entries.groupBy { it.itemObjectId }
             .mapValues { (_, list) -> list.sumOf { e -> minutesOf(e) } }
 
         XSSFWorkbook().use { wb ->
@@ -58,7 +58,7 @@ class ExcelExportService(
                 r.createCell(4).setCellValue(item?.assigneeObjectId?.let { memberMap[it]?.displayName } ?: "")
                 r.createCell(5).setCellValue(row.startDate ?: "")
                 r.createCell(6).setCellValue(row.dueDate ?: "")
-                r.createCell(7).setCellValue((item?.id?.let { minutesByItemId[it] } ?: 0L).toDouble())
+                r.createCell(7).setCellValue((item?.objectId?.let { minutesByItemObjectId[it] } ?: 0L).toDouble())
                 r.createCell(8).setCellValue(if (row.overdue) "是" else "否")
             }
 
@@ -69,8 +69,8 @@ class ExcelExportService(
                 .forEachIndexed { c, title -> h2.createCell(c).setCellValue(title) }
             entries.sortedByDescending { it.startedAt }.forEachIndexed { i, e ->
                 val r: Row = s2.createRow(i + 1)
-                r.createCell(0).setCellValue(entryMemberMap[e.memberId]?.displayName ?: "?")
-                r.createCell(1).setCellValue(entryItemMap[e.itemId]?.let { "${project.key}-${it.number}" } ?: "?")
+                r.createCell(0).setCellValue(entryMemberMap[e.memberObjectId]?.displayName ?: "?")
+                r.createCell(1).setCellValue(entryItemMap[e.itemObjectId]?.let { "${project.key}-${it.number}" } ?: "?")
                 r.createCell(2).setCellValue(timeFmt.format(e.startedAt))
                 r.createCell(3).setCellValue(e.endedAt?.let { timeFmt.format(it) } ?: "(计时中)")
                 r.createCell(4).setCellValue(minutesOf(e).toDouble())

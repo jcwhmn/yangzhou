@@ -28,15 +28,15 @@ class WorkflowServiceUnitTest {
     private val leaderGuard = mockk<yangzhou.api.guard.LeaderGuard>(relaxed = true)
     private val service = WorkflowService(leaderGuard, projects, statuses, transitions)
 
-    private val project = Project(id = 1L, workspaceId = 9L, key = "CHE", name = "CHE")
-    private val todo = Status(id = 1L, projectId = 1L, name = "To Do", position = 0)
-    private val done = Status(id = 2L, projectId = 1L, name = "Done", isFinal = true, position = 1)
+    private val project = Project(id = 1L, objectId = UUID(0, 1), workspaceObjectId = UUID(0, 9), key = "CHE", name = "CHE")
+    private val todo = Status(id = 1L, objectId = UUID(0, 1), projectObjectId = UUID(0, 1), name = "To Do", position = 0)
+    private val done = Status(id = 2L, objectId = UUID(0, 2), projectObjectId = UUID(0, 1), name = "Done", isFinal = true, position = 1)
 
     @BeforeEach
     fun setup() {
         clearMocks(projects, statuses, transitions)
         every { projects.findByKey("CHE") } returns project
-        every { statuses.findByProjectIdOrderByPosition(1L) } returns listOf(todo, done)
+        every { statuses.findByProjectObjectIdOrderByPosition(UUID(0, 1)) } returns listOf(todo, done)
     }
 
     @Nested
@@ -49,7 +49,7 @@ class WorkflowServiceUnitTest {
 
         @Test
         fun positionAutoAppended() {
-            every { statuses.save(any()) } answers { firstArg<Status>().copy(id = 3L) }
+            every { statuses.save(any()) } answers { firstArg<Status>().copy(id = 3L, objectId = UUID(0, 3)) }
             assertEquals(2, service.createStatus("CHE", "QA", null, false, false, null).position) // max+1
         }
     }
@@ -84,32 +84,32 @@ class WorkflowServiceUnitTest {
 
         @Test
         fun replaceDeletesThenInserts() {
-            every { transitions.deleteByProjectId(1L) } returns Unit
+            every { transitions.deleteByProjectObjectId(UUID(0, 1)) } returns Unit
             every { transitions.save(any()) } answers { firstArg<StatusTransition>() }
-            every { transitions.findByProjectId(1L) } returns listOf(
-                StatusTransition(id = 9L, projectId = 1L, fromStatusId = 1L, toStatusId = 2L),
+            every { transitions.findByProjectObjectId(UUID(0, 1)) } returns listOf(
+                StatusTransition(id = 9L, objectId = UUID(0, 9), projectObjectId = UUID(0, 1), fromStatusObjectId = UUID(0, 1), toStatusObjectId = UUID(0, 2)),
             )
             val result = service.replaceTransitions("CHE", listOf(WorkflowService.TransitionDto("To Do", "Done")))
             assertEquals(listOf("To Do" to "Done"), result.map { it.from to it.to })
-            verify { transitions.deleteByProjectId(1L) }
-            verify { transitions.save(withArg<StatusTransition> { assertEquals(1L, it.fromStatusId); assertEquals(2L, it.toStatusId) }) }
+            verify { transitions.deleteByProjectObjectId(UUID(0, 1)) }
+            verify { transitions.save(withArg<StatusTransition> { assertEquals(UUID(0, 1), it.fromStatusObjectId); assertEquals(UUID(0, 2), it.toStatusObjectId) }) }
         }
 
         @Test
         fun emptyTableMeansFreeTransitions() {
-            every { transitions.findByProjectId(1L) } returns emptyList()
-            service.assertTransitionAllowed(1L, fromStatusId = 1L, toStatusId = 2L) // 不抛即通过
+            every { transitions.findByProjectObjectId(UUID(0, 1)) } returns emptyList()
+            service.assertTransitionAllowed(UUID(0, 1), fromStatusObjectId = UUID(0, 1), toStatusObjectId = UUID(0, 2)) // 不抛即通过
         }
 
         @Test
         fun offTableTransitionRejected() {
-            val other = Status(id = 3L, projectId = 1L, name = "QA", position = 2)
-            every { transitions.findByProjectId(1L) } returns listOf(
-                StatusTransition(id = 1L, projectId = 1L, fromStatusId = 1L, toStatusId = 2L),
+            val other = Status(id = 3L, objectId = UUID(0, 3), projectObjectId = UUID(0, 1), name = "QA", position = 2)
+            every { transitions.findByProjectObjectId(UUID(0, 1)) } returns listOf(
+                StatusTransition(id = 1L, objectId = UUID(0, 1), projectObjectId = UUID(0, 1), fromStatusObjectId = UUID(0, 1), toStatusObjectId = UUID(0, 2)),
             )
-            service.assertTransitionAllowed(1L, 1L, 2L) // 表内放行
-            service.assertTransitionAllowed(1L, 1L, 1L) // 自迁恒放行
-            assertFailsWith<ConflictException> { service.assertTransitionAllowed(1L, 1L, other.id!!) }
+            service.assertTransitionAllowed(UUID(0, 1), UUID(0, 1), UUID(0, 2)) // 表内放行
+            service.assertTransitionAllowed(UUID(0, 1), UUID(0, 1), UUID(0, 1)) // 自迁恒放行
+            assertFailsWith<ConflictException> { service.assertTransitionAllowed(UUID(0, 1), UUID(0, 1), other.objectId) }
         }
     }
 }

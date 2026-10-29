@@ -53,34 +53,34 @@ class SprintServiceUnitTest {
         projects, groups, memberships, itemRepo, itemService, memberHistory, clock, groupTypes,
     )
 
-    private val project = Project(id = 100L, workspaceId = 1L, key = "YPJ", name = "yangzhou")
-    private val item = Item(id = 9L, objectId = UUID.randomUUID(), projectId = 100L, number = 7, title = "任务", statusObjectId = UUID.randomUUID())
-    private val sprintOid = UUID.randomUUID()
-    private val sprint = ItemGroup(id = 55L, objectId = sprintOid, projectId = 100L, name = "V23", status = "planned")
-    private val otherOid = UUID.randomUUID()
-    private val otherSprint = ItemGroup(id = 66L, objectId = otherOid, projectId = 100L, name = "V24", status = "planned")
+    private val project = Project(id = 100L, objectId = UUID(0, 100), workspaceObjectId = UUID(0, 1), key = "YPJ", name = "yangzhou")
+    private val item = Item(id = 9L, objectId = UUID(0, 9), projectObjectId = UUID(0, 100), number = 7, title = "任务", statusObjectId = UUID.randomUUID())
+    private val sprintOid = UUID(0, 55)
+    private val sprint = ItemGroup(id = 55L, objectId = sprintOid, projectObjectId = UUID(0, 100), name = "V23", status = "planned")
+    private val otherOid = UUID(0, 66)
+    private val otherSprint = ItemGroup(id = 66L, objectId = otherOid, projectObjectId = UUID(0, 100), name = "V24", status = "planned")
 
     @BeforeEach
     fun setup() {
         clearMocks(projects, groups, memberships, itemRepo, itemService, memberHistory, groupTypes) // clock 是 fixed 真实例,非 mock,勿 clear
         every { projects.findByKey("YPJ") } returns project
-        every { groups.findByProjectIdAndObjectId(100L, sprintOid) } returns sprint
-        every { groups.findByProjectIdAndObjectId(100L, otherOid) } returns otherSprint
+        every { groups.findByProjectObjectIdAndObjectId(UUID(0, 100), sprintOid) } returns sprint
+        every { groups.findByProjectObjectIdAndObjectId(UUID(0, 100), otherOid) } returns otherSprint
         every { itemRepo.findByObjectId(item.objectId) } returns item
         savedRows.clear()
         every { memberships.save(any()) } answers { val arg: ItemGroupMember = firstArg(); savedRows.add(arg); arg } // 泛型 save 坑(P0);记录落库行供断言
         every { itemService.get(item.objectId) } returns mockk()
     }
 
-    private fun currentRow(groupId: Long = 55L) = ItemGroupMember(id = 77L, groupId = groupId, itemId = 9L, createdAt = Instant.EPOCH) // createdAt 钉死:data class 相等性依赖它
+    private fun currentRow(groupObjectId: UUID = UUID(0, 55)) = ItemGroupMember(id = 77L, objectId = UUID(0, 77), groupObjectId = groupObjectId, itemObjectId = UUID(0, 9), createdAt = Instant.EPOCH) // createdAt 钉死:data class 相等性依赖它
 
     private fun stubCurrent(row: ItemGroupMember?) {
         if (row == null) {
-            every { memberships.findByItemIdIn(listOf(9L)) } returns emptyList()
+            every { memberships.findByItemObjectIdIn(listOf(UUID(0, 9))) } returns emptyList()
         } else {
-            every { memberships.findByItemIdIn(listOf(9L)) } returns listOf(row)
-            every { groups.findAllById(setOf(row.groupId)) } returns
-                listOf(if (row.groupId == 55L) sprint else otherSprint)
+            every { memberships.findByItemObjectIdIn(listOf(UUID(0, 9))) } returns listOf(row)
+            every { groups.findAllByObjectIdIn(setOf(row.groupObjectId)) } returns
+                listOf(if (row.groupObjectId == UUID(0, 55)) sprint else otherSprint)
         }
     }
 
@@ -95,14 +95,14 @@ class SprintServiceUnitTest {
         @Test
         fun `sprint 不存在 - 404`() {
             stubCurrent(null)
-            every { groups.findByProjectIdAndObjectId(100L, any()) } returns null // relaxed 对未知 UUID 会造非空占位,显式压 null
+            every { groups.findByProjectObjectIdAndObjectId(UUID(0, 100), any()) } returns null // relaxed 对未知 UUID 会造非空占位,显式压 null
             assertFailsWith<NotFoundException> { service.assignItem(item.objectId, UUID.randomUUID()) }
         }
 
         @Test
         fun `completed sprint - 409 拒绝指派`() {
             stubCurrent(null)
-            every { groups.findByProjectIdAndObjectId(100L, sprintOid) } returns sprint.copy(status = "completed")
+            every { groups.findByProjectObjectIdAndObjectId(UUID(0, 100), sprintOid) } returns sprint.copy(status = "completed")
             assertFailsWith<ConflictException> { service.assignItem(item.objectId, sprintOid) }
         }
 
@@ -113,7 +113,7 @@ class SprintServiceUnitTest {
             service.assignItem(item.objectId, null)
 
             verify(exactly = 1) { memberships.delete(any()) }
-            verify(exactly = 1) { memberHistory.recordRemove(55L, 9L, clock.instant()) }
+            verify(exactly = 1) { memberHistory.recordRemove(UUID(0, 55), UUID(0, 9), clock.instant()) }
             verify(exactly = 0) { memberships.save(any()) }
         }
 
@@ -145,9 +145,9 @@ class SprintServiceUnitTest {
             service.assignItem(item.objectId, otherOid)
 
             verify(exactly = 1) { memberships.delete(any()) } // delete 匹配用 any:row 的 objectId 每次随机
-            verify(exactly = 1) { memberHistory.recordRemove(55L, 9L, clock.instant()) }
-            verify(exactly = 1) { memberHistory.recordAdd(66L, 9L, clock.instant()) }
-            assertEquals(66L, savedRows.single().groupId)
+            verify(exactly = 1) { memberHistory.recordRemove(UUID(0, 55), UUID(0, 9), clock.instant()) }
+            verify(exactly = 1) { memberHistory.recordAdd(UUID(0, 66), UUID(0, 9), clock.instant()) }
+            assertEquals(UUID(0, 66), savedRows.single().groupObjectId)
         }
 
         @Test
@@ -157,7 +157,7 @@ class SprintServiceUnitTest {
             service.assignItem(item.objectId, sprintOid)
 
             verify(exactly = 0) { memberships.delete(any()) }
-            verify(exactly = 1) { memberHistory.recordAdd(55L, 9L, clock.instant()) }
+            verify(exactly = 1) { memberHistory.recordAdd(UUID(0, 55), UUID(0, 9), clock.instant()) }
         }
     }
 

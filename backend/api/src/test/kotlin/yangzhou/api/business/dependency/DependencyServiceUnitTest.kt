@@ -33,26 +33,27 @@ class DependencyServiceUnitTest {
     private val statuses = mockk<StatusRepository>(relaxed = true)
     private val service = DependencyService(dependencies, items, projects, statuses)
 
-    private val projA = 1L
-    private val projB = 2L
-    private val projectA = Project(id = projA, workspaceId = 9L, key = "CHE", name = "CHE")
+    private val projA = UUID(0, 1)
+    private val projB = UUID(0, 2)
+    private val projectA = Project(id = 1L, objectId = projA, workspaceObjectId = UUID(0, 9), key = "CHE", name = "CHE")
 
-    private fun item(id: Long?, number: Int, project: Long = projA, status: Status) = Item(
+    private fun item(id: Long?, number: Int, project: UUID = projA, status: Status) = Item(
         id = id,
-        projectId = project,
+        objectId = id?.let { UUID(0, it) } ?: UUID.randomUUID(),
+        projectObjectId = project,
         number = number,
         title = "item-$number",
         statusObjectId = status.objectId,
     )
 
     private fun status(name: String, final: Boolean = false, position: Int = 0) = Status(
-        projectId = projA, name = name, isFinal = final, position = position,
+        projectObjectId = projA, name = name, isFinal = final, position = position,
     )
 
     @BeforeEach
     fun setup() {
         clearMocks(dependencies, items, projects, statuses)
-        every { projects.findById(any()) } returns java.util.Optional.of(projectA)
+        every { projects.findByObjectId(any()) } returns (projectA)
     }
 
     @Nested
@@ -93,7 +94,7 @@ class DependencyServiceUnitTest {
             val b = item(2L, 2, status = status("To Do"))
             every { items.findByObjectId(a.objectId) } returns a
             every { items.findByObjectId(b.objectId) } returns b
-            every { dependencies.existsByItemIdAndDependsOnItemId(1L, 2L) } returns true
+            every { dependencies.existsByItemObjectIdAndDependsOnItemObjectId(UUID(0, 1), UUID(0, 2)) } returns true
             assertFailsWith<ConflictException> { service.add(a.objectId, b.objectId) }
         }
 
@@ -104,8 +105,8 @@ class DependencyServiceUnitTest {
             val b = item(2L, 2, status = status("To Do"))
             every { items.findByObjectId(a.objectId) } returns a
             every { items.findByObjectId(b.objectId) } returns b
-            every { dependencies.existsByItemIdAndDependsOnItemId(1L, 2L) } returns false
-            every { dependencies.findByDependsOnItemId(1L) } returns listOf(ItemDependency(itemId = 2L, dependsOnItemId = 1L))
+            every { dependencies.existsByItemObjectIdAndDependsOnItemObjectId(UUID(0, 1), UUID(0, 2)) } returns false
+            every { dependencies.findByDependsOnItemObjectId(UUID(0, 1)) } returns listOf(ItemDependency(itemObjectId = UUID(0, 2), dependsOnItemObjectId = UUID(0, 1)))
             assertFailsWith<BadRequestException> { service.add(a.objectId, b.objectId) }
         }
 
@@ -116,10 +117,10 @@ class DependencyServiceUnitTest {
             val b = item(2L, 2, status = open)
             every { items.findByObjectId(a.objectId) } returns a
             every { items.findByObjectId(b.objectId) } returns b
-            every { dependencies.existsByItemIdAndDependsOnItemId(1L, 2L) } returns false
-            every { dependencies.findByDependsOnItemId(1L) } returns emptyList()
+            every { dependencies.existsByItemObjectIdAndDependsOnItemObjectId(UUID(0, 1), UUID(0, 2)) } returns false
+            every { dependencies.findByDependsOnItemObjectId(UUID(0, 1)) } returns emptyList()
             every { dependencies.save(any()) } answers { firstArg() }
-            every { statuses.findByProjectIdOrderByPosition(projA) } returns listOf(open)
+            every { statuses.findByProjectObjectIdOrderByPosition(projA) } returns listOf(open)
             val dto = service.add(a.objectId, b.objectId)
             assertEquals("CHE-2", dto.number)
             assertEquals("To Do", dto.statusName)
@@ -136,13 +137,13 @@ class DependencyServiceUnitTest {
             val done = status("Done", final = true)
             val a = item(1L, 1, status = open)
             every { items.findByObjectId(a.objectId) } returns a
-            every { statuses.findByProjectIdOrderByPosition(projA) } returns listOf(open, done)
-            every { dependencies.findByItemId(1L) } returns listOf(
-                ItemDependency(itemId = 1L, dependsOnItemId = 2L),   // 未终态 → 阻塞
-                ItemDependency(itemId = 1L, dependsOnItemId = 3L),   // 终态 → 不阻塞
+            every { statuses.findByProjectObjectIdOrderByPosition(projA) } returns listOf(open, done)
+            every { dependencies.findByItemObjectId(UUID(0, 1)) } returns listOf(
+                ItemDependency(itemObjectId = UUID(0, 1), dependsOnItemObjectId = UUID(0, 2)),   // 未终态 → 阻塞
+                ItemDependency(itemObjectId = UUID(0, 1), dependsOnItemObjectId = UUID(0, 3)),   // 终态 → 不阻塞
             )
-            every { items.findById(2L) } returns java.util.Optional.of(item(2L, 2, status = open))
-            every { items.findById(3L) } returns java.util.Optional.of(item(3L, 3, status = done))
+            every { items.findByObjectId(UUID(0, 2)) } returns (item(2L, 2, status = open))
+            every { items.findByObjectId(UUID(0, 3)) } returns (item(3L, 3, status = done))
             val result = service.list(a.objectId)
             assertTrue(result.blocked)
             assertEquals(2, result.dependencies.size)
@@ -167,7 +168,7 @@ class DependencyServiceUnitTest {
 
         @Test
         fun rowDeleted() {
-            val row = ItemDependency(itemId = 1L, dependsOnItemId = 2L)
+            val row = ItemDependency(itemObjectId = UUID(0, 1), dependsOnItemObjectId = UUID(0, 2))
             every { dependencies.findByObjectId(row.objectId) } returns row
             service.remove(row.objectId)
             io.mockk.verify { dependencies.delete(row) }
@@ -175,7 +176,7 @@ class DependencyServiceUnitTest {
     }
 
     @Nested
-    inner class BlockedItemIds {
+    inner class BlockedItemObjectIds {
 
         @Test
         fun unfinishedTargetBlocksDependent() {
@@ -184,15 +185,15 @@ class DependencyServiceUnitTest {
             val a = item(1L, 1, status = open)
             val b = item(2L, 2, status = done)
             val c = item(3L, 3, status = open)
-            every { items.findByProjectIdAndDeletedAtIsNullOrderByNumber(projA) } returns listOf(a, b, c)
-            every { statuses.findByProjectIdOrderByPosition(projA) } returns listOf(open, done)
+            every { items.findByProjectObjectIdAndDeletedAtIsNullOrderByNumber(projA) } returns listOf(a, b, c)
+            every { statuses.findByProjectObjectIdOrderByPosition(projA) } returns listOf(open, done)
             // a 依赖未终态 c → a 阻塞;b 依赖未终态 target 但 target 不在项目 → 不计;a 依赖 b(终态)→ 不阻塞
-            every { dependencies.findByItemIdIn(listOf(1L, 2L, 3L)) } returns listOf(
-                ItemDependency(itemId = 1L, dependsOnItemId = 3L),
-                ItemDependency(itemId = 2L, dependsOnItemId = 99L),
-                ItemDependency(itemId = 1L, dependsOnItemId = 2L),
+            every { dependencies.findByItemObjectIdIn(listOf(UUID(0, 1), UUID(0, 2), UUID(0, 3))) } returns listOf(
+                ItemDependency(itemObjectId = UUID(0, 1), dependsOnItemObjectId = UUID(0, 3)),
+                ItemDependency(itemObjectId = UUID(0, 2), dependsOnItemObjectId = UUID(0, 99)),
+                ItemDependency(itemObjectId = UUID(0, 1), dependsOnItemObjectId = UUID(0, 2)),
             )
-            assertEquals(setOf(1L), service.blockedItemIds(projA))
+            assertEquals(setOf(UUID(0, 1)), service.blockedItemObjectIds(projA))
         }
     }
 }

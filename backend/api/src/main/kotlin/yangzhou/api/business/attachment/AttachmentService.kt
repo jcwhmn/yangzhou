@@ -22,8 +22,8 @@ class AttachmentService(
     private val log = LoggerFactory.getLogger(AttachmentService::class.java)
 
     @Transactional
-    fun register(itemId: UUID, filename: String, contentType: String, sizeBytes: Long): AttachmentUploadedResponse {
-        val item = items.findByObjectId(itemId) ?: throw NotFoundException("item 不存在")
+    fun register(itemObjectId: UUID, filename: String, contentType: String, sizeBytes: Long): AttachmentUploadedResponse {
+        val item = items.findByObjectId(itemObjectId) ?: throw NotFoundException("item 不存在")
         val name = filename.trim()
         if (name.isEmpty() || name.length > 255) throw BadRequestException("文件名非法")
         val ext = name.substringAfterLast('.', "").lowercase()
@@ -38,7 +38,7 @@ class AttachmentService(
         val entity = attachments.save(
             Attachment(
                 objectId = objectId,
-                itemId = item.id!!,
+                itemObjectId = item.objectId!!,
                 filename = name,
                 contentType = contentType,
                 sizeBytes = sizeBytes,
@@ -55,28 +55,28 @@ class AttachmentService(
     }
 
     @Transactional(readOnly = true)
-    fun list(itemId: UUID): List<AttachmentResponse> {
-        val item = items.findByObjectId(itemId) ?: throw NotFoundException("item 不存在")
-        return attachments.findByItemId(item.id!!).map { it.toResponse() }
+    fun list(itemObjectId: UUID): List<AttachmentResponse> {
+        val item = items.findByObjectId(itemObjectId) ?: throw NotFoundException("item 不存在")
+        return attachments.findByItemObjectId(item.objectId!!).map { it.toResponse() }
     }
 
     @Transactional(readOnly = true)
-    fun downloadUrl(itemId: UUID, attachmentObjectId: UUID): AttachmentDownloadResponse {
-        val row = requireRow(itemId, attachmentObjectId)
+    fun downloadUrl(itemObjectId: UUID, attachmentObjectId: UUID): AttachmentDownloadResponse {
+        val row = requireRow(itemObjectId, attachmentObjectId)
         return AttachmentDownloadResponse(downloadUrl = storage.presignGet(row.objectKey))
     }
 
     @Transactional
-    fun delete(itemId: UUID, attachmentObjectId: UUID) {
-        val row = requireRow(itemId, attachmentObjectId)
+    fun delete(itemObjectId: UUID, attachmentObjectId: UUID) {
+        val row = requireRow(itemObjectId, attachmentObjectId)
         attachments.delete(row)
         runCatching { storage.delete(row.objectKey) }
             .onFailure { log.warn("S3 对象删除失败(附件行已删): {}: {}", row.objectKey, it.message) }
     }
 
-    private fun requireRow(itemId: UUID, attachmentObjectId: UUID): Attachment {
-        val item = items.findByObjectId(itemId) ?: throw NotFoundException("item 不存在")
-        return attachments.findByObjectIdAndItemId(attachmentObjectId, item.id!!)
+    private fun requireRow(itemObjectId: UUID, attachmentObjectId: UUID): Attachment {
+        val item = items.findByObjectId(itemObjectId) ?: throw NotFoundException("item 不存在")
+        return attachments.findByObjectIdAndItemObjectId(attachmentObjectId, item.objectId!!)
             ?: throw NotFoundException("附件不存在")
     }
 

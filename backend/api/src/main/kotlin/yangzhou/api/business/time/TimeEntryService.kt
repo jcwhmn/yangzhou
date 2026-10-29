@@ -64,7 +64,7 @@ class TimeEntryService(
         }
         val item = items.findByObjectId(itemId) ?: throw NotFoundException("item 不存在")
         val me = memberService.current()
-        projectMembers.assertAssignable(item.projectId, me.id!!)
+        projectMembers.assertAssignable(item.projectObjectId, me.objectId!!)
 
         val entry = when {
             minutes == null && startedAtText != null -> { // V16-3 起止补录(工时建议落账走这里);首末 commit ≈ 开工/收工
@@ -72,17 +72,17 @@ class TimeEntryService(
                 val start = parseInstant(startedAtText) ?: throw BadRequestException("startedAt 应为 ISO-8601(如 2026-10-07T14:00:00Z)")
                 val end = parseInstant(endText) ?: throw BadRequestException("endedAt 应为 ISO-8601")
                 if (!end.isAfter(start)) throw BadRequestException("endedAt 必须晚于 startedAt")
-                TimeEntry(itemId = item.id!!, memberId = me.id!!, startedAt = start, endedAt = end, note = note)
+                TimeEntry(itemObjectId = item.objectId!!, memberObjectId = me.objectId!!, startedAt = start, endedAt = end, note = note)
             }
             minutes == null -> { // 计时:停掉我所有进行中的,再开新的
-                timeEntries.findByMemberIdAndEndedAtIsNull(me.id!!)
+                timeEntries.findByMemberObjectIdAndEndedAtIsNull(me.objectId!!)
                     .forEach { timeEntries.save(it.copy(endedAt = Instant.now())) }
-                TimeEntry(itemId = item.id!!, memberId = me.id!!, startedAt = Instant.now(), note = note)
+                TimeEntry(itemObjectId = item.objectId!!, memberObjectId = me.objectId!!, startedAt = Instant.now(), note = note)
             }
             minutes <= 0 -> throw BadRequestException("minutes 必须为正数")
             else -> TimeEntry(
-                itemId = item.id!!,
-                memberId = me.id!!,
+                itemObjectId = item.objectId!!,
+                memberObjectId = me.objectId!!,
                 startedAt = Instant.now().minusSeconds(minutes * 60L),
                 endedAt = Instant.now(),
                 minutes = minutes,
@@ -95,29 +95,29 @@ class TimeEntryService(
     /** 停止自己的计时;非本人/不存在 404,已结束 409。 */
     @Transactional
     fun stop(entryId: UUID): TimeEntryDto {
-        val meId = memberService.current().id!!
+        val meId = memberService.current().objectId!!
         val entry = timeEntries.findByObjectId(entryId) ?: throw NotFoundException("工时记录不存在")
-        if (entry.memberId != meId) throw NotFoundException("工时记录不存在")
+        if (entry.memberObjectId != meId) throw NotFoundException("工时记录不存在")
         if (entry.endedAt != null) throw ConflictException("计时已结束")
         val saved = timeEntries.save(entry.copy(endedAt = Instant.now()))
-        val name = members.findById(entry.memberId).orElse(null)?.displayName ?: "?"
+        val name = members.findByObjectId(entry.memberObjectId)?.displayName ?: "?"
         return toDto(saved, name)
     }
 
     fun listForItem(itemId: UUID): ItemTimeLog {
         val item = items.findByObjectId(itemId) ?: throw NotFoundException("item 不存在")
-        val rows = timeEntries.findByItemIdOrderByStartedAtDesc(item.id!!)
-        val memberMap = members.findAllById(rows.map { it.memberId }.toSet()).associateBy { it.id }
-        val entries = rows.map { toDto(it, memberMap[it.memberId]?.displayName ?: "?") }
+        val rows = timeEntries.findByItemObjectIdOrderByStartedAtDesc(item.objectId!!)
+        val memberMap = members.findAllByObjectIdIn(rows.map { it.memberObjectId }.toSet()).associateBy { it.objectId }
+        val entries = rows.map { toDto(it, memberMap[it.memberObjectId]?.displayName ?: "?") }
         return ItemTimeLog(entries = entries, totalMinutes = entries.sumOf { it.minutes })
     }
 
     fun summary(projectKey: String): List<MemberSummary> {
         val project = projects.findByKey(projectKey) ?: throw NotFoundException("项目不存在:$projectKey")
-        val projectItems = items.findByProjectIdAndDeletedAtIsNullOrderByNumber(project.id!!)
-        val rows = timeEntries.findByItemIdIn(projectItems.mapNotNull { it.id })
-        val memberMap = members.findAllById(rows.map { it.memberId }.toSet()).associateBy { it.id }
-        return rows.groupBy { it.memberId }
+        val projectItems = items.findByProjectObjectIdAndDeletedAtIsNullOrderByNumber(project.objectId!!)
+        val rows = timeEntries.findByItemObjectIdIn(projectItems.mapNotNull { it.objectId })
+        val memberMap = members.findAllByObjectIdIn(rows.map { it.memberObjectId }.toSet()).associateBy { it.objectId }
+        return rows.groupBy { it.memberObjectId }
             .map { (memberId, list) ->
                 MemberSummary(
                     memberId = memberMap[memberId]?.objectId ?: UUID(0, 0),
@@ -166,7 +166,7 @@ class TimeEntryService(
 
     private fun toDto(e: TimeEntry, memberName: String) = TimeEntryDto(
         timeEntryId = e.objectId,
-        itemId = items.findById(e.itemId).orElse(null)?.objectId ?: UUID(0, 0),
+        itemId = items.findByObjectId(e.itemObjectId)?.objectId ?: UUID(0, 0),
         member = memberName,
         startedAt = e.startedAt.toString(),
         endedAt = e.endedAt?.toString(),

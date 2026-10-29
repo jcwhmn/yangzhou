@@ -32,14 +32,14 @@ class TeamServiceUnitTest {
     private val workspaceService = mockk<WorkspaceService>(relaxed = true)
     private val service = TeamService(teams, teamMembers, members, memberService, workspaceService)
 
-    private val wsId = 9L
-    private val team = Team(id = 1L, workspaceId = wsId, name = "后端")
-    private val alice = Member(id = 5L, workspaceId = wsId, username = null, passwordHash = null, displayName = "alice")
+    private val wsId = UUID(0, 9)
+    private val team = Team(id = 1L, objectId = UUID(0, 1), workspaceObjectId = wsId, name = "后端")
+    private val alice = Member(id = 5L, objectId = UUID(0, 5), workspaceObjectId = wsId, username = null, passwordHash = null, displayName = "alice")
 
     @BeforeEach
     fun setup() {
         clearMocks(teams, teamMembers, members, memberService, workspaceService)
-        every { workspaceService.required() } returns Workspace(id = wsId)
+        every { workspaceService.required() } returns Workspace(id = 1L, objectId = wsId)
         every { teams.findByObjectId(team.objectId) } returns team
     }
 
@@ -48,14 +48,14 @@ class TeamServiceUnitTest {
 
         @Test
         fun duplicateNameRejected() {
-            every { teams.existsByWorkspaceIdAndName(wsId, "后端") } returns true
+            every { teams.existsByWorkspaceObjectIdAndName(wsId, "后端") } returns true
             assertFailsWith<ConflictException> { service.create("后端") }
         }
 
         @Test
         fun createdEmpty() {
-            every { teams.existsByWorkspaceIdAndName(wsId, "前端") } returns false
-            every { teams.save(any()) } answers { firstArg<Team>().copy(id = 2L) }
+            every { teams.existsByWorkspaceObjectIdAndName(wsId, "前端") } returns false
+            every { teams.save(any()) } answers { firstArg<Team>().copy(id = 2L, objectId = UUID(0, 2)) }
             val dto = service.create("前端")
             assertEquals("前端", dto.name)
             assertTrue(dto.members.isEmpty())
@@ -92,10 +92,10 @@ class TeamServiceUnitTest {
     inner class Members {
 
         @Test
-        fun addMemberIdempotent() {
+        fun addMemberObjectIdempotent() {
             every { memberService.requireMember(alice.objectId) } returns alice
             every { members.findByObjectId(alice.objectId) } returns alice
-            every { teamMembers.existsByTeamIdAndMemberId(1L, 5L) } returns true
+            every { teamMembers.existsByTeamObjectIdAndMemberObjectId(UUID(0, 1), UUID(0, 5)) } returns true
             val dto = service.addMember(team.objectId, alice.objectId)
             io.mockk.verify(exactly = 0) { teamMembers.save(any()) } // 已在组内不重插
             assertEquals("后端", dto.name)
@@ -103,19 +103,19 @@ class TeamServiceUnitTest {
 
         @Test
         fun removeMemberWithoutRowIsNoop() {
-            val bob = alice.copy(id = 6L, displayName = "bob")
+            val bob = alice.copy(id = 6L, objectId = UUID(0, 6), displayName = "bob")
             every { members.findByObjectId(bob.objectId) } returns bob
-            every { teamMembers.findByTeamId(1L) } returns emptyList()
+            every { teamMembers.findByTeamObjectId(UUID(0, 1)) } returns emptyList()
             service.removeMember(team.objectId, bob.objectId) // 不在组内 → 静默
             io.mockk.verify(exactly = 0) { teamMembers.delete(any()) }
         }
 
         @Test
         fun toDtoMapsMemberNames() {
-            val bob = alice.copy(id = 6L, displayName = "bob")
+            val bob = alice.copy(id = 6L, objectId = UUID(0, 6), displayName = "bob")
             every { members.findAll() } returns listOf(alice, bob)
-            every { teamMembers.findByTeamId(1L) } returns listOf(
-                yangzhou.persistence.TeamMember(id = 10L, teamId = 1L, memberId = 6L),
+            every { teamMembers.findByTeamObjectId(UUID(0, 1)) } returns listOf(
+                yangzhou.persistence.TeamMember(id = 10L, objectId = UUID(0, 10), teamObjectId = UUID(0, 1), memberObjectId = UUID(0, 6)),
             )
             every { teams.save(any<Team>()) } answers { firstArg<Team>() }
             val dto = service.rename(team.objectId, "后端")

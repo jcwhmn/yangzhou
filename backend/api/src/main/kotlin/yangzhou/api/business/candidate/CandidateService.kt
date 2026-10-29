@@ -44,11 +44,11 @@ class CandidateService(
         val verdicts: List<VerdictDto>,
     )
 
-    fun candidates(itemId: UUID): List<CandidateDto> {
-        val item = items.findByObjectId(itemId) ?: throw NotFoundException("item 不存在")
+    fun candidates(itemObjectId: UUID): List<CandidateDto> {
+        val item = items.findByObjectId(itemObjectId) ?: throw NotFoundException("item 不存在")
         val domainItem = feasibility.itemToDomain(item)
-        val workspaceMembers = members.findByWorkspaceId(workspaceService.required().id!!)
-        val scopedMembers = workspaceMembers.filter { it.id in projectMembers.restrictedPool(item.projectId) }
+        val workspaceMembers = members.findByWorkspaceObjectId(workspaceService.required().objectId!!)
+        val scopedMembers = workspaceMembers.filter { it.objectId in projectMembers.restrictedPool(item.projectObjectId) }
         memberService.current() // 确保已初始化(与可行性端点语义一致)
         // 预计算 持久层↔domain 配对(每成员一次装配;值相等的两成员视为同位,天然一致)
         val domainOf = LinkedHashMap<yangzhou.persistence.Member, yangzhou.domain.Member>()

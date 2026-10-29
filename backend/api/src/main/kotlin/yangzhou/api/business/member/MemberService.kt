@@ -59,18 +59,18 @@ class MemberService(
             ?: throw NotFoundException("尚未初始化,请先 bootstrap")
 
     fun list(): List<MemberResponse> =
-        members.findByWorkspaceId(workspaceService.required().id!!)
+        members.findByWorkspaceObjectId(workspaceService.required().objectId!!)
             .map { it.toResponse() }
 
     /** 建虚拟成员:纯数据人,无凭据无登录;能力自评走 /api/members/{id}/capabilities。 */
     @Transactional
     fun createVirtual(displayName: String): MemberResponse {
-        val workspaceId = workspaceService.required().id!!
-        members.findByWorkspaceId(workspaceId).firstOrNull { it.displayName == displayName }
+        val workspaceObjectId = workspaceService.required().objectId!!
+        members.findByWorkspaceObjectId(workspaceObjectId).firstOrNull { it.displayName == displayName }
             ?.let { throw ConflictException("成员已存在:$displayName") }
         val saved = members.save(
             Member(
-                workspaceId = workspaceId,
+                workspaceObjectId = workspaceObjectId,
                 username = null,
                 passwordHash = null,
                 displayName = displayName,
@@ -91,19 +91,19 @@ class MemberService(
             throw ConflictException("该成员仍有进行中 item(${activeItems.size} 个),请先改派或完成")
         }
         // YPJ-60:restrict 引用非空即拒(直删会触发 DB 异常 500);附引用计数供清理决策
-        val mid = member.id!!
+        val mid = member.objectId!!
         val refs = buildList {
-            comments.countByAuthorMemberId(mid).takeIf { it > 0 }?.let { add("评论 $it") }
-            itemActivities.countByActorMemberId(mid).takeIf { it > 0 }?.let { add("动态 $it") }
-            itemStatusHistories.countByActorMemberId(mid).takeIf { it > 0 }?.let { add("状态历史 $it") }
-            timeEntries.countByMemberId(mid).takeIf { it > 0 }?.let { add("工时 $it") }
-            projectViews.countByCreatorId(mid).takeIf { it > 0 }?.let { add("视图 $it") }
-            notifications.countByActorMemberId(mid).takeIf { it > 0 }?.let { add("通知 $it") }
+            comments.countByAuthorMemberObjectId(mid).takeIf { it > 0 }?.let { add("评论 $it") }
+            itemActivities.countByActorMemberObjectId(mid).takeIf { it > 0 }?.let { add("动态 $it") }
+            itemStatusHistories.countByActorMemberObjectId(mid).takeIf { it > 0 }?.let { add("状态历史 $it") }
+            timeEntries.countByMemberObjectId(mid).takeIf { it > 0 }?.let { add("工时 $it") }
+            projectViews.countByCreatorObjectId(mid).takeIf { it > 0 }?.let { add("视图 $it") }
+            notifications.countByActorMemberObjectId(mid).takeIf { it > 0 }?.let { add("通知 $it") }
         }
         if (refs.isNotEmpty()) {
             throw ConflictException("该成员仍有引用数据(${refs.joinToString("、")}),先删除相关项目或数据")
         }
-        capabilities.deleteByMemberId(mid)
+        capabilities.deleteByMemberObjectId(mid)
         members.delete(member)
     }
 
@@ -122,8 +122,8 @@ class MemberService(
             if (!Regex("^[A-Za-z0-9-]{1,39}$").matches(cleaned)) {
                 throw BadRequestException("GitHub 用户名格式非法:$cleaned")
             }
-            members.findByWorkspaceIdAndGithubUsername(member.workspaceId, cleaned)
-                ?.let { if (it.id != member.id) throw ConflictException("GitHub 用户名已被占用:$cleaned") }
+            members.findByWorkspaceObjectIdAndGithubUsername(member.workspaceObjectId, cleaned)
+                ?.let { if (it.objectId != member.objectId) throw ConflictException("GitHub 用户名已被占用:$cleaned") }
         }
         val saved = members.save(member.copy(githubUsername = cleaned, updatedAt = Instant.now()))
         return saved.toResponse()

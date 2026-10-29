@@ -2,6 +2,7 @@ package yangzhou.persistence.repository
 
 import org.springframework.jdbc.core.JdbcOperations
 import org.springframework.stereotype.Repository
+import java.util.UUID
 
 /**
  * 原子取号:行锁串行化 per-project 编号(spec:DB 层防并发重号)。
@@ -10,10 +11,10 @@ import org.springframework.stereotype.Repository
 @Repository
 class ItemNumberRepository(private val jdbc: JdbcOperations) {
 
-    fun nextNumber(projectId: Long): Int =
+    fun nextNumber(projectObjectId: UUID): Int =
         jdbc.queryForObject(
-            "update project set last_item_number = last_item_number + 1, updated_at = now() where id = ? returning last_item_number",
+            "update project set last_item_number = last_item_number + 1, updated_at = now() where object_id = ? returning last_item_number",
             Int::class.java,
-            projectId,
-        ) ?: error("project not found: $projectId")
+            projectObjectId,
+        ) ?: error("project not found: $projectObjectId")
 }

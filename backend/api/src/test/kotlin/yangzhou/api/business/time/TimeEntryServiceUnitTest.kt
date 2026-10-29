@@ -45,8 +45,8 @@ class TimeEntryServiceUnitTest {
         timeEntries, items, projects, members, memberService, projectMembers, githubCommits,
     )
 
-    private val item = Item(id = 9L, objectId = UUID.randomUUID(), projectId = 100L, number = 7, title = "任务", statusObjectId = UUID.randomUUID())
-    private val me = Member(id = 5L, workspaceId = 1L, username = "me", passwordHash = "x", displayName = "我")
+    private val item = Item(id = 9L, objectId = UUID(0, 9), projectObjectId = UUID(0, 100), number = 7, title = "任务", statusObjectId = UUID.randomUUID())
+    private val me = Member(id = 5L, objectId = UUID(0, 5), workspaceObjectId = UUID(0, 1), username = "me", passwordHash = "x", displayName = "我")
 
     @BeforeEach
     fun setup() {
@@ -54,8 +54,8 @@ class TimeEntryServiceUnitTest {
         every { items.findByObjectId(item.objectId) } returns item
         every { memberService.current() } returns me
         every { projectMembers.assertAssignable(any(), any()) } returns Unit
-        every { timeEntries.save(any()) } answers { val arg: TimeEntry = firstArg(); arg.copy(id = 1L) } // 泛型 save 坑(P0)
-        every { items.findById(9L) } returns Optional.of(item)
+        every { timeEntries.save(any()) } answers { val arg: TimeEntry = firstArg(); arg.copy(id = 1L, objectId = UUID(0, 1)) } // 泛型 save 坑(P0)
+        every { items.findByObjectId(UUID(0, 9)) } returns (item)
     }
 
     @Nested
@@ -102,8 +102,8 @@ class TimeEntryServiceUnitTest {
 
         @Test
         fun `计时模式 先停表中未结束条目再开新表`() {
-            val running = TimeEntry(id = 1L, itemId = 9L, memberId = 5L, startedAt = Instant.now().minusSeconds(3600))
-            every { timeEntries.findByMemberIdAndEndedAtIsNull(5L) } returns listOf(running)
+            val running = TimeEntry(id = 1L, objectId = UUID(0, 1), itemObjectId = UUID(0, 9), memberObjectId = UUID(0, 5), startedAt = Instant.now().minusSeconds(3600))
+            every { timeEntries.findByMemberObjectIdAndEndedAtIsNull(UUID(0, 5)) } returns listOf(running)
 
             val saved = mutableListOf<TimeEntry>()
             every { timeEntries.save(any()) } answers { val arg: TimeEntry = firstArg(); saved.add(arg); arg }
@@ -128,9 +128,9 @@ class TimeEntryServiceUnitTest {
     inner class Stop {
         @Test
         fun `非本人记录 404 不暴露`() {
-            every { memberService.current() } returns me.copy(id = 6L)
+            every { memberService.current() } returns me.copy(id = 6L, objectId = UUID(0, 6))
             every { timeEntries.findByObjectId(any()) } returns
-                TimeEntry(id = 1L, itemId = 9L, memberId = 5L, startedAt = Instant.now())
+                TimeEntry(id = 1L, objectId = UUID(0, 1), itemObjectId = UUID(0, 9), memberObjectId = UUID(0, 5), startedAt = Instant.now())
 
             assertFailsWith<NotFoundException> { service.stop(UUID.randomUUID()) }
         }
@@ -138,7 +138,7 @@ class TimeEntryServiceUnitTest {
         @Test
         fun `已结束 409`() {
             every { timeEntries.findByObjectId(any()) } returns
-                TimeEntry(id = 1L, itemId = 9L, memberId = 5L, startedAt = Instant.now(), endedAt = Instant.now())
+                TimeEntry(id = 1L, objectId = UUID(0, 1), itemObjectId = UUID(0, 9), memberObjectId = UUID(0, 5), startedAt = Instant.now(), endedAt = Instant.now())
 
             assertFailsWith<ConflictException> { service.stop(UUID.randomUUID()) }
         }
@@ -151,9 +151,9 @@ class TimeEntryServiceUnitTest {
 
         @Test
         fun `正常停 endedAt 落`() {
-            val open = TimeEntry(id = 1L, itemId = 9L, memberId = 5L, startedAt = Instant.now().minusSeconds(600))
+            val open = TimeEntry(id = 1L, objectId = UUID(0, 1), itemObjectId = UUID(0, 9), memberObjectId = UUID(0, 5), startedAt = Instant.now().minusSeconds(600))
             every { timeEntries.findByObjectId(any()) } returns open
-            every { members.findById(5L) } returns Optional.of(me)
+            every { members.findByObjectId(UUID(0, 5)) } returns (me)
 
             val dto = service.stop(UUID.randomUUID())
 

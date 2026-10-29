@@ -31,7 +31,7 @@ class CapabilityService(
 
     fun listFor(member: Member): List<CapabilityDto> {
         val names = definitionNames()
-        return capabilities.findByMemberId(member.id!!).map { CapabilityDto(names[it.attributeDefinitionId] ?: "?", it.level) }
+        return capabilities.findByMemberObjectId(member.objectId!!).map { CapabilityDto(names[it.attributeDefinitionObjectId] ?: "?", it.level) }
     }
 
     /** 按属性名 upsert;level=null 表示未评级,attribute=null 表示移除等级只保留 presence。 */
@@ -42,14 +42,14 @@ class CapabilityService(
     @Transactional
     fun upsertFor(member: Member, attribute: String, level: Int?): CapabilityDto {
         if (level != null && level !in 1..4) throw BadRequestException("level 只能是 1–4 或不填")
-        val memberId = member.id!!
-        val def = definitions.findByWorkspaceIdAndName(workspaceService.required().id!!, attribute)
+        val memberObjectId = member.objectId!!
+        val def = definitions.findByWorkspaceObjectIdAndName(workspaceService.required().objectId!!, attribute)
             ?: throw NotFoundException("词表中没有属性:$attribute(先建属性)")
-        val defId = def.id!!
-        val existing = capabilities.findByMemberIdAndAttributeDefinitionId(memberId, defId)
+        val defId = def.objectId!!
+        val existing = capabilities.findByMemberObjectIdAndAttributeDefinitionObjectId(memberObjectId, defId)
         val saved = try {
             capabilities.save(
-                (existing ?: Capability(memberId = memberId, attributeDefinitionId = defId))
+                (existing ?: Capability(memberObjectId = memberObjectId, attributeDefinitionObjectId = defId))
                     .copy(level = level),
             )
         } catch (_: DataIntegrityViolationException) {
@@ -65,15 +65,15 @@ class CapabilityService(
 
     @Transactional
     fun deleteFor(member: Member, attribute: String) {
-        val def = definitions.findByWorkspaceIdAndName(workspaceService.required().id!!, attribute)
+        val def = definitions.findByWorkspaceObjectIdAndName(workspaceService.required().objectId!!, attribute)
             ?: throw NotFoundException("词表中没有属性:$attribute")
-        capabilities.findByMemberIdAndAttributeDefinitionId(member.id!!, def.id!!)
+        capabilities.findByMemberObjectIdAndAttributeDefinitionObjectId(member.objectId!!, def.objectId!!)
             ?.let { capabilities.delete(it) }
         feasibilityService.recomputeWorkspace() // V9-S1
     }
 
-    private fun definitionNames(): Map<Long, String> =
-        definitions.findByWorkspaceId(workspaceService.required().id!!).associate { it.id!! to it.name }
+    private fun definitionNames(): Map<UUID, String> =
+        definitions.findByWorkspaceObjectId(workspaceService.required().objectId!!).associate { it.objectId!! to it.name }
 }
 
 data class UpsertCapabilityRequest(

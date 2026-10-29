@@ -15,6 +15,7 @@ import yangzhou.persistence.repository.ProjectRepository
 import yangzhou.persistence.repository.ProjectWorkflowRuleRepository
 import yangzhou.persistence.repository.StatusRepository
 import yangzhou.persistence.repository.WorkspaceRepository
+import java.util.UUID
 import java.time.Instant
 
 /**
@@ -54,7 +55,7 @@ class GithubSyncService(
         val mounts = projectRepos.findAll().toList()
         if (mounts.isEmpty()) return
         for (mount in mounts) {
-            val project = projects.findById(mount.projectId).orElse(null) ?: continue
+            val project = projects.findByObjectId(mount.projectObjectId) ?: continue
             try {
                 syncRepo(project, mount.repo, token)
             } catch (e: VcsApiException) {
@@ -70,8 +71,8 @@ class GithubSyncService(
         for (name in gateway.listBranches(repo, token)) {
             val item = headItem(project, name) ?: continue
             if (gitRefs.findByRepoAndKindAndRef(repo, KIND_BRANCH, name).isNotEmpty()) continue
-            gitRefs.save(ItemGitRef(itemId = item.id!!, kind = KIND_BRANCH, repo = repo, ref = name))
-            applyEvent(project, item.id!!, VcsEvent.BRANCH_CREATED.wire, "branch $name")
+            gitRefs.save(ItemGitRef(itemObjectId = item.objectId!!, kind = KIND_BRANCH, repo = repo, ref = name))
+            applyEvent(project, item.objectId!!, VcsEvent.BRANCH_CREATED.wire, "branch $name")
         }
 
         for (pr in gateway.listPullRequests(repo, token)) {
@@ -82,33 +83,33 @@ class GithubSyncService(
                     for (row in existingRows) {
                         if (row.state == pr.state) continue
                         gitRefs.save(row.copy(state = pr.state, updatedAt = Instant.now()))
-                        applyEvent(project, row.itemId, eventForState(pr.state), "pr #${pr.number} ${pr.url.orEmpty()}")
+                        applyEvent(project, row.itemObjectId, eventForState(pr.state), "pr #${pr.number} ${pr.url.orEmpty()}")
                     }
                 }
                 else -> {
                     // YPJ-39:PR 扇出——head 分支挂多票则各落一行;分支未入册回退 head 内嵌键(既有行为)
                     val targets = gitRefs.findByRepoAndKindAndRef(repo, KIND_BRANCH, pr.headRef)
-                        .mapNotNull { items.findById(it.itemId).orElse(null) }
-                        .distinctBy { it.id }
+                        .mapNotNull { items.findByObjectId(it.itemObjectId) }
+                        .distinctBy { it.objectId }
                         .ifEmpty { listOfNotNull(headItem(project, pr.headRef)) }
                     for (item in targets) {
                         gitRefs.save(
-                            ItemGitRef(itemId = item.id!!, kind = KIND_PR, repo = repo, ref = pr.number.toString(), url = pr.url, state = pr.state),
+                            ItemGitRef(itemObjectId = item.objectId!!, kind = KIND_PR, repo = repo, ref = pr.number.toString(), url = pr.url, state = pr.state),
                         )
                         // V10-S5:PR author → github_username 映射成员 → 池内自动 assign(未配置池/找不到则留痕跳过)
-                        val wsId = projects.findById(project.id).orElse(null)?.workspaceId ?: 0L
+                        val wsId = projects.findByObjectId(project.objectId)?.workspaceObjectId ?: continue
                         if (item.assigneeObjectId == null && pr.authorLogin != null) {
-                            val authorMember = members.findByWorkspaceIdAndGithubUsername(wsId, pr.authorLogin)
-                            if (authorMember != null && authorMember.id != null) {
-                                val authorId = authorMember.id
-                                runCatching { projectMembers.assertAssignable(project.id!!, authorId!!) }
+                            val authorMember = members.findByWorkspaceObjectIdAndGithubUsername(wsId, pr.authorLogin)
+                            if (authorMember != null && authorMember.objectId != null) {
+                                val authorId = authorMember.objectId
+                                runCatching { projectMembers.assertAssignable(project.objectId!!, authorId!!) }
                                     .onFailure { log.warn("PR 自动指派跳过(作者不在指派池?),事件照常应用: {}", it.message) }
                                     .onSuccess {
                                         items.save(item.copy(assigneeObjectId = authorMember.objectId))
                                     }
                             }
                         }
-                        applyEvent(project, item.id!!, eventForState(pr.state), "pr #${pr.number} ${pr.url.orEmpty()}")
+                        applyEvent(project, item.objectId!!, eventForState(pr.state), "pr #${pr.number} ${pr.url.orEmpty()}")
                     }
                 }
             }
@@ -119,7 +120,7 @@ class GithubSyncService(
     private fun headItem(project: Project, name: String): Item? {
         val m = ITEM_KEY.find(name) ?: return null
         if (m.groupValues[1] != project.key) return null
-        return items.findByProjectIdAndNumber(project.id!!, m.groupValues[2].toInt())
+        return items.findByProjectObjectIdAndNumber(project.objectId!!, m.groupValues[2].toInt())
     }
 
     private fun eventForState(state: String) = when (state) {
@@ -129,29 +130,29 @@ class GithubSyncService(
     }
 
     /** 防呆:未配映射忽略;当前 final 封口;只按 position 前进;WIP 超限跳过并留痕。S3 建分支后也走此管道。 */
-    fun applyEvent(project: Project, itemId: Long, event: String, detail: String) {
-        val projectId = project.id ?: return
-        val rule = rules.findByProjectIdAndEventType(projectId, event) ?: return
-        val target = statuses.findByProjectIdAndObjectId(projectId, rule.statusObjectId) ?: return
-        val item = items.findById(itemId).orElse(null) ?: return
-        val current = statuses.findByProjectIdOrderByPosition(projectId)
+    fun applyEvent(project: Project, itemObjectId: UUID, event: String, detail: String) {
+        val projectObjectId = project.objectId ?: return
+        val rule = rules.findByProjectObjectIdAndEventType(projectObjectId, event) ?: return
+        val target = statuses.findByProjectObjectIdAndObjectId(projectObjectId, rule.statusObjectId) ?: return
+        val item = items.findByObjectId(itemObjectId) ?: return
+        val current = statuses.findByProjectObjectIdOrderByPosition(projectObjectId)
             .firstOrNull { it.objectId == item.statusObjectId }
         if (current?.isFinal == true) return
         if (current != null && target.position <= current.position) return
         val limit = target.wipLimit
         if (limit != null && limit > 0 &&
-            items.findByProjectIdAndStatusObjectId(projectId, target.objectId).size >= limit
+            items.findByProjectObjectIdAndStatusObjectId(projectObjectId, target.objectId).size >= limit
         ) {
-            logActivity(itemId, current?.name, "WIP 满跳过:${target.name}($event $detail)")
+            logActivity(itemObjectId, current?.name, "WIP 满跳过:${target.name}($event $detail)")
             return
         }
         val saved = items.save(item.copy(statusObjectId = target.objectId))
-        logActivity(itemId, current?.name, "${target.name}($event $detail)")
-        historyRepo.save(ItemStatusHistory(itemId = itemId, fromStatusId = current?.id, toStatusId = target.id!!, source = "github"))
+        logActivity(itemObjectId, current?.name, "${target.name}($event $detail)")
+        historyRepo.save(ItemStatusHistory(itemObjectId = itemObjectId, fromStatusObjectId = current?.objectId, toStatusObjectId = target.objectId!!, source = "github"))
         notificationService.notifyStatusChange(saved, null, current?.name, target.name)
     }
 
-    private fun logActivity(itemId: Long, oldValue: String?, newValue: String?, kind: String = ACT_GITHUB) {
-        activityRepo.save(ItemActivity(itemId = itemId, kind = kind, oldValue = oldValue, newValue = newValue))
+    private fun logActivity(itemObjectId: UUID, oldValue: String?, newValue: String?, kind: String = ACT_GITHUB) {
+        activityRepo.save(ItemActivity(itemObjectId = itemObjectId, kind = kind, oldValue = oldValue, newValue = newValue))
     }
 }

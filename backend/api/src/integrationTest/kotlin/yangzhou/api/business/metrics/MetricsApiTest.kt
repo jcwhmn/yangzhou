@@ -57,30 +57,30 @@ class MetricsApiTest : AbstractApiTest() {
         val itemId = createItem(authed, "MTR", title)["itemId"].asText()
         if (assignee) put("/api/items/$itemId/assignee", mapOf("assigneeItemId" to meId))
         if (sprintId != null) put("/api/items/$itemId/sprint", mapOf("sprintId" to sprintId))
-        val iid = jdbc.queryForObject("select id from item where object_id = ?::uuid", Long::class.java, itemId)
-        jdbc.update("update item set created_at = ?::timestamptz where id = ?", createdAt, iid)
-        jdbc.update("update item_status_history set created_at = ?::timestamptz where item_id = ? and source = 'created'", createdAt, iid)
+        val iid = jdbc.queryForObject("select object_id from item where object_id = ?::uuid", java.util.UUID::class.java, itemId)
+        jdbc.update("update item set created_at = ?::timestamptz where object_id = ?", createdAt, iid)
+        jdbc.update("update item_status_history set created_at = ?::timestamptz where item_object_id = ? and source = 'created'", createdAt, iid)
         for ((fromName, toName, at) in transitions) {
             val fromId = fromName?.let { statusInternalId(it) }
             jdbc.update(
-                "insert into item_status_history (object_id, item_id, from_status_id, to_status_id, source, created_at, updated_at) " +
+                "insert into item_status_history (object_id, item_object_id, from_status_object_id, to_status_object_id, source, created_at, updated_at) " +
                     "values (?, ?, ?, ?, 'manual', ?::timestamptz, ?::timestamptz)",
                 UUID.randomUUID(), iid, fromId, statusInternalId(toName), at, at,
             )
         }
         if (currentStatus != null) {
-            jdbc.update("update item set status_object_id = ?::uuid where id = ?", status[currentStatus]!!, iid)
+            jdbc.update("update item set status_object_id = ?::uuid where object_id = ?", status[currentStatus]!!, iid)
         }
         if (sprintId != null && joinedAt != null) {
-            val gid = jdbc.queryForObject("select id from item_group where object_id = ?::uuid", Long::class.java, sprintId)
-            jdbc.update("update item_group_member set created_at = ?::timestamptz where item_id = ? and group_id = ?", joinedAt, iid, gid)
-            jdbc.update("update item_group_member_history set added_at = ?::timestamptz where item_id = ? and group_id = ?", joinedAt, iid, gid)
+            val gid = jdbc.queryForObject("select object_id from item_group where object_id = ?::uuid", java.util.UUID::class.java, sprintId)
+            jdbc.update("update item_group_member set created_at = ?::timestamptz where item_object_id = ? and group_object_id = ?", joinedAt, iid, gid)
+            jdbc.update("update item_group_member_history set added_at = ?::timestamptz where item_object_id = ? and group_object_id = ?", joinedAt, iid, gid)
         }
         return itemId
     }
 
-    private fun statusInternalId(name: String): Long =
-        jdbc.queryForObject("select id from status where object_id = ?::uuid", Long::class.java, status[name])
+    private fun statusInternalId(name: String): java.util.UUID =
+        jdbc.queryForObject("select object_id from status where object_id = ?::uuid", java.util.UUID::class.java, status[name])
 
     private fun seedAll() {
         newItem("一", "2026-09-28T09:00:00Z", listOf(Triple("To Do", "In Progress", "2026-09-29T09:00:00Z"), Triple("In Progress", "Done", "2026-10-02T09:00:00Z")), "Done", s1, "2026-10-01T00:00:00Z", assignee = true)
@@ -293,9 +293,9 @@ class MetricsApiTest : AbstractApiTest() {
     fun assignItem_全程留痕() {
         setupProject()
         val id = createItem(authed, "MTR", "留痕")["itemId"].asText()
-        val iid = jdbc.queryForObject("select id from item where object_id = ?::uuid", Long::class.java, id)
+        val iid = jdbc.queryForObject("select object_id from item where object_id = ?::uuid", java.util.UUID::class.java, id)
         fun rows(openOnly: Boolean): Int = jdbc.queryForObject(
-            "select count(*) from item_group_member_history where item_id = ? ${if (openOnly) "and removed_at is null" else ""}",
+            "select count(*) from item_group_member_history where item_object_id = ? ${if (openOnly) "and removed_at is null" else ""}",
             Int::class.java, iid,
         )
         put("/api/items/$id/sprint", mapOf("sprintId" to s1))
@@ -316,8 +316,8 @@ class MetricsApiTest : AbstractApiTest() {
     fun create带sprintId_落episode() {
         setupProject()
         val r = post("/api/projects/MTR/items", mapOf("title" to "c1", "sprintId" to s1))
-        val iid = jdbc.queryForObject("select id from item where object_id = ?::uuid", Long::class.java, r["itemId"].asText())
-        assertEquals(1, jdbc.queryForObject("select count(*) from item_group_member_history where item_id = ?", Int::class.java, iid))
+        val iid = jdbc.queryForObject("select object_id from item where object_id = ?::uuid", java.util.UUID::class.java, r["itemId"].asText())
+        assertEquals(1, jdbc.queryForObject("select count(*) from item_group_member_history where item_object_id = ?", Int::class.java, iid))
     }
 
     @Test
@@ -326,8 +326,8 @@ class MetricsApiTest : AbstractApiTest() {
         newItem("sca", "2026-10-02T09:00:00Z", sprintId = s1, joinedAt = "2026-10-02T09:00:00Z")
         val b = newItem("scb", "2026-09-28T09:00:00Z", sprintId = s1, joinedAt = "2026-09-28T09:00:00Z")
         jdbc.update(
-            "update item_group_member_history set removed_at = '2026-10-10T09:00:00Z'::timestamptz where item_id = (select id from item where object_id = ?::uuid)", b)
-        jdbc.update("delete from item_group_member where item_id = (select id from item where object_id = ?::uuid)", b)
+            "update item_group_member_history set removed_at = '2026-10-10T09:00:00Z'::timestamptz where item_object_id = (select object_id from item where object_id = ?::uuid)", b)
+        jdbc.update("delete from item_group_member where item_object_id = (select object_id from item where object_id = ?::uuid)", b)
         val r = get("/api/projects/MTR/metrics/scope-change?groupId=$s1")
         assertEquals(1, r["original"].asInt()) // 10-01 00:00:b 在册
         assertEquals(1, r["final"].asInt()) // 10-15 00:00:a 在册(b 已离)
@@ -344,8 +344,8 @@ class MetricsApiTest : AbstractApiTest() {
         newItem("bua", "2026-10-01T09:00:00Z", sprintId = s1, joinedAt = "2026-10-01T00:00:00Z")
         val b = newItem("bub", "2026-10-01T09:00:00Z", sprintId = s1, joinedAt = "2026-10-01T00:00:00Z")
         jdbc.update(
-            "update item_group_member_history set removed_at = '2026-10-05T12:00:00Z'::timestamptz where item_id = (select id from item where object_id = ?::uuid)", b)
-        jdbc.update("delete from item_group_member where item_id = (select id from item where object_id = ?::uuid)", b)
+            "update item_group_member_history set removed_at = '2026-10-05T12:00:00Z'::timestamptz where item_object_id = (select object_id from item where object_id = ?::uuid)", b)
+        jdbc.update("delete from item_group_member where item_object_id = (select object_id from item where object_id = ?::uuid)", b)
         val r = get("/api/projects/MTR/metrics/burnup?groupId=$s1")
         assertEquals(2, r["scope"][3]["total"].asInt()) // 10-04 末:b 仍在册
         assertEquals(1, r["scope"][4]["total"].asInt()) // 10-05 末:已离

@@ -50,21 +50,21 @@ class ProjectService(
     @Transactional
     fun create(key: String, name: String): ProjectDto {
         if (projects.existsByKey(key)) throw ConflictException("项目 key 已存在:$key")
-        val workspaceId = workspaceService.required().id!!
-        val project = projects.save(Project(workspaceId = workspaceId, key = key, name = name))
+        val workspaceObjectId = workspaceService.required().objectId!!
+        val project = projects.save(Project(workspaceObjectId = workspaceObjectId, key = key, name = name))
         // 默认 workflow:To Do / In Progress / In Review / QA / Done(final)——模板系统的最小预置(V7 5 列)
-        val saved = defaultStatuses(project.id!!).map { statuses.save(it) }
-        seedDefaultRules(project.id!!, saved)
+        val saved = defaultStatuses(project.objectId!!).map { statuses.save(it) }
+        seedDefaultRules(project.objectId!!, saved)
         // 0047:创建者自动入池(池=合法指派范围,保证创建者至少能给自己指派)
         // 0047+R1(spec 0081):创建者自动入池,且为项目 leader
         projectMembers.save(
             yangzhou.persistence.ProjectMember(
-                projectId = project.id!!, memberId = members.current().id!!, role = yangzhou.persistence.ProjectMember.ROLE_LEADER,
+                projectObjectId = project.objectId!!, memberObjectId = members.current().objectId!!, role = yangzhou.persistence.ProjectMember.ROLE_LEADER,
             ),
         )
         // 0056:内建 group 类型种子(sprint/release);既有项目由 V35 迁移种子
         listOf("sprint" to "Sprint", "release" to "Release").forEach { (k, n) ->
-            groupTypes.save(yangzhou.persistence.ItemGroupType(projectId = project.id!!, typeKey = k, name = n, builtin = true))
+            groupTypes.save(yangzhou.persistence.ItemGroupType(projectObjectId = project.objectId!!, typeKey = k, name = n, builtin = true))
         }
         return get(key)
     }
@@ -78,7 +78,7 @@ class ProjectService(
 
     fun get(key: String): ProjectDto {
         val project = projects.findByKey(key) ?: throw NotFoundException("项目不存在:$key")
-        val statusDtos = statuses.findByProjectIdOrderByPosition(project.id!!).map {
+        val statusDtos = statuses.findByProjectObjectIdOrderByPosition(project.objectId!!).map {
             StatusDto(it.objectId, it.name, it.icon, it.isStart, it.isFinal, it.position)
         }
         return ProjectDto(project.objectId, project.key, project.name, project.archivedAt != null, project.feasSignal, statusDtos)
@@ -87,7 +87,7 @@ class ProjectService(
     /** YPJ-60:删除预览——将随项目物理删除的数据量(只读,不动库)。 */
     fun deletionPreview(key: String): DeletionPreviewDto {
         val project = projects.findByKey(key) ?: throw NotFoundException("项目不存在:$key")
-        val pid = project.id ?: error("no id")
+        val pid = project.objectId ?: error("no id")
         val r = deletions.deletionPreview(pid)
         return DeletionPreviewDto(
             key = project.key,
@@ -117,7 +117,7 @@ class ProjectService(
     fun delete(key: String) {
         leaderGuard.requireLeader(key)
         val project = projects.findByKey(key) ?: throw NotFoundException("项目不存在:$key")
-        val pid = project.id ?: error("no id")
+        val pid = project.objectId ?: error("no id")
         deletions.purgeRequirements(pid)
         deletions.purgeItemGroupMembers(pid)
         // 子表(评论/工时/动态/状态历史/依赖/清单/git_ref/通知/群成员历史)随 item 级联;软删 item 一并物理删
@@ -135,10 +135,10 @@ class ProjectService(
     /** V8-S2 甘特数据:全量 item 按树序(父先子后,number 次序);日期可空;overdue 同看板语义。 */
     fun gantt(key: String): GanttDto {
         val project = projects.findByKey(key) ?: throw NotFoundException("项目不存在:$key")
-        val projectId = project.id ?: error("no id")
-        val all = items.findByProjectIdAndDeletedAtIsNullOrderByNumber(projectId)
+        val projectId = project.objectId ?: error("no id")
+        val all = items.findByProjectObjectIdAndDeletedAtIsNullOrderByNumber(projectId)
         val byParent = all.groupBy { it.parentObjectId }
-        val statusById = statuses.findByProjectIdOrderByPosition(projectId).associateBy { it.objectId }
+        val statusById = statuses.findByProjectObjectIdOrderByPosition(projectId).associateBy { it.objectId }
         val today = LocalDate.now()
 
         fun depthOf(item: yangzhou.persistence.Item): Int {
@@ -186,18 +186,18 @@ class ProjectService(
     data class GanttDto(val rows: List<GanttRow>)
 
     /** YPJ-40 方案 A:默认规则按语义推导(branch→首个非 start、pr_open→次个非 start(无则不种=人管)、pr_merged→首个 final、unmerged 恒不种);标准 V7 五列下与旧按名映射结果一致。 */
-    private fun seedDefaultRules(projectId: Long, saved: List<Status>) {
+    private fun seedDefaultRules(projectId: UUID, saved: List<Status>) {
         defaultRuleSeeds(saved).forEach { (event, status) ->
-            workflowRules.save(ProjectWorkflowRule(projectId = projectId, eventType = event.wire, statusObjectId = status.objectId))
+            workflowRules.save(ProjectWorkflowRule(projectObjectId = projectId, eventType = event.wire, statusObjectId = status.objectId))
         }
     }
 
-    private fun defaultStatuses(projectId: Long) = listOf( // V7:5 列(评审环节天然有位置);存量项目不动
-        Status(projectId = projectId, name = "To Do", isStart = true, position = 0),
-        Status(projectId = projectId, name = "In Progress", position = 1),
-        Status(projectId = projectId, name = "In Review", position = 2),
-        Status(projectId = projectId, name = "QA", position = 3),
-        Status(projectId = projectId, name = "Done", isFinal = true, position = 4),
+    private fun defaultStatuses(projectId: UUID) = listOf( // V7:5 列(评审环节天然有位置);存量项目不动
+        Status(projectObjectId = projectId, name = "To Do", isStart = true, position = 0),
+        Status(projectObjectId = projectId, name = "In Progress", position = 1),
+        Status(projectObjectId = projectId, name = "In Review", position = 2),
+        Status(projectObjectId = projectId, name = "QA", position = 3),
+        Status(projectObjectId = projectId, name = "Done", isFinal = true, position = 4),
     )
 
     companion object {

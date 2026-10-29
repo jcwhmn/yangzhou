@@ -25,15 +25,15 @@ class ChecklistServiceUnitTest {
     private val service = ChecklistService(checklists, items)
 
     private val item = Item(
-        id = 1L,
-        projectId = 1L,
+        id = 1L, objectId = UUID(0, 1),
+        projectObjectId = UUID(0, 1),
         number = 1,
         title = "t",
         statusObjectId = UUID.randomUUID(),
     )
 
     private fun entry(id: Long?, text: String, done: Boolean = false, position: Int = 0) =
-        ChecklistItem(id = id, itemId = 1L, text = text, done = done, position = position)
+        ChecklistItem(id = id, itemObjectId = UUID(0, 1), text = text, done = done, position = position)
 
     @BeforeEach
     fun setup() {
@@ -46,7 +46,7 @@ class ChecklistServiceUnitTest {
 
         @Test
         fun countsDoneAndTotal() {
-            every { checklists.findByItemIdOrderByPositionAscIdAsc(1L) } returns listOf(
+            every { checklists.findByItemObjectIdOrderByPositionAscIdAsc(UUID(0, 1)) } returns listOf(
                 entry(1L, "a", done = true),
                 entry(2L, "b"),
             )
@@ -67,7 +67,7 @@ class ChecklistServiceUnitTest {
 
         @Test
         fun appendsAtNextPositionAndTrims() {
-            every { checklists.findByItemIdOrderByPositionAscIdAsc(1L) } returns listOf(entry(1L, "a", position = 0))
+            every { checklists.findByItemObjectIdOrderByPositionAscIdAsc(UUID(0, 1)) } returns listOf(entry(1L, "a", position = 0))
             every { checklists.save(any()) } answers { firstArg() }
             val dto = service.add(item.objectId, "  新条目  ")
             assertEquals("新条目", dto.text)
@@ -76,7 +76,7 @@ class ChecklistServiceUnitTest {
 
         @Test
         fun firstEntryAtPositionZero() {
-            every { checklists.findByItemIdOrderByPositionAscIdAsc(1L) } returns emptyList()
+            every { checklists.findByItemObjectIdOrderByPositionAscIdAsc(UUID(0, 1)) } returns emptyList()
             every { checklists.save(any()) } answers { firstArg() }
             service.add(item.objectId, "x")
             io.mockk.verify { checklists.save(withArg { assertEquals(0, it.position) }) }

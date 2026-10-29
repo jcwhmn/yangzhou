@@ -42,13 +42,13 @@ class WorkflowService(
     @Transactional
     fun createStatus(projectKey: String, name: String, icon: String?, isStart: Boolean, isFinal: Boolean, position: Int?): StatusDto {
         val project = projects.findByKey(projectKey) ?: throw NotFoundException("项目不存在:$projectKey")
-        leaderGuard.requireLeader(project.id!!)
-        val projectId = project.id!!
-        val existing = statuses.findByProjectIdOrderByPosition(projectId)
+        leaderGuard.requireLeader(project.objectId!!)
+        val projectObjectId = project.objectId!!
+        val existing = statuses.findByProjectObjectIdOrderByPosition(projectObjectId)
         if (existing.any { it.name == name }) throw ConflictException("状态名已存在:$name")
         val saved = statuses.save(
             Status(
-                projectId = projectId,
+                projectObjectId = projectObjectId,
                 name = name,
                 icon = icon,
                 isStart = isStart,
@@ -62,7 +62,7 @@ class WorkflowService(
     @Transactional
     fun updateStatus(statusId: UUID, name: String?, icon: String?, isStart: Boolean?, isFinal: Boolean?, position: Int?): StatusDto {
         val status = statuses.findByObjectId(statusId) ?: throw NotFoundException("状态不存在")
-        leaderGuard.requireLeader(status.projectId)
+        leaderGuard.requireLeader(status.projectObjectId)
         try {
             val updated = statuses.save(
                 status.copy(
@@ -82,7 +82,7 @@ class WorkflowService(
     @Transactional
     fun deleteStatus(statusId: UUID) {
         val status = statuses.findByObjectId(statusId) ?: throw NotFoundException("状态不存在")
-        leaderGuard.requireLeader(status.projectId)
+        leaderGuard.requireLeader(status.projectObjectId)
         try {
             statuses.delete(status) // 关联迁移行由 FK 级联清除
         } catch (_: DataIntegrityViolationException) {
@@ -94,31 +94,31 @@ class WorkflowService(
 
     fun listTransitions(projectKey: String): List<TransitionDto> {
         val project = projects.findByKey(projectKey) ?: throw NotFoundException("项目不存在:$projectKey")
-        val projectId = project.id!!
-        val names = statuses.findByProjectIdOrderByPosition(projectId).associate { it.id!! to it.name }
-        return transitions.findByProjectId(projectId).map {
-            TransitionDto(names[it.fromStatusId] ?: "?", names[it.toStatusId] ?: "?")
+        val projectObjectId = project.objectId!!
+        val names = statuses.findByProjectObjectIdOrderByPosition(projectObjectId).associate { it.objectId!! to it.name }
+        return transitions.findByProjectObjectId(projectObjectId).map {
+            TransitionDto(names[it.fromStatusObjectId] ?: "?", names[it.toStatusObjectId] ?: "?")
         }
     }
 
     @Transactional
     fun replaceTransitions(projectKey: String, list: List<TransitionDto>): List<TransitionDto> {
         val project = projects.findByKey(projectKey) ?: throw NotFoundException("项目不存在:$projectKey")
-        leaderGuard.requireLeader(project.id!!)
-        val projectId = project.id!!
-        val byName = statuses.findByProjectIdOrderByPosition(projectId).associateBy { it.name }
+        leaderGuard.requireLeader(project.objectId!!)
+        val projectObjectId = project.objectId!!
+        val byName = statuses.findByProjectObjectIdOrderByPosition(projectObjectId).associateBy { it.name }
         list.forEach { t ->
             if (t.from !in byName || t.to !in byName) {
                 throw yangzhou.api.error.BadRequestException("迁移引用了不存在的状态:${t.from}→${t.to}")
             }
         }
-        transitions.deleteByProjectId(projectId)
+        transitions.deleteByProjectObjectId(projectObjectId)
         list.map { t ->
             transitions.save(
                 StatusTransition(
-                    projectId = projectId,
-                    fromStatusId = byName.getValue(t.from).id!!,
-                    toStatusId = byName.getValue(t.to).id!!,
+                    projectObjectId = projectObjectId,
+                    fromStatusObjectId = byName.getValue(t.from).objectId!!,
+                    toStatusObjectId = byName.getValue(t.to).objectId!!,
                 ),
             )
         }
@@ -126,11 +126,11 @@ class WorkflowService(
     }
 
     /** Item 状态迁移校验:迁移表空 = 全放行;否则 from→to 必须在表内(from==to 恒放行)。 */
-    fun assertTransitionAllowed(projectId: Long, fromStatusId: Long, toStatusId: Long) {
-        if (fromStatusId == toStatusId) return
-        val table = transitions.findByProjectId(projectId)
+    fun assertTransitionAllowed(projectObjectId: UUID, fromStatusObjectId: UUID, toStatusObjectId: UUID) {
+        if (fromStatusObjectId == toStatusObjectId) return
+        val table = transitions.findByProjectObjectId(projectObjectId)
         if (table.isEmpty()) return // 自由迁移(V1 默认)
-        if (table.none { it.fromStatusId == fromStatusId && it.toStatusId == toStatusId }) {
+        if (table.none { it.fromStatusObjectId == fromStatusObjectId && it.toStatusObjectId == toStatusObjectId }) {
             throw ConflictException("工作流不允许此状态迁移")
         }
     }

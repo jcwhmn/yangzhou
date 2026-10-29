@@ -21,16 +21,16 @@ data class Workspace(
     @LastModifiedDate
     var updatedAt: Instant = Instant.now(),
     @CreatedBy
-    var createdBy: Long? = null,
+    var createdByObjectId: UUID? = null,
     @LastModifiedBy
-    var updatedBy: Long? = null,
+    var updatedByObjectId: UUID? = null,
 )
 
 @Table("member")
 data class Member(
     @Id val id: Long? = null,
     val objectId: UUID = UUID.randomUUID(),
-    val workspaceId: Long,
+    val workspaceObjectId: UUID,
     val username: String?,
     val passwordHash: String?,
     val displayName: String,
@@ -42,52 +42,52 @@ data class Member(
     @LastModifiedDate
     var updatedAt: Instant = Instant.now(),
     @CreatedBy
-    var createdBy: Long? = null,
+    var createdByObjectId: UUID? = null,
     @LastModifiedBy
-    var updatedBy: Long? = null,
+    var updatedByObjectId: UUID? = null,
 )
 
 @Table("team")
 data class Team(
     @Id val id: Long? = null,
     val objectId: UUID = UUID.randomUUID(),
-    val workspaceId: Long,
+    val workspaceObjectId: UUID,
     val name: String,
     @CreatedDate
     var createdAt: Instant = Instant.now(),
     @LastModifiedDate
     var updatedAt: Instant = Instant.now(),
     @CreatedBy
-    var createdBy: Long? = null,
+    var createdByObjectId: UUID? = null,
     @LastModifiedBy
-    var updatedBy: Long? = null,
+    var updatedByObjectId: UUID? = null,
 )
 
 @Table("team_member")
 data class TeamMember(
     @Id val id: Long? = null,
     val objectId: UUID = UUID.randomUUID(),
-    val teamId: Long,
-    val memberId: Long,
+    val teamObjectId: UUID,
+    val memberObjectId: UUID,
     @CreatedDate
     var createdAt: Instant = Instant.now(),
     @LastModifiedDate
     var updatedAt: Instant = Instant.now(),
     @CreatedBy
-    var createdBy: Long? = null,
+    var createdByObjectId: UUID? = null,
     @LastModifiedBy
-    var updatedBy: Long? = null,
+    var updatedByObjectId: UUID? = null,
 )
 
 @Table("item_activity")
 data class ItemActivity(
     @Id val id: Long? = null,
     val objectId: UUID = UUID.randomUUID(),
-    val itemId: Long,
+    val itemObjectId: UUID,
     val kind: String,
     val oldValue: String? = null,
     val newValue: String? = null,
-    val actorMemberId: Long? = null,
+    val actorMemberObjectId: UUID? = null,
     val createdAt: Instant = Instant.now(),
 )
 
@@ -95,79 +95,79 @@ data class ItemActivity(
 data class ItemStatusHistory(
     @Id val id: Long? = null,
     val objectId: UUID = UUID.randomUUID(),
-    val itemId: Long,
-    val fromStatusId: Long? = null,
-    val toStatusId: Long,
+    val itemObjectId: UUID,
+    val fromStatusObjectId: UUID? = null,
+    val toStatusObjectId: UUID,
     val source: String,
-    val actorMemberId: Long? = null,
+    val actorMemberObjectId: UUID? = null,
     @CreatedDate
     var createdAt: Instant = Instant.now(),
     @LastModifiedDate
     var updatedAt: Instant = Instant.now(),
     @CreatedBy
-    var createdBy: Long? = null,
+    var createdByObjectId: UUID? = null,
     @LastModifiedBy
-    var updatedBy: Long? = null,
+    var updatedByObjectId: UUID? = null,
 )
 
 @Table("comment")
 data class Comment(
     @Id val id: Long? = null,
     val objectId: UUID = UUID.randomUUID(),
-    val itemId: Long,
-    val authorMemberId: Long,
+    val itemObjectId: UUID,
+    val authorMemberObjectId: UUID,
     val body: String,
     @CreatedDate
     var createdAt: Instant = Instant.now(),
     @LastModifiedDate
     var updatedAt: Instant = Instant.now(),
     @CreatedBy
-    var createdBy: Long? = null,
+    var createdByObjectId: UUID? = null,
     @LastModifiedBy
-    var updatedBy: Long? = null,
+    var updatedByObjectId: UUID? = null,
 )
 
 @Table("attribute_definition")
 data class AttributeDefinition(
     @Id val id: Long? = null,
     val objectId: UUID = UUID.randomUUID(),
-    val workspaceId: Long,
+    val workspaceObjectId: UUID,
     val name: String,
     val kind: String = "skill",
     val leveled: Boolean = false,
-    val parentId: Long? = null,
+    val parentObjectId: UUID? = null,
     @CreatedDate
     var createdAt: Instant = Instant.now(),
     @LastModifiedDate
     var updatedAt: Instant = Instant.now(),
     @CreatedBy
-    var createdBy: Long? = null,
+    var createdByObjectId: UUID? = null,
     @LastModifiedBy
-    var updatedBy: Long? = null,
+    var updatedByObjectId: UUID? = null,
 )
 
 @Table("capability")
 data class Capability(
     @Id val id: Long? = null,
     val objectId: UUID = UUID.randomUUID(),
-    val memberId: Long,
-    val attributeDefinitionId: Long,
+    val memberObjectId: UUID,
+    val attributeDefinitionObjectId: UUID,
     val level: Int? = null,
     @CreatedDate
     var createdAt: Instant = Instant.now(),
     @LastModifiedDate
     var updatedAt: Instant = Instant.now(),
     @CreatedBy
-    var createdBy: Long? = null,
+    var createdByObjectId: UUID? = null,
     @LastModifiedBy
-    var updatedBy: Long? = null,
+    var updatedByObjectId: UUID? = null,
 )
 
 @Table("project")
 data class Project(
     @Id val id: Long? = null,
     val objectId: UUID = UUID.randomUUID(),
-    val workspaceId: Long,
+    val workspaceObjectId: UUID,
     val key: String,
     val name: String,
     val lastItemNumber: Int = 0,
@@ -178,26 +178,26 @@ data class Project(
     @LastModifiedDate
     var updatedAt: Instant = Instant.now(),
     @CreatedBy
-    var createdBy: Long? = null,
+    var createdByObjectId: UUID? = null,
     @LastModifiedBy
-    var updatedBy: Long? = null,
+    var updatedByObjectId: UUID? = null,
 )
 
 @Table("project_member")
 data class ProjectMember(
     @Id val id: Long? = null,
     val objectId: UUID = UUID.randomUUID(),
-    val projectId: Long,
-    val memberId: Long,
+    val projectObjectId: UUID,
+    val memberObjectId: UUID,
     val role: String = ROLE_MEMBER,
     @CreatedDate
     var createdAt: Instant = Instant.now(),
     @LastModifiedDate
     var updatedAt: Instant = Instant.now(),
     @CreatedBy
-    var createdBy: Long? = null,
+    var createdByObjectId: UUID? = null,
     @LastModifiedBy
-    var updatedBy: Long? = null,
+    var updatedByObjectId: UUID? = null,
 ) {
     companion object {
         const val ROLE_MEMBER = "member"
@@ -209,7 +209,7 @@ data class ProjectMember(
 data class Status(
     @Id val id: Long? = null,
     val objectId: UUID = UUID.randomUUID(),
-    val projectId: Long,
+    val projectObjectId: UUID,
     val name: String,
     val icon: String? = null,
     val isFinal: Boolean = false,
@@ -221,33 +221,33 @@ data class Status(
     @LastModifiedDate
     var updatedAt: Instant = Instant.now(),
     @CreatedBy
-    var createdBy: Long? = null,
+    var createdByObjectId: UUID? = null,
     @LastModifiedBy
-    var updatedBy: Long? = null,
+    var updatedByObjectId: UUID? = null,
 )
 
 @Table("status_transition")
 data class StatusTransition(
     @Id val id: Long? = null,
     val objectId: UUID = UUID.randomUUID(),
-    val projectId: Long,
-    val fromStatusId: Long,
-    val toStatusId: Long,
+    val projectObjectId: UUID,
+    val fromStatusObjectId: UUID,
+    val toStatusObjectId: UUID,
     @CreatedDate
     var createdAt: Instant = Instant.now(),
     @LastModifiedDate
     var updatedAt: Instant = Instant.now(),
     @CreatedBy
-    var createdBy: Long? = null,
+    var createdByObjectId: UUID? = null,
     @LastModifiedBy
-    var updatedBy: Long? = null,
+    var updatedByObjectId: UUID? = null,
 )
 
 @Table("item")
 data class Item(
     @Id val id: Long? = null,
     val objectId: UUID = UUID.randomUUID(),
-    val projectId: Long,
+    val projectObjectId: UUID,
     val number: Int,
     val title: String,
     val description: String? = null,
@@ -266,9 +266,9 @@ data class Item(
     @LastModifiedDate
     var updatedAt: Instant = Instant.now(),
     @CreatedBy
-    var createdBy: Long? = null,
+    var createdByObjectId: UUID? = null,
     @LastModifiedBy
-    var updatedBy: Long? = null,
+    var updatedByObjectId: UUID? = null,
 )
 
 /** V7:站内通知(收件人维度;动作按钮读时现算,不落库)。 */
@@ -276,10 +276,10 @@ data class Item(
 data class Notification(
     @Id val id: Long? = null,
     val objectId: UUID = UUID.randomUUID(),
-    val recipientMemberId: Long,
-    val itemId: Long,
+    val recipientMemberObjectId: UUID,
+    val itemObjectId: UUID,
     val kind: String,
-    val actorMemberId: Long? = null,
+    val actorMemberObjectId: UUID? = null,
     val oldValue: String? = null,
     val newValue: String? = null,
     val readAt: Instant? = null,
@@ -291,7 +291,7 @@ data class Notification(
 data class ChecklistItem(
     @Id val id: Long? = null,
     val objectId: UUID = UUID.randomUUID(),
-    val itemId: Long,
+    val itemObjectId: UUID,
     val text: String,
     val done: Boolean = false,
     val position: Int = 0,
@@ -300,9 +300,9 @@ data class ChecklistItem(
     @LastModifiedDate
     var updatedAt: Instant = Instant.now(),
     @CreatedBy
-    var createdBy: Long? = null,
+    var createdByObjectId: UUID? = null,
     @LastModifiedBy
-    var updatedBy: Long? = null,
+    var updatedByObjectId: UUID? = null,
 )
 
 /** V9:item 依赖(阻塞关系):本 item 依赖 depends_on_item;依赖未终态 → 本 item 被阻塞。 */
@@ -310,8 +310,8 @@ data class ChecklistItem(
 data class ItemDependency(
     @Id val id: Long? = null,
     val objectId: UUID = UUID.randomUUID(),
-    val itemId: Long,
-    val dependsOnItemId: Long,
+    val itemObjectId: UUID,
+    val dependsOnItemObjectId: UUID,
     val createdAt: Instant = Instant.now(),
 )
 
@@ -320,8 +320,8 @@ data class ItemDependency(
 data class Favorite(
     @Id val id: Long? = null,
     val objectId: UUID = UUID.randomUUID(),
-    val memberId: Long,
-    val projectId: Long,
+    val memberObjectId: UUID,
+    val projectObjectId: UUID,
     val createdAt: Instant = Instant.now(),
 )
 
@@ -330,8 +330,8 @@ data class Favorite(
 data class TimeEntry(
     @Id val id: Long? = null,
     val objectId: UUID = UUID.randomUUID(),
-    val itemId: Long,
-    val memberId: Long,
+    val itemObjectId: UUID,
+    val memberObjectId: UUID,
     val startedAt: Instant,
     val endedAt: Instant? = null,
     val minutes: Int? = null,
@@ -341,9 +341,9 @@ data class TimeEntry(
     @LastModifiedDate
     var updatedAt: Instant? = null,
     @CreatedBy
-    var createdBy: Long? = null,
+    var createdByObjectId: UUID? = null,
     @LastModifiedBy
-    var updatedBy: Long? = null,
+    var updatedByObjectId: UUID? = null,
 )
 
 /** V6:项目挂载的 GitHub 仓库(monorepo 1 个,前后端分离/微服务多个);无 default 标记。 */
@@ -351,16 +351,16 @@ data class TimeEntry(
 data class ProjectRepo(
     @Id val id: Long? = null,
     val objectId: UUID = UUID.randomUUID(),
-    val projectId: Long,
+    val projectObjectId: UUID,
     val repo: String,
     @CreatedDate
     var createdAt: Instant = Instant.now(),
     @LastModifiedDate
     var updatedAt: Instant = Instant.now(),
     @CreatedBy
-    var createdBy: Long? = null,
+    var createdByObjectId: UUID? = null,
     @LastModifiedBy
-    var updatedBy: Long? = null,
+    var updatedByObjectId: UUID? = null,
 )
 
 /** V6:item↔GitHub 分支/PR 链接;YPJ-39 起分支/PR 可挂多票(uk 每票唯一)。 */
@@ -368,7 +368,7 @@ data class ProjectRepo(
 data class ItemGitRef(
     @Id val id: Long? = null,
     val objectId: UUID = UUID.randomUUID(),
-    val itemId: Long,
+    val itemObjectId: UUID,
     val kind: String,
     val repo: String,
     val ref: String,
@@ -379,9 +379,9 @@ data class ItemGitRef(
     @LastModifiedDate
     var updatedAt: Instant = Instant.now(),
     @CreatedBy
-    var createdBy: Long? = null,
+    var createdByObjectId: UUID? = null,
     @LastModifiedBy
-    var updatedBy: Long? = null,
+    var updatedByObjectId: UUID? = null,
 )
 
 /** V6:每项目「GitHub 事件→目标状态」映射(Kaneo WorkflowRule 同款);GitHub 永不知道状态名。 */
@@ -389,7 +389,7 @@ data class ItemGitRef(
 data class ProjectWorkflowRule(
     @Id val id: Long? = null,
     val objectId: UUID = UUID.randomUUID(),
-    val projectId: Long,
+    val projectObjectId: UUID,
     val eventType: String,
     val statusObjectId: UUID,
     @CreatedDate
@@ -397,65 +397,65 @@ data class ProjectWorkflowRule(
     @LastModifiedDate
     var updatedAt: Instant = Instant.now(),
     @CreatedBy
-    var createdBy: Long? = null,
+    var createdByObjectId: UUID? = null,
     @LastModifiedBy
-    var updatedBy: Long? = null,
+    var updatedByObjectId: UUID? = null,
 )
 
 @Table("item_attribute")
 data class ItemAttribute(
     @Id val id: Long? = null,
     val objectId: UUID = UUID.randomUUID(),
-    val itemId: Long,
-    val attributeDefinitionId: Long,
+    val itemObjectId: UUID,
+    val attributeDefinitionObjectId: UUID,
     val value: String,
     @CreatedDate
     var createdAt: Instant = Instant.now(),
     @LastModifiedDate
     var updatedAt: Instant = Instant.now(),
     @CreatedBy
-    var createdBy: Long? = null,
+    var createdByObjectId: UUID? = null,
     @LastModifiedBy
-    var updatedBy: Long? = null,
+    var updatedByObjectId: UUID? = null,
 )
 
 @Table("requirement")
 data class Requirement(
     @Id val id: Long? = null,
     val objectId: UUID = UUID.randomUUID(),
-    val itemId: Long,
-    val attributeDefinitionId: Long,
+    val itemObjectId: UUID,
+    val attributeDefinitionObjectId: UUID,
     val minLevel: Int? = null,
     @CreatedDate
     var createdAt: Instant = Instant.now(),
     @LastModifiedDate
     var updatedAt: Instant = Instant.now(),
     @CreatedBy
-    var createdBy: Long? = null,
+    var createdByObjectId: UUID? = null,
     @LastModifiedBy
-    var updatedBy: Long? = null,
+    var updatedByObjectId: UUID? = null,
 )
 
 @Table("item_group")
 data class ItemGroup(
     @Id val id: Long? = null,
     val objectId: UUID = UUID.randomUUID(),
-    val projectId: Long,
+    val projectObjectId: UUID,
     val type: String = "sprint",
     val name: String,
     val status: String = "planned",
     val startDate: LocalDate? = null,
     val endDate: LocalDate? = null,
     val releasedDate: LocalDate? = null,
-    val milestoneId: Long? = null,
+    val milestoneObjectId: UUID? = null,
     @CreatedDate
     var createdAt: Instant = Instant.now(),
     @LastModifiedDate
     var updatedAt: Instant = Instant.now(),
     @CreatedBy
-    var createdBy: Long? = null,
+    var createdByObjectId: UUID? = null,
     @LastModifiedBy
-    var updatedBy: Long? = null,
+    var updatedByObjectId: UUID? = null,
 )
 
 /** V35 YPJ-48:项目级 group 类型运行时定义(PRD §6);builtin 种子 sprint/release,自定义类型走最小语义。 */
@@ -463,7 +463,7 @@ data class ItemGroup(
 data class ItemGroupType(
     @Id val id: Long? = null,
     val objectId: UUID = UUID.randomUUID(),
-    val projectId: Long,
+    val projectObjectId: UUID,
     val typeKey: String,
     val name: String,
     val builtin: Boolean = false,
@@ -472,9 +472,9 @@ data class ItemGroupType(
     @LastModifiedDate
     var updatedAt: Instant = Instant.now(),
     @CreatedBy
-    var createdBy: Long? = null,
+    var createdByObjectId: UUID? = null,
     @LastModifiedBy
-    var updatedBy: Long? = null,
+    var updatedByObjectId: UUID? = null,
 )
 
 /** item × group 多对多;不变量「至多一个 planned/active sprint」在 SprintService 保证(见 spec 0010 裁决 2);release 归属同理单选(release 端点语义,spec 0012)。 */
@@ -482,8 +482,8 @@ data class ItemGroupType(
 data class ItemGroupMember(
     @Id val id: Long? = null,
     val objectId: UUID = UUID.randomUUID(),
-    val groupId: Long,
-    val itemId: Long,
+    val groupObjectId: UUID,
+    val itemObjectId: UUID,
     val createdAt: Instant = Instant.now(),
 )
 
@@ -492,8 +492,8 @@ data class ItemGroupMember(
 data class ItemGroupMemberHistory(
     @Id val id: Long? = null,
     val objectId: UUID = UUID.randomUUID(),
-    val groupId: Long,
-    val itemId: Long,
+    val groupObjectId: UUID,
+    val itemObjectId: UUID,
     val addedAt: Instant,
     val removedAt: Instant? = null,
 )
@@ -503,7 +503,7 @@ data class ItemGroupMemberHistory(
 data class Milestone(
     @Id val id: Long? = null,
     val objectId: UUID = UUID.randomUUID(),
-    val projectId: Long,
+    val projectObjectId: UUID,
     val name: String,
     val status: String = "planned",
     val targetDate: LocalDate? = null,
@@ -512,9 +512,9 @@ data class Milestone(
     @LastModifiedDate
     var updatedAt: Instant = Instant.now(),
     @CreatedBy
-    var createdBy: Long? = null,
+    var createdByObjectId: UUID? = null,
     @LastModifiedBy
-    var updatedBy: Long? = null,
+    var updatedByObjectId: UUID? = null,
 )
 
 /** YPJ-47 视图配置:表格筛选/列配置按 用户×项目 私有保存(spec 0045)。filters/columns 为小 JSON 串(TEXT 列)。 */
@@ -522,8 +522,8 @@ data class Milestone(
 data class ProjectView(
     @Id val id: Long? = null,
     val objectId: UUID = UUID.randomUUID(),
-    val projectId: Long,
-    val creatorId: Long,
+    val projectObjectId: UUID,
+    val creatorObjectId: UUID,
     val name: String,
     val filters: String = "{}",
     val columns: String = "{}",
@@ -532,9 +532,9 @@ data class ProjectView(
     @LastModifiedDate
     var updatedAt: Instant = Instant.now(),
     @CreatedBy
-    var createdBy: Long? = null,
+    var createdByObjectId: UUID? = null,
     @LastModifiedBy
-    var updatedBy: Long? = null,
+    var updatedByObjectId: UUID? = null,
 )
 
 /** YPJ-50:item 附件元数据;字节在 S3 兼容存储(presign 直传直取),objectKey 即桶内路径。 */
@@ -542,7 +542,7 @@ data class ProjectView(
 data class Attachment(
     @Id val id: Long? = null,
     val objectId: UUID = UUID.randomUUID(),
-    val itemId: Long,
+    val itemObjectId: UUID,
     val filename: String,
     val contentType: String,
     val sizeBytes: Long,
@@ -552,7 +552,7 @@ data class Attachment(
     @LastModifiedDate
     var updatedAt: Instant = Instant.now(),
     @CreatedBy
-    var createdBy: Long? = null,
+    var createdByObjectId: UUID? = null,
     @LastModifiedBy
-    var updatedBy: Long? = null,
+    var updatedByObjectId: UUID? = null,
 )
