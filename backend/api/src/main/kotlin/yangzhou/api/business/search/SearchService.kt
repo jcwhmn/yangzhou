@@ -9,7 +9,7 @@ import java.util.UUID
 class SearchService(private val searchRepo: SearchRepository) {
 
     data class SearchResult(
-        val itemObjectId: UUID,
+        val itemId: UUID,
         val projectKey: String,
         val number: String,
         val title: String,
