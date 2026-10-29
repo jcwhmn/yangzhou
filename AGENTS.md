@@ -99,7 +99,7 @@ docs/      adr/ · spec/ · architecture/(puml 类图) · requirement/(PRD) · p
 - CI(GitHub Actions):`backend.yml` 跑 `gradle test`(纯单元,免 Docker;spec 0014);`nightly.yml` 每日全量兜底(含集成,红了必修);`e2e.yml` web/backend 变更起 bootRun + Playwright 整跑 E2E
 - 本机开发库:`yangzhou`(外部共享 postgres,已建);bootRun 用 `gradle :api:bootRun`;rustfs 起停 `script/dev-infra.ps1`。
 - **不要猜前端或后端是否已运行,需要运行环境的,告知需要的运行环境,命令,从我这里确认**。
-- **双 profile 并存**(2026-10-06 起):8080 常跑 **test profile**(库 `yangzhou_test`,E2E 用);**PM 日常实例 = default profile**(库 `yangzhou`,dogfood 项目 YPJ),约定端口 **8081**:`gradle :api:bootRun --args='--server.port=8081'`。CLI `yz` 的 session(`~/.yangzhou/session.json`)指向谁就写谁的库——动 PM 数据前确认 server 指向 default 实例。
+- **三 profile 并存**(2026-10-29 起,YPJ-117):**8080 = test profile**(库 `yangzhou_test`,E2E/集成用,globalSetup 会清库);**8081 = PM 日常实例 = default profile**(库 `yangzhou`,dogfood 项目 YPJ,真实数据):`gradle :api:bootRun --args='--server.port=8081'`;**8082 = dev profile**(库 `yangzhou_dev`,本地开发 scratch,可丢弃数据):`gradle :api:bootRun --args='--spring.profiles.active=dev --server.port=8082'`,空库首启用 `POST /api/auth/bootstrap` 引导管理员。CLI `yz` 的 session(`~/.yangzhou/session.json`)指向谁就写谁的库——动 PM 数据前确认 server 指向 default 实例。
 - PM 实例部署形态(已拍板):本机常驻即可;Postgres 备份手工期(`pg_dump`),自动化另票。
 - **⚠ 前端命令必须在 `web/` 目录下执行**:`cd /d/code/yangzhou/web && npx next build` / `npm run dev` / `npx playwright test` 等。agent 的 shell CWD 每次重置到 repo 根,漏 cd 会在错误目录跑命令导致 `.next` 污染或路径找不到。
 

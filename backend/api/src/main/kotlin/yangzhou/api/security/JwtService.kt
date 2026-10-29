@@ -15,8 +15,8 @@ class JwtService(
     profiles: Environment,
 ) {
     init {
-        // 默认密钥防护(spec 0051):非 test profile 检测到内置开发密钥 → 启动即拒;test profile 豁免
-        if ("test" !in profiles.activeProfiles && secret == DEFAULT_DEV_SECRET) {
+        // 默认密钥防护(spec 0051):检测到内置开发密钥 → 启动即拒;test/dev(scratch 库)profile 豁免(YPJ-117)
+        if (profiles.activeProfiles.none { it == "test" || it == "dev" } && secret == DEFAULT_DEV_SECRET) {
             throw IllegalStateException("检测到内置默认 JWT 密钥:请设置 YANGZHOU_JWT_SECRET(test profile 豁免)")
         }
     }
