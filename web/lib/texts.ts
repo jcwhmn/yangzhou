@@ -28,6 +28,8 @@ export const t = {
   fav: {
     empty: "暂无收藏——在项目卡上点 ☆",
     remove: "移除",
+    addCurrent: "☆ 加入收藏",
+    removeCurrent: "★ 取消收藏",
   },
   login: {
     title: "登录",

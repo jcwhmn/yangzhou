@@ -9,7 +9,7 @@ import { api, API_BASE } from "@/lib/api";
 import { t } from "@/lib/texts";
 import { MilestoneManager, type Milestone } from "@/components/MilestoneManager";
 import { ReleaseManager, type Release } from "@/components/ReleaseManager";
-import { Category as CategoryIcon, Download as DownloadIcon, GitHub as GitHubIcon, Group as GroupIcon, Tune as TuneIcon } from "@mui/icons-material";
+import { Category as CategoryIcon, Download as DownloadIcon, GitHub as GitHubIcon, Group as GroupIcon, Star as StarIcon, StarBorder as StarBorderIcon, Tune as TuneIcon } from "@mui/icons-material";
 import type { Signal } from "@/components/Verdict";
 import { WorkflowEditor } from "@/components/WorkflowEditor";
 import { ProjectMembersPanel } from "@/components/ProjectMembersPanel";
@@ -43,6 +43,7 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
   const [membersOpen, setMembersOpen] = useState(false);
   const [ghOpen, setGhOpen] = useState(false);
   const [gtypeOpen, setGtypeOpen] = useState(false);
+  const [fav, setFav] = useState<boolean | null>(null);
 
   const loadSprints = () => {
     // CI 冷 JVM 偶发连接重置(status -1):失败隔 1s 重试一次
@@ -58,9 +59,27 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
     api<Release[]>(`/api/projects/${key}/releases`).then(setReleases).catch(() => setReleases([]));
   };
 
+  // YPJ-107:header 星标收藏状态(null=加载中;失败静默视为未收藏)
+  const loadFav = () => {
+    api<{ projectId: string; key: string }[]>("/api/favorites")
+      .then((favs) => setFav(favs.some((f) => f.key.toUpperCase() === String(key).toUpperCase())))
+      .catch(() => setFav(false));
+  };
+
+  async function toggleFav() {
+    if (fav === null) return;
+    setFav(!fav);
+    try {
+      await api(`/api/projects/${key}/favorite`, { method: fav ? "DELETE" : "PUT" });
+    } catch {
+      setFav(fav); // 失败回滚
+    }
+  }
+
   useEffect(() => {
     loadSprints();
     loadSide();
+    loadFav();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
 
@@ -137,6 +156,9 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
           <Typography variant="subtitle2" sx={{ fontWeight: 700, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>
             {String(key).toUpperCase()}
           </Typography>
+          <IconButton size="small" aria-label="favorite" disabled={fav === null} onClick={toggleFav}>
+            {fav ? <StarIcon fontSize="small" /> : <StarBorderIcon fontSize="small" />}
+          </IconButton>
           <IconButton size="small" aria-label={t.wf.button} onClick={() => setWfOpen(true)}>
             <TuneIcon fontSize="small" />
           </IconButton>
