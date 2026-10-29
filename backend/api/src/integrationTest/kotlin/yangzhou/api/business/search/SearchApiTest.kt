@@ -1,6 +1,7 @@
 package yangzhou.api.business.search
 
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import org.junit.jupiter.api.Test
 import yangzhou.api.AbstractApiTest
 
@@ -32,6 +33,8 @@ class SearchApiTest : AbstractApiTest() {
         assertEquals(1, hits.size(), "编号 ILIKE 应命中(大小写不敏感)")
         assertEquals("SR9-1", hits[0]["number"].asText())
         assertEquals("SR9", hits[0]["projectKey"].asText())
+        // 契约锁:字段名必须是 itemId(YPJ-106 回归——曾误改 itemObjectId,web 编号直达解析读 itemId 断裂)
+        assertTrue(hits[0]["itemId"].asText().length == 36, "search hit 应暴露 itemId(=objectId)")
     }
 
     @Test
