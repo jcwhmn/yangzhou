@@ -1,6 +1,6 @@
 "use client";
 
-import { Badge, Button, Menu, Stack, TextField, Typography } from "@mui/material";
+import { Badge, Box, Button, Menu, Stack, TextField, Typography } from "@mui/material";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -48,6 +48,19 @@ export function AppNav() {
   async function removeFav(projectKey: string) {
     try {
       await api(`/api/projects/${projectKey}/favorite`, { method: "DELETE" });
+      await loadFavs();
+    } catch {
+      /* 静默 */
+    }
+  }
+
+  // YPJ-107:当前项目收藏切换,下拉顶部展示(状态用已加载 favs 判定,key 比较不区分大小写)
+  const isFav = projectKey !== undefined && favs.some((f) => f.key.toUpperCase() === projectKey);
+
+  async function toggleCurrentFav() {
+    if (!projectKey) return;
+    try {
+      await api(`/api/projects/${projectKey}/favorite`, { method: isFav ? "DELETE" : "PUT" });
       await loadFavs();
     } catch {
       /* 静默 */
@@ -127,6 +140,13 @@ export function AppNav() {
       </Button>
 
       <Menu anchorEl={favAnchor} open={favAnchor !== null} onClose={() => setFavAnchor(null)}>
+        {projectKey && (
+          <Box sx={{ px: 2, py: 1 }}>
+            <Button size="small" fullWidth variant={isFav ? "outlined" : "contained"} onClick={toggleCurrentFav}>
+              {isFav ? t.fav.removeCurrent : t.fav.addCurrent} {projectKey}
+            </Button>
+          </Box>
+        )}
         {favs.length === 0 && (
           <Typography variant="caption" sx={{ px: 2, py: 1, display: "block" }}>
             {t.fav.empty}
