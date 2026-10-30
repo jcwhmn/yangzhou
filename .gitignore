@@ -31,3 +31,5 @@ web/next-env.d.ts
 backend/ijhttp.zip
 # YPJ-118:bootJar 产物复制为 Docker 构建上下文用(app-infra.ps1 build 生成,不入库)
 backend/app.jar
+# PM prod 容器密钥(YPJ-118)
+infra/compose/prod.env

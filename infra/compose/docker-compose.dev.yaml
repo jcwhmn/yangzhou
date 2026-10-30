@@ -1,5 +1,7 @@
 # YPJ-118(spec 0087):dev = scratch 实例,web 3001 + api 8081,库 yangzhou_dev(可整库丢弃)
 # postgres/rustfs 为外部共享实例(ADR-0004),容器内经 host.docker.internal 访问
+# name 必须三文件互异:同名 project 会互相顶替容器(实测踩坑)
+name: yz-dev
 services:
   api:
     build: ../../backend
