@@ -16,7 +16,7 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 $composeFile = Join-Path $repoRoot "infra\compose\docker-compose.$Env.yaml"
 
-# build 阶段暴露的 host 端口(占用预检用)
+# 各环境暴露的 host 端口(占用预检用)
 $ports = switch ($Env) {
     "prod" { 3000, 8080 }
     "dev"  { 3001, 8081 }
@@ -30,7 +30,7 @@ function Assert-PortsFree {
         $conn = Get-NetTCPConnection -LocalPort $p -State Listen -ErrorAction SilentlyContinue
         if ($conn) {
             $proc = (Get-CimInstance Win32_Process -Filter "ProcessId=$($conn[0].OwningProcess)").ProcessName
-            if ($dockerProcs -contains $proc) { continue }
+            if ($proc -and $dockerProcs -contains ($proc -replace '\.exe$', '')) { continue }
             throw "端口 $p 已被占用(PID $($conn[0].OwningProcess) / $proc)。请先停对应进程(严禁 taskkill /IM node.exe 或 java.exe,按端口找 PID)或 docker compose down 对应容器。"
         }
     }
