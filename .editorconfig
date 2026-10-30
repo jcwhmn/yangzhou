@@ -1,0 +1,13 @@
+# YPJ-121:与 .gitattributes 行尾策略一致;ktlint 读同文件,其余走默认。
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+
+[*.md]
+trim_trailing_whitespace = false
+
+[*.{ps1,bat,cmd}]
+end_of_line = crlf
