@@ -79,5 +79,10 @@
 - 排查中误伤:Gradle 任务快照在文件改名(改大小写)后可能残留旧路径,ktlintFormat 报已不存在的文件名违规;`--rerun-tasks` 强制重跑即消,属陈旧缓存非真实违规。
 - 排查中删除的 `*/bin/` 目录为 IDE 输出残留(已 gitignore,不入库)。
 
+**后补:风格切换为 intellij_idea(2026-10-31 用户拍板,取代 @Suppress 方案)**
+- 最终 `.editorconfig`:根节 `indent_size=4` / `trim_trailing_whitespace=true`(md 豁免)+ `[*.{kt,kts}]` `ktlint_code_style = intellij_idea` + `ktlint_standard_argument-list-wrapping = disabled`(紧凑调用全仓合法)。
+- **单禁 argument-list-wrapping 不触发依赖崩溃**;此前的"任一 wrapping 家族禁用即崩"实为 test 节同时禁 trailing-comma/wrapping 依赖对所致——依赖约束仍然存在,wrapping 与 trailing-comma-* 不可禁。
+- 代价 = 第二次存量重排基准(66 文件,+876/−976:缩进基准变化 + 尾逗号从强制变为不管),已入 blame-ignore(35f74f5);FeasibilityApiTest 的 @Suppress 已随之移除。
+
 **待合并后验证**
 - GitHub PR diff 只见真实改动;blame 经 ignore-revs 归位(手工用例 5)。
