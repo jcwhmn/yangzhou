@@ -54,3 +54,24 @@
 5. 合并后 GitHub blame 该文件,历史归位到基准提交之前的原始作者(blame-ignore 生效)。
 
 ## As-built(完工后补)
+
+按设计落地,偏差与实证坑如下。
+
+**落地内容**
+- `.gitattributes` / `.editorconfig` / backend ktlint(插件 14.2.0,`ktlintCheck` 挂 `check`)/ web Prettier 3(`.prettierrc.json` + `.prettierignore`)/ CI(backend.yml `gradle test ktlintCheck`;e2e.yml 前端依赖后 `prettier --check`)。
+- 基准提交 e1fea05:renormalize + `gradle ktlintFormat` + `prettier --write` 一次过(252 文件,+17307/−7851);3aae099 加 `.git-blame-ignore-revs`;本地已设 `git config blame.ignoreRevsFile`。
+- 验证:`gradle build` 绿(单元 + ktlint)、`prettier --check .` 绿、`app-infra.ps1 status test` 正常(ps1 保 CRLF)。
+
+**超出设计的必要改动**
+- ktlint filename 规则强制 PascalCase,四个源文件改名:`model.kt`→`Model.kt`、`entities.kt`→`Entities.kt`、`repositories.kt`→`Repositories.kt`(AGENTS 提及处同步)、`exceptions.kt`→`Exceptions.kt`。均为模块内文件名,无契约影响。
+- `.editorconfig` 测试路径豁免三条规则(`property-naming` / `function-naming` / `class-naming`,glob `**/src/{test,integrationTest}/**/*.kt`):仓库测试惯例是中文标识符与 snake_case 中文函数名,规则误伤面远大于保护面;main 源集不受影响。
+- 5 处超 140 字符长行手工折行(MetricsService 常量、cli 删除确认文案、MetricsApiTest SQL、GithubSync/Notification 测试),未关 max-line-length。
+- AccessLogFilterTest 一处 KDoc+行注释顺序违规,合并进 KDoc。
+
+**实证坑(复盘要点)**
+- 并行失败掩盖:ktlint 多模块并行跑,先失败的模块挡住后面模块的报错,violations 是分批暴露的(domain → persistence/cli → api),需要跑到全绿才算清完。
+- **`git checkout-index -f -a`(plumbing)不认 `eol` 属性**,按 `core.autocrlf` 写出 CRLF;porcelain `git checkout --` 才正确。renormalize 提交后强制 LF 重检出的可靠姿势:`git ls-files -z | xargs -0 rm -f && git checkout -- .`(本次实证,467 LF + 4 CRLF 属性文件 + 38 binary,零 mixed)。
+- `git reset --hard` 只重写两 commit 间有差异的文件,不动存量 CRLF 字节——别指望它做 renormalize 收尾。
+
+**待合并后验证**
+- GitHub PR diff 只见真实改动;blame 经 ignore-revs 归位(手工用例 5)。
