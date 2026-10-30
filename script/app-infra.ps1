@@ -24,10 +24,13 @@ $ports = switch ($Env) {
 }
 
 function Assert-PortsFree {
+    # docker infra 持有 = 自家容器在发布端口(wslrelay/com.docker.backend),up -d 幂等,放行
+    $dockerProcs = @('com.docker.backend', 'wslrelay', 'wslhost', 'vpnkit')
     foreach ($p in $ports) {
         $conn = Get-NetTCPConnection -LocalPort $p -State Listen -ErrorAction SilentlyContinue
         if ($conn) {
             $proc = (Get-CimInstance Win32_Process -Filter "ProcessId=$($conn[0].OwningProcess)").ProcessName
+            if ($dockerProcs -contains $proc) { continue }
             throw "端口 $p 已被占用(PID $($conn[0].OwningProcess) / $proc)。请先停对应进程(严禁 taskkill /IM node.exe 或 java.exe,按端口找 PID)或 docker compose down 对应容器。"
         }
     }
