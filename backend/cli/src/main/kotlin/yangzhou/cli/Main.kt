@@ -63,6 +63,7 @@ private fun run(args: List<String>) {
     var i = 0
     while (i < args.size) {
         val a = args[i]
+        if (a == "--help" || a == "-h") return usage()  // 帮助请求不是错误,退出 0(YPJ-119)
         when {
             a == "--req" -> { reqs += args[i + 1]; i += 2 }
             a == "--json" -> { flags["json"] = ""; i += 1 } // 无值旗标,可放任意位置
@@ -125,7 +126,7 @@ private fun run(args: List<String>) {
                 val lvl = body["level"]
                 println("已设置:$name · $attr = ${if (lvl.isNull) "未评级" else lvl.asInt()}")
             }
-            else -> usage()
+            else -> { usage(); error("未知子命令:" + verb) }
         }
     }
     if (noun == "teams") {
@@ -143,7 +144,7 @@ private fun run(args: List<String>) {
                     println("${team["name"].asString()}:${team["members"].joinToString("、") { m -> m["displayName"].asString() }.ifEmpty { "(空)" }}")
                 }
             }
-            else -> usage()
+            else -> { usage(); error("未知子命令:" + verb) }
         }
     }
     if (noun == "candidates" || noun == "assign") {
@@ -441,7 +442,7 @@ private fun run(args: List<String>) {
             }
         }
 
-        else -> usage()
+        else -> { usage(); error("未知命令:" + noun + " " + verb) }
     }
 }
 

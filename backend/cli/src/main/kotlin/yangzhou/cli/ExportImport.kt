@@ -111,7 +111,6 @@ object ExportImport {
 
     fun exportCsv(api: ApiClient, key: String, file: File) {
         val items = api.json("GET", "/api/projects/$key/items")
-        fun esc(v: String) = if (v.any { it == ',' || it == '"' || it == '\n' }) "\"${v.replace("\"", "\"\"")}\"" else v
         val sb = StringBuilder("number,title,type,status,requirements,description\n")
         items.forEach { i ->
             val reqs = i["requirements"].joinToString(";") { r ->
@@ -188,6 +187,10 @@ object ExportImport {
         }
         println("CSV 导入完成:$created 个 item → 项目 $key")
     }
+
+    /** CSV 字段转义:含逗号/引号/换行 → 引号包裹 + 引号双写(RFC4180)。 */
+    internal fun esc(v: String): String =
+        if (v.any { it == ',' || it == '"' || it == '\n' }) "\"${v.replace("\"", "\"\"")}\"" else v
 
     /** 解析 CSV 文本 → 行×列(带表头映射);支持引号包裹、双引号转义、字段内逗号与换行。 */
     fun parseCsv(text: String): List<Map<String, String>> {

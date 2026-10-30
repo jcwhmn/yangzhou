@@ -17,11 +17,10 @@ jobs:
           distribution: temurin
           java-version: 25
       - uses: gradle/actions/setup-gradle@v4
-      - name: Build fat-jar (version from tag)
-        run: gradle :cli:jar "-PcliVersion=${GITHUB_REF_NAME#yz-v}"
+      # YPJ-119(spec 0088):发版门禁——单测+进程级冒烟全绿才出 Release(test 依赖 jar 任务,产物即构建)
+      - name: Smoke gate - build + unit + process smoke
+        run: gradle :cli:test "-PcliVersion=${GITHUB_REF_NAME#yz-v}"
         working-directory: backend
-      - name: Guard — jar file must match tag version
-        run: ls "backend/cli/build/libs/yz-${GITHUB_REF_NAME#yz-v}.jar"
       - name: Create GitHub Release (jar + launch scripts)
         env:
           GH_TOKEN: ${{ github.token }}
