@@ -1,0 +1,25 @@
+# YPJ-118(spec 0087):prod = PM 日常实例,web 3000 + api 8080,库 yangzhou
+# postgres/rustfs 为外部共享实例(ADR-0004),容器内经 host.docker.internal 访问
+services:
+  api:
+    build: ../../backend
+    image: yangzhou-api:local
+    restart: unless-stopped
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://host.docker.internal:5432/yangzhou
+      YANGZHOU_ATTACHMENT_ENDPOINT: http://host.docker.internal:9000
+    ports:
+      - "8080:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  web:
+    build: ../../web
+    image: yangzhou-web:local
+    restart: unless-stopped
+    environment:
+      BACKEND_URL: http://api:8080
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api

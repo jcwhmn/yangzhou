@@ -3,8 +3,8 @@ import { config } from "./e2e/config";
 
 /**
  * E2E:并行、按用例隔离(project fixture 唯一 key,数据走 API 预置)。
- * 前置:本机 Postgres(共享 compose)+ 后端 test profile:
- *   gradle :api:bootRun --args='--spring.profiles.active=test'
+ * 前置:本机 Postgres(共享 compose)+ test 容器(YPJ-118):script/app-infra.ps1 up test
+ *   (api http://localhost:8082;调试也可 bootRun test profile,须 --server.port=8082)
  * 前端 prod server(next build && next start)由 webServer 拉起(已在跑则复用);
  * 构建走独立目录 .next-e2e(NEXT_DIST_DIR),不踩常驻 dev 的 .next。
  * 凭证/地址见 e2e/.env(模板 .env.example)。

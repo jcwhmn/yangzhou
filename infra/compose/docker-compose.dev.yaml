@@ -1,0 +1,26 @@
+# YPJ-118(spec 0087):dev = scratch 实例,web 3001 + api 8081,库 yangzhou_dev(可整库丢弃)
+# postgres/rustfs 为外部共享实例(ADR-0004),容器内经 host.docker.internal 访问
+services:
+  api:
+    build: ../../backend
+    image: yangzhou-api:local
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      SPRING_DATASOURCE_URL: jdbc:postgresql://host.docker.internal:5432/yangzhou_dev
+      YANGZHOU_ATTACHMENT_ENDPOINT: http://host.docker.internal:9000
+    ports:
+      - "8081:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  web:
+    build: ../../web
+    image: yangzhou-web:local
+    restart: unless-stopped
+    environment:
+      BACKEND_URL: http://api:8080
+    ports:
+      - "3001:3000"
+    depends_on:
+      - api
