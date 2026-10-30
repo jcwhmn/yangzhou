@@ -82,6 +82,7 @@ class ItemService(
         val createdAt: String? = null,
         val sprintId: UUID? = null,
         val sprintName: String? = null,
+        val autoAssignedSprintName: String? = null, // YPJ-120 仅 PATCH 触发自动挂载时非空
         val releaseId: UUID? = null,
         val releaseName: String? = null,
     )
@@ -199,6 +200,7 @@ class ItemService(
 
         val projectObjectId = project.objectId ?: error("no id")
         val actorId = memberService.current().objectId!!
+        var autoSprintName: String? = null // YPJ-120 自动挂载的 sprint 名;仅本次 PATCH 触发时非空
         if (statusItemId != null) {
             val status = statuses.findByProjectObjectIdAndObjectId(projectObjectId, statusItemId)
                 ?: throw BadRequestException("状态不属于该项目")
@@ -223,6 +225,23 @@ class ItemService(
                 ItemStatusHistory(itemObjectId = current.objectId!!, fromStatusObjectId = oldStatus?.objectId, toStatusObjectId = status.objectId!!, source = "manual", actorMemberObjectId = actorId),
             )
             notificationService.notifyStatusChange(current, actorId, oldStatus?.name, status.name)
+                        // YPJ-120(spec 0089):开始动作自动入当前 sprint——离开 start 态、目标为进行态、且无 sprint 时,
+            // 挂到最早创建的 active sprint(与 board activeSprints[0] 同序);无 active/已有 sprint 静默跳过。
+            if (oldStatus?.isStart == true && !status.isStart && status.isInProgress) {
+                val rows = memberships.findByItemObjectIdIn(listOf(current.objectId!!))
+                val rowGroups = if (rows.isEmpty()) emptyMap()
+                else groups.findAllByObjectIdIn(rows.map { it.groupObjectId }.toSet()).associateBy { it.objectId!! }
+                val hasLive = rows.any { rowGroups[it.groupObjectId]?.status != "completed" }
+                if (!hasLive) {
+                    val first = groups.findByProjectObjectIdOrderByCreatedAt(projectObjectId)
+                        .firstOrNull { it.status == "active" }
+                    if (first != null) { // 同 create 初始归属模式(YPJ-56):save + 留痕,同事务
+                        memberships.save(ItemGroupMember(groupObjectId = first.objectId!!, itemObjectId = current.objectId!!))
+                        memberHistory.recordAdd(first.objectId!!, current.objectId!!, clock.instant())
+                        autoSprintName = first.name
+                    }
+                }
+            }
         }
 
         if (parentItemId != null) {
@@ -271,7 +290,7 @@ class ItemService(
                 logActivity(current.objectId!!, "dates_changed", old, "${newStart ?: "—"} ~ ${newDue ?: "—"}", actorId)
             }
         }
-        return get(current.objectId)
+        return get(current.objectId).copy(autoAssignedSprintName = autoSprintName) // YPJ-120
     }
 
     /** 需求整表替换(同 transitions 语义);供 item 详情编辑用。 */

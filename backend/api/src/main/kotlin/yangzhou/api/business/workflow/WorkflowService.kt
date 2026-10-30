@@ -32,6 +32,7 @@ class WorkflowService(
         val icon: String?,
         val isStart: Boolean,
         val isFinal: Boolean,
+        val isInProgress: Boolean,
         val position: Int,
     )
 
@@ -40,7 +41,7 @@ class WorkflowService(
     // ---------- Status ----------
 
     @Transactional
-    fun createStatus(projectKey: String, name: String, icon: String?, isStart: Boolean, isFinal: Boolean, position: Int?): StatusDto {
+    fun createStatus(projectKey: String, name: String, icon: String?, isStart: Boolean, isFinal: Boolean, isInProgress: Boolean, position: Int?): StatusDto {
         val project = projects.findByKey(projectKey) ?: throw NotFoundException("项目不存在:$projectKey")
         leaderGuard.requireLeader(project.objectId!!)
         val projectObjectId = project.objectId!!
@@ -53,6 +54,7 @@ class WorkflowService(
                 icon = icon,
                 isStart = isStart,
                 isFinal = isFinal,
+                isInProgress = isInProgress,
                 position = position ?: ((existing.maxOfOrNull { it.position } ?: -1) + 1),
             ),
         )
@@ -60,7 +62,7 @@ class WorkflowService(
     }
 
     @Transactional
-    fun updateStatus(statusId: UUID, name: String?, icon: String?, isStart: Boolean?, isFinal: Boolean?, position: Int?): StatusDto {
+    fun updateStatus(statusId: UUID, name: String?, icon: String?, isStart: Boolean?, isFinal: Boolean?, isInProgress: Boolean?, position: Int?): StatusDto {
         val status = statuses.findByObjectId(statusId) ?: throw NotFoundException("状态不存在")
         leaderGuard.requireLeader(status.projectObjectId)
         try {
@@ -70,6 +72,7 @@ class WorkflowService(
                     icon = icon ?: status.icon,
                     isStart = isStart ?: status.isStart,
                     isFinal = isFinal ?: status.isFinal,
+                    isInProgress = isInProgress ?: status.isInProgress,
                     position = position ?: status.position,
                 ),
             )
@@ -135,7 +138,7 @@ class WorkflowService(
         }
     }
 
-    private fun Status.toDto() = StatusDto(objectId, name, icon, isStart, isFinal, position)
+    private fun Status.toDto() = StatusDto(objectId, name, icon, isStart, isFinal, isInProgress, position)
 }
 
 data class CreateStatusRequest(
@@ -143,6 +146,7 @@ data class CreateStatusRequest(
     val icon: String? = null,
     val isStart: Boolean = false,
     val isFinal: Boolean = false,
+    val isInProgress: Boolean = false,
     val position: Int? = null,
 )
 
@@ -151,6 +155,7 @@ data class UpdateStatusRequest(
     val icon: String? = null,
     val isStart: Boolean? = null,
     val isFinal: Boolean? = null,
+    val isInProgress: Boolean? = null,
     val position: Int? = null,
 )
 

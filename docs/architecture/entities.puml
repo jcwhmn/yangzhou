@@ -31,6 +31,7 @@ class Status {
   icon: String?
   isStart: Boolean
   isFinal: Boolean
+  isInProgress: Boolean
   position: Int
 }
 class ItemStatusHistory {

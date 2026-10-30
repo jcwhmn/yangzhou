@@ -37,7 +37,7 @@ class ProjectService(
 
     private val log = LoggerFactory.getLogger(ProjectService::class.java)
 
-    data class StatusDto(val statusId: UUID, val name: String, val icon: String?, val isStart: Boolean, val isFinal: Boolean, val position: Int)
+    data class StatusDto(val statusId: UUID, val name: String, val icon: String?, val isStart: Boolean, val isFinal: Boolean, val isInProgress: Boolean, val position: Int)
     data class ProjectDto(
         val projectId: UUID,
         val key: String,
@@ -79,7 +79,7 @@ class ProjectService(
     fun get(key: String): ProjectDto {
         val project = projects.findByKey(key) ?: throw NotFoundException("项目不存在:$key")
         val statusDtos = statuses.findByProjectObjectIdOrderByPosition(project.objectId!!).map {
-            StatusDto(it.objectId, it.name, it.icon, it.isStart, it.isFinal, it.position)
+            StatusDto(it.objectId, it.name, it.icon, it.isStart, it.isFinal, it.isInProgress, it.position)
         }
         return ProjectDto(project.objectId, project.key, project.name, project.archivedAt != null, project.feasSignal, statusDtos)
     }
@@ -194,7 +194,7 @@ class ProjectService(
 
     private fun defaultStatuses(projectId: UUID) = listOf( // V7:5 列(评审环节天然有位置);存量项目不动
         Status(projectObjectId = projectId, name = "To Do", isStart = true, position = 0),
-        Status(projectObjectId = projectId, name = "In Progress", position = 1),
+        Status(projectObjectId = projectId, name = "In Progress", isInProgress = true, position = 1), // YPJ-120:进行态属预置模板语义,V42 只负责存量回填
         Status(projectObjectId = projectId, name = "In Review", position = 2),
         Status(projectObjectId = projectId, name = "QA", position = 3),
         Status(projectObjectId = projectId, name = "Done", isFinal = true, position = 4),
