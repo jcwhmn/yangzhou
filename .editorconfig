@@ -1,20 +1,23 @@
-# YPJ-121:与 .gitattributes 行尾策略一致;ktlint 读同文件,其余走默认。
 root = true
 
 [*]
 charset = utf-8
 end_of_line = lf
 insert_final_newline = true
+indent_style = space
+indent_size = 4
+trim_trailing_whitespace = true
 
-[*.md]
-trim_trailing_whitespace = false
+[*.{kt,kts}]
+ktlint_code_style = intellij_idea
+ktlint_standard_argument-list-wrapping = disabled
 
-[*.{ps1,bat,cmd}]
-end_of_line = crlf
-
-# 测试中文名标识符(小李/小张等)是本仓库测试惯例,property-naming 会误伤(YPJ-121)
-# 测试函数名 snake_case+中文 是仓库惯例,function-naming 同样误伤;integrationTest 目录即集成边界
+# 测试中文/下划线命名是仓库惯例,命名规则误伤(YPJ-121;integrationTest 目录即集成边界)
 [**/src/{test,integrationTest}/**/*.kt]
 ktlint_standard_property-naming = disabled
 ktlint_standard_function-naming = disabled
 ktlint_standard_class-naming = disabled
+
+# markdown 行尾双空格 = 硬换行,不去行尾空白
+[*.md]
+trim_trailing_whitespace = false
