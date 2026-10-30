@@ -73,5 +73,11 @@
 - **`git checkout-index -f -a`(plumbing)不认 `eol` 属性**,按 `core.autocrlf` 写出 CRLF;porcelain `git checkout --` 才正确。renormalize 提交后强制 LF 重检出的可靠姿势:`git ls-files -z | xargs -0 rm -f && git checkout -- .`(本次实证,467 LF + 4 CRLF 属性文件 + 38 binary,零 mixed)。
 - `git reset --hard` 只重写两 commit 间有差异的文件,不动存量 CRLF 字节——别指望它做 renormalize 收尾。
 
+**后补:紧凑调用风格(2026-10-31 用户偏好)**
+- ktlint 官方风格要求"多行调用一参一行",与用户偏好的紧凑 fixture 写法冲突;且 wrapping 家族规则存在**硬依赖链(trailing-comma-* → wrapping),任一条配置级 `disabled` 都会令 ktlint 整体抛 IllegalStateException**(插件包装成误导性的 "KtLint failed to parse file"),故配置级禁用不可行。
+- 落地:紧凑调用点用 `@Suppress("ktlint:standard:wrapping", ...)` 注解级豁免(FeasibilityApiTest.seedFixture 首例);新建紧凑 fixture 时照此办理。
+- 排查中误伤:Gradle 任务快照在文件改名(改大小写)后可能残留旧路径,ktlintFormat 报已不存在的文件名违规;`--rerun-tasks` 强制重跑即消,属陈旧缓存非真实违规。
+- 排查中删除的 `*/bin/` 目录为 IDE 输出残留(已 gitignore,不入库)。
+
 **待合并后验证**
 - GitHub PR diff 只见真实改动;blame 经 ignore-revs 归位(手工用例 5)。
