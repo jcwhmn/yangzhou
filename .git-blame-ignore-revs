@@ -1,0 +1,4 @@
+# YPJ-121(spec 0088):行尾归一 + 存量格式化基准——机械性变更,blame 跳过此提交
+# 本地生效:git config blame.ignoreRevsFile .git-blame-ignore-revs
+# GitHub 侧自动生效
+e1fea05c1e04e191e5b73ed3ec07d94b26e94e25
