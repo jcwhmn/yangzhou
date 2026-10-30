@@ -27,18 +27,17 @@ class ItemController(
     fun create(
         @PathVariable key: String,
         @Valid @RequestBody request: CreateItemRequest,
-    ): ItemService.ItemDto =
-        service.create(
-            projectKey = key,
-            title = request.title.trim(),
-            description = request.description,
-            type = request.type,
-            parentItemId = request.parentItemId,
-            statusItemId = request.statusItemId,
-            externalRef = request.externalRef,
-            sprintId = request.sprintId,
-            requirements = request.requirements.map { ItemService.RequirementDto(it.attribute.trim(), it.minLevel) },
-        )
+    ): ItemService.ItemDto = service.create(
+        projectKey = key,
+        title = request.title.trim(),
+        description = request.description,
+        type = request.type,
+        parentItemId = request.parentItemId,
+        statusItemId = request.statusItemId,
+        externalRef = request.externalRef,
+        sprintId = request.sprintId,
+        requirements = request.requirements.map { ItemService.RequirementDto(it.attribute.trim(), it.minLevel) },
+    )
 
     @GetMapping("/projects/{key}/items")
     fun list(
@@ -54,21 +53,19 @@ class ItemController(
     fun replaceRequirements(
         @PathVariable itemId: UUID,
         @RequestBody request: ReplaceRequirementsRequest,
-    ): ItemService.ItemDto =
-        service.replaceRequirements(
-            itemId,
-            request.requirements.map { ItemService.RequirementDto(it.attribute.trim(), it.minLevel) },
-        )
+    ): ItemService.ItemDto = service.replaceRequirements(
+        itemId,
+        request.requirements.map { ItemService.RequirementDto(it.attribute.trim(), it.minLevel) },
+    )
 
     @PutMapping("/items/{itemId}/attributes")
     fun replaceAttributes(
         @PathVariable itemId: UUID,
         @RequestBody request: ReplaceItemAttributesRequest,
-    ): ItemService.ItemDto =
-        service.replaceAttributes(
-            itemId,
-            request.values.map { ItemService.ItemAttributeDto(it.attribute.trim(), it.value) },
-        )
+    ): ItemService.ItemDto = service.replaceAttributes(
+        itemId,
+        request.values.map { ItemService.ItemAttributeDto(it.attribute.trim(), it.value) },
+    )
 
     @PutMapping("/items/{itemId}/assignee")
     fun assign(
@@ -105,16 +102,15 @@ class ItemController(
     fun update(
         @PathVariable itemId: UUID,
         @RequestBody request: UpdateItemRequest,
-    ): ItemService.ItemDto =
-        service.update(
-            itemId,
-            request.title,
-            request.description,
-            request.type,
-            request.statusItemId,
-            request.parentItemId,
-            request.startDate,
-            request.dueDate,
-            request.priority,
-        )
+    ): ItemService.ItemDto = service.update(
+        itemId,
+        request.title,
+        request.description,
+        request.type,
+        request.statusItemId,
+        request.parentItemId,
+        request.startDate,
+        request.dueDate,
+        request.priority,
+    )
 }

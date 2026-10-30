@@ -72,12 +72,11 @@ class ChecklistService(
         checklists.delete(entry)
     }
 
-    private fun toDto(rows: List<ChecklistItem>): ChecklistDto =
-        ChecklistDto(
-            entries = rows.map { EntryDto(it.objectId, it.text, it.done) },
-            doneCount = rows.count { it.done },
-            totalCount = rows.size,
-        )
+    private fun toDto(rows: List<ChecklistItem>): ChecklistDto = ChecklistDto(
+        entries = rows.map { EntryDto(it.objectId, it.text, it.done) },
+        doneCount = rows.count { it.done },
+        totalCount = rows.size,
+    )
 }
 
 data class UpsertChecklistRequest(

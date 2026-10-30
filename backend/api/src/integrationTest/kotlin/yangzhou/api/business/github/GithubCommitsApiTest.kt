@@ -114,15 +114,14 @@ class GithubCommitsApiTest : AbstractApiTest() {
 
     private fun getCommits(itemId: String): RestTestClient.ResponseSpec = authed.get().uri("/api/items/$itemId/commits").exchange()
 
-    private fun body(spec: RestTestClient.ResponseSpec): JsonNode =
-        json.readTree(
-            spec
-                .expectStatus()
-                .isOk()
-                .expectBody(String::class.java)
-                .returnResult()
-                .responseBody!!,
-        )
+    private fun body(spec: RestTestClient.ResponseSpec): JsonNode = json.readTree(
+        spec
+            .expectStatus()
+            .isOk()
+            .expectBody(String::class.java)
+            .returnResult()
+            .responseBody!!,
+    )
 
     @Test
     fun `按需拉取——按 branch ref 分组返回提交——不落库`() {

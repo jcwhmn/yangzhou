@@ -73,11 +73,10 @@ class GithubCommitService(
     private fun fetchBranchCommits(
         ref: ItemGitRef,
         token: String,
-    ): List<RepoCommit> =
-        runCatching { gateway.listCommits(ref.repo, ref.ref, ref.createdAt, token) }
-            .getOrElse { e -> wrap(e) }
-            // 响应侧兜底:GitHub since 按 commit date 过滤,边缘仍可能有漏网(date 缺失则保留,宁多勿漏)
-            .filter { it.date == null || runCatching { Instant.parse(it.date) >= ref.createdAt }.getOrDefault(true) }
+    ): List<RepoCommit> = runCatching { gateway.listCommits(ref.repo, ref.ref, ref.createdAt, token) }
+        .getOrElse { e -> wrap(e) }
+        // 响应侧兜底:GitHub since 按 commit date 过滤,边缘仍可能有漏网(date 缺失则保留,宁多勿漏)
+        .filter { it.date == null || runCatching { Instant.parse(it.date) >= ref.createdAt }.getOrDefault(true) }
 
     /** 分支查空 → PR 回溯:返回 (PR 号, 过滤后 commits);未命中 PR 或全被 since 过滤 → null。 */
     private fun fetchPrCommits(

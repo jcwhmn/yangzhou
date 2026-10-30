@@ -6,14 +6,6 @@ import kotlin.test.assertEquals
 
 /** 判定语义用真实 fixture(chess JCW-30/44/46、BOO-UI 家族)断言。 */
 class FeasibilityApiTest : AbstractApiTest() {
-    // 紧凑 fixture 写法(用户偏好,2026-10-31):wrapping 家族逐点豁免;配置级禁用会触发
-    // ktlint 规则依赖校验崩溃(trailing-comma-* 硬依赖 wrapping),只能注解级豁免——spec 0088 As-built
-    @Suppress(
-        "ktlint:standard:wrapping",
-        "ktlint:standard:argument-list-wrapping",
-        "ktlint:standard:multiline-expression-wrapping",
-        "ktlint:standard:trailing-comma-on-call-site",
-    )
     private fun seedFixture(): org.springframework.test.web.servlet.client.RestTestClient {
         val authed = bootstrapAndAuth()
         createSkillAttribute(authed, "Java")
@@ -27,16 +19,25 @@ class FeasibilityApiTest : AbstractApiTest() {
         setCapability(authed, "React", 1)
 
         createProject(authed, "CHE")
-        createItem(authed, "CHE", "auth baseline", listOf(
-            mapOf("attribute" to "Java", "minLevel" to 3),
-            mapOf("attribute" to "架构", "minLevel" to 2),
-        )) // JCW-30:有余 + 差1级 → YELLOW
-        createItem(authed, "CHE", "websocket draw", listOf(
-            mapOf("attribute" to "Java", "minLevel" to 3),
-        )) // JCW-44:有余 → GREEN
-        createItem(authed, "CHE", "wire frontend", listOf(
-            mapOf("attribute" to "React", "minLevel" to 2),
-        )) // JCW-46:差1级 → YELLOW
+        createItem(
+            authed, "CHE", "auth baseline",
+            listOf(
+                mapOf("attribute" to "Java", "minLevel" to 3),
+                mapOf("attribute" to "架构", "minLevel" to 2),
+            ),
+        ) // JCW-30:有余 + 差1级 → YELLOW
+        createItem(
+            authed, "CHE", "websocket draw",
+            listOf(
+                mapOf("attribute" to "Java", "minLevel" to 3),
+            ),
+        ) // JCW-44:有余 → GREEN
+        createItem(
+            authed, "CHE", "wire frontend",
+            listOf(
+                mapOf("attribute" to "React", "minLevel" to 2),
+            ),
+        ) // JCW-46:差1级 → YELLOW
 
         createProject(authed, "BOO")
         createItem(

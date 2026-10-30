@@ -217,33 +217,31 @@ class ReleaseApiTest : AbstractApiTest() {
         authed: RestTestClient,
         uri: String,
         body: Map<String, Any?>,
-    ): JsonNode =
-        json.readTree(
-            authed
-                .post()
-                .uri(uri)
-                .body(body)
-                .exchange()
-                .expectStatus()
-                .isCreated()
-                .expectBody(String::class.java)
-                .returnResult()
-                .responseBody!!,
-        )
+    ): JsonNode = json.readTree(
+        authed
+            .post()
+            .uri(uri)
+            .body(body)
+            .exchange()
+            .expectStatus()
+            .isCreated()
+            .expectBody(String::class.java)
+            .returnResult()
+            .responseBody!!,
+    )
 
     private fun get(
         authed: RestTestClient,
         uri: String,
-    ): JsonNode =
-        json.readTree(
-            authed
-                .get()
-                .uri(uri)
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody(String::class.java)
-                .returnResult()
-                .responseBody!!,
-        )
+    ): JsonNode = json.readTree(
+        authed
+            .get()
+            .uri(uri)
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody(String::class.java)
+            .returnResult()
+            .responseBody!!,
+    )
 }

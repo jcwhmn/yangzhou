@@ -84,8 +84,7 @@ class ExcelExportService(
         }
     }
 
-    private fun minutesOf(e: yangzhou.persistence.TimeEntry): Long =
-        e.minutes?.toLong() ?: Duration.between(e.startedAt, e.endedAt ?: Instant.now()).toMinutes()
+    private fun minutesOf(e: yangzhou.persistence.TimeEntry): Long = e.minutes?.toLong() ?: Duration.between(e.startedAt, e.endedAt ?: Instant.now()).toMinutes()
 
     data class ExportFile(
         val filename: String,

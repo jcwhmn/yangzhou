@@ -12,10 +12,9 @@ import java.util.UUID
 class ItemNumberRepository(
     private val jdbc: JdbcOperations,
 ) {
-    fun nextNumber(projectObjectId: UUID): Int =
-        jdbc.queryForObject(
-            "update project set last_item_number = last_item_number + 1, updated_at = now() where object_id = ? returning last_item_number",
-            Int::class.java,
-            projectObjectId,
-        ) ?: error("project not found: $projectObjectId")
+    fun nextNumber(projectObjectId: UUID): Int = jdbc.queryForObject(
+        "update project set last_item_number = last_item_number + 1, updated_at = now() where object_id = ? returning last_item_number",
+        Int::class.java,
+        projectObjectId,
+    ) ?: error("project not found: $projectObjectId")
 }

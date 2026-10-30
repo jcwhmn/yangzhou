@@ -9,21 +9,20 @@ class CandidatesApiTest : AbstractApiTest() {
     private fun addMember(
         authed: org.springframework.test.web.servlet.client.RestTestClient,
         name: String,
-    ): String =
-        json
-            .readTree(
-                authed
-                    .post()
-                    .uri("/api/members")
-                    .body(mapOf("displayName" to name))
-                    .exchange()
-                    .expectStatus()
-                    .isCreated()
-                    .expectBody(String::class.java)
-                    .returnResult()
-                    .responseBody!!,
-            )["memberId"]
-            .asText()
+    ): String = json
+        .readTree(
+            authed
+                .post()
+                .uri("/api/members")
+                .body(mapOf("displayName" to name))
+                .exchange()
+                .expectStatus()
+                .isCreated()
+                .expectBody(String::class.java)
+                .returnResult()
+                .responseBody!!,
+        )["memberId"]
+        .asText()
 
     private fun setMemberCap(
         authed: org.springframework.test.web.servlet.client.RestTestClient,

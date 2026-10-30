@@ -100,9 +100,9 @@ class TeamService(
             teamId = team.objectId,
             name = team.name,
             members =
-                list.mapNotNull { tm ->
-                    byInternal[tm.memberObjectId]?.let { TeamMemberDto(it.objectId, it.displayName) }
-                },
+            list.mapNotNull { tm ->
+                byInternal[tm.memberObjectId]?.let { TeamMemberDto(it.objectId, it.displayName) }
+            },
         )
     }
 }

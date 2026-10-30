@@ -226,18 +226,17 @@ class NotificationApiTest : AbstractApiTest() {
         assertEquals(0, (rows[0]["c"] as Number).toInt())
     }
 
-    private fun unreadCount(authed: org.springframework.test.web.servlet.client.RestTestClient): Int =
-        json
-            .readTree(
-                authed
-                    .get()
-                    .uri("/api/notifications/unread-count")
-                    .exchange()
-                    .expectStatus()
-                    .isOk()
-                    .expectBody(String::class.java)
-                    .returnResult()
-                    .responseBody!!,
-            )["count"]
-            .asInt()
+    private fun unreadCount(authed: org.springframework.test.web.servlet.client.RestTestClient): Int = json
+        .readTree(
+            authed
+                .get()
+                .uri("/api/notifications/unread-count")
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(String::class.java)
+                .returnResult()
+                .responseBody!!,
+        )["count"]
+        .asInt()
 }

@@ -13,10 +13,10 @@ class MatchItemTest {
         Member(
             name = "我",
             capabilities =
-                listOf(
-                    Capability(Attribute("Java"), 4),
-                    Capability(Attribute("架构"), 1),
-                ),
+            listOf(
+                Capability(Attribute("Java"), 4),
+                Capability(Attribute("架构"), 1),
+            ),
         )
 
     @Test

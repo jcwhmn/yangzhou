@@ -25,11 +25,10 @@ class ApiClient private constructor(
 
         fun sessionFile(): File = File(System.getProperty("user.home"), ".yangzhou/session.json")
 
-        fun loadSession(): Session? =
-            runCatching {
-                val node = mapper.readTree(sessionFile())
-                Session(node["server"].asString(), node["token"].asString())
-            }.getOrNull()
+        fun loadSession(): Session? = runCatching {
+            val node = mapper.readTree(sessionFile())
+            Session(node["server"].asString(), node["token"].asString())
+        }.getOrNull()
 
         fun create(): ApiClient = ApiClient(HttpClient.newHttpClient(), mapper, loadSession())
 
@@ -42,18 +41,17 @@ class ApiClient private constructor(
             val http = HttpClient.newHttpClient()
             val normalized = server.trimEnd('/')
 
-            fun post(path: String): HttpResponse<String> =
-                http.send(
-                    HttpRequest
-                        .newBuilder(URI("$normalized$path"))
-                        .header("Content-Type", "application/json")
-                        .POST(
-                            HttpRequest.BodyPublishers.ofString(
-                                mapper.writeValueAsString(mapOf("username" to username, "password" to password)),
-                            ),
-                        ).build(),
-                    HttpResponse.BodyHandlers.ofString(),
-                )
+            fun post(path: String): HttpResponse<String> = http.send(
+                HttpRequest
+                    .newBuilder(URI("$normalized$path"))
+                    .header("Content-Type", "application/json")
+                    .POST(
+                        HttpRequest.BodyPublishers.ofString(
+                            mapper.writeValueAsString(mapOf("username" to username, "password" to password)),
+                        ),
+                    ).build(),
+                HttpResponse.BodyHandlers.ofString(),
+            )
 
             val response =
                 try {

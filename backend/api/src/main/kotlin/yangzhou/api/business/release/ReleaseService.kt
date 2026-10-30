@@ -72,11 +72,10 @@ class ReleaseService(
     private fun find(
         key: String,
         releaseId: UUID,
-    ): ItemGroup =
-        groups
-            .findByProjectObjectIdAndObjectId(project(key).objectId!!, releaseId)
-            ?.takeIf { it.type == "release" }
-            ?: throw NotFoundException("release 不存在")
+    ): ItemGroup = groups
+        .findByProjectObjectIdAndObjectId(project(key).objectId!!, releaseId)
+        ?.takeIf { it.type == "release" }
+        ?: throw NotFoundException("release 不存在")
 
     private fun milestoneIn(
         key: String,
@@ -87,23 +86,21 @@ class ReleaseService(
     private fun parseDate(
         text: String,
         field: String,
-    ): LocalDate =
-        try {
-            LocalDate.parse(text)
-        } catch (_: Exception) {
-            throw BadRequestException("$field 格式应为 yyyy-MM-dd")
-        }
+    ): LocalDate = try {
+        LocalDate.parse(text)
+    } catch (_: Exception) {
+        throw BadRequestException("$field 格式应为 yyyy-MM-dd")
+    }
 
-    private fun ItemGroup.toDto(memberCount: Int) =
-        ReleaseDto(
-            releaseId = objectId,
-            name = name,
-            status = status,
-            targetDate = endDate?.toString(),
-            releasedDate = releasedDate?.toString(),
-            milestoneId = milestoneObjectId?.let { milestones.findByObjectId(it)?.objectId },
-            memberCount = memberCount,
-        )
+    private fun ItemGroup.toDto(memberCount: Int) = ReleaseDto(
+        releaseId = objectId,
+        name = name,
+        status = status,
+        targetDate = endDate?.toString(),
+        releasedDate = releasedDate?.toString(),
+        milestoneId = milestoneObjectId?.let { milestones.findByObjectId(it)?.objectId },
+        memberCount = memberCount,
+    )
 
     /** 排序:planned 先(target asc nulls last,再创建序);released 后(发布日 desc,最新在前)。 */
     fun list(key: String): List<ReleaseDto> {

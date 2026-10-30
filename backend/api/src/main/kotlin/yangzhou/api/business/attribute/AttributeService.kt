@@ -129,8 +129,7 @@ class AttributeService(
         }
     }
 
-    private fun AttributeDefinition.toDto(categoryName: String? = null) =
-        AttributeDto(objectId, name, kind, leveled, parentObjectId, categoryName)
+    private fun AttributeDefinition.toDto(categoryName: String? = null) = AttributeDto(objectId, name, kind, leveled, parentObjectId, categoryName)
 
     /** list:叶子带分类名(未分类 = null)。 */
     fun list(): List<AttributeDto> {

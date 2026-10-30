@@ -74,11 +74,10 @@ private fun printItem(
     r.verdicts.forEach { v -> println("    ${describe(v)}") }
 }
 
-private fun describe(v: Verdict): String =
-    when (v) {
-        is Verdict.Satisfied -> "✓ 满足(${v.attribute.name})"
-        is Verdict.Surplus -> "✓ 有余(${v.attribute.name})"
-        is Verdict.Gap -> "△ 差 ${v.delta} 级(${v.attribute.name}:需≥${v.required},有 ${v.actual})"
-        is Verdict.Unrated -> "△ 有但未评级(${v.attribute.name},需≥${v.required})——差距未知"
-        is Verdict.Missing -> "✗ 缺能力(${v.attribute.name})"
-    }
+private fun describe(v: Verdict): String = when (v) {
+    is Verdict.Satisfied -> "✓ 满足(${v.attribute.name})"
+    is Verdict.Surplus -> "✓ 有余(${v.attribute.name})"
+    is Verdict.Gap -> "△ 差 ${v.delta} 级(${v.attribute.name}:需≥${v.required},有 ${v.actual})"
+    is Verdict.Unrated -> "△ 有但未评级(${v.attribute.name},需≥${v.required})——差距未知"
+    is Verdict.Missing -> "✗ 缺能力(${v.attribute.name})"
+}

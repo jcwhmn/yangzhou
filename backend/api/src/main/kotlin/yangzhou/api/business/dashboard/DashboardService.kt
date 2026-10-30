@@ -48,15 +48,15 @@ class DashboardService(
                     LiveGroupDto(
                         projectKey = p.key,
                         sprints =
-                            sprintService
-                                .list(p.key)
-                                .filter { it.status == "active" }
-                                .map { LiveSprintDto(it.sprintId, it.name, it.endDate) },
+                        sprintService
+                            .list(p.key)
+                            .filter { it.status == "active" }
+                            .map { LiveSprintDto(it.sprintId, it.name, it.endDate) },
                         milestones =
-                            milestoneService
-                                .list(p.key)
-                                .filter { it.status == "in_progress" }
-                                .map { LiveMilestoneDto(it.milestoneId, it.name, it.targetDate) },
+                        milestoneService
+                            .list(p.key)
+                            .filter { it.status == "in_progress" }
+                            .map { LiveMilestoneDto(it.milestoneId, it.name, it.targetDate) },
                     )
                 }.filter { it.sprints.isNotEmpty() || it.milestones.isNotEmpty() }
         return DashboardDto(standup = standupService.standup(null), live = live)

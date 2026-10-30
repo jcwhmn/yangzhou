@@ -38,18 +38,16 @@ class GithubAdapter(
     override fun listBranches(
         repo: String,
         token: String,
-    ): List<String> =
-        mapper
-            .readTree(get(repo, "/branches?per_page=100", token))
-            .map { it.get("name").asString() }
+    ): List<String> = mapper
+        .readTree(get(repo, "/branches?per_page=100", token))
+        .map { it.get("name").asString() }
 
     override fun listPullRequests(
         repo: String,
         token: String,
-    ): List<RepoPr> =
-        mapper
-            .readTree(get(repo, "/pulls?state=all&sort=updated&direction=desc&per_page=50", token))
-            .map { toRepoPr(it) }
+    ): List<RepoPr> = mapper
+        .readTree(get(repo, "/pulls?state=all&sort=updated&direction=desc&per_page=50", token))
+        .map { toRepoPr(it) }
 
     // head=owner:branch 平台侧过滤,不受首页窗口限制(老 PR 也能回溯,YPJ-52)
     override fun findPrByHead(
@@ -70,71 +68,67 @@ class GithubAdapter(
         sha: String,
         since: Instant?,
         token: String,
-    ): List<RepoCommit> =
-        try {
-            val sinceQ = if (since != null) "&since=" + DateTimeFormatter.ISO_INSTANT.format(since) else ""
-            mapper
-                .readTree(get(repo, "/commits?sha=$sha$sinceQ&per_page=20", token))
-                .map { parseCommit(it) }
-        } catch (e: VcsApiException) {
-            if (e.status == 404) emptyList() else throw e // ref 已删 → 视为无提交
-        }
+    ): List<RepoCommit> = try {
+        val sinceQ = if (since != null) "&since=" + DateTimeFormatter.ISO_INSTANT.format(since) else ""
+        mapper
+            .readTree(get(repo, "/commits?sha=$sha$sinceQ&per_page=20", token))
+            .map { parseCommit(it) }
+    } catch (e: VcsApiException) {
+        if (e.status == 404) emptyList() else throw e // ref 已删 → 视为无提交
+    }
 
     // ponytail: pulls commits 无 since 参数,过滤交给调用方;第一页 per_page=100 同量级假设
     override fun listPullRequestCommits(
         repo: String,
         number: Int,
         token: String,
-    ): List<RepoCommit> =
-        try {
-            mapper
-                .readTree(get(repo, "/pulls/$number/commits?per_page=100", token))
-                .map { parseCommit(it) }
-        } catch (e: VcsApiException) {
-            if (e.status == 404) emptyList() else throw e
-        }
+    ): List<RepoCommit> = try {
+        mapper
+            .readTree(get(repo, "/pulls/$number/commits?per_page=100", token))
+            .map { parseCommit(it) }
+    } catch (e: VcsApiException) {
+        if (e.status == 404) emptyList() else throw e
+    }
 
-    private fun parseCommit(c: tools.jackson.databind.JsonNode) =
-        RepoCommit(
-            sha = c.get("sha").asString(),
-            message =
-                c
-                    .path("commit")
-                    .path("message")
-                    .asString()
-                    .lineSequence()
-                    .firstOrNull()
-                    .orEmpty(),
-            author =
-                c.path("author").path("login").asString(null)
-                    ?: c
-                        .path("commit")
-                        .path("author")
-                        .path("name")
-                        .asString(null),
-            date =
-                c
-                    .path("commit")
-                    .path("author")
-                    .path("date")
-                    .asString(null),
-            url = c.path("html_url").asString(null),
-        )
+    private fun parseCommit(c: tools.jackson.databind.JsonNode) = RepoCommit(
+        sha = c.get("sha").asString(),
+        message =
+        c
+            .path("commit")
+            .path("message")
+            .asString()
+            .lineSequence()
+            .firstOrNull()
+            .orEmpty(),
+        author =
+        c.path("author").path("login").asString(null)
+            ?: c
+                .path("commit")
+                .path("author")
+                .path("name")
+                .asString(null),
+        date =
+        c
+            .path("commit")
+            .path("author")
+            .path("date")
+            .asString(null),
+        url = c.path("html_url").asString(null),
+    )
 
     companion object {
         /** 列表载荷无 merged 布尔,只有 merged_at(dogfood JCW-113 抓到的 NPE):非空即已合并。 */
-        fun toRepoPr(pr: tools.jackson.databind.JsonNode): RepoPr =
-            RepoPr(
-                number = pr.get("number").asInt(),
-                headRef = pr.get("head").get("ref").asString(),
-                state =
-                    when {
-                        !pr.path("merged_at").isNull() -> "merged"
-                        pr.get("state").asString() == "open" -> "open"
-                        else -> "closed"
-                    },
-                url = pr.path("html_url").asString(null),
-            )
+        fun toRepoPr(pr: tools.jackson.databind.JsonNode): RepoPr = RepoPr(
+            number = pr.get("number").asInt(),
+            headRef = pr.get("head").get("ref").asString(),
+            state =
+            when {
+                !pr.path("merged_at").isNull() -> "merged"
+                pr.get("state").asString() == "open" -> "open"
+                else -> "closed"
+            },
+            url = pr.path("html_url").asString(null),
+        )
     }
 
     override fun createBranch(

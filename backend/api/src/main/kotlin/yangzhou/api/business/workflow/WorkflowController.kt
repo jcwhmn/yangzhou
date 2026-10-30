@@ -24,15 +24,13 @@ class WorkflowController(
     fun createStatus(
         @PathVariable key: String,
         @Valid @RequestBody request: CreateStatusRequest,
-    ): WorkflowService.StatusDto =
-        service.createStatus(key, request.name.trim(), request.icon, request.isStart, request.isFinal, request.position)
+    ): WorkflowService.StatusDto = service.createStatus(key, request.name.trim(), request.icon, request.isStart, request.isFinal, request.position)
 
     @PatchMapping("/statuses/{statusId}")
     fun updateStatus(
         @PathVariable statusId: UUID,
         @RequestBody request: UpdateStatusRequest,
-    ): WorkflowService.StatusDto =
-        service.updateStatus(statusId, request.name, request.icon, request.isStart, request.isFinal, request.position)
+    ): WorkflowService.StatusDto = service.updateStatus(statusId, request.name, request.icon, request.isStart, request.isFinal, request.position)
 
     @DeleteMapping("/statuses/{statusId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)

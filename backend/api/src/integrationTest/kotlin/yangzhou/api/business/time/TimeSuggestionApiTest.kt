@@ -104,18 +104,16 @@ class TimeSuggestionApiTest : AbstractApiTest() {
         )
     }
 
-    private fun getSuggestions(itemId: String): RestTestClient.ResponseSpec =
-        authed.get().uri("/api/items/$itemId/time-entry-suggestions").exchange()
+    private fun getSuggestions(itemId: String): RestTestClient.ResponseSpec = authed.get().uri("/api/items/$itemId/time-entry-suggestions").exchange()
 
-    private fun body(spec: RestTestClient.ResponseSpec): JsonNode =
-        json.readTree(
-            spec
-                .expectStatus()
-                .isOk()
-                .expectBody(String::class.java)
-                .returnResult()
-                .responseBody!!,
-        )
+    private fun body(spec: RestTestClient.ResponseSpec): JsonNode = json.readTree(
+        spec
+            .expectStatus()
+            .isOk()
+            .expectBody(String::class.java)
+            .returnResult()
+            .responseBody!!,
+    )
 
     @Test
     fun `建议——首末 commit 成段——乱序日期取时间首尾`() {

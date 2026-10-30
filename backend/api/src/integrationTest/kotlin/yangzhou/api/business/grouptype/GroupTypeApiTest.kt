@@ -31,16 +31,15 @@ class GroupTypeApiTest : AbstractApiTest() {
     private fun getJson(
         authed: RestTestClient,
         uri: String,
-    ): JsonNode =
-        json.readTree(
-            authed
-                .get()
-                .uri(uri)
-                .exchange()
-                .expectBody(String::class.java)
-                .returnResult()
-                .responseBody!!,
-        )
+    ): JsonNode = json.readTree(
+        authed
+            .get()
+            .uri(uri)
+            .exchange()
+            .expectBody(String::class.java)
+            .returnResult()
+            .responseBody!!,
+    )
 
     @Test
     fun `建项目种子内建类型 且既有 sprint 端点照常`() {

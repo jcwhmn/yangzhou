@@ -142,12 +142,11 @@ class ProjectServiceUnitTest {
     }
 
     /** 镜像 ProjectService.defaultStatuses(V7 五列)供 get 组装;种子内容已由 DefaultRuleSeedsUnitTest 守护。 */
-    private fun defaultStatuses(projectObjectId: UUID): List<Status> =
-        listOf(
-            Status(projectObjectId = projectObjectId, name = "To Do", position = 0),
-            Status(projectObjectId = projectObjectId, name = "In Progress", position = 1),
-            Status(projectObjectId = projectObjectId, name = "In Review", position = 2),
-            Status(projectObjectId = projectObjectId, name = "QA", position = 3),
-            Status(projectObjectId = projectObjectId, name = "Done", isFinal = true, position = 4),
-        )
+    private fun defaultStatuses(projectObjectId: UUID): List<Status> = listOf(
+        Status(projectObjectId = projectObjectId, name = "To Do", position = 0),
+        Status(projectObjectId = projectObjectId, name = "In Progress", position = 1),
+        Status(projectObjectId = projectObjectId, name = "In Review", position = 2),
+        Status(projectObjectId = projectObjectId, name = "QA", position = 3),
+        Status(projectObjectId = projectObjectId, name = "Done", isFinal = true, position = 4),
+    )
 }

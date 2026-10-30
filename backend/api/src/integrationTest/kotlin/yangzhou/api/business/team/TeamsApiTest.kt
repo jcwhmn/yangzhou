@@ -10,21 +10,20 @@ class TeamsApiTest : AbstractApiTest() {
     private fun createMember(
         authed: org.springframework.test.web.servlet.client.RestTestClient,
         name: String,
-    ): String =
-        json
-            .readTree(
-                authed
-                    .post()
-                    .uri("/api/members")
-                    .body(mapOf("displayName" to name))
-                    .exchange()
-                    .expectStatus()
-                    .isCreated()
-                    .expectBody(String::class.java)
-                    .returnResult()
-                    .responseBody!!,
-            )["memberId"]
-            .asText()
+    ): String = json
+        .readTree(
+            authed
+                .post()
+                .uri("/api/members")
+                .body(mapOf("displayName" to name))
+                .exchange()
+                .expectStatus()
+                .isCreated()
+                .expectBody(String::class.java)
+                .returnResult()
+                .responseBody!!,
+        )["memberId"]
+        .asText()
 
     @Test
     fun `建组重名 409,改名可用`() {

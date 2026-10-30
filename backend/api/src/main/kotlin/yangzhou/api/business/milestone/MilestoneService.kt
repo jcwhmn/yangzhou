@@ -56,13 +56,12 @@ class MilestoneService(
         return milestones.findByProjectObjectIdAndObjectId(p.objectId!!, milestoneId) ?: throw NotFoundException("milestone 不存在")
     }
 
-    private fun Milestone.toDto() =
-        MilestoneDto(
-            milestoneId = objectId,
-            name = name,
-            status = status,
-            targetDate = targetDate?.toString(),
-        )
+    private fun Milestone.toDto() = MilestoneDto(
+        milestoneId = objectId,
+        name = name,
+        status = status,
+        targetDate = targetDate?.toString(),
+    )
 
     /** 排序:in_progress 优先,completed/cancelled 末尾(历史);余按 target_date asc nulls last,再按创建序。 */
     fun list(key: String): List<MilestoneDto> {
@@ -122,11 +121,11 @@ class MilestoneService(
                     name = name ?: m.name,
                     status = newStatus,
                     targetDate =
-                        when {
-                            request.targetDate == null -> m.targetDate
-                            request.targetDate.isEmpty() -> null
-                            else -> parseDate(request.targetDate)
-                        },
+                    when {
+                        request.targetDate == null -> m.targetDate
+                        request.targetDate.isEmpty() -> null
+                        else -> parseDate(request.targetDate)
+                    },
                     updatedAt = Instant.now(),
                 ),
             )

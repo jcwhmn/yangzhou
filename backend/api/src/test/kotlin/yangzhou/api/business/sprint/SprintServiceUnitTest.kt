@@ -82,14 +82,13 @@ class SprintServiceUnitTest {
         every { itemService.get(item.objectId) } returns mockk()
     }
 
-    private fun currentRow(groupObjectId: UUID = UUID(0, 55)) =
-        ItemGroupMember(
-            id = 77L,
-            objectId = UUID(0, 77),
-            groupObjectId = groupObjectId,
-            itemObjectId = UUID(0, 9),
-            createdAt = Instant.EPOCH,
-        ) // createdAt 钉死:data class 相等性依赖它
+    private fun currentRow(groupObjectId: UUID = UUID(0, 55)) = ItemGroupMember(
+        id = 77L,
+        objectId = UUID(0, 77),
+        groupObjectId = groupObjectId,
+        itemObjectId = UUID(0, 9),
+        createdAt = Instant.EPOCH,
+    ) // createdAt 钉死:data class 相等性依赖它
 
     private fun stubCurrent(row: ItemGroupMember?) {
         if (row == null) {

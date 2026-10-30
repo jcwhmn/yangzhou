@@ -77,15 +77,14 @@ class GroupTypeService(
 
     private fun ItemGroupType.toDto() = GroupTypeDto(typeKey, name, builtin)
 
-    private fun ItemGroup.toDto(typeKey: String) =
-        GroupDto(
-            groupId = objectId,
-            typeKey = typeKey,
-            name = name,
-            status = status,
-            startDate = startDate?.toString(),
-            endDate = endDate?.toString(),
-        )
+    private fun ItemGroup.toDto(typeKey: String) = GroupDto(
+        groupId = objectId,
+        typeKey = typeKey,
+        name = name,
+        status = status,
+        startDate = startDate?.toString(),
+        endDate = endDate?.toString(),
+    )
 
     private fun customType(
         key: String,
@@ -228,17 +227,17 @@ class GroupTypeService(
                 name = name ?: g.name,
                 status = request.status ?: g.status,
                 startDate =
-                    when {
-                        request.startDate == null -> g.startDate
-                        request.startDate.isEmpty() -> null
-                        else -> parseDate(request.startDate, "startDate")
-                    },
+                when {
+                    request.startDate == null -> g.startDate
+                    request.startDate.isEmpty() -> null
+                    else -> parseDate(request.startDate, "startDate")
+                },
                 endDate =
-                    when {
-                        request.endDate == null -> g.endDate
-                        request.endDate.isEmpty() -> null
-                        else -> parseDate(request.endDate, "endDate")
-                    },
+                when {
+                    request.endDate == null -> g.endDate
+                    request.endDate.isEmpty() -> null
+                    else -> parseDate(request.endDate, "endDate")
+                },
                 updatedAt = Instant.now(),
             )
         return groups.save(updated).toDto(g.type)

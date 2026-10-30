@@ -109,8 +109,7 @@ object MatchingEngine {
     fun rankCandidates(
         item: Item,
         members: List<Member>,
-    ): List<Candidate> =
-        members
-            .map { Candidate(it, matchItem(item, it)) }
-            .sortedWith(compareBy({ it.match.missingCount }, { it.match.totalDelta }))
+    ): List<Candidate> = members
+        .map { Candidate(it, matchItem(item, it)) }
+        .sortedWith(compareBy({ it.match.missingCount }, { it.match.totalDelta }))
 }

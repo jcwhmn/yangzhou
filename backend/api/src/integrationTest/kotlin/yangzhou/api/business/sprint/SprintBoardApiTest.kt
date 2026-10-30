@@ -10,14 +10,13 @@ class SprintBoardApiTest : AbstractApiTest() {
     fun `看板——无 active 返回全量,active 后仅 sprint 内 items,完成后回到全量`() {
         val authed = bootstrapAndAuth()
 
-        fun board(): String =
-            authed
-                .get()
-                .uri("/api/projects/BRD/board")
-                .exchange()
-                .expectBody(String::class.java)
-                .returnResult()
-                .responseBody!!
+        fun board(): String = authed
+            .get()
+            .uri("/api/projects/BRD/board")
+            .exchange()
+            .expectBody(String::class.java)
+            .returnResult()
+            .responseBody!!
         createProject(authed, "BRD")
         val attr = "看板技"
         createSkillAttribute(authed, attr)

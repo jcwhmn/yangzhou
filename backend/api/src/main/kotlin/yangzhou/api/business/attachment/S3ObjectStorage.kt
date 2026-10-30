@@ -44,38 +44,36 @@ class S3ObjectStorage(
     override fun presignPut(
         key: String,
         contentType: String,
-    ): String =
-        presigner
-            .presignPutObject(
-                PutObjectPresignRequest
-                    .builder()
-                    .signatureDuration(SIGN_TTL)
-                    .putObjectRequest(
-                        PutObjectRequest
-                            .builder()
-                            .bucket(bucket)
-                            .key(key)
-                            .contentType(contentType)
-                            .build(),
-                    ).build(),
-            ).url()
-            .toString()
+    ): String = presigner
+        .presignPutObject(
+            PutObjectPresignRequest
+                .builder()
+                .signatureDuration(SIGN_TTL)
+                .putObjectRequest(
+                    PutObjectRequest
+                        .builder()
+                        .bucket(bucket)
+                        .key(key)
+                        .contentType(contentType)
+                        .build(),
+                ).build(),
+        ).url()
+        .toString()
 
-    override fun presignGet(key: String): String =
-        presigner
-            .presignGetObject(
-                GetObjectPresignRequest
-                    .builder()
-                    .signatureDuration(SIGN_TTL)
-                    .getObjectRequest(
-                        GetObjectRequest
-                            .builder()
-                            .bucket(bucket)
-                            .key(key)
-                            .build(),
-                    ).build(),
-            ).url()
-            .toString()
+    override fun presignGet(key: String): String = presigner
+        .presignGetObject(
+            GetObjectPresignRequest
+                .builder()
+                .signatureDuration(SIGN_TTL)
+                .getObjectRequest(
+                    GetObjectRequest
+                        .builder()
+                        .bucket(bucket)
+                        .key(key)
+                        .build(),
+                ).build(),
+        ).url()
+        .toString()
 
     override fun delete(key: String) {
         s3.deleteObject(

@@ -90,8 +90,7 @@ class CapabilityService(
         feasibilityService.recomputeWorkspace() // V9-S1
     }
 
-    private fun definitionNames(): Map<UUID, String> =
-        definitions.findByWorkspaceObjectId(workspaceService.required().objectId!!).associate { it.objectId!! to it.name }
+    private fun definitionNames(): Map<UUID, String> = definitions.findByWorkspaceObjectId(workspaceService.required().objectId!!).associate { it.objectId!! to it.name }
 }
 
 data class UpsertCapabilityRequest(

@@ -142,12 +142,11 @@ class GithubSyncService(
         return items.findByProjectObjectIdAndNumber(project.objectId!!, m.groupValues[2].toInt())
     }
 
-    private fun eventForState(state: String) =
-        when (state) {
-            "open" -> VcsEvent.PR_OPENED.wire
-            "merged" -> VcsEvent.PR_MERGED.wire
-            else -> VcsEvent.PR_CLOSED_UNMERGED.wire
-        }
+    private fun eventForState(state: String) = when (state) {
+        "open" -> VcsEvent.PR_OPENED.wire
+        "merged" -> VcsEvent.PR_MERGED.wire
+        else -> VcsEvent.PR_CLOSED_UNMERGED.wire
+    }
 
     /** 防呆:未配映射忽略;当前 final 封口;只按 position 前进;WIP 超限跳过并留痕。S3 建分支后也走此管道。 */
     fun applyEvent(

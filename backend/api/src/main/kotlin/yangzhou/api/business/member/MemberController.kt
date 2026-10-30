@@ -65,8 +65,7 @@ class MemberController(
     fun upsertCapability(
         @PathVariable memberId: UUID,
         @Valid @RequestBody request: UpsertCapabilityRequest,
-    ): CapabilityService.CapabilityDto =
-        capabilityService.upsertFor(memberService.requireMember(memberId), request.attribute.trim(), request.level)
+    ): CapabilityService.CapabilityDto = capabilityService.upsertFor(memberService.requireMember(memberId), request.attribute.trim(), request.level)
 
     @DeleteMapping("/members/{memberId}/capabilities/{attribute}")
     @ResponseStatus(HttpStatus.NO_CONTENT)

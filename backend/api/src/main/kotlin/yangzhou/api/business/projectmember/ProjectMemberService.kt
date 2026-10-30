@@ -100,8 +100,7 @@ class ProjectMemberService(
     }
 
     /** 池规则共用点(0047 严格化):恒返回池内成员 id;空池 = 无人可指派/无候选。 */
-    fun restrictedPool(projectObjectId: UUID): Set<UUID> =
-        projectMembers.findByProjectObjectId(projectObjectId).mapTo(HashSet()) { it.memberObjectId }
+    fun restrictedPool(projectObjectId: UUID): Set<UUID> = projectMembers.findByProjectObjectId(projectObjectId).mapTo(HashSet()) { it.memberObjectId }
 
     /** 池外指派 fail-fast(409)。 */
     fun assertAssignable(
@@ -111,6 +110,5 @@ class ProjectMemberService(
         if (memberId !in restrictedPool(projectObjectId)) throw ConflictException("该成员不在项目成员中")
     }
 
-    private fun Member.toDto(role: String = ProjectMember.ROLE_MEMBER) =
-        MemberDto(objectId, displayName, virtual = passwordHash == null, role = role)
+    private fun Member.toDto(role: String = ProjectMember.ROLE_MEMBER) = MemberDto(objectId, displayName, virtual = passwordHash == null, role = role)
 }

@@ -418,17 +418,16 @@ class ItemsApiTest : AbstractApiTest() {
         authed: RestTestClient,
         key: String,
         name: String,
-    ): JsonNode =
-        json.readTree(
-            authed
-                .post()
-                .uri("/api/projects/$key/sprints")
-                .body(mapOf("name" to name, "startDate" to "2026-10-01", "endDate" to "2026-10-15"))
-                .exchange()
-                .expectBody(String::class.java)
-                .returnResult()
-                .responseBody!!,
-        )
+    ): JsonNode = json.readTree(
+        authed
+            .post()
+            .uri("/api/projects/$key/sprints")
+            .body(mapOf("name" to name, "startDate" to "2026-10-01", "endDate" to "2026-10-15"))
+            .exchange()
+            .expectBody(String::class.java)
+            .returnResult()
+            .responseBody!!,
+    )
 
     private fun setSprintStatus56(
         authed: RestTestClient,
@@ -448,17 +447,16 @@ class ItemsApiTest : AbstractApiTest() {
     private fun countItems56(
         authed: RestTestClient,
         key: String,
-    ): Int =
-        json
-            .readTree(
-                authed
-                    .get()
-                    .uri("/api/projects/$key/items")
-                    .exchange()
-                    .expectBody(String::class.java)
-                    .returnResult()
-                    .responseBody!!,
-            ).size()
+    ): Int = json
+        .readTree(
+            authed
+                .get()
+                .uri("/api/projects/$key/items")
+                .exchange()
+                .expectBody(String::class.java)
+                .returnResult()
+                .responseBody!!,
+        ).size()
 
     private fun createWithSprint56(
         authed: RestTestClient,

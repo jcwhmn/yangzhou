@@ -127,37 +127,35 @@ abstract class AbstractApiTest {
     protected fun login(
         username: String,
         password: String,
-    ): JsonNode =
-        rest
-            .post()
-            .uri("/api/auth/login")
-            .body(mapOf("username" to username, "password" to password))
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody(String::class.java)
-            .returnResult()
-            .responseBody!!
-            .let { json.readTree(it) }
+    ): JsonNode = rest
+        .post()
+        .uri("/api/auth/login")
+        .body(mapOf("username" to username, "password" to password))
+        .exchange()
+        .expectStatus()
+        .isOk()
+        .expectBody(String::class.java)
+        .returnResult()
+        .responseBody!!
+        .let { json.readTree(it) }
 
     protected fun createSkillAttribute(
         authed: RestTestClient,
         name: String,
         leveled: Boolean = true,
-    ): JsonNode =
-        authed
-            .post()
-            .uri("/api/attributes")
-            .body(mapOf("name" to name, "kind" to "skill", "leveled" to leveled))
-            .exchange()
-            .expectStatus()
-            .isCreated()
-            .expectBody(String::class.java)
-            .returnResult()
-            .let { r ->
-                if (r.status.value() != 201) println("CREATE_FAIL=" + r.responseBody)
-                json.readTree(r.responseBody!!)
-            }
+    ): JsonNode = authed
+        .post()
+        .uri("/api/attributes")
+        .body(mapOf("name" to name, "kind" to "skill", "leveled" to leveled))
+        .exchange()
+        .expectStatus()
+        .isCreated()
+        .expectBody(String::class.java)
+        .returnResult()
+        .let { r ->
+            if (r.status.value() != 201) println("CREATE_FAIL=" + r.responseBody)
+            json.readTree(r.responseBody!!)
+        }
 
     protected fun setCapability(
         authed: RestTestClient,
@@ -175,34 +173,32 @@ abstract class AbstractApiTest {
         authed: RestTestClient,
         key: String,
         name: String = key,
-    ): JsonNode =
-        authed
-            .post()
-            .uri("/api/projects")
-            .body(mapOf("key" to key, "name" to name))
-            .exchange()
-            .expectStatus()
-            .isCreated()
-            .expectBody(String::class.java)
-            .returnResult()
-            .responseBody!!
-            .let { json.readTree(it) }
+    ): JsonNode = authed
+        .post()
+        .uri("/api/projects")
+        .body(mapOf("key" to key, "name" to name))
+        .exchange()
+        .expectStatus()
+        .isCreated()
+        .expectBody(String::class.java)
+        .returnResult()
+        .responseBody!!
+        .let { json.readTree(it) }
 
     /** 0047:创建者(me)自动入池,测试常需要其 memberId。 */
-    protected fun meMemberId(authed: RestTestClient): String =
-        json
-            .readTree(
-                authed
-                    .get()
-                    .uri("/api/members")
-                    .exchange()
-                    .expectStatus()
-                    .isOk()
-                    .expectBody(String::class.java)
-                    .returnResult()
-                    .responseBody!!,
-            ).first { !it["virtual"].asBoolean() }["memberId"]
-            .asText()
+    protected fun meMemberId(authed: RestTestClient): String = json
+        .readTree(
+            authed
+                .get()
+                .uri("/api/members")
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(String::class.java)
+                .returnResult()
+                .responseBody!!,
+        ).first { !it["virtual"].asBoolean() }["memberId"]
+        .asText()
 
     /** 0047:池语义严格化后,指派虚拟成员的用例需先入池。memberId = workspace 成员 objectId。 */
     protected fun addPoolMember(

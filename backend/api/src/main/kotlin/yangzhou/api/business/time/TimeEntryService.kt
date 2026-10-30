@@ -156,22 +156,21 @@ class TimeEntryService(
 
     companion object {
         /** 纯映射:≥2 个带时间戳的 commit 才成段(单 commit 无从定义收工);无日期 commit 忽略。 */
-        fun buildSuggestions(refs: List<GithubCommitService.RefCommitsDto>): List<SuggestedEntry> =
-            refs.mapNotNull { ref ->
-                val dates =
-                    ref.commits
-                        .mapNotNull { c -> c.date?.let { d -> runCatching { Instant.parse(d) }.getOrNull() } }
-                        .sorted()
-                if (dates.size < 2) return@mapNotNull null
-                SuggestedEntry(
-                    repo = ref.repo,
-                    ref = ref.ref,
-                    commitCount = ref.commits.size,
-                    startedAt = dates.first().toString(),
-                    endedAt = dates.last().toString(),
-                    note = "分支 ${ref.ref} · ${ref.commits.size} commits",
-                )
-            }
+        fun buildSuggestions(refs: List<GithubCommitService.RefCommitsDto>): List<SuggestedEntry> = refs.mapNotNull { ref ->
+            val dates =
+                ref.commits
+                    .mapNotNull { c -> c.date?.let { d -> runCatching { Instant.parse(d) }.getOrNull() } }
+                    .sorted()
+            if (dates.size < 2) return@mapNotNull null
+            SuggestedEntry(
+                repo = ref.repo,
+                ref = ref.ref,
+                commitCount = ref.commits.size,
+                startedAt = dates.first().toString(),
+                endedAt = dates.last().toString(),
+                note = "分支 ${ref.ref} · ${ref.commits.size} commits",
+            )
+        }
     }
 
     // ---------- 内部 ----------

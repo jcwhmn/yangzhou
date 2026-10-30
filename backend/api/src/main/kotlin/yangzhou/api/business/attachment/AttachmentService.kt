@@ -95,13 +95,12 @@ class AttachmentService(
             ?: throw NotFoundException("附件不存在")
     }
 
-    private fun Attachment.toResponse() =
-        AttachmentResponse(
-            attachmentId = objectId,
-            filename = filename,
-            contentType = contentType,
-            sizeBytes = sizeBytes,
-        )
+    private fun Attachment.toResponse() = AttachmentResponse(
+        attachmentId = objectId,
+        filename = filename,
+        contentType = contentType,
+        sizeBytes = sizeBytes,
+    )
 }
 
 data class AttachmentResponse(

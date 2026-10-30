@@ -201,9 +201,9 @@ class ItemService(
             ctx.toDto(it).copy(
                 parentNumber = it.parentObjectId?.let(numberById::get),
                 attributes =
-                    attrsByItem[it.objectId].orEmpty().map { a ->
-                        ItemAttributeDto(attrNames[a.attributeDefinitionObjectId] ?: "?", a.value)
-                    },
+                attrsByItem[it.objectId].orEmpty().map { a ->
+                    ItemAttributeDto(attrNames[a.attributeDefinitionObjectId] ?: "?", a.value)
+                },
             )
         }
     }
@@ -217,9 +217,9 @@ class ItemService(
         return ctx.toDto(item).copy(
             parentNumber = parentNumber,
             gitRefs =
-                gitRefs.findByItemObjectId(item.objectId!!).map {
-                    GitRefDto(it.kind, it.repo, it.ref, it.url, it.state)
-                },
+            gitRefs.findByItemObjectId(item.objectId!!).map {
+                GitRefDto(it.kind, it.repo, it.ref, it.url, it.state)
+            },
             attributes = toAttrDtos(itemAttributes.findByItemObjectId(item.objectId!!)),
         )
     }
@@ -314,10 +314,9 @@ class ItemService(
             fun parse(
                 text: String?,
                 field: String,
-            ): LocalDate? =
-                text?.trim()?.ifEmpty { null }?.let {
-                    runCatching { LocalDate.parse(it) }.getOrElse { throw BadRequestException("$field 格式应为 yyyy-MM-dd:$it") }
-                }
+            ): LocalDate? = text?.trim()?.ifEmpty { null }?.let {
+                runCatching { LocalDate.parse(it) }.getOrElse { throw BadRequestException("$field 格式应为 yyyy-MM-dd:$it") }
+            }
             val newStart = parse(startDateText, "startDate")
             val newDue = parse(dueDateText, "dueDate")
             val start = newStart ?: current.startDate
@@ -554,8 +553,7 @@ class ItemService(
     }
 
     /** D3(spec 0052):按 id 直取项目行,替代 findAll().firstOrNull 的整表扫描。 */
-    private fun projectOf(projectObjectId: UUID): yangzhou.persistence.Project =
-        projects.findByObjectId(projectObjectId) ?: throw NotFoundException("项目不存在")
+    private fun projectOf(projectObjectId: UUID): yangzhou.persistence.Project = projects.findByObjectId(projectObjectId) ?: throw NotFoundException("项目不存在")
 
     /** D3(spec 0052):单项目 item 组装上下文,list()/get() 共享。 */
     private fun buildCtx(
@@ -610,35 +608,34 @@ class ItemService(
         private val statusNames = statusById.mapValues { it.value.name }
         private val memberNames = memberMap.mapValues { it.value.displayName }
 
-        fun toDto(item: Item): ItemDto =
-            ItemDto(
-                itemId = item.objectId,
-                number = "${project.key}-${item.number}",
-                title = item.title,
-                description = item.description,
-                type = item.type,
-                status = statusNames[item.statusObjectId]?.let { if (item.deletedAt != null) "[已删除] $it" else it } ?: "?",
-                startDate = item.startDate?.toString(),
-                dueDate = item.dueDate?.toString(),
-                overdue = isOverdue(item.dueDate, LocalDate.now(clock), statusById[item.statusObjectId]?.isFinal == true),
-                feasSignal = item.feasSignal,
-                priority = item.priority,
-                blocked = item.objectId in blockedIds,
-                assignee = item.assigneeObjectId?.let { memberNames[it] },
-                assigneeColor = item.assigneeObjectId?.let { memberMap[it]?.color },
-                dueSoon = isDueSoon(item.dueDate, LocalDate.now(clock)),
-                createdAt = item.createdAt.toString(),
-                sprintId = currentSprint[item.objectId]?.objectId,
-                sprintName = currentSprint[item.objectId]?.name,
-                releaseId = currentRelease[item.objectId]?.objectId,
-                releaseName = currentRelease[item.objectId]?.name,
-                externalRef = item.externalRef,
-                parentItemId = item.parentObjectId,
-                requirements =
-                    reqs.filter { it.itemObjectId == item.objectId }.map {
-                        RequirementDto(attrNames[it.attributeDefinitionObjectId] ?: "?", it.minLevel)
-                    },
-            )
+        fun toDto(item: Item): ItemDto = ItemDto(
+            itemId = item.objectId,
+            number = "${project.key}-${item.number}",
+            title = item.title,
+            description = item.description,
+            type = item.type,
+            status = statusNames[item.statusObjectId]?.let { if (item.deletedAt != null) "[已删除] $it" else it } ?: "?",
+            startDate = item.startDate?.toString(),
+            dueDate = item.dueDate?.toString(),
+            overdue = isOverdue(item.dueDate, LocalDate.now(clock), statusById[item.statusObjectId]?.isFinal == true),
+            feasSignal = item.feasSignal,
+            priority = item.priority,
+            blocked = item.objectId in blockedIds,
+            assignee = item.assigneeObjectId?.let { memberNames[it] },
+            assigneeColor = item.assigneeObjectId?.let { memberMap[it]?.color },
+            dueSoon = isDueSoon(item.dueDate, LocalDate.now(clock)),
+            createdAt = item.createdAt.toString(),
+            sprintId = currentSprint[item.objectId]?.objectId,
+            sprintName = currentSprint[item.objectId]?.name,
+            releaseId = currentRelease[item.objectId]?.objectId,
+            releaseName = currentRelease[item.objectId]?.name,
+            externalRef = item.externalRef,
+            parentItemId = item.parentObjectId,
+            requirements =
+            reqs.filter { it.itemObjectId == item.objectId }.map {
+                RequirementDto(attrNames[it.attributeDefinitionObjectId] ?: "?", it.minLevel)
+            },
+        )
     }
 
     private fun resolveRequirements(

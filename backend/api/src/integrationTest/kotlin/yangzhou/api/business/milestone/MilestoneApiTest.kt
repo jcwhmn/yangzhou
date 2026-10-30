@@ -45,16 +45,15 @@ class MilestoneApiTest : AbstractApiTest() {
     private fun list(
         authed: RestTestClient,
         key: String,
-    ): JsonNode =
-        json.readTree(
-            authed
-                .get()
-                .uri("/api/projects/$key/milestones")
-                .exchange()
-                .expectBody(String::class.java)
-                .returnResult()
-                .responseBody!!,
-        )
+    ): JsonNode = json.readTree(
+        authed
+            .get()
+            .uri("/api/projects/$key/milestones")
+            .exchange()
+            .expectBody(String::class.java)
+            .returnResult()
+            .responseBody!!,
+    )
 
     @Test
     fun `CRUD 与字段校验`() {

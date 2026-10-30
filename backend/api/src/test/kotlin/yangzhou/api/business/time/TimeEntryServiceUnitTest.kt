@@ -197,14 +197,13 @@ class TimeEntryServiceUnitTest {
 
     @Nested
     inner class BuildSuggestions {
-        private fun commit(date: String?) =
-            GithubCommitService.CommitDto(
-                sha = "abc",
-                message = "m",
-                author = "a",
-                date = date,
-                url = null,
-            )
+        private fun commit(date: String?) = GithubCommitService.CommitDto(
+            sha = "abc",
+            message = "m",
+            author = "a",
+            date = date,
+            url = null,
+        )
 
         @Test
         fun `少于 2 个有效 commit 剔除`() {
@@ -223,12 +222,12 @@ class TimeEntryServiceUnitTest {
                         "r",
                         "YPJ-7-x",
                         commits =
-                            listOf(
-                                commit("2026-10-07T16:00:00Z"),
-                                commit("2026-10-07T14:00:00Z"),
-                                commit("bad-date"),
-                                commit(null),
-                            ),
+                        listOf(
+                            commit("2026-10-07T16:00:00Z"),
+                            commit("2026-10-07T14:00:00Z"),
+                            commit("bad-date"),
+                            commit(null),
+                        ),
                     ),
                 )
 

@@ -367,14 +367,14 @@ class MetricsService(
             definitions = mapOf("cycle" to D_CYCLE, "lead" to D_LEAD, "percentiles" to D_PCT),
             items = flows,
             percentiles =
-                PercentilesDto(
-                    cycleP50 = percentile(cycles, 50.0),
-                    cycleP85 = percentile(cycles, 85.0),
-                    cycleP95 = percentile(cycles, 95.0),
-                    leadP50 = percentile(leads, 50.0),
-                    leadP85 = percentile(leads, 85.0),
-                    leadP95 = percentile(leads, 95.0),
-                ),
+            PercentilesDto(
+                cycleP50 = percentile(cycles, 50.0),
+                cycleP85 = percentile(cycles, 85.0),
+                cycleP95 = percentile(cycles, 95.0),
+                leadP50 = percentile(leads, 50.0),
+                leadP85 = percentile(leads, 85.0),
+                leadP95 = percentile(leads, 95.0),
+            ),
             noCycleCount = flows.size - cycles.size,
         )
     }
@@ -606,12 +606,11 @@ class MetricsService(
         return from to to
     }
 
-    private fun parseInstant(s: String): Instant =
-        try {
-            Instant.parse(s)
-        } catch (e: DateTimeParseException) {
-            throw BadRequestException("时间须为 ISO-8601 Instant:$s")
-        }
+    private fun parseInstant(s: String): Instant = try {
+        Instant.parse(s)
+    } catch (e: DateTimeParseException) {
+        throw BadRequestException("时间须为 ISO-8601 Instant:$s")
+    }
 
     /** groupObjectId 限定时的成员 item 内部 id 集;null = 全项目。 */
     private fun memberItemObjectIds(
@@ -648,8 +647,7 @@ class MetricsService(
     private fun findGroup(
         key: String,
         groupObjectId: UUID,
-    ): MetricsGroupRow =
-        repo.groups(key, null).find { it.groupObjectId == groupObjectId } ?: throw NotFoundException("sprint 不存在:$groupObjectId")
+    ): MetricsGroupRow = repo.groups(key, null).find { it.groupObjectId == groupObjectId } ?: throw NotFoundException("sprint 不存在:$groupObjectId")
 
     /** (group, 各成员加入时刻, 各成员首次完成时刻)。 */
     private fun sprintData(

@@ -73,14 +73,13 @@ class SprintService(
         return groups.findByProjectObjectIdAndObjectId(p.objectId!!, groupObjectId) ?: throw NotFoundException("sprint 不存在")
     }
 
-    private fun ItemGroup.toDto() =
-        SprintDto(
-            sprintId = objectId,
-            name = name,
-            status = status,
-            startDate = startDate?.toString(),
-            endDate = endDate?.toString(),
-        )
+    private fun ItemGroup.toDto() = SprintDto(
+        sprintId = objectId,
+        name = name,
+        status = status,
+        startDate = startDate?.toString(),
+        endDate = endDate?.toString(),
+    )
 
     private fun parseDate(
         text: String?,
@@ -140,17 +139,17 @@ class SprintService(
                 name = name ?: g.name,
                 status = request.status ?: g.status,
                 startDate =
-                    when {
-                        request.startDate == null -> g.startDate
-                        request.startDate.isEmpty() -> null
-                        else -> parseDate(request.startDate, "startDate")
-                    },
+                when {
+                    request.startDate == null -> g.startDate
+                    request.startDate.isEmpty() -> null
+                    else -> parseDate(request.startDate, "startDate")
+                },
                 endDate =
-                    when {
-                        request.endDate == null -> g.endDate
-                        request.endDate.isEmpty() -> null
-                        else -> parseDate(request.endDate, "endDate")
-                    },
+                when {
+                    request.endDate == null -> g.endDate
+                    request.endDate.isEmpty() -> null
+                    else -> parseDate(request.endDate, "endDate")
+                },
                 updatedAt = Instant.now(),
             )
         return groups.save(updated).toDto()

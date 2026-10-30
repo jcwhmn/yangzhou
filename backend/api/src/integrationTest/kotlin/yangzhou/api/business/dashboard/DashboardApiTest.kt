@@ -66,32 +66,30 @@ class DashboardApiTest : AbstractApiTest() {
         authed: RestTestClient,
         uri: String,
         body: Map<String, Any?>,
-    ): JsonNode =
-        json.readTree(
+    ): JsonNode = json.readTree(
+        authed
+            .post()
+            .uri(uri)
+            .body(body)
+            .exchange()
+            .expectStatus()
+            .isCreated()
+            .expectBody(String::class.java)
+            .returnResult()
+            .responseBody!!,
+    )
+
+    private fun meId(authed: RestTestClient): String = json
+        .readTree(
             authed
-                .post()
-                .uri(uri)
-                .body(body)
+                .get()
+                .uri("/api/members")
                 .exchange()
                 .expectStatus()
-                .isCreated()
+                .isOk()
                 .expectBody(String::class.java)
                 .returnResult()
                 .responseBody!!,
-        )
-
-    private fun meId(authed: RestTestClient): String =
-        json
-            .readTree(
-                authed
-                    .get()
-                    .uri("/api/members")
-                    .exchange()
-                    .expectStatus()
-                    .isOk()
-                    .expectBody(String::class.java)
-                    .returnResult()
-                    .responseBody!!,
-            ).first { !it["virtual"].asBoolean() }["memberId"]
-            .asText()
+        ).first { !it["virtual"].asBoolean() }["memberId"]
+        .asText()
 }

@@ -72,17 +72,17 @@ class FeasibilityService(
             missingCount = rollup.results.sumOf { it.second.missingCount },
             totalDelta = rollup.results.sumOf { it.second.totalDelta },
             items =
-                rollup.results.map { (item, match) ->
-                    ItemResultDto(
-                        itemId = byNumber[item.id]!!.objectId,
-                        number = item.id,
-                        title = item.title,
-                        signal = match.worst.name,
-                        missingCount = match.missingCount,
-                        totalDelta = match.totalDelta,
-                        verdicts = match.verdicts.map { it.toDto() },
-                    )
-                },
+            rollup.results.map { (item, match) ->
+                ItemResultDto(
+                    itemId = byNumber[item.id]!!.objectId,
+                    number = item.id,
+                    title = item.title,
+                    signal = match.worst.name,
+                    missingCount = match.missingCount,
+                    totalDelta = match.totalDelta,
+                    verdicts = match.verdicts.map { it.toDto() },
+                )
+            },
         )
     }
 
@@ -210,12 +210,11 @@ class FeasibilityService(
         return yangzhou.domain.Item(number, item.title, reqs)
     }
 
-    private fun Verdict.toDto() =
-        when (this) {
-            is Verdict.Satisfied -> VerdictDto("satisfied", attribute.name)
-            is Verdict.Surplus -> VerdictDto("surplus", attribute.name)
-            is Verdict.Gap -> VerdictDto("gap", attribute.name, delta, required, actual)
-            is Verdict.Unrated -> VerdictDto("unrated", attribute.name, null, required, null)
-            is Verdict.Missing -> VerdictDto("missing", attribute.name)
-        }
+    private fun Verdict.toDto() = when (this) {
+        is Verdict.Satisfied -> VerdictDto("satisfied", attribute.name)
+        is Verdict.Surplus -> VerdictDto("surplus", attribute.name)
+        is Verdict.Gap -> VerdictDto("gap", attribute.name, delta, required, actual)
+        is Verdict.Unrated -> VerdictDto("unrated", attribute.name, null, required, null)
+        is Verdict.Missing -> VerdictDto("missing", attribute.name)
+    }
 }

@@ -59,12 +59,11 @@ class AuthService(
         return tokenFor(member)
     }
 
-    private fun tokenFor(member: Member) =
-        TokenResponse(
-            token = jwt.generate(member.objectId.toString()),
-            memberId = member.objectId.toString(),
-            username = member.username ?: member.displayName,
-        )
+    private fun tokenFor(member: Member) = TokenResponse(
+        token = jwt.generate(member.objectId.toString()),
+        memberId = member.objectId.toString(),
+        username = member.username ?: member.displayName,
+    )
 }
 
 data class BootstrapRequest(

@@ -46,16 +46,15 @@ class SprintApiTest : AbstractApiTest() {
         authed: RestTestClient,
         key: String,
         path: String,
-    ): JsonNode =
-        json.readTree(
-            authed
-                .get()
-                .uri("/api/projects/$key/$path")
-                .exchange()
-                .expectBody(String::class.java)
-                .returnResult()
-                .responseBody!!,
-        )
+    ): JsonNode = json.readTree(
+        authed
+            .get()
+            .uri("/api/projects/$key/$path")
+            .exchange()
+            .expectBody(String::class.java)
+            .returnResult()
+            .responseBody!!,
+    )
 
     @Test
     fun `sprint CRUD 与校验`() {

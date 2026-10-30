@@ -112,36 +112,34 @@ class StandupApiTest : AbstractApiTest() {
         assertTrue(hers["doneYesterday"].size() == 0)
     }
 
-    private fun meId(authed: org.springframework.test.web.servlet.client.RestTestClient): String =
-        json
-            .readTree(
-                authed
-                    .get()
-                    .uri("/api/members")
-                    .exchange()
-                    .expectStatus()
-                    .isOk()
-                    .expectBody(String::class.java)
-                    .returnResult()
-                    .responseBody!!,
-            ).first { !it["virtual"].asBoolean() }["memberId"]
-            .asText()
+    private fun meId(authed: org.springframework.test.web.servlet.client.RestTestClient): String = json
+        .readTree(
+            authed
+                .get()
+                .uri("/api/members")
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(String::class.java)
+                .returnResult()
+                .responseBody!!,
+        ).first { !it["virtual"].asBoolean() }["memberId"]
+        .asText()
 
     private fun memberIdOf(
         authed: org.springframework.test.web.servlet.client.RestTestClient,
         name: String,
-    ): String =
-        json
-            .readTree(
-                authed
-                    .get()
-                    .uri("/api/members")
-                    .exchange()
-                    .expectStatus()
-                    .isOk()
-                    .expectBody(String::class.java)
-                    .returnResult()
-                    .responseBody!!,
-            ).first { it["displayName"].asText() == name }["memberId"]
-            .asText()
+    ): String = json
+        .readTree(
+            authed
+                .get()
+                .uri("/api/members")
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(String::class.java)
+                .returnResult()
+                .responseBody!!,
+        ).first { it["displayName"].asText() == name }["memberId"]
+        .asText()
 }

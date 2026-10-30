@@ -20,8 +20,7 @@ class TimeEntryController(
     fun create(
         @PathVariable itemId: UUID,
         @RequestBody request: CreateTimeEntryRequest,
-    ): TimeEntryService.TimeEntryDto =
-        service.create(itemId, request.minutes, request.startedAt, request.endedAt, request.note?.takeIf { it.isNotBlank() })
+    ): TimeEntryService.TimeEntryDto = service.create(itemId, request.minutes, request.startedAt, request.endedAt, request.note?.takeIf { it.isNotBlank() })
 
     @PostMapping("/time-entries/{entryId}/stop")
     fun stop(

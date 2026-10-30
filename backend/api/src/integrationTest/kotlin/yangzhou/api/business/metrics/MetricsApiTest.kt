@@ -108,8 +108,7 @@ class MetricsApiTest : AbstractApiTest() {
         return itemId
     }
 
-    private fun statusInternalId(name: String): java.util.UUID =
-        jdbc.queryForObject("select object_id from status where object_id = ?::uuid", java.util.UUID::class.java, status[name])
+    private fun statusInternalId(name: String): java.util.UUID = jdbc.queryForObject("select object_id from status where object_id = ?::uuid", java.util.UUID::class.java, status[name])
 
     private fun seedAll() {
         newItem(
@@ -429,12 +428,11 @@ class MetricsApiTest : AbstractApiTest() {
         val id = createItem(authed, "MTR", "留痕")["itemId"].asText()
         val iid = jdbc.queryForObject("select object_id from item where object_id = ?::uuid", java.util.UUID::class.java, id)
 
-        fun rows(openOnly: Boolean): Int =
-            jdbc.queryForObject(
-                "select count(*) from item_group_member_history where item_object_id = ? ${if (openOnly) "and removed_at is null" else ""}",
-                Int::class.java,
-                iid,
-            )
+        fun rows(openOnly: Boolean): Int = jdbc.queryForObject(
+            "select count(*) from item_group_member_history where item_object_id = ? ${if (openOnly) "and removed_at is null" else ""}",
+            Int::class.java,
+            iid,
+        )
         put("/api/items/$id/sprint", mapOf("sprintId" to s1))
         assertEquals(1, rows(false))
         assertEquals(1, rows(true)) // 加入:S1 在册

@@ -159,17 +159,16 @@ class ItemServiceUnitTest {
 
     private var row: Item = newItem()
 
-    private fun newItem() =
-        Item(
-            id = 999,
-            objectId = itemOid,
-            projectObjectId = projectObjectId,
-            number = 37,
-            title = "新 item",
-            type = "task",
-            statusObjectId = startStatus.objectId,
-            createdByObjectId = me.objectId,
-        )
+    private fun newItem() = Item(
+        id = 999,
+        objectId = itemOid,
+        projectObjectId = projectObjectId,
+        number = 37,
+        title = "新 item",
+        type = "task",
+        statusObjectId = startStatus.objectId,
+        createdByObjectId = me.objectId,
+    )
 
     private fun create(
         title: String = "新 item",

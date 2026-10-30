@@ -81,12 +81,11 @@ class ProjectService(
         return get(key)
     }
 
-    fun list(): List<ProjectDto> =
-        projects.findAll().map { it.key }.mapNotNull { key ->
-            runCatching { get(key) }
-                .onFailure { log.warn("项目组装失败,列表中跳过 key={}", key, it) }
-                .getOrNull()
-        }
+    fun list(): List<ProjectDto> = projects.findAll().map { it.key }.mapNotNull { key ->
+        runCatching { get(key) }
+            .onFailure { log.warn("项目组装失败,列表中跳过 key={}", key, it) }
+            .getOrNull()
+    }
 
     fun get(key: String): ProjectDto {
         val project = projects.findByKey(key) ?: throw NotFoundException("项目不存在:$key")
@@ -164,23 +163,22 @@ class ProjectService(
             return depth
         }
 
-        fun walk(parent: UUID?): List<GanttRow> =
-            (byParent[parent] ?: emptyList()).sortedBy { it.number }.flatMap { item ->
-                val status = statusById[item.statusObjectId]
-                val row =
-                    GanttRow(
-                        itemId = item.objectId,
-                        parentItemId = item.parentObjectId,
-                        number = "${project.key}-${item.number}",
-                        title = item.title,
-                        startDate = item.startDate?.toString(),
-                        dueDate = item.dueDate?.toString(),
-                        statusName = status?.name ?: "?",
-                        overdue = item.dueDate?.let { it < today } == true && status?.isFinal != true,
-                        depth = depthOf(item),
-                    )
-                listOf(row) + walk(item.objectId)
-            }
+        fun walk(parent: UUID?): List<GanttRow> = (byParent[parent] ?: emptyList()).sortedBy { it.number }.flatMap { item ->
+            val status = statusById[item.statusObjectId]
+            val row =
+                GanttRow(
+                    itemId = item.objectId,
+                    parentItemId = item.parentObjectId,
+                    number = "${project.key}-${item.number}",
+                    title = item.title,
+                    startDate = item.startDate?.toString(),
+                    dueDate = item.dueDate?.toString(),
+                    statusName = status?.name ?: "?",
+                    overdue = item.dueDate?.let { it < today } == true && status?.isFinal != true,
+                    depth = depthOf(item),
+                )
+            listOf(row) + walk(item.objectId)
+        }
 
         return GanttDto(rows = walk(null))
     }
@@ -211,24 +209,22 @@ class ProjectService(
         }
     }
 
-    private fun defaultStatuses(projectId: UUID) =
-        listOf( // V7:5 列(评审环节天然有位置);存量项目不动
-            Status(projectObjectId = projectId, name = "To Do", isStart = true, position = 0),
-            Status(projectObjectId = projectId, name = "In Progress", position = 1),
-            Status(projectObjectId = projectId, name = "In Review", position = 2),
-            Status(projectObjectId = projectId, name = "QA", position = 3),
-            Status(projectObjectId = projectId, name = "Done", isFinal = true, position = 4),
-        )
+    private fun defaultStatuses(projectId: UUID) = listOf( // V7:5 列(评审环节天然有位置);存量项目不动
+        Status(projectObjectId = projectId, name = "To Do", isStart = true, position = 0),
+        Status(projectObjectId = projectId, name = "In Progress", position = 1),
+        Status(projectObjectId = projectId, name = "In Review", position = 2),
+        Status(projectObjectId = projectId, name = "QA", position = 3),
+        Status(projectObjectId = projectId, name = "Done", isFinal = true, position = 4),
+    )
 
     companion object {
         /** YPJ-40 方案 A 的推导核心(纯函数,单测直测):branch→首个非 start、pr_open→次个非 start(无则不种=人管)、pr_merged→首个 final;缺失即不种,非标 workflow 开箱有定义。 */
-        fun defaultRuleSeeds(statuses: List<Status>): List<Pair<VcsEvent, Status>> =
-            buildList {
-                val nonStart = statuses.filter { !it.isStart }
-                nonStart.firstOrNull()?.let { add(VcsEvent.BRANCH_CREATED to it) }
-                nonStart.getOrNull(1)?.let { add(VcsEvent.PR_OPENED to it) }
-                statuses.firstOrNull { it.isFinal }?.let { add(VcsEvent.PR_MERGED to it) }
-            }
+        fun defaultRuleSeeds(statuses: List<Status>): List<Pair<VcsEvent, Status>> = buildList {
+            val nonStart = statuses.filter { !it.isStart }
+            nonStart.firstOrNull()?.let { add(VcsEvent.BRANCH_CREATED to it) }
+            nonStart.getOrNull(1)?.let { add(VcsEvent.PR_OPENED to it) }
+            statuses.firstOrNull { it.isFinal }?.let { add(VcsEvent.PR_MERGED to it) }
+        }
     }
 }
 

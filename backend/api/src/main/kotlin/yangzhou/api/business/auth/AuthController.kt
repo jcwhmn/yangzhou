@@ -16,8 +16,7 @@ class AuthController(
     @PostMapping("/auth/bootstrap")
     fun bootstrap(
         @Valid @RequestBody request: BootstrapRequest,
-    ): ResponseEntity<AuthService.TokenResponse> =
-        ResponseEntity.status(HttpStatus.CREATED).body(authService.bootstrap(request.username, request.password))
+    ): ResponseEntity<AuthService.TokenResponse> = ResponseEntity.status(HttpStatus.CREATED).body(authService.bootstrap(request.username, request.password))
 
     @PostMapping("/auth/login")
     fun login(

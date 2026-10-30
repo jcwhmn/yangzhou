@@ -52,33 +52,30 @@ class ItemStatusHistoryApiTest : AbstractApiTest() {
         return createItem(authed, "CHE", "hist-x")["itemId"].asText()
     }
 
-    private fun statuses(): JsonNode =
-        json.readTree(
-            authed
-                .get()
-                .uri("/api/projects/CHE")
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody(String::class.java)
-                .returnResult()
-                .responseBody!!,
-        )["statuses"]
+    private fun statuses(): JsonNode = json.readTree(
+        authed
+            .get()
+            .uri("/api/projects/CHE")
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody(String::class.java)
+            .returnResult()
+            .responseBody!!,
+    )["statuses"]
 
     private fun statusId(name: String): String = statuses().first { it["name"].asText() == name }["statusId"].asText()
 
-    private fun statusRowId(name: String): java.util.UUID =
-        jdbc.queryForList(
-            "select object_id from status where name = ? and project_object_id = (select object_id from project where key = 'CHE')",
-            name,
-        )[0]["object_id"] as java.util.UUID
+    private fun statusRowId(name: String): java.util.UUID = jdbc.queryForList(
+        "select object_id from status where name = ? and project_object_id = (select object_id from project where key = 'CHE')",
+        name,
+    )[0]["object_id"] as java.util.UUID
 
-    private fun history(title: String = "hist-x"): List<Map<String, Any?>> =
-        jdbc.queryForList(
-            "select h.from_status_object_id, h.to_status_object_id, h.source, h.actor_member_object_id " +
-                "from item_status_history h where h.item_object_id = (select object_id from item where title = ?) order by h.id",
-            title,
-        )
+    private fun history(title: String = "hist-x"): List<Map<String, Any?>> = jdbc.queryForList(
+        "select h.from_status_object_id, h.to_status_object_id, h.source, h.actor_member_object_id " +
+            "from item_status_history h where h.item_object_id = (select object_id from item where title = ?) order by h.id",
+        title,
+    )
 
     @Test
     fun `create 即留初始行——manual 迁移留行——同状态 no-op 不写`() {

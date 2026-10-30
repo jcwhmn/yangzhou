@@ -71,10 +71,9 @@ class GithubConfigService(
         val repo: String,
     )
 
-    fun listRepos(projectKey: String): List<RepoDto> =
-        requireProject(projectKey).let { p ->
-            repos.findByProjectObjectId(p.objectId!!).map { RepoDto(it.objectId, it.repo) }
-        }
+    fun listRepos(projectKey: String): List<RepoDto> = requireProject(projectKey).let { p ->
+        repos.findByProjectObjectId(p.objectId!!).map { RepoDto(it.objectId, it.repo) }
+    }
 
     @Transactional
     fun addRepo(

@@ -11,21 +11,20 @@ class ProjectMembersApiTest : AbstractApiTest() {
     private fun addWorkspaceMember(
         authed: RestTestClient,
         name: String,
-    ): String =
-        json
-            .readTree(
-                authed
-                    .post()
-                    .uri("/api/members")
-                    .body(mapOf("displayName" to name))
-                    .exchange()
-                    .expectStatus()
-                    .isCreated()
-                    .expectBody(String::class.java)
-                    .returnResult()
-                    .responseBody!!,
-            )["memberId"]
-            .asText()
+    ): String = json
+        .readTree(
+            authed
+                .post()
+                .uri("/api/members")
+                .body(mapOf("displayName" to name))
+                .exchange()
+                .expectStatus()
+                .isCreated()
+                .expectBody(String::class.java)
+                .returnResult()
+                .responseBody!!,
+        )["memberId"]
+        .asText()
 
     private fun post(
         authed: RestTestClient,
@@ -80,20 +79,19 @@ class ProjectMembersApiTest : AbstractApiTest() {
     private fun candidateIds(
         authed: RestTestClient,
         itemId: String,
-    ): Set<String> =
-        json
-            .readTree(
-                authed
-                    .get()
-                    .uri("/api/items/$itemId/candidates")
-                    .exchange()
-                    .expectStatus()
-                    .isOk()
-                    .expectBody(String::class.java)
-                    .returnResult()
-                    .responseBody!!,
-            ).map { it["memberId"].asText() }
-            .toSet()
+    ): Set<String> = json
+        .readTree(
+            authed
+                .get()
+                .uri("/api/items/$itemId/candidates")
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(String::class.java)
+                .returnResult()
+                .responseBody!!,
+        ).map { it["memberId"].asText() }
+        .toSet()
 
     /** fixture:项目 CHE + 两名虚拟成员(小李/小王)+ 属性 Java。 */
     private fun seed(): Triple<RestTestClient, String, String> {

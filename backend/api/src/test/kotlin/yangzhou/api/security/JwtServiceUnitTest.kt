@@ -7,10 +7,9 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 class JwtServiceUnitTest {
-    private fun env(vararg profiles: String): MockEnvironment =
-        MockEnvironment().apply {
-            setActiveProfiles(*profiles)
-        }
+    private fun env(vararg profiles: String): MockEnvironment = MockEnvironment().apply {
+        setActiveProfiles(*profiles)
+    }
 
     @Test
     fun `默认密钥且非 test profile,启动即拒`() {

@@ -68,12 +68,11 @@ class CandidateService(
         }
     }
 
-    private fun Verdict.toDto() =
-        when (this) {
-            is Verdict.Satisfied -> VerdictDto("satisfied", attribute.name)
-            is Verdict.Surplus -> VerdictDto("surplus", attribute.name)
-            is Verdict.Gap -> VerdictDto("gap", attribute.name, delta, required, actual)
-            is Verdict.Unrated -> VerdictDto("unrated", attribute.name, null, required, null)
-            is Verdict.Missing -> VerdictDto("missing", attribute.name)
-        }
+    private fun Verdict.toDto() = when (this) {
+        is Verdict.Satisfied -> VerdictDto("satisfied", attribute.name)
+        is Verdict.Surplus -> VerdictDto("surplus", attribute.name)
+        is Verdict.Gap -> VerdictDto("gap", attribute.name, delta, required, actual)
+        is Verdict.Unrated -> VerdictDto("unrated", attribute.name, null, required, null)
+        is Verdict.Missing -> VerdictDto("missing", attribute.name)
+    }
 }

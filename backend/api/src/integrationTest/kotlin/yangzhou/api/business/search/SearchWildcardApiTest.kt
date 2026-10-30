@@ -10,17 +10,16 @@ class SearchWildcardApiTest : AbstractApiTest() {
     private fun search(
         authed: RestTestClient,
         q: String,
-    ): Int =
-        authed
-            .get()
-            .uri { b -> b.path("/api/search").queryParam("q", q).build() }
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody(String::class.java)
-            .returnResult()
-            .responseBody!!
-            .let { json.readTree(it).size() }
+    ): Int = authed
+        .get()
+        .uri { b -> b.path("/api/search").queryParam("q", q).build() }
+        .exchange()
+        .expectStatus()
+        .isOk()
+        .expectBody(String::class.java)
+        .returnResult()
+        .responseBody!!
+        .let { json.readTree(it).size() }
 
     @Test
     fun `标题含百分号——按字面命中,不过度匹配`() {

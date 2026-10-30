@@ -20,18 +20,16 @@ import java.util.UUID
 @EnableJdbcAuditing(dateTimeProviderRef = "auditingDateTimeProvider")
 class AuditingConfig {
     @Bean
-    fun auditorProvider(members: MemberService): AuditorAware<UUID> =
-        AuditorAware {
-            try {
-                Optional.of(members.current().objectId)
-            } catch (_: Exception) {
-                Optional.empty()
-            }
+    fun auditorProvider(members: MemberService): AuditorAware<UUID> = AuditorAware {
+        try {
+            Optional.of(members.current().objectId)
+        } catch (_: Exception) {
+            Optional.empty()
         }
+    }
 
     @Bean
-    fun auditingDateTimeProvider(clock: Clock): DateTimeProvider =
-        DateTimeProvider {
-            Optional.of(OffsetDateTime.now(clock))
-        }
+    fun auditingDateTimeProvider(clock: Clock): DateTimeProvider = DateTimeProvider {
+        Optional.of(OffsetDateTime.now(clock))
+    }
 }

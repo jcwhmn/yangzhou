@@ -53,14 +53,12 @@ class MemberService(
     }
 
     /** 登录成员 = 唯一有凭据者(虚拟成员出现后,findAll().first() 不再可靠)。 */
-    fun current(): Member =
-        members.findAll().firstOrNull { it.passwordHash != null }
-            ?: throw NotFoundException("尚未初始化,请先 bootstrap")
+    fun current(): Member = members.findAll().firstOrNull { it.passwordHash != null }
+        ?: throw NotFoundException("尚未初始化,请先 bootstrap")
 
-    fun list(): List<MemberResponse> =
-        members
-            .findByWorkspaceObjectId(workspaceService.required().objectId!!)
-            .map { it.toResponse() }
+    fun list(): List<MemberResponse> = members
+        .findByWorkspaceObjectId(workspaceService.required().objectId!!)
+        .map { it.toResponse() }
 
     /** 建虚拟成员:纯数据人,无凭据无登录;能力自评走 /api/members/{id}/capabilities。 */
     @Transactional
@@ -150,14 +148,13 @@ class MemberService(
         return saved.toResponse()
     }
 
-    private fun Member.toResponse() =
-        MemberResponse(
-            objectId,
-            displayName,
-            username,
-            virtual = passwordHash == null,
-            githubUsername = githubUsername,
-            color = color,
-            lastProjectKey = lastProjectKey,
-        )
+    private fun Member.toResponse() = MemberResponse(
+        objectId,
+        displayName,
+        username,
+        virtual = passwordHash == null,
+        githubUsername = githubUsername,
+        color = color,
+        lastProjectKey = lastProjectKey,
+    )
 }

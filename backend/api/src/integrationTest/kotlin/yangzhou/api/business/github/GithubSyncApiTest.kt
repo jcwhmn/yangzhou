@@ -123,46 +123,43 @@ class GithubSyncApiTest : AbstractApiTest() {
         return createItem(authed, "CHE", "x")["itemId"].asText() // CHE-1,To Do
     }
 
-    private fun statuses0(): JsonNode =
-        json.readTree(
-            authed
-                .get()
-                .uri("/api/projects/CHE")
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody(String::class.java)
-                .returnResult()
-                .responseBody!!,
-        )["statuses"]
+    private fun statuses0(): JsonNode = json.readTree(
+        authed
+            .get()
+            .uri("/api/projects/CHE")
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody(String::class.java)
+            .returnResult()
+            .responseBody!!,
+    )["statuses"]
 
-    private fun items(): JsonNode =
-        json.readTree(
-            authed
-                .get()
-                .uri("/api/projects/CHE/items")
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody(String::class.java)
-                .returnResult()
-                .responseBody!!,
-        )
+    private fun items(): JsonNode = json.readTree(
+        authed
+            .get()
+            .uri("/api/projects/CHE/items")
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody(String::class.java)
+            .returnResult()
+            .responseBody!!,
+    )
 
     private fun statusOf(itemId: String): String = items().first { it["itemId"].asText() == itemId }["status"].asText()
 
-    private fun activities(itemId: String): JsonNode =
-        json.readTree(
-            authed
-                .get()
-                .uri("/api/items/$itemId/activity")
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody(String::class.java)
-                .returnResult()
-                .responseBody!!,
-        )
+    private fun activities(itemId: String): JsonNode = json.readTree(
+        authed
+            .get()
+            .uri("/api/items/$itemId/activity")
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody(String::class.java)
+            .returnResult()
+            .responseBody!!,
+    )
 
     @Test
     fun `branch_created 命中映射——手工分支同样关联——重复轮询幂等`() {
@@ -307,9 +304,8 @@ class GithubSyncApiTest : AbstractApiTest() {
         assertEquals(2, prRows().map { it["oid"] }.toSet().size)
     }
 
-    private fun prRows(): List<Map<String, Any>> =
-        jdbc.queryForList(
-            "select ir.item_object_id, i.object_id as oid, ir.state from item_git_ref ir " +
-                "join item i on i.object_id = ir.item_object_id where ir.kind = 'pr'",
-        )
+    private fun prRows(): List<Map<String, Any>> = jdbc.queryForList(
+        "select ir.item_object_id, i.object_id as oid, ir.state from item_git_ref ir " +
+            "join item i on i.object_id = ir.item_object_id where ir.kind = 'pr'",
+    )
 }
