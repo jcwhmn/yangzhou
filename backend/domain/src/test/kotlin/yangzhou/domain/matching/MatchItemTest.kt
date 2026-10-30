@@ -9,22 +9,24 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class MatchItemTest {
-
-    private val me = Member(
-        name = "我",
-        capabilities = listOf(
-            Capability(Attribute("Java"), 4),
-            Capability(Attribute("架构"), 1),
-        ),
-    )
+    private val me =
+        Member(
+            name = "我",
+            capabilities =
+                listOf(
+                    Capability(Attribute("Java"), 4),
+                    Capability(Attribute("架构"), 1),
+                ),
+        )
 
     @Test
     fun `JCW-30 surplus plus gap yields yellow`() {
-        val item = Item(
-            id = "JCW-30",
-            title = "Apply architecture decisions to Auth/PlayerConfig baseline",
-            requirements = listOf(Requirement(Attribute("Java"), 3), Requirement(Attribute("架构"), 2)),
-        )
+        val item =
+            Item(
+                id = "JCW-30",
+                title = "Apply architecture decisions to Auth/PlayerConfig baseline",
+                requirements = listOf(Requirement(Attribute("Java"), 3), Requirement(Attribute("架构"), 2)),
+            )
         val r = MatchingEngine.matchItem(item, me)
         assertEquals(2, r.verdicts.size)
         assertEquals(0, r.missingCount)

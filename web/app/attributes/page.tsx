@@ -53,9 +53,16 @@ export default function AttributesPage() {
     e.preventDefault();
     setError("");
     try {
-      const body: Record<string, unknown> = { name: name.trim(), kind, leveled: kind === "skill" && leveled };
+      const body: Record<string, unknown> = {
+        name: name.trim(),
+        kind,
+        leveled: kind === "skill" && leveled,
+      };
       if (kind !== "category" && parentId) body.parentId = parentId;
-      await api("/api/attributes", { method: "POST", body: JSON.stringify(body) });
+      await api("/api/attributes", {
+        method: "POST",
+        body: JSON.stringify(body),
+      });
       setName("");
       setParentId("");
       await load();
@@ -64,10 +71,16 @@ export default function AttributesPage() {
     }
   }
 
-  async function patch(a: Attribute, changes: Partial<Pick<Attribute, "kind" | "leveled" | "parentId">>) {
+  async function patch(
+    a: Attribute,
+    changes: Partial<Pick<Attribute, "kind" | "leveled" | "parentId">>,
+  ) {
     setError("");
     try {
-      await api(`/api/attributes/${a.attributeId}`, { method: "PATCH", body: JSON.stringify(changes) });
+      await api(`/api/attributes/${a.attributeId}`, {
+        method: "PATCH",
+        body: JSON.stringify(changes),
+      });
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : t.attrs.updateFailed);
@@ -91,7 +104,13 @@ export default function AttributesPage() {
     const g = a.categoryName ?? UNCATEGORIZED;
     byGroup.set(g, [...(byGroup.get(g) ?? []), a]);
   });
-  const groups = [...byGroup.entries()].sort((a, b) => (a[0] === UNCATEGORIZED ? 1 : b[0] === UNCATEGORIZED ? -1 : a[0].localeCompare(b[0])));
+  const groups = [...byGroup.entries()].sort((a, b) =>
+    a[0] === UNCATEGORIZED
+      ? 1
+      : b[0] === UNCATEGORIZED
+        ? -1
+        : a[0].localeCompare(b[0]),
+  );
 
   return (
     <PageShell>
@@ -101,12 +120,31 @@ export default function AttributesPage() {
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
         {t.attrs.hint}
       </Typography>
-      {error && <Typography color="error" sx={{ mb: 1 }}>{error}</Typography>}
+      {error && (
+        <Typography color="error" sx={{ mb: 1 }}>
+          {error}
+        </Typography>
+      )}
 
       {/* 创建表单 */}
-      <Stack component="form" direction="row" spacing={1} onSubmit={create} sx={{ mb: 3 }} alignItems="center" flexWrap="wrap" useFlexGap>
-        <TextField size="small" label={t.attrs.name} value={name} onChange={(e) => setName(e.target.value)} required />
-<Dropdown
+      <Stack
+        component="form"
+        direction="row"
+        spacing={1}
+        onSubmit={create}
+        sx={{ mb: 3 }}
+        alignItems="center"
+        flexWrap="wrap"
+        useFlexGap
+      >
+        <TextField
+          size="small"
+          label={t.attrs.name}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          required
+        />
+        <Dropdown
           label="类型"
           size="small"
           value={kind}
@@ -122,17 +160,31 @@ export default function AttributesPage() {
           ]}
         />
         {kind !== "category" && (
-<Dropdown
-          label="分类"
-          size="small"
-          value={parentId}
-          onChange={(v) => setParentId(v)}
-          sx={{ width: 150 }}
-          options={[{ value: "", label: UNCATEGORIZED }, ...categories.map((c) => ({ value: c.attributeId, label: c.name }))]}
-        />
+          <Dropdown
+            label="分类"
+            size="small"
+            value={parentId}
+            onChange={(v) => setParentId(v)}
+            sx={{ width: 150 }}
+            options={[
+              { value: "", label: UNCATEGORIZED },
+              ...categories.map((c) => ({
+                value: c.attributeId,
+                label: c.name,
+              })),
+            ]}
+          />
         )}
         {kind === "skill" && (
-          <FormControlLabel control={<Switch checked={leveled} onChange={(e) => setLeveled(e.target.checked)} />} label={t.attrs.leveled} />
+          <FormControlLabel
+            control={
+              <Switch
+                checked={leveled}
+                onChange={(e) => setLeveled(e.target.checked)}
+              />
+            }
+            label={t.attrs.leveled}
+          />
         )}
         <Button type="submit" variant="contained">
           {t.attrs.add}
@@ -147,7 +199,13 @@ export default function AttributesPage() {
           </Typography>
           <Stack spacing={1}>
             {attrs.map((a) => (
-              <Stack key={a.attributeId} direction="row" spacing={1} alignItems="center" justifyContent="space-between">
+              <Stack
+                key={a.attributeId}
+                direction="row"
+                spacing={1}
+                alignItems="center"
+                justifyContent="space-between"
+              >
                 <Stack direction="row" spacing={1} alignItems="center">
                   <Typography sx={{ minWidth: 110 }}>{a.name}</Typography>
                   <Chip size="small" label={a.kind} variant="outlined" />
@@ -155,10 +213,21 @@ export default function AttributesPage() {
                 <Stack direction="row" spacing={1} alignItems="center">
                   {a.kind !== "category" && (
                     <>
-                      <Button size="small" onClick={() => patch(a, { kind: a.kind === "skill" ? "label" : "skill" })}>
+                      <Button
+                        size="small"
+                        onClick={() =>
+                          patch(a, {
+                            kind: a.kind === "skill" ? "label" : "skill",
+                          })
+                        }
+                      >
                         {t.attrs.toKind(a.kind === "skill" ? "label" : "skill")}
                       </Button>
-                      <Button size="small" disabled={a.kind !== "skill"} onClick={() => patch(a, { leveled: !a.leveled })}>
+                      <Button
+                        size="small"
+                        disabled={a.kind !== "skill"}
+                        onClick={() => patch(a, { leveled: !a.leveled })}
+                      >
                         {a.leveled ? t.attrs.unleveled : t.attrs.leveled}
                       </Button>
                     </>

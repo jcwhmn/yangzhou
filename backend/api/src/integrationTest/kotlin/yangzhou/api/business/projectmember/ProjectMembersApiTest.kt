@@ -8,41 +8,92 @@ import kotlin.test.assertTrue
 
 /** JCW-94 V3.5-B:项目成员池 CRUD + 指派/候选池语义(黑盒)。 */
 class ProjectMembersApiTest : AbstractApiTest() {
+    private fun addWorkspaceMember(
+        authed: RestTestClient,
+        name: String,
+    ): String =
+        json
+            .readTree(
+                authed
+                    .post()
+                    .uri("/api/members")
+                    .body(mapOf("displayName" to name))
+                    .exchange()
+                    .expectStatus()
+                    .isCreated()
+                    .expectBody(String::class.java)
+                    .returnResult()
+                    .responseBody!!,
+            )["memberId"]
+            .asText()
 
-    private fun addWorkspaceMember(authed: RestTestClient, name: String): String =
-        json.readTree(
-            authed.post().uri("/api/members").body(mapOf("displayName" to name))
-                .exchange().expectStatus().isCreated()
-                .expectBody(String::class.java).returnResult().responseBody!!,
-        )["memberId"].asText()
+    private fun post(
+        authed: RestTestClient,
+        key: String,
+        memberId: String,
+    ) = authed
+        .post()
+        .uri("/api/projects/$key/members")
+        .body(mapOf("memberId" to memberId))
+        .exchange()
+        .expectBody(String::class.java)
+        .returnResult()
 
-    private fun post(authed: RestTestClient, key: String, memberId: String) =
-        authed.post().uri("/api/projects/$key/members")
-            .body(mapOf("memberId" to memberId))
-            .exchange().expectBody(String::class.java).returnResult()
+    private fun listMembers(
+        authed: RestTestClient,
+        key: String,
+    ) = json.readTree(
+        authed
+            .get()
+            .uri("/api/projects/$key/members")
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody(String::class.java)
+            .returnResult()
+            .responseBody!!,
+    )
 
-    private fun listMembers(authed: RestTestClient, key: String) =
-        json.readTree(
-            authed.get().uri("/api/projects/$key/members")
-                .exchange().expectStatus().isOk()
-                .expectBody(String::class.java).returnResult().responseBody!!,
-        )
+    private fun delete(
+        authed: RestTestClient,
+        key: String,
+        memberId: String,
+    ) = authed
+        .delete()
+        .uri("/api/projects/$key/members/$memberId")
+        .exchange()
+        .expectBody(String::class.java)
+        .returnResult()
 
-    private fun delete(authed: RestTestClient, key: String, memberId: String) =
-        authed.delete().uri("/api/projects/$key/members/$memberId")
-            .exchange().expectBody(String::class.java).returnResult()
+    private fun assign(
+        authed: RestTestClient,
+        itemId: String,
+        memberId: String?,
+    ) = authed
+        .put()
+        .uri("/api/items/$itemId/assignee")
+        .body(mapOf("assigneeItemId" to memberId))
+        .exchange()
+        .expectBody(String::class.java)
+        .returnResult()
 
-    private fun assign(authed: RestTestClient, itemId: String, memberId: String?) =
-        authed.put().uri("/api/items/$itemId/assignee")
-            .body(mapOf("assigneeItemId" to memberId))
-            .exchange().expectBody(String::class.java).returnResult()
-
-    private fun candidateIds(authed: RestTestClient, itemId: String): Set<String> =
-        json.readTree(
-            authed.get().uri("/api/items/$itemId/candidates")
-                .exchange().expectStatus().isOk()
-                .expectBody(String::class.java).returnResult().responseBody!!,
-        ).map { it["memberId"].asText() }.toSet()
+    private fun candidateIds(
+        authed: RestTestClient,
+        itemId: String,
+    ): Set<String> =
+        json
+            .readTree(
+                authed
+                    .get()
+                    .uri("/api/items/$itemId/candidates")
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody(String::class.java)
+                    .returnResult()
+                    .responseBody!!,
+            ).map { it["memberId"].asText() }
+            .toSet()
 
     /** fixture:项目 CHE + 两名虚拟成员(小李/小王)+ 属性 Java。 */
     private fun seed(): Triple<RestTestClient, String, String> {
@@ -128,24 +179,51 @@ class ProjectMembersApiTest : AbstractApiTest() {
         assertEquals(200, assign(authed, itemId, xiaoli).status.value())
 
         // V10-Q9:先完成 item(终态)再删成员
-        val doneStatusId = json.readTree(
-            authed.get().uri("/api/projects/CHE").exchange()
-                .expectStatus().isOk().expectBody(String::class.java).returnResult().responseBody!!,
-        )["statuses"].last { it["isFinal"].asBoolean() }["statusId"].asText()
-        authed.patch().uri("/api/items/$itemId")
+        val doneStatusId =
+            json
+                .readTree(
+                    authed
+                        .get()
+                        .uri("/api/projects/CHE")
+                        .exchange()
+                        .expectStatus()
+                        .isOk()
+                        .expectBody(String::class.java)
+                        .returnResult()
+                        .responseBody!!,
+                )["statuses"]
+                .last { it["isFinal"].asBoolean() }["statusId"]
+                .asText()
+        authed
+            .patch()
+            .uri("/api/items/$itemId")
             .body(mapOf("statusItemId" to doneStatusId))
-            .exchange().expectStatus().isOk()
+            .exchange()
+            .expectStatus()
+            .isOk()
 
-        authed.delete().uri("/api/members/$xiaoli").exchange().expectStatus().isNoContent()
+        authed
+            .delete()
+            .uri("/api/members/$xiaoli")
+            .exchange()
+            .expectStatus()
+            .isNoContent()
 
         // project_member 行随 FK 级联清;0047:创建者(me)仍在池
         assertEquals(1, listMembers(authed, "CHE").size())
         // assignee 由 V5 FK(on delete set null)置空
-        val itemAfter = json.readTree(
-            authed.get().uri("/api/items/$itemId")
-                .exchange().expectStatus().isOk()
-                .expectBody(String::class.java).returnResult().responseBody!!,
-        )
+        val itemAfter =
+            json.readTree(
+                authed
+                    .get()
+                    .uri("/api/items/$itemId")
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody(String::class.java)
+                    .returnResult()
+                    .responseBody!!,
+            )
         assertEquals(null, itemAfter["assignee"].let { if (it.isNull) null else it.asText() })
     }
 
@@ -172,9 +250,18 @@ class ProjectMembersApiTest : AbstractApiTest() {
         assertEquals(200, assign(authed, item["itemId"].asText(), me).status.value())
     }
 
-    private fun setMemberCap(authed: RestTestClient, memberId: String, attribute: String, level: Int) {
-        authed.put().uri("/api/members/$memberId/capabilities")
+    private fun setMemberCap(
+        authed: RestTestClient,
+        memberId: String,
+        attribute: String,
+        level: Int,
+    ) {
+        authed
+            .put()
+            .uri("/api/members/$memberId/capabilities")
             .body(mapOf("attribute" to attribute, "level" to level))
-            .exchange().expectStatus().isOk()
+            .exchange()
+            .expectStatus()
+            .isOk()
     }
 }

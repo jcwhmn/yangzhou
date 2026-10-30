@@ -25,16 +25,24 @@ class ProjectMemberService(
     private val members: MemberRepository,
     private val projectMembers: ProjectMemberRepository,
 ) {
-
-    data class MemberDto(val memberId: UUID, val displayName: String, val virtual: Boolean, val role: String)
+    data class MemberDto(
+        val memberId: UUID,
+        val displayName: String,
+        val virtual: Boolean,
+        val role: String,
+    )
 
     @Transactional
-    fun add(projectKey: String, memberId: UUID): MemberDto {
+    fun add(
+        projectKey: String,
+        memberId: UUID,
+    ): MemberDto {
         leaderGuard.requireLeader(projectKey)
         val project = projects.findByKey(projectKey) ?: throw NotFoundException("项目不存在:$projectKey")
         val member = members.findByObjectId(memberId) ?: throw NotFoundException("成员不存在")
-        if (projectMembers.existsByProjectObjectIdAndMemberObjectId(project.objectId!!, member.objectId!!))
+        if (projectMembers.existsByProjectObjectIdAndMemberObjectId(project.objectId!!, member.objectId!!)) {
             throw ConflictException("该成员已在项目成员中")
+        }
         projectMembers.save(ProjectMember(projectObjectId = project.objectId!!, memberObjectId = member.objectId!!))
         return member.toDto(ProjectMember.ROLE_MEMBER)
     }
@@ -48,26 +56,36 @@ class ProjectMemberService(
     }
 
     @Transactional
-    fun remove(projectKey: String, memberId: UUID) {
+    fun remove(
+        projectKey: String,
+        memberId: UUID,
+    ) {
         leaderGuard.requireLeader(projectKey)
         val project = projects.findByKey(projectKey) ?: throw NotFoundException("项目不存在:$projectKey")
         val member = members.findByObjectId(memberId) ?: throw NotFoundException("成员不存在")
-        val row = projectMembers.findByProjectObjectIdAndMemberObjectId(project.objectId!!, member.objectId!!)
-            ?: throw NotFoundException("该成员不在项目成员中")
+        val row =
+            projectMembers.findByProjectObjectIdAndMemberObjectId(project.objectId!!, member.objectId!!)
+                ?: throw NotFoundException("该成员不在项目成员中")
         requireNotLastLeader(row)
         projectMembers.delete(row)
     }
 
     /** YPJ-102(spec 0081):设/撤 leader;唯一 leader 降级 409(防静默开放管理)。 */
     @Transactional
-    fun setRole(projectKey: String, memberId: UUID, role: String): MemberDto {
+    fun setRole(
+        projectKey: String,
+        memberId: UUID,
+        role: String,
+    ): MemberDto {
         leaderGuard.requireLeader(projectKey)
-        if (role != ProjectMember.ROLE_MEMBER && role != ProjectMember.ROLE_LEADER)
+        if (role != ProjectMember.ROLE_MEMBER && role != ProjectMember.ROLE_LEADER) {
             throw BadRequestException("role 只能是 leader 或 member")
+        }
         val project = projects.findByKey(projectKey) ?: throw NotFoundException("项目不存在:$projectKey")
         val member = members.findByObjectId(memberId) ?: throw NotFoundException("成员不存在")
-        val row = projectMembers.findByProjectObjectIdAndMemberObjectId(project.objectId!!, member.objectId!!)
-            ?: throw NotFoundException("该成员不在项目成员中")
+        val row =
+            projectMembers.findByProjectObjectIdAndMemberObjectId(project.objectId!!, member.objectId!!)
+                ?: throw NotFoundException("该成员不在项目成员中")
         if (row.role == ProjectMember.ROLE_LEADER && role == ProjectMember.ROLE_MEMBER) requireNotLastLeader(row)
         projectMembers.save(row.copy(role = role))
         return member.toDto(role)
@@ -76,7 +94,9 @@ class ProjectMemberService(
     private fun requireNotLastLeader(row: ProjectMember) {
         if (row.role == ProjectMember.ROLE_LEADER &&
             projectMembers.findByProjectObjectId(row.projectObjectId).count { it.role == ProjectMember.ROLE_LEADER } <= 1
-        ) throw ConflictException("最后一个 leader 不可降级/移出,先设好接任者")
+        ) {
+            throw ConflictException("最后一个 leader 不可降级/移出,先设好接任者")
+        }
     }
 
     /** 池规则共用点(0047 严格化):恒返回池内成员 id;空池 = 无人可指派/无候选。 */
@@ -84,7 +104,10 @@ class ProjectMemberService(
         projectMembers.findByProjectObjectId(projectObjectId).mapTo(HashSet()) { it.memberObjectId }
 
     /** 池外指派 fail-fast(409)。 */
-    fun assertAssignable(projectObjectId: UUID, memberId: UUID) {
+    fun assertAssignable(
+        projectObjectId: UUID,
+        memberId: UUID,
+    ) {
         if (memberId !in restrictedPool(projectObjectId)) throw ConflictException("该成员不在项目成员中")
     }
 

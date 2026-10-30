@@ -15,13 +15,16 @@ import kotlin.test.assertFailsWith
 
 /** YPJ-50:AttachmentService 校验分支与存储 seam(纯单测,mockk + FakeObjectStorage)。 */
 class AttachmentServiceTest {
-
     private val fake = FakeObjectStorage()
 
     private fun service(
         props: AttachmentProperties = AttachmentProperties(enabled = true),
         storage: ObjectStorage = fake,
-        item: Item? = mockk { every { id } returns 1L; every { objectId } returns UUID(0, 1) },
+        item: Item? =
+            mockk {
+                every { id } returns 1L
+                every { objectId } returns UUID(0, 1)
+            },
     ): AttachmentService {
         val items = mockk<ItemRepository>()
         every { items.findByObjectId(any()) } returns item

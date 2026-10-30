@@ -1,13 +1,13 @@
 package yangzhou.api.business.github
 
 import org.springframework.stereotype.Service
+import yangzhou.api.business.workspace.WorkspaceService
 import yangzhou.api.error.BadRequestException
 import yangzhou.api.error.NotFoundException
 import yangzhou.persistence.ItemGitRef
 import yangzhou.persistence.repository.ItemGitRefRepository
 import yangzhou.persistence.repository.ItemRepository
 import yangzhou.persistence.repository.ProjectRepoRepository
-import yangzhou.api.business.workspace.WorkspaceService
 import java.time.Instant
 import java.util.UUID
 
@@ -43,39 +43,55 @@ class GithubCommitService(
         val item = items.findByObjectId(itemObjectId) ?: throw NotFoundException("item 不存在")
         val mounts = projectRepos.findByProjectObjectId(item.projectObjectId)
         if (mounts.isEmpty()) throw BadRequestException("项目未挂载 GitHub 仓库(设置 → GitHub)")
-        val token = workspaceService.required().githubToken
-            ?: throw BadRequestException("未配置 workspace GitHub PAT(设置 → GitHub)")
+        val token =
+            workspaceService.required().githubToken
+                ?: throw BadRequestException("未配置 workspace GitHub PAT(设置 → GitHub)")
 
         val branchRefs = gitRefs.findByItemObjectId(item.objectId!!).filter { it.kind == "branch" }
         return branchRefs.map { ref ->
             // 降级链(YPJ-69):分支仍在走原路;空表(分支已删)→ 按 head 分支名匹配 PR 回溯
             val commits = fetchBranchCommits(ref, token)
             if (commits.isNotEmpty()) {
-                RefCommitsDto(repo = ref.repo, ref = ref.ref, commits = commits.map { CommitDto(it.sha, it.message, it.author, it.date, it.url) })
+                RefCommitsDto(
+                    repo = ref.repo,
+                    ref = ref.ref,
+                    commits = commits.map { CommitDto(it.sha, it.message, it.author, it.date, it.url) },
+                )
             } else {
                 val via = fetchPrCommits(ref, token)
                 RefCommitsDto(
-                    repo = ref.repo, ref = ref.ref, viaPr = via != null, prNumber = via?.first,
+                    repo = ref.repo,
+                    ref = ref.ref,
+                    viaPr = via != null,
+                    prNumber = via?.first,
                     commits = via?.second?.map { CommitDto(it.sha, it.message, it.author, it.date, it.url) } ?: emptyList(),
                 )
             }
         }
     }
 
-    private fun fetchBranchCommits(ref: ItemGitRef, token: String): List<RepoCommit> =
+    private fun fetchBranchCommits(
+        ref: ItemGitRef,
+        token: String,
+    ): List<RepoCommit> =
         runCatching { gateway.listCommits(ref.repo, ref.ref, ref.createdAt, token) }
             .getOrElse { e -> wrap(e) }
             // 响应侧兜底:GitHub since 按 commit date 过滤,边缘仍可能有漏网(date 缺失则保留,宁多勿漏)
             .filter { it.date == null || runCatching { Instant.parse(it.date) >= ref.createdAt }.getOrDefault(true) }
 
     /** 分支查空 → PR 回溯:返回 (PR 号, 过滤后 commits);未命中 PR 或全被 since 过滤 → null。 */
-    private fun fetchPrCommits(ref: ItemGitRef, token: String): Pair<Int, List<RepoCommit>>? {
-        val pr = runCatching { gateway.findPrByHead(ref.repo, ref.ref, token) }
-            .getOrElse { e -> wrap(e) } ?: return null
-        val commits = runCatching { gateway.listPullRequestCommits(ref.repo, pr.number, token) }
-            .getOrElse { e -> wrap(e) }
-            // PR commits API 不支持 since,服务侧按 commit date 过滤(同兜底语义:date 缺失保留)
-            .filter { it.date == null || runCatching { Instant.parse(it.date) >= ref.createdAt }.getOrDefault(true) }
+    private fun fetchPrCommits(
+        ref: ItemGitRef,
+        token: String,
+    ): Pair<Int, List<RepoCommit>>? {
+        val pr =
+            runCatching { gateway.findPrByHead(ref.repo, ref.ref, token) }
+                .getOrElse { e -> wrap(e) } ?: return null
+        val commits =
+            runCatching { gateway.listPullRequestCommits(ref.repo, pr.number, token) }
+                .getOrElse { e -> wrap(e) }
+                // PR commits API 不支持 since,服务侧按 commit date 过滤(同兜底语义:date 缺失保留)
+                .filter { it.date == null || runCatching { Instant.parse(it.date) >= ref.createdAt }.getOrDefault(true) }
         return if (commits.isEmpty()) null else pr.number to commits
     }
 

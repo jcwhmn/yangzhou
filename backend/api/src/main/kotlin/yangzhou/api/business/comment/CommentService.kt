@@ -18,7 +18,6 @@ class CommentService(
     private val memberService: MemberService,
     private val notificationService: yangzhou.api.business.notification.NotificationService,
 ) {
-
     data class CommentDto(
         val commentId: UUID,
         val body: String,
@@ -29,12 +28,16 @@ class CommentService(
     fun list(itemObjectId: UUID): List<CommentDto> {
         val item = itemRepo.findByObjectId(itemObjectId) ?: throw NotFoundException("item 不存在")
         val author = memberService.current()
-        return comments.findByItemObjectIdOrderByCreatedAtDesc(item.objectId!!)
+        return comments
+            .findByItemObjectIdOrderByCreatedAtDesc(item.objectId!!)
             .map { CommentDto(it.objectId, it.body, author.displayName, it.createdAt.toString()) }
     }
 
     @Transactional
-    fun create(itemObjectId: UUID, body: String): CommentDto {
+    fun create(
+        itemObjectId: UUID,
+        body: String,
+    ): CommentDto {
         val item = itemRepo.findByObjectId(itemObjectId) ?: throw NotFoundException("item 不存在")
         val member = memberService.current()
         val saved = comments.save(Comment(itemObjectId = item.objectId!!, authorMemberObjectId = member.objectId!!, body = body.trim()))

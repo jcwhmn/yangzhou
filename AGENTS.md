@@ -65,7 +65,7 @@ docs/      adr/ · spec/ · architecture/(puml 类图) · requirement/(PRD) · p
 
 ## 持久层(ADR-0004;chess 实战约定平移)
 
-- **永不用 JDBC client(JdbcTemplate/JdbcOperations)**——跨表/投影/批量/级联一律 repository `@Query`/`@Modifying`(repositories.kt,ADR-0004 唯一授权扩展点;2026-10-17 定)
+- **永不用 JDBC client(JdbcTemplate/JdbcOperations)**——跨表/投影/批量/级联一律 repository `@Query`/`@Modifying`(Repositories.kt,ADR-0004 唯一授权扩展点;2026-10-17 定)
 - Spring Data JDBC + Flyway;禁 JPA/Hibernate/Exposed/BaseEntity 继承
 - 实体主构造直接声明 `id` / `objectId` / `createdAt` / `updatedAt`;`objectId` 在 Kotlin 生成
 - 对外只暴露公共 ID(`projectId` / `itemId`),永不暴露内部数字 id;FK 用 `object_id` UUID 列

@@ -11,15 +11,20 @@ import org.springframework.web.bind.annotation.RestController
 
 @RestController
 @RequestMapping("/api")
-class FavoriteController(private val service: FavoriteService) {
-
+class FavoriteController(
+    private val service: FavoriteService,
+) {
     @GetMapping("/favorites")
     fun list(): List<FavoriteService.FavoriteDto> = service.list()
 
     @PutMapping("/projects/{key}/favorite")
-    fun add(@PathVariable key: String): FavoriteService.FavoriteDto = service.add(key)
+    fun add(
+        @PathVariable key: String,
+    ): FavoriteService.FavoriteDto = service.add(key)
 
     @DeleteMapping("/projects/{key}/favorite")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    fun remove(@PathVariable key: String) = service.remove(key)
+    fun remove(
+        @PathVariable key: String,
+    ) = service.remove(key)
 }

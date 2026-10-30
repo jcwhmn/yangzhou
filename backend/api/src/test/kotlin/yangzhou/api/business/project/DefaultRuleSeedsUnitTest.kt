@@ -1,27 +1,31 @@
 package yangzhou.api.business.project
 
-import java.util.UUID
 import yangzhou.api.business.github.VcsEvent
 import yangzhou.persistence.Status
+import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /** YPJ-40 方案 A(spec 0057):默认规则语义推导纯函数直测——标准 V7 五列 = 旧按名映射快照;非标 workflow 开箱有定义。 */
 class DefaultRuleSeedsUnitTest {
-
-    private fun col(name: String, position: Int, isStart: Boolean = false, isFinal: Boolean = false) =
-        Status(projectObjectId = UUID(0, 0), name = name, position = position, isStart = isStart, isFinal = isFinal)
+    private fun col(
+        name: String,
+        position: Int,
+        isStart: Boolean = false,
+        isFinal: Boolean = false,
+    ) = Status(projectObjectId = UUID(0, 0), name = name, position = position, isStart = isStart, isFinal = isFinal)
 
     @Test
     fun `标准 V7 五列 - 与旧按名映射一致`() {
-        val saved = listOf(
-            col("To Do", 0, isStart = true),
-            col("In Progress", 1),
-            col("In Review", 2),
-            col("QA", 3),
-            col("Done", 4, isFinal = true),
-        )
+        val saved =
+            listOf(
+                col("To Do", 0, isStart = true),
+                col("In Progress", 1),
+                col("In Review", 2),
+                col("QA", 3),
+                col("Done", 4, isFinal = true),
+            )
         val seeds = ProjectService.defaultRuleSeeds(saved)
         assertEquals(
             listOf("branch_created", "pr_opened", "pr_merged"),
@@ -33,12 +37,13 @@ class DefaultRuleSeedsUnitTest {
 
     @Test
     fun `非标四列 - 按顺序推导`() {
-        val saved = listOf(
-            col("To Do", 0, isStart = true),
-            col("Doing", 1),
-            col("Review", 2),
-            col("Done", 3, isFinal = true),
-        )
+        val saved =
+            listOf(
+                col("To Do", 0, isStart = true),
+                col("Doing", 1),
+                col("Review", 2),
+                col("Done", 3, isFinal = true),
+            )
         val seeds = ProjectService.defaultRuleSeeds(saved)
         assertEquals(listOf("branch_created", "pr_opened", "pr_merged"), seeds.map { it.first.wire })
         assertEquals(listOf("Doing", "Review", "Done"), seeds.map { it.second.name })

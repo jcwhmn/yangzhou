@@ -10,7 +10,6 @@ import yangzhou.api.config.AttachmentProperties
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties(AttachmentProperties::class)
 class AttachmentConfig {
-
     @Bean
     @ConditionalOnProperty(prefix = "yangzhou.attachment", name = ["enabled"], havingValue = "true")
     fun s3ObjectStorage(props: AttachmentProperties): S3ObjectStorage = S3ObjectStorage(props)

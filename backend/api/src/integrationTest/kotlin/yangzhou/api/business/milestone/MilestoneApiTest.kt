@@ -12,21 +12,49 @@ import kotlin.test.assertTrue
  * 黑盒走 REST:CRUD、状态机合法/非法迁移、0..1 in_progress、终态不可变、跨项目 404、排序。
  */
 class MilestoneApiTest : AbstractApiTest() {
-
-    private fun createMilestone(authed: RestTestClient, key: String, body: Map<String, Any?>): JsonNode {
-        val r = authed.post().uri("/api/projects/$key/milestones").body(body).exchange()
-            .expectBody(String::class.java).returnResult()
+    private fun createMilestone(
+        authed: RestTestClient,
+        key: String,
+        body: Map<String, Any?>,
+    ): JsonNode {
+        val r =
+            authed
+                .post()
+                .uri("/api/projects/$key/milestones")
+                .body(body)
+                .exchange()
+                .expectBody(String::class.java)
+                .returnResult()
         assertEquals(201, r.status.value(), r.responseBody)
         return json.readTree(r.responseBody!!)
     }
 
-    private fun patch(authed: RestTestClient, key: String, id: String, body: Map<String, Any?>) =
-        authed.patch().uri("/api/projects/$key/milestones/$id").body(body).exchange()
-            .expectBody(String::class.java).returnResult()
+    private fun patch(
+        authed: RestTestClient,
+        key: String,
+        id: String,
+        body: Map<String, Any?>,
+    ) = authed
+        .patch()
+        .uri("/api/projects/$key/milestones/$id")
+        .body(body)
+        .exchange()
+        .expectBody(String::class.java)
+        .returnResult()
 
-    private fun list(authed: RestTestClient, key: String): JsonNode =
-        json.readTree(authed.get().uri("/api/projects/$key/milestones").exchange()
-            .expectBody(String::class.java).returnResult().responseBody!!)
+    private fun list(
+        authed: RestTestClient,
+        key: String,
+    ): JsonNode =
+        json.readTree(
+            authed
+                .get()
+                .uri("/api/projects/$key/milestones")
+                .exchange()
+                .expectBody(String::class.java)
+                .returnResult()
+                .responseBody!!,
+        )
 
     @Test
     fun `CRUD 与字段校验`() {
@@ -45,15 +73,35 @@ class MilestoneApiTest : AbstractApiTest() {
         assertTrue(patched["targetDate"].isNull)
 
         // name 必填 / 日期格式
-        authed.post().uri("/api/projects/MIL/milestones").body(mapOf("name" to " "))
-            .exchange().expectStatus().isBadRequest()
-        authed.post().uri("/api/projects/MIL/milestones").body(mapOf("name" to "X", "targetDate" to "12/01"))
-            .exchange().expectStatus().isBadRequest()
+        authed
+            .post()
+            .uri("/api/projects/MIL/milestones")
+            .body(mapOf("name" to " "))
+            .exchange()
+            .expectStatus()
+            .isBadRequest()
+        authed
+            .post()
+            .uri("/api/projects/MIL/milestones")
+            .body(mapOf("name" to "X", "targetDate" to "12/01"))
+            .exchange()
+            .expectStatus()
+            .isBadRequest()
 
         // 删除 → 204 + 列表消失
-        authed.delete().uri("/api/projects/MIL/milestones/$mid").exchange().expectStatus().isNoContent()
+        authed
+            .delete()
+            .uri("/api/projects/MIL/milestones/$mid")
+            .exchange()
+            .expectStatus()
+            .isNoContent()
         assertEquals(0, list(authed, "MIL").size())
-        authed.delete().uri("/api/projects/MIL/milestones/$mid").exchange().expectStatus().isNotFound()
+        authed
+            .delete()
+            .uri("/api/projects/MIL/milestones/$mid")
+            .exchange()
+            .expectStatus()
+            .isNotFound()
     }
 
     @Test
@@ -64,11 +112,19 @@ class MilestoneApiTest : AbstractApiTest() {
 
         // 非法:planned → completed(跳级);非法值 400
         assertEquals(409, patch(authed, "LIFE", m, mapOf("status" to "completed")).status.value())
-        authed.patch().uri("/api/projects/LIFE/milestones/$m").body(mapOf("status" to "doing"))
-            .exchange().expectStatus().isBadRequest()
+        authed
+            .patch()
+            .uri("/api/projects/LIFE/milestones/$m")
+            .body(mapOf("status" to "doing"))
+            .exchange()
+            .expectStatus()
+            .isBadRequest()
 
         // 合法全链:planned → in_progress → completed
-        assertEquals("in_progress", json.readTree(patch(authed, "LIFE", m, mapOf("status" to "in_progress")).responseBody!!)["status"].asText())
+        assertEquals(
+            "in_progress",
+            json.readTree(patch(authed, "LIFE", m, mapOf("status" to "in_progress")).responseBody!!)["status"].asText(),
+        )
         assertEquals("completed", json.readTree(patch(authed, "LIFE", m, mapOf("status" to "completed")).responseBody!!)["status"].asText())
 
         // 终态:再迁移 409、改名 409、历史仍可读
@@ -118,8 +174,19 @@ class MilestoneApiTest : AbstractApiTest() {
 
         val names = list(authed, "SORT").map { it["name"].asText() }
         assertEquals(listOf("进行中", "近期", "远期", "无日期", "已完"), names)
-        assertTrue(json.readTree(authed.get().uri("/api/projects/SORT/milestones").exchange()
-            .expectBody(String::class.java).returnResult().responseBody!!)[0]["status"].asText() == "in_progress")
+        assertTrue(
+            json
+                .readTree(
+                    authed
+                        .get()
+                        .uri("/api/projects/SORT/milestones")
+                        .exchange()
+                        .expectBody(String::class.java)
+                        .returnResult()
+                        .responseBody!!,
+                )[0]["status"]
+                .asText() == "in_progress",
+        )
     }
 
     @Test
@@ -129,8 +196,18 @@ class MilestoneApiTest : AbstractApiTest() {
         createProject(authed, "X2")
         val m = createMilestone(authed, "X1", mapOf("name" to "私有"))["milestoneId"].asText()
 
-        authed.get().uri("/api/projects/X2/milestones").exchange().expectStatus().isOk()
+        authed
+            .get()
+            .uri("/api/projects/X2/milestones")
+            .exchange()
+            .expectStatus()
+            .isOk()
         assertEquals(404, patch(authed, "X2", m, mapOf("name" to "偷改")).status.value())
-        authed.delete().uri("/api/projects/X2/milestones/$m").exchange().expectStatus().isNotFound()
+        authed
+            .delete()
+            .uri("/api/projects/X2/milestones/$m")
+            .exchange()
+            .expectStatus()
+            .isNotFound()
     }
 }

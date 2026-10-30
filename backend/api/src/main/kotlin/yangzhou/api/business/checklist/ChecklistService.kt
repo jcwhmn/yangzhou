@@ -17,10 +17,17 @@ class ChecklistService(
     private val checklists: ChecklistItemRepository,
     private val items: ItemRepository,
 ) {
+    data class EntryDto(
+        val checklistItemId: UUID,
+        val text: String,
+        val done: Boolean,
+    )
 
-    data class EntryDto(val checklistItemId: UUID, val text: String, val done: Boolean)
-
-    data class ChecklistDto(val entries: List<EntryDto>, val doneCount: Int, val totalCount: Int)
+    data class ChecklistDto(
+        val entries: List<EntryDto>,
+        val doneCount: Int,
+        val totalCount: Int,
+    )
 
     fun list(itemObjectId: UUID): ChecklistDto {
         val item = items.findByObjectId(itemObjectId) ?: throw NotFoundException("item 不存在")
@@ -28,24 +35,33 @@ class ChecklistService(
     }
 
     @Transactional
-    fun add(itemObjectId: UUID, text: String): EntryDto {
+    fun add(
+        itemObjectId: UUID,
+        text: String,
+    ): EntryDto {
         val item = items.findByObjectId(itemObjectId) ?: throw NotFoundException("item 不存在")
         val position = checklists.findByItemObjectIdOrderByPositionAscIdAsc(item.objectId!!).maxOfOrNull { it.position + 1 } ?: 0
-        val saved = checklists.save(
-            ChecklistItem(itemObjectId = item.objectId!!, text = text.trim(), position = position),
-        )
+        val saved =
+            checklists.save(
+                ChecklistItem(itemObjectId = item.objectId!!, text = text.trim(), position = position),
+            )
         return EntryDto(saved.objectId, saved.text, saved.done)
     }
 
     @Transactional
-    fun update(entryObjectId: UUID, text: String?, done: Boolean?): EntryDto {
+    fun update(
+        entryObjectId: UUID,
+        text: String?,
+        done: Boolean?,
+    ): EntryDto {
         val entry = checklists.findByObjectId(entryObjectId) ?: throw NotFoundException("条目不存在")
         val newDone = done ?: entry.done
-        val newText = when {
-            text == null -> entry.text
-            text.isBlank() -> throw BadRequestException("text 不能为空")
-            else -> text.trim()
-        }
+        val newText =
+            when {
+                text == null -> entry.text
+                text.isBlank() -> throw BadRequestException("text 不能为空")
+                else -> text.trim()
+            }
         val saved = checklists.save(entry.copy(text = newText, done = newDone, updatedAt = Instant.now()))
         return EntryDto(saved.objectId, saved.text, saved.done)
     }
@@ -56,11 +72,12 @@ class ChecklistService(
         checklists.delete(entry)
     }
 
-    private fun toDto(rows: List<ChecklistItem>): ChecklistDto = ChecklistDto(
-        entries = rows.map { EntryDto(it.objectId, it.text, it.done) },
-        doneCount = rows.count { it.done },
-        totalCount = rows.size,
-    )
+    private fun toDto(rows: List<ChecklistItem>): ChecklistDto =
+        ChecklistDto(
+            entries = rows.map { EntryDto(it.objectId, it.text, it.done) },
+            doneCount = rows.count { it.done },
+            totalCount = rows.size,
+        )
 }
 
 data class UpsertChecklistRequest(

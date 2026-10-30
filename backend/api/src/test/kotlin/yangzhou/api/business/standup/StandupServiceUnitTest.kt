@@ -3,8 +3,9 @@ package yangzhou.api.business.standup
 import io.mockk.clearMocks
 import io.mockk.every
 import io.mockk.mockk
-import yangzhou.api.business.member.MemberService
+import org.junit.jupiter.api.BeforeEach
 import yangzhou.api.business.dependency.DependencyService
+import yangzhou.api.business.member.MemberService
 import yangzhou.api.error.NotFoundException
 import yangzhou.persistence.Item
 import yangzhou.persistence.ItemActivity
@@ -17,17 +18,13 @@ import yangzhou.persistence.repository.MemberRepository
 import yangzhou.persistence.repository.ProjectRepository
 import yangzhou.persistence.repository.StatusRepository
 import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneId
 import java.util.UUID
-import org.junit.jupiter.api.BeforeEach
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 /** YPJ-89 单测补齐:StandupService(三组归类:昨日完成/今日名下/阻塞)。 */
 class StandupServiceUnitTest {
-
     private val projects = mockk<ProjectRepository>(relaxed = true)
     private val items = mockk<ItemRepository>(relaxed = true)
     private val statuses = mockk<StatusRepository>(relaxed = true)
@@ -37,14 +34,24 @@ class StandupServiceUnitTest {
     private val memberService = mockk<MemberService>(relaxed = true)
     private val service = StandupService(projects, items, statuses, members, activities, dependencyService, memberService)
 
-    private val me = Member(id = 5L, objectId = UUID(0, 5), workspaceObjectId = UUID(0, 9), username = null, passwordHash = "h", displayName = "me")
+    private val me =
+        Member(id = 5L, objectId = UUID(0, 5), workspaceObjectId = UUID(0, 9), username = null, passwordHash = "h", displayName = "me")
     private val project = Project(id = 1L, objectId = UUID(0, 1), workspaceObjectId = UUID(0, 9), key = "CHE", name = "CHE")
     private val open = Status(id = 1L, objectId = UUID(0, 1), projectObjectId = UUID(0, 1), name = "In Progress", position = 1)
     private val done = Status(id = 2L, objectId = UUID(0, 2), projectObjectId = UUID(0, 1), name = "Done", isFinal = true, position = 2)
 
-    private fun item(id: Long, number: Int, status: Status) = Item(
-        id = id, objectId = UUID(0, id), projectObjectId = UUID(0, 1), number = number, title = "t$number",
-        assigneeObjectId = me.objectId, statusObjectId = status.objectId,
+    private fun item(
+        id: Long,
+        number: Int,
+        status: Status,
+    ) = Item(
+        id = id,
+        objectId = UUID(0, id),
+        projectObjectId = UUID(0, 1),
+        number = number,
+        title = "t$number",
+        assigneeObjectId = me.objectId,
+        statusObjectId = status.objectId,
     )
 
     @BeforeEach
@@ -55,18 +62,34 @@ class StandupServiceUnitTest {
         every { statuses.findByProjectObjectIdOrderByPosition(UUID(0, 1)) } returns listOf(open, done)
         every { dependencyService.blockedItemObjectIds(UUID(0, 1)) } returns emptySet()
         // 窗口桩:任一活动都算「昨日推进」
-        every { activities.findByKindAndCreatedAtBetween(any(), any<Instant>(), any<Instant>()) } returns listOf(
-            ItemActivity(id = 1L, objectId = UUID(0, 1), itemObjectId = UUID(0, 1), kind = "status_changed", actorMemberObjectId = UUID(0, 5)),
-            ItemActivity(id = 2L, objectId = UUID(0, 2), itemObjectId = UUID(0, 2), kind = "status_changed", actorMemberObjectId = UUID(0, 5)),
-        )
+        every { activities.findByKindAndCreatedAtBetween(any(), any<Instant>(), any<Instant>()) } returns
+            listOf(
+                ItemActivity(
+                    id = 1L,
+                    objectId = UUID(0, 1),
+                    itemObjectId = UUID(0, 1),
+                    kind = "status_changed",
+                    actorMemberObjectId = UUID(0, 5),
+                ),
+                ItemActivity(
+                    id = 2L,
+                    objectId = UUID(0, 2),
+                    itemObjectId = UUID(0, 2),
+                    kind = "status_changed",
+                    actorMemberObjectId = UUID(0, 5),
+                ),
+            )
     }
 
     @Test
     fun threeBucketsByAssignee() {
         // item1:昨日推进且未终态 → done + today;item2:终态 → done only;item3:未推进未终态 → today
-        every { items.findByProjectObjectIdAndDeletedAtIsNullOrderByNumber(UUID(0, 1)) } returns listOf(
-            item(1L, 1, open), item(2L, 2, done), item(3L, 3, open),
-        )
+        every { items.findByProjectObjectIdAndDeletedAtIsNullOrderByNumber(UUID(0, 1)) } returns
+            listOf(
+                item(1L, 1, open),
+                item(2L, 2, done),
+                item(3L, 3, open),
+            )
         val dto = service.standup(null) // null = 我
         assertEquals(listOf("CHE-1", "CHE-2"), dto.doneYesterday.map { it.number })
         assertEquals(listOf("CHE-1", "CHE-3"), dto.today.map { it.number })

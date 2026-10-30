@@ -22,11 +22,24 @@ class ViewService(
     private val memberService: MemberService,
     private val mapper: ObjectMapper,
 ) {
-    data class ViewDto(val viewId: UUID, val name: String, val filters: JsonNode, val columns: JsonNode)
+    data class ViewDto(
+        val viewId: UUID,
+        val name: String,
+        val filters: JsonNode,
+        val columns: JsonNode,
+    )
 
-    data class CreateViewRequest(val name: String, val filters: JsonNode? = null, val columns: JsonNode? = null)
+    data class CreateViewRequest(
+        val name: String,
+        val filters: JsonNode? = null,
+        val columns: JsonNode? = null,
+    )
 
-    data class UpdateViewRequest(val name: String? = null, val filters: JsonNode? = null, val columns: JsonNode? = null)
+    data class UpdateViewRequest(
+        val name: String? = null,
+        val filters: JsonNode? = null,
+        val columns: JsonNode? = null,
+    )
 
     @Transactional(readOnly = true)
     fun list(key: String): List<ViewDto> {
@@ -35,7 +48,10 @@ class ViewService(
     }
 
     @Transactional
-    fun create(key: String, request: CreateViewRequest): ViewDto {
+    fun create(
+        key: String,
+        request: CreateViewRequest,
+    ): ViewDto {
         val (projectObjectId, memberObjectId) = requireContext(key)
         val name = request.name.trim()
         if (name.isEmpty()) throw BadRequestException("视图名不可为空")
@@ -44,20 +60,25 @@ class ViewService(
         if (views.existsByProjectObjectIdAndCreatorObjectIdAndName(projectObjectId, memberObjectId, name)) {
             throw ConflictException("同名视图已存在:$name")
         }
-        val saved = views.save(
-            ProjectView(
-                projectObjectId = projectObjectId,
-                creatorObjectId = memberObjectId,
-                name = name,
-                filters = filters.toString(),
-                columns = columns.toString(),
-            ),
-        )
+        val saved =
+            views.save(
+                ProjectView(
+                    projectObjectId = projectObjectId,
+                    creatorObjectId = memberObjectId,
+                    name = name,
+                    filters = filters.toString(),
+                    columns = columns.toString(),
+                ),
+            )
         return toDto(saved)
     }
 
     @Transactional
-    fun update(key: String, viewId: UUID, request: UpdateViewRequest): ViewDto {
+    fun update(
+        key: String,
+        viewId: UUID,
+        request: UpdateViewRequest,
+    ): ViewDto {
         val (projectObjectId, memberObjectId) = requireContext(key)
         // 只能改自己的:非本人/不存在一律 404(不泄露存在性)
         val view = views.findByObjectIdAndCreatorObjectId(viewId, memberObjectId) ?: throw NotFoundException("视图不存在")
@@ -78,7 +99,10 @@ class ViewService(
     }
 
     @Transactional
-    fun delete(key: String, viewId: UUID) {
+    fun delete(
+        key: String,
+        viewId: UUID,
+    ) {
         val (projectObjectId, memberObjectId) = requireContext(key)
         val view = views.findByObjectIdAndCreatorObjectId(viewId, memberObjectId) ?: throw NotFoundException("视图不存在")
         if (view.projectObjectId != projectObjectId) throw NotFoundException("视图不存在")
@@ -95,7 +119,10 @@ class ViewService(
     }
 
     /** 校验为 JSON 对象且 ≤4KB;null 返回空对象。 */
-    private fun validated(node: JsonNode?, field: String): JsonNode {
+    private fun validated(
+        node: JsonNode?,
+        field: String,
+    ): JsonNode {
         val n = node ?: mapper.readTree("{}")
         if (!n.isObject) throw BadRequestException("$field 须为 JSON 对象")
         if (n.toString().toByteArray(Charsets.UTF_8).size > 4096) throw BadRequestException("$field 超过 4KB 上限")

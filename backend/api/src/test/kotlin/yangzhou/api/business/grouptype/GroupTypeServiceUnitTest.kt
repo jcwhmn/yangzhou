@@ -24,7 +24,6 @@ import kotlin.test.assertFailsWith
  * 覆盖:typeKey 校验、内建冲突、唯一 409、builtin 保护、类型下有组拒删、通用组校验与内建封闭。
  */
 class GroupTypeServiceUnitTest {
-
     private val projects = mockk<ProjectRepository>(relaxed = true)
     private val types = mockk<ItemGroupTypeRepository>(relaxed = true)
     private val groups = mockk<ItemGroupRepository>(relaxed = true)
@@ -35,8 +34,13 @@ class GroupTypeServiceUnitTest {
     private val service = GroupTypeService(leaderGuard, projects, types, groups, memberships, memberHistory)
 
     private val project = Project(workspaceObjectId = UUID(0, 1), key = "P", name = "P").let { it.copy(id = 7L, objectId = UUID(0, 7)) }
-    private fun type(key: String, builtin: Boolean = false) =
-        ItemGroupType(projectObjectId = UUID(0, 7), typeKey = key, name = key, builtin = builtin).let { it.copy(id = 100L, objectId = UUID(0, 100)) }
+
+    private fun type(
+        key: String,
+        builtin: Boolean = false,
+    ) = ItemGroupType(projectObjectId = UUID(0, 7), typeKey = key, name = key, builtin = builtin).let {
+        it.copy(id = 100L, objectId = UUID(0, 100))
+    }
 
     private fun stubProject() {
         every { projects.findByKey("P") } returns project
@@ -103,9 +107,10 @@ class GroupTypeServiceUnitTest {
     fun `删类型 - 类型下有组 409 且不落删`() {
         stubProject()
         every { types.findByProjectObjectIdAndTypeKey(UUID(0, 7), "quarter") } returns type("quarter")
-        every { groups.findByProjectObjectIdOrderByCreatedAt(UUID(0, 7)) } returns listOf(
-            ItemGroup(projectObjectId = UUID(0, 7), type = "quarter", name = "Q1"),
-        )
+        every { groups.findByProjectObjectIdOrderByCreatedAt(UUID(0, 7)) } returns
+            listOf(
+                ItemGroup(projectObjectId = UUID(0, 7), type = "quarter", name = "Q1"),
+            )
         assertFailsWith<ConflictException> { service.deleteType("P", "quarter") }
         verify(exactly = 0) { types.delete(any<ItemGroupType>()) }
     }
@@ -155,10 +160,11 @@ class GroupTypeServiceUnitTest {
         stubProject()
         every { types.findByProjectObjectIdAndTypeKey(UUID(0, 7), "quarter") } returns type("quarter")
         every { groups.save(any<ItemGroup>()) } answers { firstArg<ItemGroup>().copy(id = 1L, objectId = UUID(0, 1)) }
-        val dto = service.createGroup(
-            "P",
-            GroupTypeService.CreateGroupRequest("quarter", "2026-Q1", startDate = "2026-01-01", endDate = "2026-03-31"),
-        )
+        val dto =
+            service.createGroup(
+                "P",
+                GroupTypeService.CreateGroupRequest("quarter", "2026-Q1", startDate = "2026-01-01", endDate = "2026-03-31"),
+            )
         assertEquals("planned", dto.status)
         assertEquals("2026-01-01", dto.startDate)
         assertEquals("quarter", dto.typeKey)

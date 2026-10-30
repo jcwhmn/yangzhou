@@ -14,7 +14,12 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { t } from "@/lib/texts";
 
-type Member = { memberId: string; displayName: string; username: string | null; virtual: boolean };
+type Member = {
+  memberId: string;
+  displayName: string;
+  username: string | null;
+  virtual: boolean;
+};
 type PoolMember = { memberId: string; displayName: string; virtual: boolean };
 type StatusLite = { name: string; isFinal: boolean };
 type ItemLite = { assignee: string | null; status: string };
@@ -50,8 +55,16 @@ export function ProjectMembersPanel({
       setPool(p);
       setAll(a);
       // V11-S5 成员色点:🟢 有非终态 assignee item / ⚪ 无(按 displayName 聚合,workspace 内唯一)
-      const finalNames = new Set(proj.statuses.filter((s) => s.isFinal).map((s) => s.name));
-      setBusy(new Set(items.filter((i) => i.assignee && !finalNames.has(i.status)).map((i) => i.assignee!)));
+      const finalNames = new Set(
+        proj.statuses.filter((s) => s.isFinal).map((s) => s.name),
+      );
+      setBusy(
+        new Set(
+          items
+            .filter((i) => i.assignee && !finalNames.has(i.status))
+            .map((i) => i.assignee!),
+        ),
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : "加载失败");
     }
@@ -78,7 +91,9 @@ export function ProjectMembersPanel({
   async function remove(memberId: string) {
     setError("");
     try {
-      await api(`/api/projects/${projectKey}/members/${memberId}`, { method: "DELETE" });
+      await api(`/api/projects/${projectKey}/members/${memberId}`, {
+        method: "DELETE",
+      });
       await load();
       onChanged();
     } catch (e) {
@@ -109,15 +124,27 @@ export function ProjectMembersPanel({
             {t.membersPanel.busyLegend}
           </Typography>
           {pool.map((m) => (
-            <Stack key={m.memberId} direction="row" spacing={1} alignItems="center" justifyContent="space-between">
+            <Stack
+              key={m.memberId}
+              direction="row"
+              spacing={1}
+              alignItems="center"
+              justifyContent="space-between"
+            >
               <Stack direction="row" spacing={1} alignItems="center">
                 <span aria-label={busy.has(m.displayName) ? "进行中" : "空闲"}>
                   {busy.has(m.displayName) ? "🟢" : "⚪"}
                 </span>
                 <Typography variant="body2">{m.displayName}</Typography>
-                {m.virtual && <Chip size="small" label="虚拟" variant="outlined" />}
+                {m.virtual && (
+                  <Chip size="small" label="虚拟" variant="outlined" />
+                )}
               </Stack>
-              <Button size="small" color="error" onClick={() => remove(m.memberId)}>
+              <Button
+                size="small"
+                color="error"
+                onClick={() => remove(m.memberId)}
+              >
                 移除
               </Button>
             </Stack>
@@ -134,7 +161,11 @@ export function ProjectMembersPanel({
         </Typography>
         <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
           {candidates.map((m) => (
-            <Chip key={m.memberId} label={`+ ${m.displayName}`} onClick={() => add(m.memberId)} />
+            <Chip
+              key={m.memberId}
+              label={`+ ${m.displayName}`}
+              onClick={() => add(m.memberId)}
+            />
           ))}
           {candidates.length === 0 && (
             <Typography variant="body2" color="text.secondary">

@@ -25,7 +25,6 @@ class ExcelExportService(
     private val timeEntries: TimeEntryRepository,
     private val projectService: ProjectService,
 ) {
-
     private val timeFmt = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.systemDefault())
 
     fun export(key: String): ExportFile {
@@ -39,8 +38,10 @@ class ExcelExportService(
         val entries = timeEntries.findByItemObjectIdIn(allItems.mapNotNull { it.objectId })
         val entryItemMap = allItems.associateBy { it.objectId }
         val entryMemberMap = members.findAllByObjectIdIn(entries.map { it.memberObjectId }.toSet()).associateBy { it.objectId }
-        val minutesByItemObjectId = entries.groupBy { it.itemObjectId }
-            .mapValues { (_, list) -> list.sumOf { e -> minutesOf(e) } }
+        val minutesByItemObjectId =
+            entries
+                .groupBy { it.itemObjectId }
+                .mapValues { (_, list) -> list.sumOf { e -> minutesOf(e) } }
 
         XSSFWorkbook().use { wb ->
             // sheet1:item 清单(树序)
@@ -86,5 +87,8 @@ class ExcelExportService(
     private fun minutesOf(e: yangzhou.persistence.TimeEntry): Long =
         e.minutes?.toLong() ?: Duration.between(e.startedAt, e.endedAt ?: Instant.now()).toMinutes()
 
-    data class ExportFile(val filename: String, val bytes: ByteArray)
+    data class ExportFile(
+        val filename: String,
+        val bytes: ByteArray,
+    )
 }

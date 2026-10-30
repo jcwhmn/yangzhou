@@ -9,7 +9,6 @@ import org.springframework.web.bind.annotation.RestController
 @RestController
 @RequestMapping("/api")
 class VersionController {
-
     @GetMapping("/version")
     fun version(): Map<String, String> = mapOf("version" to VERSION)
 

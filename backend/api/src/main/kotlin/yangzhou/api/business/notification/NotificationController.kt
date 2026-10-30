@@ -12,8 +12,9 @@ import java.util.UUID
 
 @RestController
 @RequestMapping("/api")
-class NotificationController(private val service: NotificationService) {
-
+class NotificationController(
+    private val service: NotificationService,
+) {
     @GetMapping("/notifications")
     fun list(): List<NotificationService.NotificationDto> = service.list()
 
@@ -22,7 +23,9 @@ class NotificationController(private val service: NotificationService) {
 
     @PutMapping("/notifications/{notificationId}/read")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    fun read(@PathVariable notificationId: UUID) = service.markRead(notificationId)
+    fun read(
+        @PathVariable notificationId: UUID,
+    ) = service.markRead(notificationId)
 
     @PostMapping("/notifications/read-all")
     @ResponseStatus(HttpStatus.NO_CONTENT)

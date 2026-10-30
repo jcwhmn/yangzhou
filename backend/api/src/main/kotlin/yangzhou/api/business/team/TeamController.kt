@@ -15,14 +15,17 @@ import java.util.UUID
 
 @RestController
 @RequestMapping("/api")
-class TeamController(private val service: TeamService) {
-
+class TeamController(
+    private val service: TeamService,
+) {
     @GetMapping("/teams")
     fun list(): List<TeamService.TeamDto> = service.list()
 
     @PostMapping("/teams")
     @ResponseStatus(HttpStatus.CREATED)
-    fun create(@Valid @RequestBody request: CreateTeamRequest): TeamService.TeamDto = service.create(request.name.trim())
+    fun create(
+        @Valid @RequestBody request: CreateTeamRequest,
+    ): TeamService.TeamDto = service.create(request.name.trim())
 
     @PatchMapping("/teams/{teamId}")
     fun rename(
@@ -32,7 +35,9 @@ class TeamController(private val service: TeamService) {
 
     @DeleteMapping("/teams/{teamId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    fun delete(@PathVariable teamId: UUID) = service.delete(teamId)
+    fun delete(
+        @PathVariable teamId: UUID,
+    ) = service.delete(teamId)
 
     @PostMapping("/teams/{teamId}/members")
     fun addMember(
@@ -42,5 +47,8 @@ class TeamController(private val service: TeamService) {
 
     @DeleteMapping("/teams/{teamId}/members/{memberId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    fun removeMember(@PathVariable teamId: UUID, @PathVariable memberId: UUID) = service.removeMember(teamId, memberId)
+    fun removeMember(
+        @PathVariable teamId: UUID,
+        @PathVariable memberId: UUID,
+    ) = service.removeMember(teamId, memberId)
 }

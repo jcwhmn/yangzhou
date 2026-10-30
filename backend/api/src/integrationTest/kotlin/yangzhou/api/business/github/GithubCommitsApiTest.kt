@@ -6,7 +6,6 @@ import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.context.annotation.Primary
-import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.web.servlet.client.RestTestClient
 import yangzhou.api.AbstractApiTest
 import java.time.Instant
@@ -22,19 +21,41 @@ class FakeCommitGateway : VcsGateway {
     var prs: Map<String, List<RepoPr>> = emptyMap() // key = repo
     var lastSince: Instant? = null
 
-    override fun listBranches(repo: String, token: String): List<String> = emptyList()
-    override fun listPullRequests(repo: String, token: String): List<RepoPr> = prs[repo].orEmpty()
-    override fun createBranch(repo: String, branch: String, fromBranch: String, token: String) {}
+    override fun listBranches(
+        repo: String,
+        token: String,
+    ): List<String> = emptyList()
+
+    override fun listPullRequests(
+        repo: String,
+        token: String,
+    ): List<RepoPr> = prs[repo].orEmpty()
+
+    override fun createBranch(
+        repo: String,
+        branch: String,
+        fromBranch: String,
+        token: String,
+    ) {}
 
     // 故意不 honor since(模拟 GitHub 不过滤)——服务侧兜底过滤由 YPJ-42 测试验证
-    override fun listCommits(repo: String, sha: String, since: Instant?, token: String): List<RepoCommit> {
+    override fun listCommits(
+        repo: String,
+        sha: String,
+        since: Instant?,
+        token: String,
+    ): List<RepoCommit> {
         ioError?.let { throw it }
         failWith?.let { throw it }
         lastSince = since
         return commits["$repo@$sha"].orEmpty()
     }
 
-    override fun listPullRequestCommits(repo: String, number: Int, token: String): List<RepoCommit> {
+    override fun listPullRequestCommits(
+        repo: String,
+        number: Int,
+        token: String,
+    ): List<RepoCommit> {
         failWith?.let { throw it }
         return prCommits[number].orEmpty()
     }
@@ -50,10 +71,8 @@ class FakeCommitGatewayConfig {
 /** V16-2:按需拉取 item 分支提交历史——不落库不依赖轮询;无 PAT/无挂载 400 可操作报错。 */
 @Import(FakeCommitGatewayConfig::class)
 class GithubCommitsApiTest : AbstractApiTest() {
-
     @Autowired
     lateinit var fake: FakeCommitGateway
-
 
     private lateinit var authed: RestTestClient
 
@@ -62,38 +81,57 @@ class GithubCommitsApiTest : AbstractApiTest() {
         fake.failWith = null // 用例序无关:失败注入不复位会泄漏到后续用例
         authed = bootstrapAndAuth()
         if (pat) {
-            authed.put().uri("/api/workspace/github-token")
+            authed
+                .put()
+                .uri("/api/workspace/github-token")
                 .body(mapOf("token" to "test-token"))
-                .exchange().expectStatus().isOk()
+                .exchange()
+                .expectStatus()
+                .isOk()
         }
         createProject(authed, "CHE")
-        authed.post().uri("/api/projects/CHE/repos")
+        authed
+            .post()
+            .uri("/api/projects/CHE/repos")
             .body(mapOf("repo" to "octo/r"))
-            .exchange().expectStatus().isCreated()
+            .exchange()
+            .expectStatus()
+            .isCreated()
         return createItem(authed, "CHE", "x")["itemId"].asText() // CHE-1
     }
 
-    private fun seedBranchRef(itemId: String, ref: String = "CHE-1-x") {
+    private fun seedBranchRef(
+        itemId: String,
+        ref: String = "CHE-1-x",
+    ) {
         jdbc.update(
             "insert into item_git_ref (object_id, item_object_id, kind, repo, ref, created_at) " +
                 "values (md5(random()::text || clock_timestamp()::text)::uuid, (select object_id from item where object_id = ?::uuid), 'branch', 'octo/r', ?, '2026-10-01T00:00:00Z')",
-            itemId, ref,
+            itemId,
+            ref,
         )
     }
 
-    private fun getCommits(itemId: String): RestTestClient.ResponseSpec =
-        authed.get().uri("/api/items/$itemId/commits").exchange()
+    private fun getCommits(itemId: String): RestTestClient.ResponseSpec = authed.get().uri("/api/items/$itemId/commits").exchange()
 
     private fun body(spec: RestTestClient.ResponseSpec): JsonNode =
-        json.readTree(spec.expectStatus().isOk().expectBody(String::class.java).returnResult().responseBody!!)
+        json.readTree(
+            spec
+                .expectStatus()
+                .isOk()
+                .expectBody(String::class.java)
+                .returnResult()
+                .responseBody!!,
+        )
 
     @Test
     fun `按需拉取——按 branch ref 分组返回提交——不落库`() {
         val itemId = setup()
         seedBranchRef(itemId)
-        fake.commits["octo/r@CHE-1-x"] = listOf(
-            RepoCommit("abc1234full", "YPJ-7: 加功能", "me", "2026-10-06T12:00:00Z", "https://github.com/octo/r/commit/abc1234full"),
-        )
+        fake.commits["octo/r@CHE-1-x"] =
+            listOf(
+                RepoCommit("abc1234full", "YPJ-7: 加功能", "me", "2026-10-06T12:00:00Z", "https://github.com/octo/r/commit/abc1234full"),
+            )
 
         val res = body(getCommits(itemId))
 
@@ -105,10 +143,18 @@ class GithubCommitsApiTest : AbstractApiTest() {
         assertEquals("YPJ-7: 加功能", res[0]["commits"][0]["message"].asText())
         assertEquals("me", res[0]["commits"][0]["author"].asText())
         // 只读直查:再次拉取不产生活动留痕
-        val acts = json.readTree(
-            authed.get().uri("/api/items/$itemId/activity").exchange()
-                .expectStatus().isOk().expectBody(String::class.java).returnResult().responseBody!!,
-        )
+        val acts =
+            json.readTree(
+                authed
+                    .get()
+                    .uri("/api/items/$itemId/activity")
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody(String::class.java)
+                    .returnResult()
+                    .responseBody!!,
+            )
         // 只读直查:拉取本身不产生 GitHub 类活动留痕(建 item 的 created 不算)
         assertTrue(acts.toList().none { it["kind"].asText().startsWith("github") })
     }
@@ -117,10 +163,11 @@ class GithubCommitsApiTest : AbstractApiTest() {
     fun `分支创建前的提交被兜底过滤(fake 忽略 since 模拟 GitHub 不过滤)`() {
         val itemId = setup()
         seedBranchRef(itemId) // created_at = 2026-10-01
-        fake.commits["octo/r@CHE-1-x"] = listOf(
-            RepoCommit("old111full", "YPJ-7: 历史提交", "me", "2026-09-20T12:00:00Z", null),
-            RepoCommit("new222full", "YPJ-42: 新提交", "me", "2026-10-06T12:00:00Z", null),
-        )
+        fake.commits["octo/r@CHE-1-x"] =
+            listOf(
+                RepoCommit("old111full", "YPJ-7: 历史提交", "me", "2026-09-20T12:00:00Z", null),
+                RepoCommit("new222full", "YPJ-42: 新提交", "me", "2026-10-06T12:00:00Z", null),
+            )
 
         val res = body(getCommits(itemId))
 
@@ -135,10 +182,17 @@ class GithubCommitsApiTest : AbstractApiTest() {
         seedBranchRef(itemId) // created_at = 2026-10-01
         fake.commits.clear() // 分支已删:listCommits 空 → 走 PR
         fake.prs = mapOf("octo/r" to listOf(RepoPr(7, "CHE-1-x", "merged")))
-        fake.prCommits[7] = listOf(
-            RepoCommit("old333full", "基线提交", "me", "2026-09-20T12:00:00Z", null),
-            RepoCommit("new444full", "YPJ-69: 降级取回", "me", "2026-10-06T12:00:00Z", "https://github.com/octo/r/pull/7/commits/new444full"),
-        )
+        fake.prCommits[7] =
+            listOf(
+                RepoCommit("old333full", "基线提交", "me", "2026-09-20T12:00:00Z", null),
+                RepoCommit(
+                    "new444full",
+                    "YPJ-69: 降级取回",
+                    "me",
+                    "2026-10-06T12:00:00Z",
+                    "https://github.com/octo/r/pull/7/commits/new444full",
+                ),
+            )
 
         val res = body(getCommits(itemId))
 
@@ -174,9 +228,16 @@ class GithubCommitsApiTest : AbstractApiTest() {
     fun `无 PAT——400 可操作报错`() {
         val itemId = setup(pat = false)
         seedBranchRef(itemId)
-        val res = authed.get().uri("/api/items/$itemId/commits").exchange()
-            .expectStatus().isBadRequest()
-            .expectBody(String::class.java).returnResult().responseBody!!
+        val res =
+            authed
+                .get()
+                .uri("/api/items/$itemId/commits")
+                .exchange()
+                .expectStatus()
+                .isBadRequest()
+                .expectBody(String::class.java)
+                .returnResult()
+                .responseBody!!
         assertTrue(res.contains("PAT"))
     }
 
@@ -185,9 +246,16 @@ class GithubCommitsApiTest : AbstractApiTest() {
         val itemId = setup()
         seedBranchRef(itemId)
         fake.failWith = VcsApiException(401, "unauthorized")
-        val res = authed.get().uri("/api/items/$itemId/commits").exchange()
-            .expectStatus().isBadRequest()
-            .expectBody(String::class.java).returnResult().responseBody!!
+        val res =
+            authed
+                .get()
+                .uri("/api/items/$itemId/commits")
+                .exchange()
+                .expectStatus()
+                .isBadRequest()
+                .expectBody(String::class.java)
+                .returnResult()
+                .responseBody!!
         assertTrue(res.contains("401"))
     }
 
@@ -196,9 +264,16 @@ class GithubCommitsApiTest : AbstractApiTest() {
         val itemId = setup()
         seedBranchRef(itemId)
         fake.ioError = java.io.IOException("connection reset")
-        val res = authed.get().uri("/api/items/$itemId/commits").exchange()
-            .expectStatus().isBadRequest()
-            .expectBody(String::class.java).returnResult().responseBody!!
+        val res =
+            authed
+                .get()
+                .uri("/api/items/$itemId/commits")
+                .exchange()
+                .expectStatus()
+                .isBadRequest()
+                .expectBody(String::class.java)
+                .returnResult()
+                .responseBody!!
         assertTrue(res.contains("暂时不可达"))
     }
 
@@ -207,22 +282,34 @@ class GithubCommitsApiTest : AbstractApiTest() {
         val itemId1 = setup()
         seedBranchRef(itemId1) // 先入册 CHE-1-x,再对另一票补挂
         val itemId2 = createItem(authed, "CHE", "second")["itemId"].asText()
-        authed.post().uri("/api/items/$itemId2/git-refs")
+        authed
+            .post()
+            .uri("/api/items/$itemId2/git-refs")
             .body(mapOf("repo" to "octo/r", "ref" to "CHE-1-x"))
-            .exchange().expectStatus().isOk()
-                fake.commits["octo/r@CHE-1-x"] = listOf(
-            RepoCommit("abc123full", "YPJ-7: 加功能", "me", "2026-10-06T12:00:00Z", "https://github.com/octo/r/commit/abc123full"),
-        )
+            .exchange()
+            .expectStatus()
+            .isOk()
+        fake.commits["octo/r@CHE-1-x"] =
+            listOf(
+                RepoCommit("abc123full", "YPJ-7: 加功能", "me", "2026-10-06T12:00:00Z", "https://github.com/octo/r/commit/abc123full"),
+            )
 
         for (id in listOf(itemId1, itemId2)) {
-            val res = json.readTree(
-                authed.get().uri("/api/items/$id/commits").exchange()
-                    .expectStatus().isOk().expectBody(String::class.java).returnResult().responseBody!!,
-            )
+            val res =
+                json.readTree(
+                    authed
+                        .get()
+                        .uri("/api/items/$id/commits")
+                        .exchange()
+                        .expectStatus()
+                        .isOk()
+                        .expectBody(String::class.java)
+                        .returnResult()
+                        .responseBody!!,
+                )
             assertEquals(1, res.size())
             assertEquals(1, res[0]["commits"].size())
             assertEquals("abc123full", res[0]["commits"][0]["sha"].asText())
         }
     }
-
 }

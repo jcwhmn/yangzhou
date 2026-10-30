@@ -1,6 +1,7 @@
 package yangzhou.api.business.attribute
 
 import jakarta.validation.Valid
+import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PatchMapping
@@ -10,17 +11,18 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
-import org.springframework.http.HttpStatus
 import java.util.UUID
 
 @RestController
 @RequestMapping("/api")
-class AttributeController(private val service: AttributeService) {
-
+class AttributeController(
+    private val service: AttributeService,
+) {
     @PostMapping("/attributes")
     @ResponseStatus(HttpStatus.CREATED)
-    fun create(@Valid @RequestBody request: CreateAttributeRequest): AttributeService.AttributeDto =
-        service.create(request.name.trim(), request.kind, request.leveled, request.parentId)
+    fun create(
+        @Valid @RequestBody request: CreateAttributeRequest,
+    ): AttributeService.AttributeDto = service.create(request.name.trim(), request.kind, request.leveled, request.parentId)
 
     @GetMapping("/attributes")
     fun list(): List<AttributeService.AttributeDto> = service.list()
@@ -33,5 +35,7 @@ class AttributeController(private val service: AttributeService) {
 
     @DeleteMapping("/attributes/{attributeId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    fun delete(@PathVariable attributeId: UUID) = service.delete(attributeId)
+    fun delete(
+        @PathVariable attributeId: UUID,
+    ) = service.delete(attributeId)
 }

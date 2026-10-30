@@ -8,8 +8,11 @@ import java.util.UUID
 
 @RestController
 @RequestMapping("/api")
-class CandidateController(private val service: CandidateService) {
-
+class CandidateController(
+    private val service: CandidateService,
+) {
     @GetMapping("/items/{itemId}/candidates")
-    fun candidates(@PathVariable itemId: UUID): List<CandidateService.CandidateDto> = service.candidates(itemId)
+    fun candidates(
+        @PathVariable itemId: UUID,
+    ): List<CandidateService.CandidateDto> = service.candidates(itemId)
 }

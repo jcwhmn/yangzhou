@@ -6,18 +6,38 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class CandidatesApiTest : AbstractApiTest() {
+    private fun addMember(
+        authed: org.springframework.test.web.servlet.client.RestTestClient,
+        name: String,
+    ): String =
+        json
+            .readTree(
+                authed
+                    .post()
+                    .uri("/api/members")
+                    .body(mapOf("displayName" to name))
+                    .exchange()
+                    .expectStatus()
+                    .isCreated()
+                    .expectBody(String::class.java)
+                    .returnResult()
+                    .responseBody!!,
+            )["memberId"]
+            .asText()
 
-    private fun addMember(authed: org.springframework.test.web.servlet.client.RestTestClient, name: String): String =
-        json.readTree(
-            authed.post().uri("/api/members").body(mapOf("displayName" to name))
-                .exchange().expectStatus().isCreated()
-                .expectBody(String::class.java).returnResult().responseBody!!,
-        )["memberId"].asText()
-
-    private fun setMemberCap(authed: org.springframework.test.web.servlet.client.RestTestClient, memberId: String, attribute: String, level: Int?) {
-        authed.put().uri("/api/members/$memberId/capabilities")
+    private fun setMemberCap(
+        authed: org.springframework.test.web.servlet.client.RestTestClient,
+        memberId: String,
+        attribute: String,
+        level: Int?,
+    ) {
+        authed
+            .put()
+            .uri("/api/members/$memberId/capabilities")
             .body(mapOf("attribute" to attribute, "level" to level))
-            .exchange().expectStatus().isOk()
+            .exchange()
+            .expectStatus()
+            .isOk()
     }
 
     /** fixture:小李(Java3/React3 全绿)、我(Java4/React1 差1)、小王(React1 差1);item 需 React≥2。 */
@@ -45,10 +65,18 @@ class CandidatesApiTest : AbstractApiTest() {
     fun `候选含我与虚拟成员,排序=缺门少→差距小,无加权`() {
         val (authed, itemId) = seed()
 
-        val list = json.readTree(
-            authed.get().uri("/api/items/$itemId/candidates").exchange()
-                .expectStatus().isOk().expectBody(String::class.java).returnResult().responseBody!!,
-        )
+        val list =
+            json.readTree(
+                authed
+                    .get()
+                    .uri("/api/items/$itemId/candidates")
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody(String::class.java)
+                    .returnResult()
+                    .responseBody!!,
+            )
         assertEquals(3, list.size())
 
         val first = list[0]
@@ -71,68 +99,146 @@ class CandidatesApiTest : AbstractApiTest() {
     @Test
     fun `指派与取消,item wire 带 assignee 显示名`() {
         val (authed, itemId) = seed()
-        val xiaoli = json.readTree(
-            authed.get().uri("/api/members").exchange()
-                .expectStatus().isOk().expectBody(String::class.java).returnResult().responseBody!!,
-        ).first { it["displayName"].asText() == "小李" }["memberId"].asText()
+        val xiaoli =
+            json
+                .readTree(
+                    authed
+                        .get()
+                        .uri("/api/members")
+                        .exchange()
+                        .expectStatus()
+                        .isOk()
+                        .expectBody(String::class.java)
+                        .returnResult()
+                        .responseBody!!,
+                ).first { it["displayName"].asText() == "小李" }["memberId"]
+                .asText()
 
-        val assigned = json.readTree(
-            authed.put().uri("/api/items/$itemId/assignee")
-                .body(mapOf("assigneeItemId" to xiaoli))
-                .exchange().expectStatus().isOk()
-                .expectBody(String::class.java).returnResult().responseBody!!,
-        )
+        val assigned =
+            json.readTree(
+                authed
+                    .put()
+                    .uri("/api/items/$itemId/assignee")
+                    .body(mapOf("assigneeItemId" to xiaoli))
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody(String::class.java)
+                    .returnResult()
+                    .responseBody!!,
+            )
         assertEquals("小李", assigned["assignee"].asText())
 
-        val inList = json.readTree(
-            authed.get().uri("/api/projects/CHE/items").exchange()
-                .expectStatus().isOk().expectBody(String::class.java).returnResult().responseBody!!,
-        ).first { it["itemId"].asText() == itemId }
+        val inList =
+            json
+                .readTree(
+                    authed
+                        .get()
+                        .uri("/api/projects/CHE/items")
+                        .exchange()
+                        .expectStatus()
+                        .isOk()
+                        .expectBody(String::class.java)
+                        .returnResult()
+                        .responseBody!!,
+                ).first { it["itemId"].asText() == itemId }
         assertEquals("小李", inList["assignee"].asText())
 
         // 取消
-        val cleared = json.readTree(
-            authed.put().uri("/api/items/$itemId/assignee")
-                .body(mapOf("assigneeItemId" to null))
-                .exchange().expectStatus().isOk()
-                .expectBody(String::class.java).returnResult().responseBody!!,
-        )
+        val cleared =
+            json.readTree(
+                authed
+                    .put()
+                    .uri("/api/items/$itemId/assignee")
+                    .body(mapOf("assigneeItemId" to null))
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody(String::class.java)
+                    .returnResult()
+                    .responseBody!!,
+            )
         assertTrue(cleared["assignee"].isNull)
 
         // 不存在成员 404
-        authed.put().uri("/api/items/$itemId/assignee")
+        authed
+            .put()
+            .uri("/api/items/$itemId/assignee")
             .body(mapOf("assigneeItemId" to "00000000-0000-0000-0000-000000000000"))
-            .exchange().expectStatus().isNotFound()
+            .exchange()
+            .expectStatus()
+            .isNotFound()
     }
 
     @Test
     fun `被指派成员删除 → assignee 置空(人走事在)`() {
         val (authed, itemId) = seed()
-        val xiaoli = json.readTree(
-            authed.get().uri("/api/members").exchange()
-                .expectStatus().isOk().expectBody(String::class.java).returnResult().responseBody!!,
-        ).first { it["displayName"].asText() == "小李" }["memberId"].asText()
+        val xiaoli =
+            json
+                .readTree(
+                    authed
+                        .get()
+                        .uri("/api/members")
+                        .exchange()
+                        .expectStatus()
+                        .isOk()
+                        .expectBody(String::class.java)
+                        .returnResult()
+                        .responseBody!!,
+                ).first { it["displayName"].asText() == "小李" }["memberId"]
+                .asText()
 
-        authed.put().uri("/api/items/$itemId/assignee")
+        authed
+            .put()
+            .uri("/api/items/$itemId/assignee")
             .body(mapOf("assigneeItemId" to xiaoli))
-            .exchange().expectStatus().isOk()
+            .exchange()
+            .expectStatus()
+            .isOk()
 
         // V10-Q9:成员有非终态 assignee item 时不可删,先完成 item 到终态
-        val doneStatusId = json.readTree(
-            authed.get().uri("/api/projects/CHE").exchange()
-                .expectStatus().isOk().expectBody(String::class.java).returnResult().responseBody!!,
-        )["statuses"].last { it["isFinal"].asBoolean() }["statusId"].asText()
-        authed.patch().uri("/api/items/$itemId")
+        val doneStatusId =
+            json
+                .readTree(
+                    authed
+                        .get()
+                        .uri("/api/projects/CHE")
+                        .exchange()
+                        .expectStatus()
+                        .isOk()
+                        .expectBody(String::class.java)
+                        .returnResult()
+                        .responseBody!!,
+                )["statuses"]
+                .last { it["isFinal"].asBoolean() }["statusId"]
+                .asText()
+        authed
+            .patch()
+            .uri("/api/items/$itemId")
             .body(mapOf("statusItemId" to doneStatusId))
-            .exchange().expectStatus().isOk()
+            .exchange()
+            .expectStatus()
+            .isOk()
 
-        authed.delete().uri("/api/members/$xiaoli")
-            .exchange().expectStatus().isNoContent()
+        authed
+            .delete()
+            .uri("/api/members/$xiaoli")
+            .exchange()
+            .expectStatus()
+            .isNoContent()
 
-        val item = json.readTree(
-            authed.get().uri("/api/items/$itemId").exchange()
-                .expectStatus().isOk().expectBody(String::class.java).returnResult().responseBody!!,
-        )
+        val item =
+            json.readTree(
+                authed
+                    .get()
+                    .uri("/api/items/$itemId")
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody(String::class.java)
+                    .returnResult()
+                    .responseBody!!,
+            )
         assertTrue(item["assignee"].isNull)
     }
 }

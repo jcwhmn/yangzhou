@@ -19,23 +19,33 @@ import java.util.UUID
 @Tag(name = "Attachment", description = "item 附件(presign 直传直取,字节不经后端)")
 @RequestMapping("/api")
 @RestController
-class AttachmentController(private val service: AttachmentService) {
-
+class AttachmentController(
+    private val service: AttachmentService,
+) {
     @PostMapping("/items/{itemId}/attachments")
     @ResponseStatus(HttpStatus.CREATED)
-    fun register(@PathVariable itemId: UUID, @Valid @RequestBody request: RegisterRequest): AttachmentUploadedResponse =
-        service.register(itemId, request.filename!!, request.contentType!!, request.sizeBytes!!)
+    fun register(
+        @PathVariable itemId: UUID,
+        @Valid @RequestBody request: RegisterRequest,
+    ): AttachmentUploadedResponse = service.register(itemId, request.filename!!, request.contentType!!, request.sizeBytes!!)
 
     @GetMapping("/items/{itemId}/attachments")
-    fun list(@PathVariable itemId: UUID): List<AttachmentResponse> = service.list(itemId)
+    fun list(
+        @PathVariable itemId: UUID,
+    ): List<AttachmentResponse> = service.list(itemId)
 
     @GetMapping("/items/{itemId}/attachments/{objectId}/download-url")
-    fun downloadUrl(@PathVariable itemId: UUID, @PathVariable objectId: UUID): AttachmentDownloadResponse =
-        service.downloadUrl(itemId, objectId)
+    fun downloadUrl(
+        @PathVariable itemId: UUID,
+        @PathVariable objectId: UUID,
+    ): AttachmentDownloadResponse = service.downloadUrl(itemId, objectId)
 
     @DeleteMapping("/items/{itemId}/attachments/{objectId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    fun delete(@PathVariable itemId: UUID, @PathVariable objectId: UUID) = service.delete(itemId, objectId)
+    fun delete(
+        @PathVariable itemId: UUID,
+        @PathVariable objectId: UUID,
+    ) = service.delete(itemId, objectId)
 }
 
 data class RegisterRequest(

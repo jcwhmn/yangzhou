@@ -4,6 +4,8 @@ import io.mockk.clearMocks
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Nested
 import yangzhou.api.error.BadRequestException
 import yangzhou.api.error.ConflictException
 import yangzhou.api.error.NotFoundException
@@ -12,15 +14,12 @@ import yangzhou.persistence.Project
 import yangzhou.persistence.repository.MilestoneRepository
 import yangzhou.persistence.repository.ProjectRepository
 import java.util.UUID
-import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Nested
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 /** YPJ-89 单测补齐:MilestoneService(状态机:单 in_progress/终态不可变)。 */
 class MilestoneServiceUnitTest {
-
     private val projects = mockk<ProjectRepository>(relaxed = true)
     private val milestones = mockk<MilestoneRepository>(relaxed = true)
     private val service = MilestoneService(projects, milestones)
@@ -37,7 +36,6 @@ class MilestoneServiceUnitTest {
 
     @Nested
     inner class CreateMilestone {
-
         @Test
         fun blankNameRejected() {
             assertFailsWith<BadRequestException> { service.create("CHE", CreateMilestoneRequest("  ")) }
@@ -53,7 +51,6 @@ class MilestoneServiceUnitTest {
 
     @Nested
     inner class UpdateMilestone {
-
         @Test
         fun invalidStatusRejected() {
             assertFailsWith<BadRequestException> {
@@ -102,7 +99,6 @@ class MilestoneServiceUnitTest {
 
     @Nested
     inner class FindMilestone {
-
         @Test
         fun missingRejected() {
             every { milestones.findByProjectObjectIdAndObjectId(UUID(0, 1), any()) } returns null

@@ -4,13 +4,14 @@ import io.mockk.clearMocks
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Nested
 import yangzhou.api.business.notification.NotificationService
 import yangzhou.api.business.projectmember.ProjectMemberService
 import yangzhou.persistence.Item
 import yangzhou.persistence.ItemActivity
 import yangzhou.persistence.ItemGitRef
 import yangzhou.persistence.ItemStatusHistory
-import yangzhou.persistence.Member
 import yangzhou.persistence.Project
 import yangzhou.persistence.ProjectRepo
 import yangzhou.persistence.ProjectWorkflowRule
@@ -26,21 +27,16 @@ import yangzhou.persistence.repository.ProjectRepository
 import yangzhou.persistence.repository.ProjectWorkflowRuleRepository
 import yangzhou.persistence.repository.StatusRepository
 import yangzhou.persistence.repository.WorkspaceRepository
-import java.util.Optional
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Nested
 
 /**
  * YPJ-82 mockk 子票③:GithubSyncService 迁移规则(applyEvent)与扇出(syncAll)单测。
  * 协作者 mockk(relaxed);泛型 save 显式 firstArg(P0 坑);事件名经 VcsEvent.wire 引用不抄字符串。
  */
 class GithubSyncServiceUnitTest {
-
     private val workspaces = mockk<WorkspaceRepository>(relaxed = true)
     private val projectRepos = mockk<ProjectRepoRepository>(relaxed = true)
     private val projects = mockk<ProjectRepository>(relaxed = true)
@@ -55,14 +51,27 @@ class GithubSyncServiceUnitTest {
     private val notificationService = mockk<NotificationService>(relaxed = true)
     private val gateway = mockk<VcsGateway>(relaxed = true)
 
-    private val service = GithubSyncService(
-        workspaces, projectRepos, projects, items, statuses, rules, gitRefs,
-        activityRepo, historyRepo, members, projectMembers, notificationService, gateway,
-    )
+    private val service =
+        GithubSyncService(
+            workspaces,
+            projectRepos,
+            projects,
+            items,
+            statuses,
+            rules,
+            gitRefs,
+            activityRepo,
+            historyRepo,
+            members,
+            projectMembers,
+            notificationService,
+            gateway,
+        )
 
     private val project = Project(id = 100L, objectId = UUID(0, 100), workspaceObjectId = UUID(0, 1), key = "YPJ", name = "yangzhou")
     private val ws = Workspace(id = 1L, objectId = UUID(0, 1), githubToken = "tok")
-    private val item = Item(id = 9L, objectId = UUID(0, 9), projectObjectId = UUID(0, 100), number = 7, title = "任务", statusObjectId = UUID.randomUUID())
+    private val item =
+        Item(id = 9L, objectId = UUID(0, 9), projectObjectId = UUID(0, 100), number = 7, title = "任务", statusObjectId = UUID.randomUUID())
 
     private val todoOid = UUID.randomUUID()
     private val doingOid = UUID.randomUUID()
@@ -74,16 +83,39 @@ class GithubSyncServiceUnitTest {
     @BeforeEach
     fun setup() {
         clearMocks(
-            workspaces, projectRepos, projects, items, statuses, rules, gitRefs,
-            activityRepo, historyRepo, members, projectMembers, notificationService, gateway,
+            workspaces,
+            projectRepos,
+            projects,
+            items,
+            statuses,
+            rules,
+            gitRefs,
+            activityRepo,
+            historyRepo,
+            members,
+            projectMembers,
+            notificationService,
+            gateway,
         )
         every { statuses.findByProjectObjectIdOrderByPosition(UUID(0, 100)) } returns listOf(todo, doing, done)
         every { items.findByObjectId(UUID(0, 9)) } returns (item)
-        every { items.save(any()) } answers { val arg: Item = firstArg(); arg }
-        every { gitRefs.save(any()) } answers { val arg: ItemGitRef = firstArg(); arg }
-        every { historyRepo.save(any()) } answers { val arg: ItemStatusHistory = firstArg(); arg }
+        every { items.save(any()) } answers {
+            val arg: Item = firstArg()
+            arg
+        }
+        every { gitRefs.save(any()) } answers {
+            val arg: ItemGitRef = firstArg()
+            arg
+        }
+        every { historyRepo.save(any()) } answers {
+            val arg: ItemStatusHistory = firstArg()
+            arg
+        }
         every { items.findByProjectObjectIdAndStatusObjectId(UUID(0, 100), doingOid) } returns emptyList()
-        every { activityRepo.save(any()) } answers { val arg: ItemActivity = firstArg(); arg } // 泛型坑(P0)
+        every { activityRepo.save(any()) } answers {
+            val arg: ItemActivity = firstArg()
+            arg
+        } // 泛型坑(P0)
     }
 
     @Nested
@@ -149,10 +181,15 @@ class GithubSyncServiceUnitTest {
             every { rules.findByProjectObjectIdAndEventType(UUID(0, 100), VcsEvent.PR_MERGED.wire) } returns
                 ProjectWorkflowRule(projectObjectId = UUID(0, 100), eventType = VcsEvent.PR_MERGED.wire, statusObjectId = doingOid)
             every { items.findByObjectId(UUID(0, 9)) } returns (item.copy(statusObjectId = todoOid))
-            every { statuses.findByProjectObjectIdAndObjectId(UUID(0, 100), doingOid) } returns doing // relaxed 对无全默认构造的 data class 返回 null,须显式
+// relaxed 对无全默认构造的 data class 返回 null,须显式
+            every { statuses.findByProjectObjectIdAndObjectId(UUID(0, 100), doingOid) } returns doing
 
             val savedItems = mutableListOf<Item>()
-            every { items.save(any()) } answers { val arg: Item = firstArg(); savedItems.add(arg); arg }
+            every { items.save(any()) } answers {
+                val arg: Item = firstArg()
+                savedItems.add(arg)
+                arg
+            }
             service.applyEvent(project, UUID(0, 9), VcsEvent.PR_MERGED.wire, "pr #1")
             assertEquals(doingOid, savedItems.single().statusObjectId)
             verify(exactly = 1) { historyRepo.save(any()) }
@@ -206,9 +243,10 @@ class GithubSyncServiceUnitTest {
         @Test
         fun `gateway 404 - 单仓库 WARN 不炸,继续后续挂载`() {
             every { workspaces.findAll() } returns listOf(ws)
-            every { projectRepos.findAll() } returnsMany listOf(
-                listOf(ProjectRepo(projectObjectId = UUID(0, 100), repo = "octo/r")),
-            )
+            every { projectRepos.findAll() } returnsMany
+                listOf(
+                    listOf(ProjectRepo(projectObjectId = UUID(0, 100), repo = "octo/r")),
+                )
             every { projects.findByObjectId(UUID(0, 100)) } returns (project)
             every { gateway.listBranches(any(), any()) } throws VcsApiException(404, "not found")
 
@@ -225,7 +263,11 @@ class GithubSyncServiceUnitTest {
             every { rules.findByProjectObjectIdAndEventType(UUID(0, 100), any()) } returns null // 事件规则缺省,只验证 gitRef
 
             val savedRefs = mutableListOf<ItemGitRef>()
-            every { gitRefs.save(any()) } answers { val arg: ItemGitRef = firstArg(); savedRefs.add(arg); arg }
+            every { gitRefs.save(any()) } answers {
+                val arg: ItemGitRef = firstArg()
+                savedRefs.add(arg)
+                arg
+            }
             service.syncAll()
             assertEquals("branch", savedRefs.single().kind)
             assertEquals(UUID(0, 9), savedRefs.single().itemObjectId)

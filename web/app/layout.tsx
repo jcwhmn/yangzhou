@@ -6,7 +6,11 @@ import { Footer } from "@/components/Footer";
 
 export const metadata: Metadata = { title: "扬州 yangzhou" };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html lang="zh-CN" suppressHydrationWarning>
       <body>

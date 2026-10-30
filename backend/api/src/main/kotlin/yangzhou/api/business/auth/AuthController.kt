@@ -10,13 +10,17 @@ import org.springframework.web.bind.annotation.RestController
 
 @RestController
 @RequestMapping("/api")
-class AuthController(private val authService: AuthService) {
-
+class AuthController(
+    private val authService: AuthService,
+) {
     @PostMapping("/auth/bootstrap")
-    fun bootstrap(@Valid @RequestBody request: BootstrapRequest): ResponseEntity<AuthService.TokenResponse> =
+    fun bootstrap(
+        @Valid @RequestBody request: BootstrapRequest,
+    ): ResponseEntity<AuthService.TokenResponse> =
         ResponseEntity.status(HttpStatus.CREATED).body(authService.bootstrap(request.username, request.password))
 
     @PostMapping("/auth/login")
-    fun login(@Valid @RequestBody request: LoginRequest): ResponseEntity<AuthService.TokenResponse> =
-        ResponseEntity.ok(authService.login(request.username, request.password))
+    fun login(
+        @Valid @RequestBody request: LoginRequest,
+    ): ResponseEntity<AuthService.TokenResponse> = ResponseEntity.ok(authService.login(request.username, request.password))
 }

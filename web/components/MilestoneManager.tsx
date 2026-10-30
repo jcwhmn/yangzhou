@@ -1,6 +1,20 @@
 "use client";
 
-import { Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Stack, TextField, Tooltip, Typography } from "@mui/material";
+import {
+  Alert,
+  Box,
+  Button,
+  Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  IconButton,
+  Stack,
+  TextField,
+  Tooltip,
+  Typography,
+} from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import { useState } from "react";
@@ -15,7 +29,12 @@ export type Milestone = {
   targetDate: string | null;
 };
 
-const statusIcon = { planned: "○", in_progress: "▶", completed: "✓", cancelled: "✗" } as const;
+const statusIcon = {
+  planned: "○",
+  in_progress: "▶",
+  completed: "✓",
+  cancelled: "✗",
+} as const;
 
 /**
  * V14 Milestone 管理对话框(spec 0011):内联创建/编辑表单 + 行内单向状态按钮
@@ -54,9 +73,15 @@ export function MilestoneManager({
     try {
       const body = { name: name.trim(), targetDate: targetDate || null };
       if (editingId) {
-        await api(`/api/projects/${projectKey}/milestones/${editingId}`, { method: "PATCH", body: JSON.stringify(body) });
+        await api(`/api/projects/${projectKey}/milestones/${editingId}`, {
+          method: "PATCH",
+          body: JSON.stringify(body),
+        });
       } else {
-        await api(`/api/projects/${projectKey}/milestones`, { method: "POST", body: JSON.stringify(body) });
+        await api(`/api/projects/${projectKey}/milestones`, {
+          method: "POST",
+          body: JSON.stringify(body),
+        });
       }
       reset();
       onChanged();
@@ -67,7 +92,10 @@ export function MilestoneManager({
 
   async function transition(m: Milestone, status: string) {
     try {
-      await api(`/api/projects/${projectKey}/milestones/${m.milestoneId}`, { method: "PATCH", body: JSON.stringify({ status }) });
+      await api(`/api/projects/${projectKey}/milestones/${m.milestoneId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status }),
+      });
       setError("");
       onChanged();
     } catch (err) {
@@ -81,7 +109,9 @@ export function MilestoneManager({
       return;
     }
     try {
-      await api(`/api/projects/${projectKey}/milestones/${m.milestoneId}`, { method: "DELETE" });
+      await api(`/api/projects/${projectKey}/milestones/${m.milestoneId}`, {
+        method: "DELETE",
+      });
       setConfirmingId(null);
       onChanged();
     } catch (err) {
@@ -90,10 +120,22 @@ export function MilestoneManager({
   }
 
   return (
-    <Dialog open={open} onClose={() => { onClose(); reset(); }} maxWidth="sm" fullWidth>
+    <Dialog
+      open={open}
+      onClose={() => {
+        onClose();
+        reset();
+      }}
+      maxWidth="sm"
+      fullWidth
+    >
       <DialogTitle>{t.projectNav.milestones}</DialogTitle>
       <DialogContent>
-        <Box component="form" onSubmit={submit} sx={{ display: "flex", gap: 1, alignItems: "center", mb: 2 }}>
+        <Box
+          component="form"
+          onSubmit={submit}
+          sx={{ display: "flex", gap: 1, alignItems: "center", mb: 2 }}
+        >
           <TextField
             label={t.milestone.createName}
             size="small"
@@ -102,7 +144,12 @@ export function MilestoneManager({
             sx={{ flex: 1 }}
             autoFocus
           />
-          <DateInput label={t.milestone.targetDate} size="small" value={targetDate} onChange={setTargetDate} />
+          <DateInput
+            label={t.milestone.targetDate}
+            size="small"
+            value={targetDate}
+            onChange={setTargetDate}
+          />
           <Button type="submit" variant="contained" disabled={!name.trim()}>
             {editingId ? t.milestone.save : t.milestone.create}
           </Button>
@@ -116,41 +163,83 @@ export function MilestoneManager({
             </Button>
           )}
         </Box>
-        {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        )}
         <Stack spacing={0.5}>
           {milestones.length === 0 && (
-            <Typography variant="body2" color="text.secondary">{t.projectNav.noMilestones}</Typography>
+            <Typography variant="body2" color="text.secondary">
+              {t.projectNav.noMilestones}
+            </Typography>
           )}
           {milestones.map((m) => {
-            const terminal = m.status === "completed" || m.status === "cancelled";
+            const terminal =
+              m.status === "completed" || m.status === "cancelled";
             return (
               <Box
                 key={m.milestoneId}
                 data-testid="milestone-row"
-                sx={{ display: "flex", alignItems: "center", gap: 1, py: 0.5, borderBottom: "1px solid", borderColor: "grey.100" }}
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1,
+                  py: 0.5,
+                  borderBottom: "1px solid",
+                  borderColor: "grey.100",
+                }}
               >
-                <Typography variant="body2" sx={{ width: 16, textAlign: "center" }}>
+                <Typography
+                  variant="body2"
+                  sx={{ width: 16, textAlign: "center" }}
+                >
                   {statusIcon[m.status as keyof typeof statusIcon]}
                 </Typography>
                 <Box sx={{ flex: 1, minWidth: 0 }}>
                   <Typography
                     variant="body2"
-                    sx={{ textDecoration: terminal && m.status === "cancelled" ? "line-through" : "none" }}
+                    sx={{
+                      textDecoration:
+                        terminal && m.status === "cancelled"
+                          ? "line-through"
+                          : "none",
+                    }}
                   >
                     {m.name}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
-                    {t.milestone.status[m.status as keyof typeof t.milestone.status]}
+                    {
+                      t.milestone.status[
+                        m.status as keyof typeof t.milestone.status
+                      ]
+                    }
                     {m.targetDate ? ` · ${m.targetDate}` : ""}
                   </Typography>
                 </Box>
                 {m.status === "planned" && (
-                  <Button size="small" onClick={() => transition(m, "in_progress")}>▶ {t.milestone.start}</Button>
+                  <Button
+                    size="small"
+                    onClick={() => transition(m, "in_progress")}
+                  >
+                    ▶ {t.milestone.start}
+                  </Button>
                 )}
                 {m.status === "in_progress" && (
                   <>
-                    <Button size="small" onClick={() => transition(m, "completed")}>✓ {t.milestone.complete}</Button>
-                    <Button size="small" color="inherit" onClick={() => transition(m, "cancelled")}>✗ {t.milestone.cancelMs}</Button>
+                    <Button
+                      size="small"
+                      onClick={() => transition(m, "completed")}
+                    >
+                      ✓ {t.milestone.complete}
+                    </Button>
+                    <Button
+                      size="small"
+                      color="inherit"
+                      onClick={() => transition(m, "cancelled")}
+                    >
+                      ✗ {t.milestone.cancelMs}
+                    </Button>
                   </>
                 )}
                 {!terminal && (
@@ -177,7 +266,9 @@ export function MilestoneManager({
                     onClick={() => remove(m)}
                   >
                     {confirmingId === m.milestoneId ? (
-                      <Typography variant="caption" color="error">{t.milestone.confirmDelete}</Typography>
+                      <Typography variant="caption" color="error">
+                        {t.milestone.confirmDelete}
+                      </Typography>
                     ) : (
                       <DeleteIcon fontSize="small" />
                     )}
@@ -189,7 +280,14 @@ export function MilestoneManager({
         </Stack>
       </DialogContent>
       <DialogActions>
-        <Button onClick={() => { onClose(); reset(); }}>{t.milestone.close}</Button>
+        <Button
+          onClick={() => {
+            onClose();
+            reset();
+          }}
+        >
+          {t.milestone.close}
+        </Button>
       </DialogActions>
     </Dialog>
   );

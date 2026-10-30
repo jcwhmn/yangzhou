@@ -9,16 +9,16 @@ import yangzhou.api.AbstractApiTest
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/** YPJ-33:访问日志黑盒——每 call 一行、写操作 INFO、密码脱敏、GET 默认不落。 */
-// 级别在 @BeforeEach 直接钉 logback(JVM 全局)——context properties 在缓存 context 复用时不重放,
-// 顺序依赖偶发(YPJ-72 会话实锤:DebugLevel 变体先行则 INFO 用例偶发抓不到行)
+/** YPJ-33:访问日志黑盒——每 call 一行、写操作 INFO、密码脱敏、GET 默认不落。
+ * 级别在 @BeforeEach 直接钉 logback(JVM 全局)——context properties 在缓存 context 复用时不重放,
+ * 顺序依赖偶发(YPJ-72 会话实锤:DebugLevel 变体先行则 INFO 用例偶发抓不到行)
+ */
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
     properties = ["logging.level.yangzhou.api.access=INFO"],
 )
 @ExtendWith(OutputCaptureExtension::class)
 class AccessLogFilterTest : AbstractApiTest() {
-
     @org.junit.jupiter.api.BeforeEach
     fun pinLogLevel() {
         (org.slf4j.LoggerFactory.getLogger("yangzhou.api.access") as ch.qos.logback.classic.Logger).level =
@@ -27,10 +27,13 @@ class AccessLogFilterTest : AbstractApiTest() {
 
     @Test
     fun `bootstrap(写操作)落 INFO 一行——密码字段 mask 原文不落`(captured: CapturedOutput) {
-        rest.post().uri("/api/auth/bootstrap")
+        rest
+            .post()
+            .uri("/api/auth/bootstrap")
             .body(mapOf("username" to "me", "password" to "pw-plain-123"))
             .exchange()
-            .expectStatus().isCreated()
+            .expectStatus()
+            .isCreated()
 
         val logs = captured.toString()
         assertTrue("method=POST path=/api/auth/bootstrap status=201" in logs, logs)
@@ -42,7 +45,12 @@ class AccessLogFilterTest : AbstractApiTest() {
     @Test
     fun `GET 默认级别不落——写操作 INFO 存在`(captured: CapturedOutput) {
         val authed = bootstrapAndAuth()
-        authed.get().uri("/api/projects").exchange().expectStatus().isOk()
+        authed
+            .get()
+            .uri("/api/projects")
+            .exchange()
+            .expectStatus()
+            .isOk()
 
         val logs = captured.toString()
         assertTrue("method=POST path=/api/auth" in logs, logs)
@@ -51,10 +59,13 @@ class AccessLogFilterTest : AbstractApiTest() {
 
     @Test
     fun `401 短路也留痕——无 token 访问受保护端点`(captured: CapturedOutput) {
-        rest.post().uri("/api/projects")
+        rest
+            .post()
+            .uri("/api/projects")
             .body(mapOf("key" to "X1", "name" to "x"))
             .exchange()
-            .expectStatus().isUnauthorized()
+            .expectStatus()
+            .isUnauthorized()
 
         // body 未被下游消费 → 不落 body 段;POST=INFO 默认可见;JWT 短路在 interceptor 之前 → 无 handler 段
         assertTrue("method=POST path=/api/projects status=401" in captured.toString(), captured.toString())
@@ -69,7 +80,6 @@ class AccessLogFilterTest : AbstractApiTest() {
 )
 @ExtendWith(OutputCaptureExtension::class)
 class AccessLogFilterDebugLevelTest : AbstractApiTest() {
-
     @org.junit.jupiter.api.BeforeEach
     fun pinLogLevel() {
         (org.slf4j.LoggerFactory.getLogger("yangzhou.api.access") as ch.qos.logback.classic.Logger).level =
@@ -79,7 +89,12 @@ class AccessLogFilterDebugLevelTest : AbstractApiTest() {
     @Test
     fun `GET 在 DEBUG 级别落行`(captured: CapturedOutput) {
         val authed = bootstrapAndAuth()
-        authed.get().uri("/api/projects").exchange().expectStatus().isOk()
+        authed
+            .get()
+            .uri("/api/projects")
+            .exchange()
+            .expectStatus()
+            .isOk()
 
         val logs = captured.toString()
         assertTrue("method=GET path=/api/projects status=200" in logs, logs)

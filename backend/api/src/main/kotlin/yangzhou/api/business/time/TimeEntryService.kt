@@ -32,7 +32,6 @@ class TimeEntryService(
     private val projectMembers: ProjectMemberService,
     private val githubCommits: GithubCommitService,
 ) {
-
     data class TimeEntryDto(
         val timeEntryId: UUID,
         val itemId: UUID,
@@ -43,7 +42,10 @@ class TimeEntryService(
         val note: String?,
     )
 
-    data class ItemTimeLog(val entries: List<TimeEntryDto>, val totalMinutes: Long)
+    data class ItemTimeLog(
+        val entries: List<TimeEntryDto>,
+        val totalMinutes: Long,
+    )
 
     data class MemberSummary(
         val memberId: UUID,
@@ -54,7 +56,13 @@ class TimeEntryService(
 
     /** minutes 空 = 开计时(自动停旧);minutes 非空 = 补录(不得再带 startedAt/endedAt)。 */
     @Transactional
-    fun create(itemId: UUID, minutes: Int?, startedAtText: String?, endedAtText: String?, note: String?): TimeEntryDto {
+    fun create(
+        itemId: UUID,
+        minutes: Int?,
+        startedAtText: String?,
+        endedAtText: String?,
+        note: String?,
+    ): TimeEntryDto {
         // 补录(minutes)与起止(startedAt/endedAt)互斥(V8-S3 验收)
         if (minutes != null && (startedAtText != null || endedAtText != null)) {
             throw BadRequestException("补录只填 minutes 与备注;计时模式由服务端生成起止")
@@ -66,29 +74,32 @@ class TimeEntryService(
         val me = memberService.current()
         projectMembers.assertAssignable(item.projectObjectId, me.objectId!!)
 
-        val entry = when {
-            minutes == null && startedAtText != null -> { // V16-3 起止补录(工时建议落账走这里);首末 commit ≈ 开工/收工
-                val endText = endedAtText ?: throw BadRequestException("起止需成对:startedAt 与 endedAt 都要给")
-                val start = parseInstant(startedAtText) ?: throw BadRequestException("startedAt 应为 ISO-8601(如 2026-10-07T14:00:00Z)")
-                val end = parseInstant(endText) ?: throw BadRequestException("endedAt 应为 ISO-8601")
-                if (!end.isAfter(start)) throw BadRequestException("endedAt 必须晚于 startedAt")
-                TimeEntry(itemObjectId = item.objectId!!, memberObjectId = me.objectId!!, startedAt = start, endedAt = end, note = note)
+        val entry =
+            when {
+                minutes == null && startedAtText != null -> { // V16-3 起止补录(工时建议落账走这里);首末 commit ≈ 开工/收工
+                    val endText = endedAtText ?: throw BadRequestException("起止需成对:startedAt 与 endedAt 都要给")
+                    val start = parseInstant(startedAtText) ?: throw BadRequestException("startedAt 应为 ISO-8601(如 2026-10-07T14:00:00Z)")
+                    val end = parseInstant(endText) ?: throw BadRequestException("endedAt 应为 ISO-8601")
+                    if (!end.isAfter(start)) throw BadRequestException("endedAt 必须晚于 startedAt")
+                    TimeEntry(itemObjectId = item.objectId!!, memberObjectId = me.objectId!!, startedAt = start, endedAt = end, note = note)
+                }
+                minutes == null -> { // 计时:停掉我所有进行中的,再开新的
+                    timeEntries
+                        .findByMemberObjectIdAndEndedAtIsNull(me.objectId!!)
+                        .forEach { timeEntries.save(it.copy(endedAt = Instant.now())) }
+                    TimeEntry(itemObjectId = item.objectId!!, memberObjectId = me.objectId!!, startedAt = Instant.now(), note = note)
+                }
+                minutes <= 0 -> throw BadRequestException("minutes 必须为正数")
+                else ->
+                    TimeEntry(
+                        itemObjectId = item.objectId!!,
+                        memberObjectId = me.objectId!!,
+                        startedAt = Instant.now().minusSeconds(minutes * 60L),
+                        endedAt = Instant.now(),
+                        minutes = minutes,
+                        note = note,
+                    )
             }
-            minutes == null -> { // 计时:停掉我所有进行中的,再开新的
-                timeEntries.findByMemberObjectIdAndEndedAtIsNull(me.objectId!!)
-                    .forEach { timeEntries.save(it.copy(endedAt = Instant.now())) }
-                TimeEntry(itemObjectId = item.objectId!!, memberObjectId = me.objectId!!, startedAt = Instant.now(), note = note)
-            }
-            minutes <= 0 -> throw BadRequestException("minutes 必须为正数")
-            else -> TimeEntry(
-                itemObjectId = item.objectId!!,
-                memberObjectId = me.objectId!!,
-                startedAt = Instant.now().minusSeconds(minutes * 60L),
-                endedAt = Instant.now(),
-                minutes = minutes,
-                note = note,
-            )
-        }
         return toDto(timeEntries.save(entry), me.displayName)
     }
 
@@ -117,7 +128,8 @@ class TimeEntryService(
         val projectItems = items.findByProjectObjectIdAndDeletedAtIsNullOrderByNumber(project.objectId!!)
         val rows = timeEntries.findByItemObjectIdIn(projectItems.mapNotNull { it.objectId })
         val memberMap = members.findAllByObjectIdIn(rows.map { it.memberObjectId }.toSet()).associateBy { it.objectId }
-        return rows.groupBy { it.memberObjectId }
+        return rows
+            .groupBy { it.memberObjectId }
             .map { (memberId, list) ->
                 MemberSummary(
                     memberId = memberMap[memberId]?.objectId ?: UUID(0, 0),
@@ -125,8 +137,7 @@ class TimeEntryService(
                     totalMinutes = list.sumOf { minutesOf(it) },
                     entryCount = list.size,
                 )
-            }
-            .sortedByDescending { it.totalMinutes }
+            }.sortedByDescending { it.totalMinutes }
     }
 
     data class SuggestedEntry(
@@ -147,9 +158,10 @@ class TimeEntryService(
         /** 纯映射:≥2 个带时间戳的 commit 才成段(单 commit 无从定义收工);无日期 commit 忽略。 */
         fun buildSuggestions(refs: List<GithubCommitService.RefCommitsDto>): List<SuggestedEntry> =
             refs.mapNotNull { ref ->
-                val dates = ref.commits
-                    .mapNotNull { c -> c.date?.let { d -> runCatching { Instant.parse(d) }.getOrNull() } }
-                    .sorted()
+                val dates =
+                    ref.commits
+                        .mapNotNull { c -> c.date?.let { d -> runCatching { Instant.parse(d) }.getOrNull() } }
+                        .sorted()
                 if (dates.size < 2) return@mapNotNull null
                 SuggestedEntry(
                     repo = ref.repo,
@@ -164,7 +176,10 @@ class TimeEntryService(
 
     // ---------- 内部 ----------
 
-    private fun toDto(e: TimeEntry, memberName: String) = TimeEntryDto(
+    private fun toDto(
+        e: TimeEntry,
+        memberName: String,
+    ) = TimeEntryDto(
         timeEntryId = e.objectId,
         itemId = items.findByObjectId(e.itemObjectId)?.objectId ?: UUID(0, 0),
         member = memberName,
@@ -174,8 +189,7 @@ class TimeEntryService(
         note = e.note,
     )
 
-    private fun minutesOf(e: TimeEntry): Long =
-        e.minutes?.toLong() ?: Duration.between(e.startedAt, e.endedAt ?: Instant.now()).toMinutes()
+    private fun minutesOf(e: TimeEntry): Long = e.minutes?.toLong() ?: Duration.between(e.startedAt, e.endedAt ?: Instant.now()).toMinutes()
 }
 
 data class CreateTimeEntryRequest(

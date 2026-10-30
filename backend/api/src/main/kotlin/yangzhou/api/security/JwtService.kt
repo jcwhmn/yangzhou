@@ -25,7 +25,8 @@ class JwtService(
     private val ttl: Duration = Duration.ofHours(ttlHours)
 
     fun generate(subject: String): String =
-        Jwts.builder()
+        Jwts
+            .builder()
             .subject(subject)
             .issuedAt(Date())
             .expiration(Date(System.currentTimeMillis() + ttl.toMillis()))
@@ -33,11 +34,17 @@ class JwtService(
             .compact()
 
     /** 校验并返回 subject;无效/过期返回 null。 */
-    fun verify(token: String): String? = try {
-        Jwts.parser().verifyWith(key).build().parseSignedClaims(token).payload.subject
-    } catch (_: Exception) {
-        null
-    }
+    fun verify(token: String): String? =
+        try {
+            Jwts
+                .parser()
+                .verifyWith(key)
+                .build()
+                .parseSignedClaims(token)
+                .payload.subject
+        } catch (_: Exception) {
+            null
+        }
 
     companion object {
         /** application.yml 的内置开发密钥;与 yml 保持一致。 */

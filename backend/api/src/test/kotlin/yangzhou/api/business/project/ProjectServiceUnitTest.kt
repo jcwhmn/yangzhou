@@ -1,11 +1,12 @@
 package yangzhou.api.business.project
 
-import java.util.UUID
+import io.mockk.Ordering
 import io.mockk.clearMocks
 import io.mockk.every
-import io.mockk.Ordering
 import io.mockk.mockk
 import io.mockk.verify
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Nested
 import yangzhou.api.business.member.MemberService
 import yangzhou.api.business.workspace.WorkspaceService
 import yangzhou.api.error.ConflictException
@@ -20,15 +21,13 @@ import yangzhou.persistence.repository.ProjectMemberRepository
 import yangzhou.persistence.repository.ProjectRepository
 import yangzhou.persistence.repository.ProjectWorkflowRuleRepository
 import yangzhou.persistence.repository.StatusRepository
-import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Nested
+import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 /** YPJ-87 单测补齐:ProjectService(建项种子/组装/删除)。规则种子细节见 DefaultRuleSeedsUnitTest,不重复。 */
 class ProjectServiceUnitTest {
-
     private val projects = mockk<ProjectRepository>(relaxed = true)
     private val statuses = mockk<StatusRepository>(relaxed = true)
     private val workflowRules = mockk<ProjectWorkflowRuleRepository>(relaxed = true)
@@ -39,14 +38,23 @@ class ProjectServiceUnitTest {
     private val projectMembers = mockk<ProjectMemberRepository>(relaxed = true)
     private val groupTypes = mockk<ItemGroupTypeRepository>(relaxed = true)
     private val leaderGuard = mockk<yangzhou.api.guard.LeaderGuard>(relaxed = true)
-    private val service = ProjectService(
-        leaderGuard,
-        projects, statuses, workflowRules, items, workspaceService,
-        deletions, members, projectMembers, groupTypes,
-    )
+    private val service =
+        ProjectService(
+            leaderGuard,
+            projects,
+            statuses,
+            workflowRules,
+            items,
+            workspaceService,
+            deletions,
+            members,
+            projectMembers,
+            groupTypes,
+        )
 
     private val wsId = UUID(0, 9)
-    private val me = Member(id = 5L, objectId = UUID(0, 5), workspaceObjectId = wsId, username = "me", passwordHash = "h", displayName = "me")
+    private val me =
+        Member(id = 5L, objectId = UUID(0, 5), workspaceObjectId = wsId, username = "me", passwordHash = "h", displayName = "me")
     private val che = Project(id = 1L, objectId = UUID(0, 1), workspaceObjectId = wsId, key = "CHE", name = "CHE")
 
     @BeforeEach
@@ -59,7 +67,6 @@ class ProjectServiceUnitTest {
 
     @Nested
     inner class Create {
-
         @Test
         fun duplicateKeyRejected() {
             every { projects.existsByKey("CHE") } returns true
@@ -72,7 +79,8 @@ class ProjectServiceUnitTest {
             every { projects.existsByKey("CHE") } returns false
             every { projects.save(any()) } returns fresh.copy(id = 1L, objectId = UUID(0, 1))
             every { statuses.save(any<Status>()) } answers { firstArg<Status>().copy(id = (firstArg<Status>().position + 1).toLong()) }
-            every { workflowRules.save(any<yangzhou.persistence.ProjectWorkflowRule>()) } answers { firstArg<yangzhou.persistence.ProjectWorkflowRule>() }
+            every { workflowRules.save(any<yangzhou.persistence.ProjectWorkflowRule>()) } answers
+                { firstArg<yangzhou.persistence.ProjectWorkflowRule>() }
             every { projectMembers.save(any<yangzhou.persistence.ProjectMember>()) } answers { firstArg() }
             every { groupTypes.save(any<yangzhou.persistence.ItemGroupType>()) } answers { firstArg() }
             every { statuses.findByProjectObjectIdOrderByPosition(UUID(0, 1)) } returns defaultStatuses(UUID(0, 1))
@@ -86,7 +94,6 @@ class ProjectServiceUnitTest {
 
     @Nested
     inner class GetAndList {
-
         @Test
         fun missingProjectRejected() {
             every { projects.findByKey("NOPE") } returns null
@@ -113,7 +120,6 @@ class ProjectServiceUnitTest {
 
     @Nested
     inner class DeleteProject {
-
         @Test
         fun missingProjectRejected() {
             every { projects.findByKey("NOPE") } returns null
@@ -136,11 +142,12 @@ class ProjectServiceUnitTest {
     }
 
     /** 镜像 ProjectService.defaultStatuses(V7 五列)供 get 组装;种子内容已由 DefaultRuleSeedsUnitTest 守护。 */
-    private fun defaultStatuses(projectObjectId: UUID): List<Status> = listOf(
-        Status(projectObjectId = projectObjectId, name = "To Do", position = 0),
-        Status(projectObjectId = projectObjectId, name = "In Progress", position = 1),
-        Status(projectObjectId = projectObjectId, name = "In Review", position = 2),
-        Status(projectObjectId = projectObjectId, name = "QA", position = 3),
-        Status(projectObjectId = projectObjectId, name = "Done", isFinal = true, position = 4),
-    )
+    private fun defaultStatuses(projectObjectId: UUID): List<Status> =
+        listOf(
+            Status(projectObjectId = projectObjectId, name = "To Do", position = 0),
+            Status(projectObjectId = projectObjectId, name = "In Progress", position = 1),
+            Status(projectObjectId = projectObjectId, name = "In Review", position = 2),
+            Status(projectObjectId = projectObjectId, name = "QA", position = 3),
+            Status(projectObjectId = projectObjectId, name = "Done", isFinal = true, position = 4),
+        )
 }

@@ -4,14 +4,19 @@ import { expect, test } from "./support/fixtures";
 import { apiCreateItem, expectDate, fillDate } from "./support/helpers";
 
 const seg = (page: Page, label: string, name: "月" | "日" | "年") =>
-  page.getByRole("group", { name: label, exact: true }).getByLabel(name, { exact: true });
+  page
+    .getByRole("group", { name: label, exact: true })
+    .getByLabel(name, { exact: true });
 
 async function gotoDetail(page: Page, projectKey: string, title: string) {
   const itemId = await apiCreateItem(projectKey, title);
   await page.goto(`/p/${projectKey}/i/${itemId}`);
 }
 
-test("段内 digit 拒绝:月 1+3 拒、日 0+0 拒(§6.1/§7.1)", async ({ page, projectKey }) => {
+test("段内 digit 拒绝:月 1+3 拒、日 0+0 拒(§6.1/§7.1)", async ({
+  page,
+  projectKey,
+}) => {
   await gotoDetail(page, projectKey, "E2E 日期 digit 拒绝");
   const mm = seg(page, "开始日期", "月");
   const dd = seg(page, "开始日期", "日");
@@ -42,7 +47,10 @@ test("段内 digit 拒绝:月 1+3 拒、日 0+0 拒(§6.1/§7.1)", async ({ page
   expect(sel).toEqual([0, 1]); // 落段首位 digit 选中(overwrite 视觉)
 });
 
-test("commit 阻止:02/31/2026 不提交、focus 拉回日段(§10.3)", async ({ page, projectKey }) => {
+test("commit 阻止:02/31/2026 不提交、focus 拉回日段(§10.3)", async ({
+  page,
+  projectKey,
+}) => {
   await gotoDetail(page, projectKey, "E2E 日期 commit 阻止");
   await fillDate(page, "开始日期", "2026-02-31");
   const g = page.getByRole("group", { name: "开始日期", exact: true });
@@ -50,16 +58,24 @@ test("commit 阻止:02/31/2026 不提交、focus 拉回日段(§10.3)", async ({
   await expect(seg(page, "开始日期", "日")).toBeFocused();
 });
 
-test("闰年 02/29/2028 提交;非闰年 02/29/2027 阻止", async ({ page, projectKey }) => {
+test("闰年 02/29/2028 提交;非闰年 02/29/2027 阻止", async ({
+  page,
+  projectKey,
+}) => {
   await gotoDetail(page, projectKey, "E2E 闰年边界");
   await fillDate(page, "开始日期", "2028-02-29");
   await expectDate(page, "开始日期", "2028-02-29");
   await fillDate(page, "截止日期", "2027-02-29");
-  await expect(page.getByRole("group", { name: "截止日期", exact: true })).toHaveAttribute("data-value", "");
+  await expect(
+    page.getByRole("group", { name: "截止日期", exact: true }),
+  ).toHaveAttribute("data-value", "");
   await expect(seg(page, "截止日期", "日")).toBeFocused();
 });
 
-test("空控件聚焦预填今天,未输入失焦 → value 保持空(§10.2)", async ({ page, projectKey }) => {
+test("空控件聚焦预填今天,未输入失焦 → value 保持空(§10.2)", async ({
+  page,
+  projectKey,
+}) => {
   await gotoDetail(page, projectKey, "E2E 日期空进空出");
   const g = page.getByRole("group", { name: "截止日期", exact: true });
   await seg(page, "截止日期", "月").click(); // 预填今天(仅显示基准)
@@ -67,7 +83,10 @@ test("空控件聚焦预填今天,未输入失焦 → value 保持空(§10.2)", 
   await expect(g).toHaveAttribute("data-value", "");
 });
 
-test("部分输入:只改日段,blur 提交月/年=今天(§17-3)", async ({ page, projectKey }) => {
+test("部分输入:只改日段,blur 提交月/年=今天(§17-3)", async ({
+  page,
+  projectKey,
+}) => {
   await gotoDetail(page, projectKey, "E2E 日期部分输入");
   const dd = seg(page, "截止日期", "日");
   await dd.click(); // 预填今天
@@ -92,7 +111,10 @@ test("Esc 回滚 committed value 且消红", async ({ page, projectKey }) => {
   await expectDate(page, "开始日期", "2026-01-15");
 });
 
-test("月历:点日回填提交关闭;←/→ 移格 Enter 选中(YPJ-23)", async ({ page, projectKey }) => {
+test("月历:点日回填提交关闭;←/→ 移格 Enter 选中(YPJ-23)", async ({
+  page,
+  projectKey,
+}) => {
   await gotoDetail(page, projectKey, "E2E 月历导航");
   await fillDate(page, "开始日期", "2026-01-15");
   const calBtn = page.getByRole("button", { name: "月历 开始日期" });
@@ -112,7 +134,10 @@ test("月历:点日回填提交关闭;←/→ 移格 Enter 选中(YPJ-23)", asyn
   await expect(pop).toBeHidden();
 });
 
-test("draft 不外泄:编辑中 data-value 不变,提交才变(§3.1/§3.2)", async ({ page, projectKey }) => {
+test("draft 不外泄:编辑中 data-value 不变,提交才变(§3.1/§3.2)", async ({
+  page,
+  projectKey,
+}) => {
   await gotoDetail(page, projectKey, "E2E draft 不外泄");
   const g = page.getByRole("group", { name: "开始日期", exact: true });
   const mm = seg(page, "开始日期", "月");
@@ -133,7 +158,10 @@ test("draft 不外泄:编辑中 data-value 不变,提交才变(§3.1/§3.2)", as
   await expectDate(page, "开始日期", exp);
 });
 
-test("Clear:清空、回焦月段并以今天为基准(§14)", async ({ page, projectKey }) => {
+test("Clear:清空、回焦月段并以今天为基准(§14)", async ({
+  page,
+  projectKey,
+}) => {
   await gotoDetail(page, projectKey, "E2E Clear 契约");
   await fillDate(page, "开始日期", "2026-01-15");
   await expectDate(page, "开始日期", "2026-01-15");
@@ -147,10 +175,14 @@ test("Clear:清空、回焦月段并以今天为基准(§14)", async ({ page, pr
   await expect(g).toHaveAttribute("data-value", "");
 });
 
-test("ARIA:group role/name、段名、月历按钮名(§2.2/§15)", async ({ page, projectKey }) => {
+test("ARIA:group role/name、段名、月历按钮名(§2.2/§15)", async ({
+  page,
+  projectKey,
+}) => {
   await gotoDetail(page, projectKey, "E2E ARIA 契约");
   const g = page.getByRole("group", { name: "开始日期", exact: true });
   await expect(g).toBeVisible();
-  for (const s of ["月", "日", "年"] as const) await expect(seg(page, "开始日期", s)).toBeVisible();
+  for (const s of ["月", "日", "年"] as const)
+    await expect(seg(page, "开始日期", s)).toBeVisible();
   await expect(g.getByRole("button", { name: "月历 开始日期" })).toBeVisible();
 });

@@ -16,8 +16,11 @@ class FavoriteService(
     private val projects: ProjectRepository,
     private val memberService: MemberService,
 ) {
-
-    data class FavoriteDto(val projectId: UUID, val key: String, val name: String)
+    data class FavoriteDto(
+        val projectId: UUID,
+        val key: String,
+        val name: String,
+    )
 
     @Transactional
     fun add(projectKey: String): FavoriteDto {

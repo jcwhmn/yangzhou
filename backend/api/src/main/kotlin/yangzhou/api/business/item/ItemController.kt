@@ -1,6 +1,7 @@
 package yangzhou.api.business.item
 
 import jakarta.validation.Valid
+import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PatchMapping
@@ -11,7 +12,6 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
-import org.springframework.http.HttpStatus
 import yangzhou.api.business.sprint.SprintService
 import java.util.UUID
 
@@ -22,47 +22,53 @@ class ItemController(
     private val sprintService: SprintService,
     private val releaseService: yangzhou.api.business.release.ReleaseService,
 ) {
-
     @PostMapping("/projects/{key}/items")
     @ResponseStatus(HttpStatus.CREATED)
     fun create(
         @PathVariable key: String,
         @Valid @RequestBody request: CreateItemRequest,
-    ): ItemService.ItemDto = service.create(
-        projectKey = key,
-        title = request.title.trim(),
-        description = request.description,
-        type = request.type,
-        parentItemId = request.parentItemId,
-        statusItemId = request.statusItemId,
-        externalRef = request.externalRef,
-        sprintId = request.sprintId,
-        requirements = request.requirements.map { ItemService.RequirementDto(it.attribute.trim(), it.minLevel) },
-    )
+    ): ItemService.ItemDto =
+        service.create(
+            projectKey = key,
+            title = request.title.trim(),
+            description = request.description,
+            type = request.type,
+            parentItemId = request.parentItemId,
+            statusItemId = request.statusItemId,
+            externalRef = request.externalRef,
+            sprintId = request.sprintId,
+            requirements = request.requirements.map { ItemService.RequirementDto(it.attribute.trim(), it.minLevel) },
+        )
 
     @GetMapping("/projects/{key}/items")
-    fun list(@PathVariable key: String): List<ItemService.ItemDto> = service.list(key)
+    fun list(
+        @PathVariable key: String,
+    ): List<ItemService.ItemDto> = service.list(key)
 
     @GetMapping("/items/{itemId}")
-    fun get(@PathVariable itemId: UUID): ItemService.ItemDto = service.get(itemId)
+    fun get(
+        @PathVariable itemId: UUID,
+    ): ItemService.ItemDto = service.get(itemId)
 
     @PutMapping("/items/{itemId}/requirements")
     fun replaceRequirements(
         @PathVariable itemId: UUID,
         @RequestBody request: ReplaceRequirementsRequest,
-    ): ItemService.ItemDto = service.replaceRequirements(
-        itemId,
-        request.requirements.map { ItemService.RequirementDto(it.attribute.trim(), it.minLevel) },
-    )
+    ): ItemService.ItemDto =
+        service.replaceRequirements(
+            itemId,
+            request.requirements.map { ItemService.RequirementDto(it.attribute.trim(), it.minLevel) },
+        )
 
     @PutMapping("/items/{itemId}/attributes")
     fun replaceAttributes(
         @PathVariable itemId: UUID,
         @RequestBody request: ReplaceItemAttributesRequest,
-    ): ItemService.ItemDto = service.replaceAttributes(
-        itemId,
-        request.values.map { ItemService.ItemAttributeDto(it.attribute.trim(), it.value) },
-    )
+    ): ItemService.ItemDto =
+        service.replaceAttributes(
+            itemId,
+            request.values.map { ItemService.ItemAttributeDto(it.attribute.trim(), it.value) },
+        )
 
     @PutMapping("/items/{itemId}/assignee")
     fun assign(
@@ -85,15 +91,30 @@ class ItemController(
     ): ItemService.ItemDto = releaseService.assignItem(itemId, request.releaseId)
 
     @GetMapping("/items/{itemId}/activity")
-    fun activity(@PathVariable itemId: UUID) = service.activity(itemId)
+    fun activity(
+        @PathVariable itemId: UUID,
+    ) = service.activity(itemId)
 
     @DeleteMapping("/items/{itemId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    fun delete(@PathVariable itemId: UUID) = service.delete(itemId)
+    fun delete(
+        @PathVariable itemId: UUID,
+    ) = service.delete(itemId)
 
     @PatchMapping("/items/{itemId}")
     fun update(
         @PathVariable itemId: UUID,
         @RequestBody request: UpdateItemRequest,
-    ): ItemService.ItemDto = service.update(itemId, request.title, request.description, request.type, request.statusItemId, request.parentItemId, request.startDate, request.dueDate, request.priority)
+    ): ItemService.ItemDto =
+        service.update(
+            itemId,
+            request.title,
+            request.description,
+            request.type,
+            request.statusItemId,
+            request.parentItemId,
+            request.startDate,
+            request.dueDate,
+            request.priority,
+        )
 }

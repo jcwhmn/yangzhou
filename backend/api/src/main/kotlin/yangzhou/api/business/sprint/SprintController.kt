@@ -6,7 +6,6 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
-import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
@@ -16,10 +15,13 @@ import java.util.UUID
 
 @RestController
 @RequestMapping("/api")
-class SprintController(private val service: SprintService) {
-
+class SprintController(
+    private val service: SprintService,
+) {
     @GetMapping("/projects/{key}/sprints")
-    fun list(@PathVariable key: String): List<SprintService.SprintDto> = service.list(key)
+    fun list(
+        @PathVariable key: String,
+    ): List<SprintService.SprintDto> = service.list(key)
 
     @PostMapping("/projects/{key}/sprints")
     @ResponseStatus(HttpStatus.CREATED)
@@ -29,8 +31,10 @@ class SprintController(private val service: SprintService) {
     ): SprintService.SprintDto = service.create(key, request)
 
     @GetMapping("/projects/{key}/sprints/{groupId}")
-    fun get(@PathVariable key: String, @PathVariable groupId: UUID): SprintService.SprintDto =
-        service.get(key, groupId)
+    fun get(
+        @PathVariable key: String,
+        @PathVariable groupId: UUID,
+    ): SprintService.SprintDto = service.get(key, groupId)
 
     @PatchMapping("/projects/{key}/sprints/{groupId}")
     fun update(
@@ -41,15 +45,24 @@ class SprintController(private val service: SprintService) {
 
     @DeleteMapping("/projects/{key}/sprints/{groupId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    fun delete(@PathVariable key: String, @PathVariable groupId: UUID) = service.delete(key, groupId)
+    fun delete(
+        @PathVariable key: String,
+        @PathVariable groupId: UUID,
+    ) = service.delete(key, groupId)
 
     @GetMapping("/projects/{key}/sprints/{groupId}/items")
-    fun items(@PathVariable key: String, @PathVariable groupId: UUID): List<ItemService.ItemDto> =
-        service.items(key, groupId)
+    fun items(
+        @PathVariable key: String,
+        @PathVariable groupId: UUID,
+    ): List<ItemService.ItemDto> = service.items(key, groupId)
 
     @GetMapping("/projects/{key}/backlog")
-    fun backlog(@PathVariable key: String): List<ItemService.ItemDto> = service.backlog(key)
+    fun backlog(
+        @PathVariable key: String,
+    ): List<ItemService.ItemDto> = service.backlog(key)
 
     @GetMapping("/projects/{key}/board")
-    fun board(@PathVariable key: String): SprintService.BoardDto = service.board(key)
+    fun board(
+        @PathVariable key: String,
+    ): SprintService.BoardDto = service.board(key)
 }
