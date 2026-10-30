@@ -133,3 +133,30 @@ services:
 - [ ] e2e 配置注释/.env.example 更新至 8082
 - [ ] 手工用例 1–7 全过
 - [ ] spec 补 As-built(含 BACKEND_URL 构建期/运行期实测结论)
+
+
+## As-built(2026-10-30,PR #160)
+
+### 实测结论(spec 预留的不确定点)
+
+1. **BACKEND_URL = build 期固化,实锤**:`next build` 把 rewrites destination 烤进 `routes-manifest.json`(`_originalRewrites`),运行期 env 无效。因 compose 内 web→api 恒为 `http://api:8080`,三环境同值 → **单 web 镜像通吃**,Dockerfile `ARG/ENV BACKEND_URL` 写死默认值,连 build-arg 都不用传。
+2. **web 镜像**:node:22-alpine 两阶段 standalone(无 public 目录,不 COPY);容器内 `npm ci`(host 用 pnpm 互不影响)。
+
+### 与 spec 的偏差(全部更优)
+
+- **compose project name 三文件互异**(`yz-prod`/`yz-dev`/`yz-test`):spec 未提,实测同名 project 容器互相顶替——每 up 一个环境上一个环境即被替换。本票最大隐性坑。
+- **prod JWT secret**:`JwtService` 护栏拒绝默认密钥 → gitignored `infra/compose/prod.env`(prod compose `env_file` 注入;重生成=重新登录,零数据风险)。
+- **CI e2e 拓扑显式化**:CI 无容器、bootRun 在 8080,workflow 显式 `E2E_API_URL`/`BACKEND_URL`→8080;本地默认 8082(test 容器)。
+
+### 新增实证坑(对后人最值钱)
+
+- **`localhost` 的 `::1` 回环间歇拒连**:Docker Desktop 端口发布经 wslrelay,IPv6 回环路径不稳定。**docker 发布的端口一律写 `127.0.0.1`**,已固化在 e2e 配置与 webServer 默认值。
+- **容器发布的端口不可 killport**:持有者是 `com.docker.backend`/`wslrelay`,杀之=Docker 瘫痪(实锤一次)。收容器用 `app-infra.ps1 down`;killport 已加保护名单。
+- **PS 5.1 读无 BOM 的 .ps1 按 GBK 解码**:中文注释搅坏解析,`app-infra.ps1` 必须带 UTF-8 BOM。
+- **E2E 端口迁 3002**:3001 已归 dev web,复用必撞。
+
+### 验证记录
+
+- 两镜像构建绿;test 容器 Flyway+登录 200;E2E 全量 54 例绿(1 例 epic 409 竞态 flake 复跑过;retries 挂账仍开放)
+- prod/dev/test 三容器并存互不干扰;dev 库重建(旧 bootstrap 密码不可考,scratch 语义重建)
+- CI:build + e2e(@smoke)全绿
