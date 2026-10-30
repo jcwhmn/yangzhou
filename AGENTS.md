@@ -77,8 +77,8 @@ docs/      adr/ · spec/ · architecture/(puml 类图) · requirement/(PRD) · p
 
 ## E2E(web/;Playwright,并行按用例隔离)
 
-- 后端跑 **test profile**(库 yangzhou_test):`gradle :api:bootRun --args='--spring.profiles.active=test'`;前端由 webServer 拉起 prod server(`next build && next start`,独立构建目录 .next-e2e,不踩日常 dev 的 .next);凭证与地址在 `web/e2e/.env`(模板 `.env.example`),不硬编码不提交。
-- 标准全量跑法(web/ 下):`E2E_FRONT_PORT=3001 E2E_BASE_URL=http://localhost:3001 E2E_API_URL=http://localhost:8080 BACKEND_URL=http://localhost:8080 npx playwright test`;globalSetup 自带**清测试库**(残渣 flake 解法;Fast Refresh 类由 prod server 根除,spec 0021 As-built),勿绕过;BACKEND_URL 必须 8080(rewrites 代理目标,8081 会污染 PM 库);手动清库 `npm run db:reset`
+- 后端跑 **test 容器**(库 yangzhou_test):`script/app-infra.ps1 up test`(api http://localhost:8082);调试改码可换 bootRun test profile,须 `--server.port=8082`;前端由 webServer 拉起 prod server(`next build && next start`,独立构建目录 .next-e2e,不踩日常 dev 的 .next);凭证与地址在 `web/e2e/.env`(模板 `.env.example`),不硬编码不提交。
+- 标准全量跑法(web/ 下):`E2E_FRONT_PORT=3002 E2E_BASE_URL=http://localhost:3002 E2E_API_URL=http://127.0.0.1:8082 BACKEND_URL=http://127.0.0.1:8082 npx playwright test`;globalSetup 自带**清测试库**(残渣 flake 解法;Fast Refresh 类由 prod server 根除,spec 0021 As-built),勿绕过;BACKEND_URL 必须 8082(test 容器;指 8080 会打 prod 容器、污染 PM 库);手动清库 `npm run db:reset`
 - CI e2e.yml 只跑 **@smoke 冒烟**(`npx playwright test --grep "@smoke"`;grep 不作用于依赖项目,auth 3 例全跑提供登录前提,实跑 ~12 例);完整套件 = merge 前本地全量,跑法不变(spec 0015)
 - 用例按模块分文件(一个功能域一个 `*.spec.ts`),`fullyParallel`;每用例经 fixture 独享唯一 key 项目(API 预置),**不依赖其它用例留下的状态,可单跑**。
 - 用例内只对被测行为走 UI;数据准备走 API helpers(`e2e/support/helpers.ts`)。MUI 对话框淡出期(~200ms)会吞下层点击,断言/点下层前先 `expect(dialog).toBeHidden()`。
@@ -97,9 +97,9 @@ docs/      adr/ · spec/ · architecture/(puml 类图) · requirement/(PRD) · p
 - JDK 25(LTS)。后端在 `backend/`:`gradle build`(单元测试,不含集成)/ `gradle integrationTest`(集成,需 Docker)/ `gradle :domain:run`(引擎 Demo,输出与 prototype S1–S7 可比对)。
 - `./gradlew` 同效;首次需下载发行包,国内网络慢属已知,用本地 gradle 即可。
 - CI(GitHub Actions):`backend.yml` 跑 `gradle test`(纯单元,免 Docker;spec 0014);`nightly.yml` 每日全量兜底(含集成,红了必修);`e2e.yml` web/backend 变更起 bootRun + Playwright 整跑 E2E
-- 本机开发库:`yangzhou`(外部共享 postgres,已建);bootRun 用 `gradle :api:bootRun`;rustfs 起停 `script/dev-infra.ps1`。
+- 本机开发库:`yangzhou`/`yangzhou_dev`/`yangzhou_test`(外部共享 postgres,已建)。**三 profile 常驻容器化**(YPJ-118,spec 0087):`script/app-infra.ps1 <build|up|down|status> <prod|dev|test>`——prod=web3000+api8080 / dev=web3001+api8081 / test=api8082(仅 api,E2E 用);镜像 2 个(api/web),build 先宿主 `bootJar` 再 docker build。rustfs 起停仍 `script/dev-infra.ps1`。调试改码走 IDE/gradle bootRun,但 test profile 须 `--server.port=8082` 且 test 容器已停(8080/8081 归容器)。
 - **不要猜前端或后端是否已运行,需要运行环境的,告知需要的运行环境,命令,从我这里确认**。
-- **三 profile 并存**(2026-10-29 起,YPJ-117):**8080 = test profile**(库 `yangzhou_test`,E2E/集成用,globalSetup 会清库);**8081 = PM 日常实例 = default profile**(库 `yangzhou`,dogfood 项目 YPJ,真实数据):`gradle :api:bootRun --args='--server.port=8081'`;**8082 = dev profile**(库 `yangzhou_dev`,本地开发 scratch,可丢弃数据):`gradle :api:bootRun --args='--spring.profiles.active=dev --server.port=8082'`,空库首启用 `POST /api/auth/bootstrap` 引导管理员。CLI `yz` 的 session(`~/.yangzhou/session.json`)指向谁就写谁的库——动 PM 数据前确认 server 指向 default 实例。
+- **三 profile 与端口格局**(2026-10-30 重排,YPJ-118 容器化):**3000(web)+8080 = prod / PM 日常**(default profile,库 `yangzhou`,dogfood 项目 YPJ,真实数据);**3001(web)+8081 = dev**(dev profile,库 `yangzhou_dev`,scratch 可丢弃,空库首启用 `POST /api/auth/bootstrap` 引导);**8082 = test**(test profile,库 `yangzhou_test`,E2E 用,globalSetup 会清库;无前端,E2E 前端由 Playwright 拉起)。常驻起停 `script/app-infra.ps1 <build|up|down|status> <prod|dev|test>`;CLI `yz` 的 session(`~/.yangzhou/session.json`)指向谁就写谁的库——动 PM 数据前确认 server 指向 prod(api 8080)。
 - PM 实例部署形态(已拍板):本机常驻即可;Postgres 备份手工期(`pg_dump`),自动化另票。
 - **⚠ 前端命令必须在 `web/` 目录下执行**:`cd /d/code/yangzhou/web && npx next build` / `npm run dev` / `npx playwright test` 等。agent 的 shell CWD 每次重置到 repo 根,漏 cd 会在错误目录跑命令导致 `.next` 污染或路径找不到。
 

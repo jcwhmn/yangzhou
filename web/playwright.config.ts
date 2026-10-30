@@ -3,8 +3,8 @@ import { config } from "./e2e/config";
 
 /**
  * E2E:并行、按用例隔离(project fixture 唯一 key,数据走 API 预置)。
- * 前置:本机 Postgres(共享 compose)+ 后端 test profile:
- *   gradle :api:bootRun --args='--spring.profiles.active=test'
+ * 前置:本机 Postgres(共享 compose)+ test 容器(YPJ-118):script/app-infra.ps1 up test
+ *   (api http://localhost:8082;调试也可 bootRun test profile,须 --server.port=8082)
  * 前端 prod server(next build && next start)由 webServer 拉起(已在跑则复用);
  * 构建走独立目录 .next-e2e(NEXT_DIST_DIR),不踩常驻 dev 的 .next。
  * 凭证/地址见 e2e/.env(模板 .env.example)。
@@ -32,7 +32,8 @@ export default defineConfig({
   webServer: {
     // 双 profile 并存(YPJ-3):日常 3000→8081;E2E 可用 E2E_FRONT_PORT 另起临时前端(配 E2E_BASE_URL + BACKEND_URL 指 test profile)
     command: `npx next build && npx next start -p ${process.env.E2E_FRONT_PORT ?? 3000}`,
-    env: { ...process.env, NEXT_DIST_DIR: ".next-e2e" },
+    // BACKEND_URL 固化 127.0.0.1:localhost 的 ::1 回环对 docker 端口发布间歇 ECONNREFUSED(YPJ-118 实证)
+    env: { ...process.env, BACKEND_URL: process.env.BACKEND_URL ?? "http://127.0.0.1:8082", NEXT_DIST_DIR: ".next-e2e" },
     url: config.baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 300_000,

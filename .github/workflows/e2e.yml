@@ -63,6 +63,10 @@ jobs:
 
       - name: 跑 E2E
         working-directory: web
+        env:
+          # CI 拓扑:后端 bootRun 在 8080(YPJ-118 后本地默认 8082=test 容器,CI 无容器故显式覆盖)
+          E2E_API_URL: http://127.0.0.1:8080
+          BACKEND_URL: http://127.0.0.1:8080
         run: npx playwright test --grep @smoke
 
       - name: 失败留证据
