@@ -78,7 +78,7 @@ docs/      adr/ · spec/ · architecture/(puml 类图) · requirement/(PRD) · p
 ## E2E(web/;Playwright,并行按用例隔离)
 
 - 后端跑 **test 容器**(库 yangzhou_test):`script/app-infra.ps1 up test`(api http://localhost:8082);调试改码可换 bootRun test profile,须 `--server.port=8082`;前端由 webServer 拉起 prod server(`next build && next start`,独立构建目录 .next-e2e,不踩日常 dev 的 .next);凭证与地址在 `web/e2e/.env`(模板 `.env.example`),不硬编码不提交。
-- 标准全量跑法(web/ 下):`E2E_FRONT_PORT=3001 E2E_BASE_URL=http://localhost:3001 E2E_API_URL=http://localhost:8082 BACKEND_URL=http://localhost:8082 npx playwright test`;globalSetup 自带**清测试库**(残渣 flake 解法;Fast Refresh 类由 prod server 根除,spec 0021 As-built),勿绕过;BACKEND_URL 必须 8082(test 容器;指 8080 会打 prod 容器、污染 PM 库);手动清库 `npm run db:reset`
+- 标准全量跑法(web/ 下):`E2E_FRONT_PORT=3002 E2E_BASE_URL=http://localhost:3002 E2E_API_URL=http://127.0.0.1:8082 BACKEND_URL=http://127.0.0.1:8082 npx playwright test`;globalSetup 自带**清测试库**(残渣 flake 解法;Fast Refresh 类由 prod server 根除,spec 0021 As-built),勿绕过;BACKEND_URL 必须 8082(test 容器;指 8080 会打 prod 容器、污染 PM 库);手动清库 `npm run db:reset`
 - CI e2e.yml 只跑 **@smoke 冒烟**(`npx playwright test --grep "@smoke"`;grep 不作用于依赖项目,auth 3 例全跑提供登录前提,实跑 ~12 例);完整套件 = merge 前本地全量,跑法不变(spec 0015)
 - 用例按模块分文件(一个功能域一个 `*.spec.ts`),`fullyParallel`;每用例经 fixture 独享唯一 key 项目(API 预置),**不依赖其它用例留下的状态,可单跑**。
 - 用例内只对被测行为走 UI;数据准备走 API helpers(`e2e/support/helpers.ts`)。MUI 对话框淡出期(~200ms)会吞下层点击,断言/点下层前先 `expect(dialog).toBeHidden()`。

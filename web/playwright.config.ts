@@ -32,7 +32,8 @@ export default defineConfig({
   webServer: {
     // 双 profile 并存(YPJ-3):日常 3000→8081;E2E 可用 E2E_FRONT_PORT 另起临时前端(配 E2E_BASE_URL + BACKEND_URL 指 test profile)
     command: `npx next build && npx next start -p ${process.env.E2E_FRONT_PORT ?? 3000}`,
-    env: { ...process.env, NEXT_DIST_DIR: ".next-e2e" },
+    // BACKEND_URL 固化 127.0.0.1:localhost 的 ::1 回环对 docker 端口发布间歇 ECONNREFUSED(YPJ-118 实证)
+    env: { ...process.env, BACKEND_URL: process.env.BACKEND_URL ?? "http://127.0.0.1:8082", NEXT_DIST_DIR: ".next-e2e" },
     url: config.baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 300_000,
