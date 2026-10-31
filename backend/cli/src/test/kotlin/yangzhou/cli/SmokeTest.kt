@@ -6,7 +6,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * 进程级冒烟(spec 0088):跑构建出的 yz fat-jar,零网络用例,防"加命令忘 usage / 发版未运行"。
+ * 进程级冒烟(spec 0090):跑构建出的 yz fat-jar,零网络用例,防"加命令忘 usage / 发版未运行"。
  * 锚点 = 主干命令集;新命令合并时须同步加锚点(YPJ-115 合并接力:sprints move / items assign)。
  * 子进程经 -Dfile.encoding=UTF-8 与 Main 的 UTF-8 PrintStream 输出,父进程按 UTF-8 解码——
  * 中文断言同时充当"判定行不乱码"的编码回归。

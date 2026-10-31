@@ -3,7 +3,7 @@ package yangzhou.cli
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/** spec 0088:parseCsv(RFC4180 子集)与 esc 的纯转换行为锁定——Linear CSV 导入正确性的地基。 */
+/** spec 0090:parseCsv(RFC4180 子集)与 esc 的纯转换行为锁定——Linear CSV 导入正确性的地基。 */
 class ExportImportTest {
 
     @Test

@@ -1,4 +1,4 @@
-# spec 0088 V46 YPJ-119 CLI 测试补齐:smokeTest 发布门禁 + ExportImport 单测 + e2e 触发隔离
+# spec 0090 V46 YPJ-119 CLI 测试补齐:smokeTest 发布门禁 + ExportImport 单测 + e2e 触发隔离
 
 票:YPJ-119。纯工程改进,零业务行为变更。
 
