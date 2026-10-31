@@ -143,4 +143,33 @@ class ViewsApiTest : AbstractApiTest() {
         // 正确 key 仍可删
         assertEquals(204, delete("/api/projects/VW4A/views/$viewId"))
     }
+
+    @Test
+    fun `视图 sort+query 透传与 PATCH 不传不改`() {
+        authed = bootstrapAndAuth()
+        createProject(authed, "VW5")
+        val (code, created) =
+            post(
+                "/api/projects/VW5/views",
+                mapOf(
+                    "name" to "带排序视图",
+                    "sort" to listOf(mapOf("field" to "title", "dir" to "asc")),
+                    "query" to "搜索词",
+                ),
+            )
+        assertEquals(201, code)
+        val viewId = created!!["viewId"].asText()
+        assertEquals("title", created["sort"][0]["field"].asText()) // 透传回读
+        assertEquals("搜索词", created["query"].asText())
+        assertEquals("搜索词", get("/api/projects/VW5/views")[0]["query"].asText()) // 列表一致
+        // PATCH 仅改 sort → query 不动
+        val (pcode, patched) =
+            patch("/api/projects/VW5/views/$viewId", mapOf("sort" to listOf(mapOf("field" to "number", "dir" to "desc"))))
+        assertEquals(200, pcode)
+        assertEquals("number", patched!!["sort"][0]["field"].asText())
+        assertEquals("搜索词", patched["query"].asText())
+        // PATCH 空串 = 显式清空;空体 = 全不变
+        assertEquals("", patch("/api/projects/VW5/views/$viewId", mapOf("query" to "")).second!!["query"].asText())
+        assertEquals("number", patch("/api/projects/VW5/views/$viewId", mapOf<String, String>()).second!!["sort"][0]["field"].asText())
+    }
 }

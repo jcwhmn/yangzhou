@@ -528,6 +528,8 @@ data class ProjectView(
     val name: String,
     val filters: String = "{}",
     val columns: String = "{}",
+    val sort: String? = null,
+    val query: String? = null,
     @CreatedDate
     var createdAt: Instant = Instant.now(),
     @LastModifiedDate

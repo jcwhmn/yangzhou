@@ -857,7 +857,9 @@ Content-Type: application/json
 {
   "name": "我的进行中",
   "filters": { "status": null, "assignee": null, "priority": "P1" },
-  "columns": { "priority": true, "blocked": true }
+  "columns": { "priority": true, "blocked": true },
+  "sort": [{ "field": "title", "dir": "asc" }],
+  "query": "搜索词"
 }
 
 > {%
@@ -875,7 +877,9 @@ Content-Type: application/json
 
 {
   "name": "我的进行中 v2",
-  "columns": { "priority": true }
+  "columns": { "priority": true },
+  "sort": [{ "field": "number", "dir": "asc" }],
+  "query": ""
 }
 
 ### 删视图

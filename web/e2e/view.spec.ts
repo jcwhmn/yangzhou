@@ -22,8 +22,16 @@ test("表格视图——筛选保存/切换/删除主链", async ({ page, projec
   await page
     .getByRole("option", { name: statuses[1].name, exact: true })
     .click();
+  await expect(page.getByRole("listbox")).toBeHidden(); // 菜单退场动画会吞下层点击
   await expect(page.getByText("VW 进行中 item")).toBeVisible();
   await expect(page.getByText("VW 待办 item")).toBeHidden();
+
+  // YPJ-127:排标题升 + 搜索词,一并入视图
+  await page
+    .getByRole("columnheader", { name: /标题/ })
+    .getByRole("button")
+    .click();
+  await page.getByPlaceholder("搜索编号、标题、负责人…").fill("进行中");
 
   // 保存视图(命名)
   await page.getByRole("button", { name: "保存 ·" }).click();
@@ -42,10 +50,22 @@ test("表格视图——筛选保存/切换/删除主链", async ({ page, projec
   await page.getByRole("option", { name: "默认视图" }).click();
   await expect(page.getByText("VW 待办 item")).toBeVisible();
 
-  // 切回视图 → 筛选恢复
+  await expect(page.getByPlaceholder("搜索编号、标题、负责人…")).toHaveValue(
+    "",
+  );
+
+  // 切换到视图 → 筛选恢复
   await page.getByRole("combobox", { name: "视图" }).click();
   await page.getByRole("option", { name: "进行中视图" }).click();
   await expect(page.getByText("VW 待办 item")).toBeHidden();
+
+  // YPJ-127:排序/搜索词随视图恢复
+  await expect(page.getByPlaceholder("搜索编号、标题、负责人…")).toHaveValue(
+    "进行中",
+  );
+  await expect(
+    page.getByRole("columnheader", { name: /标题/ }),
+  ).toHaveAttribute("aria-sort", "ascending");
 
   // 删除视图 → 回默认,数据全见
   await page.getByRole("button", { name: "删除视图" }).click();

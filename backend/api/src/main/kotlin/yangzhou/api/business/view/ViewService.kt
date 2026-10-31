@@ -27,18 +27,24 @@ class ViewService(
         val name: String,
         val filters: JsonNode,
         val columns: JsonNode,
+        val sort: JsonNode? = null,
+        val query: String? = null,
     )
 
     data class CreateViewRequest(
         val name: String,
         val filters: JsonNode? = null,
         val columns: JsonNode? = null,
+        val sort: JsonNode? = null,
+        val query: String? = null,
     )
 
     data class UpdateViewRequest(
         val name: String? = null,
         val filters: JsonNode? = null,
         val columns: JsonNode? = null,
+        val sort: JsonNode? = null,
+        val query: String? = null,
     )
 
     @Transactional(readOnly = true)
@@ -68,6 +74,8 @@ class ViewService(
                     name = name,
                     filters = filters.toString(),
                     columns = columns.toString(),
+                    sort = rawJson(request.sort, "sort"),
+                    query = cappedQuery(request.query),
                 ),
             )
         return toDto(saved)
@@ -94,6 +102,8 @@ class ViewService(
         }
         request.filters?.let { cur = cur.copy(filters = validated(it, "filters").toString()) }
         request.columns?.let { cur = cur.copy(columns = validated(it, "columns").toString()) }
+        request.sort?.let { cur = cur.copy(sort = rawJson(it, "sort")) }
+        request.query?.let { cur = cur.copy(query = cappedQuery(it)) }
         cur = cur.copy(updatedAt = Instant.now())
         return toDto(views.save(cur))
     }
@@ -119,6 +129,22 @@ class ViewService(
     }
 
     /** 校验为 JSON 对象且 ≤4KB;null 返回空对象。 */
+    /** sort/query 透传不解释(spec 0091 §5):无形状校验,仅 4KB 上限;null 存 NULL。 */
+    private fun rawJson(
+        node: JsonNode?,
+        field: String,
+    ): String? {
+        if (node == null || node.isNull) return null
+        if (node.toString().toByteArray(Charsets.UTF_8).size > 4096) throw BadRequestException("$field 超出 4KB 限制")
+        return node.toString()
+    }
+
+    private fun cappedQuery(q: String?): String? {
+        if (q == null) return null
+        if (q.toByteArray(Charsets.UTF_8).size > 4096) throw BadRequestException("query 超出 4KB 限制")
+        return q
+    }
+
     private fun validated(
         node: JsonNode?,
         field: String,
@@ -129,5 +155,12 @@ class ViewService(
         return n
     }
 
-    private fun toDto(v: ProjectView) = ViewDto(v.objectId, v.name, mapper.readTree(v.filters), mapper.readTree(v.columns))
+    private fun toDto(v: ProjectView): ViewDto = ViewDto(
+        v.objectId,
+        v.name,
+        mapper.readTree(v.filters),
+        mapper.readTree(v.columns),
+        v.sort?.let { mapper.readTree(it) },
+        v.query,
+    )
 }
