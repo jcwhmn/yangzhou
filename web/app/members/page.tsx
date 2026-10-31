@@ -34,7 +34,11 @@ type Member = {
   githubUsername: string | null;
 };
 type TokenStatus = { configured: boolean; tokenHint: string | null };
-type Team = { teamId: string; name: string; members: { memberId: string; displayName: string }[] };
+type Team = {
+  teamId: string;
+  name: string;
+  members: { memberId: string; displayName: string }[];
+};
 type Attribute = {
   attributeId: string;
   name: string;
@@ -50,13 +54,17 @@ export default function MembersPage() {
   const [members, setMembers] = useState<Member[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [attributes, setAttributes] = useState<Attribute[]>([]);
-  const [caps, setCaps] = useState<Map<string, Map<string, number | null>>>(new Map()); // memberId → (attrName → level)
+  const [caps, setCaps] = useState<Map<string, Map<string, number | null>>>(
+    new Map(),
+  ); // memberId → (attrName → level)
   const [newName, setNewName] = useState("");
   const [teamName, setTeamName] = useState("");
   const [error, setError] = useState("");
   const [pat, setPat] = useState<TokenStatus | null>(null);
   const [patInput, setPatInput] = useState("");
-  const [ghUserDraft, setGhUserDraft] = useState<Map<string, string>>(new Map());
+  const [ghUserDraft, setGhUserDraft] = useState<Map<string, string>>(
+    new Map(),
+  );
   const [levelDraft, setLevelDraft] = useState<Map<string, string>>(new Map()); // "memberId|attr" → 输入中
 
   const load = useCallback(async () => {
@@ -65,7 +73,9 @@ export default function MembersPage() {
       api<Team[]>("/api/teams"),
       api<Attribute[]>("/api/attributes"),
     ]);
-    api<TokenStatus>("/api/workspace/github-token").then(setPat).catch(() => {});
+    api<TokenStatus>("/api/workspace/github-token")
+      .then(setPat)
+      .catch(() => {});
     setMembers(ms);
     setTeams(ts);
     setAttributes(attrs);
@@ -73,7 +83,9 @@ export default function MembersPage() {
     const map = new Map<string, Map<string, number | null>>();
     await Promise.all(
       ms.map(async (m) => {
-        const caps = await api<Capability[]>(`/api/members/${m.memberId}/capabilities`);
+        const caps = await api<Capability[]>(
+          `/api/members/${m.memberId}/capabilities`,
+        );
         map.set(m.memberId, new Map(caps.map((c) => [c.attribute, c.level])));
       }),
     );
@@ -88,7 +100,10 @@ export default function MembersPage() {
     e.preventDefault();
     setError("");
     try {
-      await api("/api/members", { method: "POST", body: JSON.stringify({ displayName: newName.trim() }) });
+      await api("/api/members", {
+        method: "POST",
+        body: JSON.stringify({ displayName: newName.trim() }),
+      });
       setNewName("");
       await load();
     } catch (err) {
@@ -106,11 +121,18 @@ export default function MembersPage() {
     }
   }
 
-  async function toggleCap(memberId: string, attribute: string, current: boolean) {
+  async function toggleCap(
+    memberId: string,
+    attribute: string,
+    current: boolean,
+  ) {
     setError("");
     try {
       if (current) {
-        await api(`/api/members/${memberId}/capabilities/${encodeURIComponent(attribute)}`, { method: "DELETE" });
+        await api(
+          `/api/members/${memberId}/capabilities/${encodeURIComponent(attribute)}`,
+          { method: "DELETE" },
+        );
       } else {
         await api(`/api/members/${memberId}/capabilities`, {
           method: "PUT",
@@ -123,12 +145,19 @@ export default function MembersPage() {
     }
   }
 
-  async function saveCapLevel(memberId: string, attribute: string, value: string) {
+  async function saveCapLevel(
+    memberId: string,
+    attribute: string,
+    value: string,
+  ) {
     setError("");
     try {
       await api(`/api/members/${memberId}/capabilities`, {
         method: "PUT",
-        body: JSON.stringify({ attribute, level: value === "" ? null : Number(value) }),
+        body: JSON.stringify({
+          attribute,
+          level: value === "" ? null : Number(value),
+        }),
       });
       await load();
     } catch (err) {
@@ -140,7 +169,10 @@ export default function MembersPage() {
     e.preventDefault();
     setError("");
     try {
-      await api("/api/teams", { method: "POST", body: JSON.stringify({ name: teamName.trim() }) });
+      await api("/api/teams", {
+        method: "POST",
+        body: JSON.stringify({ name: teamName.trim() }),
+      });
       setTeamName("");
       await load();
     } catch (err) {
@@ -158,13 +190,22 @@ export default function MembersPage() {
     }
   }
 
-  async function teamMemberAction(team: Team, memberId: string, action: "add" | "remove") {
+  async function teamMemberAction(
+    team: Team,
+    memberId: string,
+    action: "add" | "remove",
+  ) {
     setError("");
     try {
       if (action === "add") {
-        await api(`/api/teams/${team.teamId}/members`, { method: "POST", body: JSON.stringify({ memberId }) });
+        await api(`/api/teams/${team.teamId}/members`, {
+          method: "POST",
+          body: JSON.stringify({ memberId }),
+        });
       } else {
-        await api(`/api/teams/${team.teamId}/members/${memberId}`, { method: "DELETE" });
+        await api(`/api/teams/${team.teamId}/members/${memberId}`, {
+          method: "DELETE",
+        });
       }
       await load();
     } catch (err) {
@@ -186,7 +227,11 @@ export default function MembersPage() {
       <Typography variant="h5" gutterBottom>
         {t.members.title}
       </Typography>
-      {error && <Typography color="error" sx={{ mb: 1 }}>{error}</Typography>}
+      {error && (
+        <Typography color="error" sx={{ mb: 1 }}>
+          {error}
+        </Typography>
+      )}
 
       {/* GitHub PAT(workspace 级,V6-S4) */}
       <Card variant="outlined" sx={{ mb: 3 }}>
@@ -194,8 +239,15 @@ export default function MembersPage() {
           <Typography variant="subtitle2" gutterBottom>
             {t.gh.patTitle}
           </Typography>
-          <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
-            {pat?.configured ? t.gh.patConfigured(pat.tokenHint ?? "") : t.gh.patHint}
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            display="block"
+            sx={{ mb: 1 }}
+          >
+            {pat?.configured
+              ? t.gh.patConfigured(pat.tokenHint ?? "")
+              : t.gh.patHint}
           </Typography>
           <Stack direction="row" spacing={1}>
             <TextField
@@ -212,10 +264,13 @@ export default function MembersPage() {
               onClick={async () => {
                 setError("");
                 try {
-                  const res = await api<TokenStatus>("/api/workspace/github-token", {
-                    method: "PUT",
-                    body: JSON.stringify({ token: patInput.trim() }),
-                  });
+                  const res = await api<TokenStatus>(
+                    "/api/workspace/github-token",
+                    {
+                      method: "PUT",
+                      body: JSON.stringify({ token: patInput.trim() }),
+                    },
+                  );
                   setPat(res);
                   setPatInput("");
                 } catch (err) {
@@ -230,7 +285,9 @@ export default function MembersPage() {
                 onClick={async () => {
                   setError("");
                   try {
-                    await api("/api/workspace/github-token", { method: "DELETE" });
+                    await api("/api/workspace/github-token", {
+                      method: "DELETE",
+                    });
                     setPat({ configured: false, tokenHint: null });
                   } catch (err) {
                     setError(err instanceof Error ? err.message : "清除失败");
@@ -245,7 +302,13 @@ export default function MembersPage() {
       </Card>
 
       {/* 建虚拟成员 */}
-      <Stack component="form" direction="row" spacing={1} onSubmit={addMember} sx={{ mb: 3 }}>
+      <Stack
+        component="form"
+        direction="row"
+        spacing={1}
+        onSubmit={addMember}
+        sx={{ mb: 3 }}
+      >
         <TextField
           size="small"
           label={t.members.newName}
@@ -293,9 +356,17 @@ export default function MembersPage() {
                     <Typography variant="body2" sx={{ whiteSpace: "nowrap" }}>
                       {m.displayName}
                     </Typography>
-                    <Chip size="small" label={m.virtual ? t.members.virtual : t.members.real} variant="outlined" />
+                    <Chip
+                      size="small"
+                      label={m.virtual ? t.members.virtual : t.members.real}
+                      variant="outlined"
+                    />
                     {m.virtual && (
-                      <IconButton size="small" onClick={() => deleteMember(m)} aria-label="delete">
+                      <IconButton
+                        size="small"
+                        onClick={() => deleteMember(m)}
+                        aria-label="delete"
+                      >
                         <DeleteIcon fontSize="small" />
                       </IconButton>
                     )}
@@ -306,7 +377,11 @@ export default function MembersPage() {
                     <TextField
                       size="small"
                       defaultValue={m.githubUsername ?? ""}
-                      onChange={(e) => setGhUserDraft((prev) => new Map(prev).set(m.memberId, e.target.value))}
+                      onChange={(e) =>
+                        setGhUserDraft((prev) =>
+                          new Map(prev).set(m.memberId, e.target.value),
+                        )
+                      }
                       sx={{ width: 150 }}
                     />
                     <IconButton
@@ -315,13 +390,26 @@ export default function MembersPage() {
                       onClick={async () => {
                         setError("");
                         try {
-                          const value = ghUserDraft.get(m.memberId) ?? m.githubUsername ?? "";
-                          const updated = await api<Member>(`/api/members/${m.memberId}/github-username`, {
-                            method: "PUT",
-                            body: JSON.stringify({ githubUsername: value }),
-                          });
+                          const value =
+                            ghUserDraft.get(m.memberId) ??
+                            m.githubUsername ??
+                            "";
+                          const updated = await api<Member>(
+                            `/api/members/${m.memberId}/github-username`,
+                            {
+                              method: "PUT",
+                              body: JSON.stringify({ githubUsername: value }),
+                            },
+                          );
                           setMembers((prev) =>
-                            prev.map((x) => (x.memberId === m.memberId ? { ...x, githubUsername: updated.githubUsername } : x)),
+                            prev.map((x) =>
+                              x.memberId === m.memberId
+                                ? {
+                                    ...x,
+                                    githubUsername: updated.githubUsername,
+                                  }
+                                : x,
+                            ),
                           );
                           setGhUserDraft((prev) => {
                             const next = new Map(prev);
@@ -329,7 +417,9 @@ export default function MembersPage() {
                             return next;
                           });
                         } catch (err) {
-                          setError(err instanceof Error ? err.message : "保存失败");
+                          setError(
+                            err instanceof Error ? err.message : "保存失败",
+                          );
                         }
                       }}
                     >
@@ -342,10 +432,18 @@ export default function MembersPage() {
                     const has = caps.get(m.memberId)?.has(a.name) ?? false;
                     const level = caps.get(m.memberId)?.get(a.name);
                     const draftKey = `${m.memberId}|${a.name}`;
-                    const shown = levelDraft.get(draftKey) ?? (level === null || level === undefined ? "" : String(level));
+                    const shown =
+                      levelDraft.get(draftKey) ??
+                      (level === null || level === undefined
+                        ? ""
+                        : String(level));
                     return (
                       <TableCell key={a.attributeId}>
-                        <Stack direction="row" spacing={0.5} alignItems="center">
+                        <Stack
+                          direction="row"
+                          spacing={0.5}
+                          alignItems="center"
+                        >
                           <Checkbox
                             size="small"
                             checked={has}
@@ -357,7 +455,11 @@ export default function MembersPage() {
                               type="number"
                               size="small"
                               value={shown}
-                              onChange={(e) => setLevelDraft((prev) => new Map(prev).set(draftKey, e.target.value))}
+                              onChange={(e) =>
+                                setLevelDraft((prev) =>
+                                  new Map(prev).set(draftKey, e.target.value),
+                                )
+                              }
                               onBlur={() => {
                                 const v = levelDraft.get(draftKey);
                                 if (v !== undefined) {
@@ -369,7 +471,10 @@ export default function MembersPage() {
                                   });
                                 }
                               }}
-                              onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+                              onKeyDown={(e) =>
+                                e.key === "Enter" &&
+                                (e.target as HTMLInputElement).blur()
+                              }
                               slotProps={{ htmlInput: { min: 1, max: 4 } }}
                               sx={{ width: 54 }}
                             />
@@ -389,8 +494,20 @@ export default function MembersPage() {
       <Typography variant="h5" gutterBottom>
         {t.members.teams}
       </Typography>
-      <Stack component="form" direction="row" spacing={1} onSubmit={createTeam} sx={{ mb: 2 }}>
-        <TextField size="small" label={t.members.teamName} value={teamName} onChange={(e) => setTeamName(e.target.value)} required />
+      <Stack
+        component="form"
+        direction="row"
+        spacing={1}
+        onSubmit={createTeam}
+        sx={{ mb: 2 }}
+      >
+        <TextField
+          size="small"
+          label={t.members.teamName}
+          value={teamName}
+          onChange={(e) => setTeamName(e.target.value)}
+          required
+        />
         <Button type="submit" variant="outlined">
           {t.members.addTeam}
         </Button>
@@ -399,19 +516,35 @@ export default function MembersPage() {
         {teams.map((team) => (
           <Card key={team.teamId} variant="outlined">
             <CardContent sx={{ py: 1.5, "&:last-child": { pb: 1.5 } }}>
-              <Stack direction="row" alignItems="center" justifyContent="space-between">
+              <Stack
+                direction="row"
+                alignItems="center"
+                justifyContent="space-between"
+              >
                 <Typography variant="subtitle1">{team.name}</Typography>
-                <Button size="small" color="error" onClick={() => deleteTeam(team)}>
+                <Button
+                  size="small"
+                  color="error"
+                  onClick={() => deleteTeam(team)}
+                >
                   {t.members.deleteTeam}
                 </Button>
               </Stack>
-              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mt: 1 }}>
+              <Stack
+                direction="row"
+                spacing={1}
+                flexWrap="wrap"
+                useFlexGap
+                sx={{ mt: 1 }}
+              >
                 {team.members.map((m) => (
                   <Chip
                     key={m.memberId}
                     size="small"
                     label={m.displayName}
-                    onDelete={() => teamMemberAction(team, m.memberId, "remove")}
+                    onDelete={() =>
+                      teamMemberAction(team, m.memberId, "remove")
+                    }
                   />
                 ))}
                 {team.members.length === 0 && (
@@ -420,7 +553,11 @@ export default function MembersPage() {
                   </Typography>
                 )}
               </Stack>
-              <AddTeamMemberSelect team={team} allMembers={members} onAdd={teamMemberAction} />
+              <AddTeamMemberSelect
+                team={team}
+                allMembers={members}
+                onAdd={teamMemberAction}
+              />
             </CardContent>
           </Card>
         ))}
@@ -443,7 +580,7 @@ function AddTeamMemberSelect({
   const candidates = allMembers.filter((m) => !inTeam.has(m.memberId));
   if (candidates.length === 0) return null;
   return (
-<Dropdown
+    <Dropdown
       size="small"
       placeholder="+ 加成员"
       ariaLabel="+ 加成员"
@@ -455,7 +592,10 @@ function AddTeamMemberSelect({
         }
       }}
       sx={{ minWidth: 160, fontSize: 13, mt: 1 }}
-      options={candidates.map((m) => ({ value: m.memberId, label: m.displayName }))}
+      options={candidates.map((m) => ({
+        value: m.memberId,
+        label: m.displayName,
+      }))}
     />
   );
 }

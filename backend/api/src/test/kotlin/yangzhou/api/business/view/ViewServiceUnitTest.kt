@@ -4,6 +4,9 @@ import io.mockk.clearMocks
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Nested
+import tools.jackson.databind.ObjectMapper
 import yangzhou.api.business.member.MemberService
 import yangzhou.api.error.BadRequestException
 import yangzhou.api.error.ConflictException
@@ -14,16 +17,12 @@ import yangzhou.persistence.ProjectView
 import yangzhou.persistence.repository.ProjectRepository
 import yangzhou.persistence.repository.ProjectViewRepository
 import java.util.UUID
-import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Nested
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import tools.jackson.databind.ObjectMapper
 
 /** YPJ-89 单测补齐:ViewService(用户×项目私有视图,4KB/对象约束)。 */
 class ViewServiceUnitTest {
-
     private val views = mockk<ProjectViewRepository>(relaxed = true)
     private val projects = mockk<ProjectRepository>(relaxed = true)
     private val memberService = mockk<MemberService>(relaxed = true)
@@ -31,11 +30,21 @@ class ViewServiceUnitTest {
     private val service = ViewService(views, projects, memberService, mapper)
 
     private val project = Project(id = 1L, objectId = UUID(0, 1), workspaceObjectId = UUID(0, 9), key = "CHE", name = "CHE")
-    private val me = Member(id = 5L, objectId = UUID(0, 5), workspaceObjectId = UUID(0, 9), username = "me", passwordHash = "h", displayName = "me")
+    private val me =
+        Member(id = 5L, objectId = UUID(0, 5), workspaceObjectId = UUID(0, 9), username = "me", passwordHash = "h", displayName = "me")
 
-    private fun row(name: String, creatorObjectId: UUID = UUID(0, 5), projectObjectId: UUID = UUID(0, 1)) = ProjectView(
-        id = 10L, objectId = UUID(0, 10), projectObjectId = projectObjectId, creatorObjectId = creatorObjectId, name = name,
-        filters = """{"status":"open"}""", columns = """{"cols":["a"]}""",
+    private fun row(
+        name: String,
+        creatorObjectId: UUID = UUID(0, 5),
+        projectObjectId: UUID = UUID(0, 1),
+    ) = ProjectView(
+        id = 10L,
+        objectId = UUID(0, 10),
+        projectObjectId = projectObjectId,
+        creatorObjectId = creatorObjectId,
+        name = name,
+        filters = """{"status":"open"}""",
+        columns = """{"cols":["a"]}""",
     )
 
     @BeforeEach
@@ -47,7 +56,6 @@ class ViewServiceUnitTest {
 
     @Nested
     inner class CreateView {
-
         @Test
         fun blankNameRejected() {
             assertFailsWith<BadRequestException> { service.create("CHE", ViewService.CreateViewRequest("  ")) }
@@ -87,7 +95,6 @@ class ViewServiceUnitTest {
 
     @Nested
     inner class UpdateAndDelete {
-
         private val mine = row("mine")
 
         @BeforeEach
@@ -122,7 +129,6 @@ class ViewServiceUnitTest {
 
     @Nested
     inner class ListView {
-
         @Test
         fun onlyMineInProject() {
             every { views.findByProjectObjectIdAndCreatorObjectIdOrderByCreatedAt(UUID(0, 1), UUID(0, 5)) } returns listOf(row("mine"))

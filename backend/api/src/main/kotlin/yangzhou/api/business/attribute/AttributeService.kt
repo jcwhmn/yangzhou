@@ -4,10 +4,10 @@ import jakarta.validation.constraints.NotBlank
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import yangzhou.api.business.workspace.WorkspaceService
 import yangzhou.api.error.BadRequestException
 import yangzhou.api.error.ConflictException
 import yangzhou.api.error.NotFoundException
-import yangzhou.api.business.workspace.WorkspaceService
 import yangzhou.persistence.AttributeDefinition
 import yangzhou.persistence.repository.AttributeDefinitionRepository
 import java.util.UUID
@@ -18,7 +18,6 @@ class AttributeService(
     private val definitions: AttributeDefinitionRepository,
     private val workspaceService: WorkspaceService,
 ) {
-
     data class AttributeDto(
         val attributeId: UUID,
         val name: String,
@@ -44,20 +43,24 @@ class AttributeService(
         var resolvedParent: UUID? = null
         if (parentObjectId != null) {
             if (kind == "category") throw BadRequestException("分类不能再挂父分类")
-            val parent = definitions.findByWorkspaceObjectIdAndObjectId(workspaceObjectId, parentObjectId)
-                ?: throw NotFoundException("分类不存在")
+            val parent =
+                definitions.findByWorkspaceObjectIdAndObjectId(workspaceObjectId, parentObjectId)
+                    ?: throw NotFoundException("分类不存在")
             if (parent.kind != "category") throw BadRequestException("parent 必须是分类(kind=category)")
             resolvedParent = parent.objectId
         }
-        val saved = definitions.save(
-            AttributeDefinition(
-                workspaceObjectId = workspaceObjectId, name = name, kind = kind, leveled = leveled,
-                parentObjectId = resolvedParent,
-            ),
-        )
+        val saved =
+            definitions.save(
+                AttributeDefinition(
+                    workspaceObjectId = workspaceObjectId,
+                    name = name,
+                    kind = kind,
+                    leveled = leveled,
+                    parentObjectId = resolvedParent,
+                ),
+            )
         return saved.toDto()
     }
-
 
     @Transactional
     fun update(
@@ -68,8 +71,9 @@ class AttributeService(
         unassign: Boolean,
     ): AttributeDto {
         val workspaceObjectId = workspaceService.required().objectId!!
-        val entity = definitions.findByWorkspaceObjectIdAndObjectId(workspaceObjectId, attributeId)
-            ?: throw NotFoundException("属性不存在")
+        val entity =
+            definitions.findByWorkspaceObjectIdAndObjectId(workspaceObjectId, attributeId)
+                ?: throw NotFoundException("属性不存在")
         if (entity.kind == "category" && kind != null && kind != "category") {
             throw BadRequestException("分类不能变更类型")
         }
@@ -77,20 +81,23 @@ class AttributeService(
         // V10-S1:叶子移动分类(unassign=true → 未分类);category 不可移动
         var newParent = entity.parentObjectId
         if (entity.kind != "category") {
-            if (unassign) newParent = null
-            else if (parentObjectId != null) {
-                val parent = definitions.findByWorkspaceObjectIdAndObjectId(workspaceObjectId, parentObjectId)
-                    ?: throw NotFoundException("分类不存在")
+            if (unassign) {
+                newParent = null
+            } else if (parentObjectId != null) {
+                val parent =
+                    definitions.findByWorkspaceObjectIdAndObjectId(workspaceObjectId, parentObjectId)
+                        ?: throw NotFoundException("分类不存在")
                 if (parent.kind != "category") throw BadRequestException("parent 必须是分类")
                 newParent = parent.objectId
             }
         }
         // leveled 关→开:已有等级数据休眠待唤醒;开→关同理,不删数据(AGENTS 硬规则)
-        val updated = entity.copy(
-            kind = kind ?: entity.kind,
-            leveled = leveled ?: entity.leveled,
-            parentObjectId = newParent,
-        )
+        val updated =
+            entity.copy(
+                kind = kind ?: entity.kind,
+                leveled = leveled ?: entity.leveled,
+                parentObjectId = newParent,
+            )
         return try {
             definitions.save(updated).toDto()
         } catch (_: DataIntegrityViolationException) {
@@ -101,8 +108,9 @@ class AttributeService(
     @Transactional
     fun delete(attributeId: UUID) {
         val workspaceObjectId = workspaceService.required().objectId!!
-        val entity = definitions.findByWorkspaceObjectIdAndObjectId(workspaceObjectId, attributeId)
-            ?: throw NotFoundException("属性不存在")
+        val entity =
+            definitions.findByWorkspaceObjectIdAndObjectId(workspaceObjectId, attributeId)
+                ?: throw NotFoundException("属性不存在")
         if (entity.kind == "category" &&
             definitions.findByWorkspaceObjectId(workspaceObjectId).any { it.parentObjectId == entity.objectId }
         ) {
@@ -121,8 +129,7 @@ class AttributeService(
         }
     }
 
-    private fun AttributeDefinition.toDto(categoryName: String? = null) =
-        AttributeDto(objectId, name, kind, leveled, parentObjectId, categoryName)
+    private fun AttributeDefinition.toDto(categoryName: String? = null) = AttributeDto(objectId, name, kind, leveled, parentObjectId, categoryName)
 
     /** list:叶子带分类名(未分类 = null)。 */
     fun list(): List<AttributeDto> {

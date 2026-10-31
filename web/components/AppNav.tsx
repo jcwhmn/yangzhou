@@ -1,6 +1,14 @@
 "use client";
 
-import { Badge, Box, Button, Menu, Stack, TextField, Typography } from "@mui/material";
+import {
+  Badge,
+  Box,
+  Button,
+  Menu,
+  Stack,
+  TextField,
+  Typography,
+} from "@mui/material";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -55,12 +63,16 @@ export function AppNav() {
   }
 
   // YPJ-107:当前项目收藏切换,下拉顶部展示(状态用已加载 favs 判定,key 比较不区分大小写)
-  const isFav = projectKey !== undefined && favs.some((f) => f.key.toUpperCase() === projectKey);
+  const isFav =
+    projectKey !== undefined &&
+    favs.some((f) => f.key.toUpperCase() === projectKey);
 
   async function toggleCurrentFav() {
     if (!projectKey) return;
     try {
-      await api(`/api/projects/${projectKey}/favorite`, { method: isFav ? "DELETE" : "PUT" });
+      await api(`/api/projects/${projectKey}/favorite`, {
+        method: isFav ? "DELETE" : "PUT",
+      });
       await loadFavs();
     } catch {
       /* 静默 */
@@ -95,8 +107,18 @@ export function AppNav() {
   ];
 
   return (
-    <Stack direction="row" spacing={3} alignItems="center" sx={{ mb: 3, borderBottom: 1, borderColor: "divider", pb: 1 }}>
-      <Typography variant="h6" component={Link} href="/" sx={{ textDecoration: "none", color: "inherit" }}>
+    <Stack
+      direction="row"
+      spacing={3}
+      alignItems="center"
+      sx={{ mb: 3, borderBottom: 1, borderColor: "divider", pb: 1 }}
+    >
+      <Typography
+        variant="h6"
+        component={Link}
+        href="/"
+        sx={{ textDecoration: "none", color: "inherit" }}
+      >
         {t.appName}
       </Typography>
       {links.map((it) => {
@@ -106,7 +128,11 @@ export function AppNav() {
             key={it.href}
             component={Link}
             href={it.href}
-            sx={{ textDecoration: "none", color: active ? "primary.main" : "text.secondary", fontWeight: active ? 700 : 400 }}
+            sx={{
+              textDecoration: "none",
+              color: active ? "primary.main" : "text.secondary",
+              fontWeight: active ? 700 : 400,
+            }}
           >
             {it.label}
           </Typography>
@@ -123,12 +149,20 @@ export function AppNav() {
         onKeyDown={(e) => e.key === "Enter" && doJump()}
         error={jumpErr}
         helperText={jumpErr ? t.nav.jump_hint : undefined}
-        sx={{ ml: "auto", width: 190, "& .MuiFormHelperText-root": { whiteSpace: "nowrap" } }}
+        sx={{
+          ml: "auto",
+          width: 190,
+          "& .MuiFormHelperText-root": { whiteSpace: "nowrap" },
+        }}
       />
       <Typography
         component={Link}
         href="/notifications"
-        sx={{ textDecoration: "none", color: pathname === "/notifications" ? "primary.main" : "text.secondary" }}
+        sx={{
+          textDecoration: "none",
+          color:
+            pathname === "/notifications" ? "primary.main" : "text.secondary",
+        }}
         aria-label={t.notif.bell}
       >
         <Badge badgeContent={unread} color="error" max={99}>
@@ -139,10 +173,19 @@ export function AppNav() {
         {t.nav.logout}
       </Button>
 
-      <Menu anchorEl={favAnchor} open={favAnchor !== null} onClose={() => setFavAnchor(null)}>
+      <Menu
+        anchorEl={favAnchor}
+        open={favAnchor !== null}
+        onClose={() => setFavAnchor(null)}
+      >
         {projectKey && (
           <Box sx={{ px: 2, py: 1 }}>
-            <Button size="small" fullWidth variant={isFav ? "outlined" : "contained"} onClick={toggleCurrentFav}>
+            <Button
+              size="small"
+              fullWidth
+              variant={isFav ? "outlined" : "contained"}
+              onClick={toggleCurrentFav}
+            >
               {isFav ? t.fav.removeCurrent : t.fav.addCurrent} {projectKey}
             </Button>
           </Box>
@@ -152,14 +195,31 @@ export function AppNav() {
             {t.fav.empty}
           </Typography>
         )}
-        <Stack sx={{ px: 2, py: 1, borderTop: "1px solid", borderColor: "divider", mt: 1 }}>
+        <Stack
+          sx={{
+            px: 2,
+            py: 1,
+            borderTop: "1px solid",
+            borderColor: "divider",
+            mt: 1,
+          }}
+        >
           <Link href="/" onClick={() => setFavAnchor(null)}>
             <Typography variant="caption">浏览项目</Typography>
           </Link>
         </Stack>
         {favs.map((f) => (
-          <Stack key={f.projectId} direction="row" spacing={1} alignItems="center" sx={{ px: 2, py: 0.5 }}>
-            <Link href={`/p/${f.key}`} style={{ textDecoration: "none", color: "inherit" }}>
+          <Stack
+            key={f.projectId}
+            direction="row"
+            spacing={1}
+            alignItems="center"
+            sx={{ px: 2, py: 0.5 }}
+          >
+            <Link
+              href={`/p/${f.key}`}
+              style={{ textDecoration: "none", color: "inherit" }}
+            >
               <Typography variant="body2">⭐ {f.name}</Typography>
             </Link>
             <Button size="small" color="error" onClick={() => removeFav(f.key)}>

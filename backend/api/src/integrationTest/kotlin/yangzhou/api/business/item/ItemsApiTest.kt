@@ -3,14 +3,13 @@ package yangzhou.api.business.item
 import com.fasterxml.jackson.databind.JsonNode
 import org.springframework.test.web.servlet.client.RestTestClient
 import yangzhou.api.AbstractApiTest
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.Executors
 
 class ItemsApiTest : AbstractApiTest() {
-
     @Test
     fun `编号项目内递增,带 key 前缀`() {
         val authed = bootstrapAndAuth()
@@ -46,7 +45,10 @@ class ItemsApiTest : AbstractApiTest() {
                 numbers += item["number"].asText().removePrefix("CHE-").toInt()
             }
         }
-        ready.await(); go.countDown(); pool.shutdown(); assertTrue(pool.awaitTermination(60, java.util.concurrent.TimeUnit.SECONDS))
+        ready.await()
+        go.countDown()
+        pool.shutdown()
+        assertTrue(pool.awaitTermination(60, java.util.concurrent.TimeUnit.SECONDS))
 
         assertEquals((1..threads).toList(), numbers.sorted())
     }
@@ -59,14 +61,22 @@ class ItemsApiTest : AbstractApiTest() {
         val child = createItem(authed, "CHE", "子")
 
         // 正常:child.parent = parent
-        authed.patch().uri("/api/items/${child["itemId"].asText()}")
+        authed
+            .patch()
+            .uri("/api/items/${child["itemId"].asText()}")
             .body(mapOf("parentItemId" to parent["itemId"].asText()))
-            .exchange().expectStatus().isOk()
+            .exchange()
+            .expectStatus()
+            .isOk()
 
         // 非法:parent.parent = child → 环
-        authed.patch().uri("/api/items/${parent["itemId"].asText()}")
+        authed
+            .patch()
+            .uri("/api/items/${parent["itemId"].asText()}")
             .body(mapOf("parentItemId" to child["itemId"].asText()))
-            .exchange().expectStatus().isEqualTo(409)
+            .exchange()
+            .expectStatus()
+            .isEqualTo(409)
     }
 
     @Test
@@ -75,19 +85,39 @@ class ItemsApiTest : AbstractApiTest() {
         val project = createProject(authed, "CHE")
         val item = createItem(authed, "CHE", "x")
         // 指派"我"(登录成员),满足开工须有主
-        val meId = json.readTree(
-            authed.get().uri("/api/members").exchange()
-                .expectStatus().isOk().expectBody(String::class.java).returnResult().responseBody!!,
-        ).first { !it["virtual"].asBoolean() }["memberId"].asText()
-        authed.put().uri("/api/items/${item["itemId"].asText()}/assignee")
+        val meId =
+            json
+                .readTree(
+                    authed
+                        .get()
+                        .uri("/api/members")
+                        .exchange()
+                        .expectStatus()
+                        .isOk()
+                        .expectBody(String::class.java)
+                        .returnResult()
+                        .responseBody!!,
+                ).first { !it["virtual"].asBoolean() }["memberId"]
+                .asText()
+        authed
+            .put()
+            .uri("/api/items/${item["itemId"].asText()}/assignee")
             .body(mapOf("assigneeItemId" to meId))
-            .exchange().expectStatus().isOk()
+            .exchange()
+            .expectStatus()
+            .isOk()
         val done = project["statuses"].first { it["name"].asText() == "Done" }["statusId"].asText()
 
-        authed.patch().uri("/api/items/${item["itemId"].asText()}")
+        authed
+            .patch()
+            .uri("/api/items/${item["itemId"].asText()}")
             .body(mapOf("statusItemId" to done))
-            .exchange().expectStatus().isOk()
-            .expectBody(String::class.java).returnResult().responseBody!!
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody(String::class.java)
+            .returnResult()
+            .responseBody!!
             .let { assertEquals("Done", json.readTree(it)["status"].asText()) }
     }
 
@@ -100,28 +130,49 @@ class ItemsApiTest : AbstractApiTest() {
         val item = createItem(authed, "CHE", "x", listOf(mapOf("attribute" to "Java", "minLevel" to 3)))
 
         // 替换:Java 改门槛 + 新增架构 presence + 移除(整表替换语义)
-        val updated = json.readTree(
-            authed.put().uri("/api/items/${item["itemId"].asText()}/requirements")
-                .body(mapOf("requirements" to listOf(
-                    mapOf("attribute" to "Java", "minLevel" to 4),
-                    mapOf("attribute" to "架构", "minLevel" to null),
-                )))
-                .exchange()
-                .expectStatus().isOk()
-                .expectBody(String::class.java).returnResult().responseBody!!,
-        )
+        val updated =
+            json.readTree(
+                authed
+                    .put()
+                    .uri("/api/items/${item["itemId"].asText()}/requirements")
+                    .body(
+                        mapOf(
+                            "requirements" to
+                                listOf(
+                                    mapOf("attribute" to "Java", "minLevel" to 4),
+                                    mapOf("attribute" to "架构", "minLevel" to null),
+                                ),
+                        ),
+                    ).exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody(String::class.java)
+                    .returnResult()
+                    .responseBody!!,
+            )
         val reqs = updated["requirements"].map { it["attribute"].asText() to if (it["minLevel"].isNull) null else it["minLevel"].asInt() }
         assertEquals(listOf("Java" to 4, "架构" to null), reqs)
 
         // 再替换为空 = 清空
-        authed.put().uri("/api/items/${item["itemId"].asText()}/requirements")
+        authed
+            .put()
+            .uri("/api/items/${item["itemId"].asText()}/requirements")
             .body(mapOf("requirements" to emptyList<String>()))
-            .exchange().expectStatus().isOk()
-        val cleared = json.readTree(
-            authed.get().uri("/api/items/${item["itemId"].asText()}").exchange()
-                .expectStatus().isOk()
-                .expectBody(String::class.java).returnResult().responseBody!!,
-        )
+            .exchange()
+            .expectStatus()
+            .isOk()
+        val cleared =
+            json.readTree(
+                authed
+                    .get()
+                    .uri("/api/items/${item["itemId"].asText()}")
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody(String::class.java)
+                    .returnResult()
+                    .responseBody!!,
+            )
         assertEquals(0, cleared["requirements"].size())
     }
 
@@ -130,54 +181,102 @@ class ItemsApiTest : AbstractApiTest() {
         val authed = bootstrapAndAuth()
         createProject(authed, "CHE")
 
-        val first = json.readTree(
-            authed.post().uri("/api/projects/CHE/items")
-                .body(mapOf("title" to "x", "externalRef" to "linear:JCW-30"))
-                .exchange().expectStatus().isCreated()
-                .expectBody(String::class.java).returnResult().responseBody!!,
-        )
+        val first =
+            json.readTree(
+                authed
+                    .post()
+                    .uri("/api/projects/CHE/items")
+                    .body(mapOf("title" to "x", "externalRef" to "linear:JCW-30"))
+                    .exchange()
+                    .expectStatus()
+                    .isCreated()
+                    .expectBody(String::class.java)
+                    .returnResult()
+                    .responseBody!!,
+            )
         assertEquals("linear:JCW-30", first["externalRef"].asText())
 
-        authed.post().uri("/api/projects/CHE/items")
+        authed
+            .post()
+            .uri("/api/projects/CHE/items")
             .body(mapOf("title" to "dup", "externalRef" to "linear:JCW-30"))
-            .exchange().expectStatus().isEqualTo(409)
+            .exchange()
+            .expectStatus()
+            .isEqualTo(409)
     }
 
     @Test
     fun `未知属性的需求 400`() {
         val authed = bootstrapAndAuth()
         createProject(authed, "CHE")
-        authed.post().uri("/api/projects/CHE/items")
+        authed
+            .post()
+            .uri("/api/projects/CHE/items")
             .body(mapOf("title" to "x", "requirements" to listOf(mapOf("attribute" to "幽灵", "minLevel" to 1))))
-            .exchange().expectStatus().isBadRequest()
+            .exchange()
+            .expectStatus()
+            .isBadRequest()
     }
 
     @Test
     fun `开工须有主——未指派离开起点 409,已指派放行,起点内移动放行`() {
         val authed = bootstrapAndAuth()
         createProject(authed, "CHE")
-        val project = json.readTree(
-            authed.get().uri("/api/projects/CHE").exchange()
-                .expectStatus().isOk().expectBody(String::class.java).returnResult().responseBody!!,
-        )
+        val project =
+            json.readTree(
+                authed
+                    .get()
+                    .uri("/api/projects/CHE")
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody(String::class.java)
+                    .returnResult()
+                    .responseBody!!,
+            )
         val toDo = project["statuses"][0]["statusId"].asText()
         val dev = project["statuses"][1]["statusId"].asText()
         val item = createItem(authed, "CHE", "无主 item") // 未指派
 
-        authed.patch().uri("/api/items/${item["itemId"].asText()}")
+        authed
+            .patch()
+            .uri("/api/items/${item["itemId"].asText()}")
             .body(mapOf("statusItemId" to dev))
-            .exchange().expectStatus().isEqualTo(409)
+            .exchange()
+            .expectStatus()
+            .isEqualTo(409)
 
         // 指派后放行
-        authed.put().uri("/api/items/${item["itemId"].asText()}/assignee")
-            .body(mapOf("assigneeItemId" to json.readTree(
-                authed.get().uri("/api/members").exchange()
-                    .expectStatus().isOk().expectBody(String::class.java).returnResult().responseBody!!,
-            ).first { it["displayName"].asText() == "me" }["memberId"].asText()))
-            .exchange().expectStatus().isOk()
-        authed.patch().uri("/api/items/${item["itemId"].asText()}")
+        authed
+            .put()
+            .uri("/api/items/${item["itemId"].asText()}/assignee")
+            .body(
+                mapOf(
+                    "assigneeItemId" to
+                        json
+                            .readTree(
+                                authed
+                                    .get()
+                                    .uri("/api/members")
+                                    .exchange()
+                                    .expectStatus()
+                                    .isOk()
+                                    .expectBody(String::class.java)
+                                    .returnResult()
+                                    .responseBody!!,
+                            ).first { it["displayName"].asText() == "me" }["memberId"]
+                            .asText(),
+                ),
+            ).exchange()
+            .expectStatus()
+            .isOk()
+        authed
+            .patch()
+            .uri("/api/items/${item["itemId"].asText()}")
             .body(mapOf("statusItemId" to dev))
-            .exchange().expectStatus().isOk()
+            .exchange()
+            .expectStatus()
+            .isOk()
     }
 
     @Test
@@ -186,48 +285,109 @@ class ItemsApiTest : AbstractApiTest() {
         createSkillAttribute(authed, "Java")
         createProject(authed, "CHE")
         val parent = createItem(authed, "CHE", "父")
-        val child = json.readTree(
-            authed.post().uri("/api/projects/CHE/items")
-                .body(mapOf("title" to "子", "parentItemId" to parent["itemId"].asText(),
-                    "requirements" to listOf(mapOf("attribute" to "Java", "minLevel" to null))))
-                .exchange().expectStatus().isCreated()
-                .expectBody(String::class.java).returnResult().responseBody!!,
-        )
+        val child =
+            json.readTree(
+                authed
+                    .post()
+                    .uri("/api/projects/CHE/items")
+                    .body(
+                        mapOf(
+                            "title" to "子",
+                            "parentItemId" to parent["itemId"].asText(),
+                            "requirements" to listOf(mapOf("attribute" to "Java", "minLevel" to null)),
+                        ),
+                    ).exchange()
+                    .expectStatus()
+                    .isCreated()
+                    .expectBody(String::class.java)
+                    .returnResult()
+                    .responseBody!!,
+            )
         val parentId = parent["itemId"].asText()
         val childId = child["itemId"].asText()
 
         // 删父 → 软删连子树:看板不含两者;详情仍可达(回收站预览语义)
-        val del = authed.delete().uri("/api/items/$parentId")
-            .exchange()
+        val del =
+            authed
+                .delete()
+                .uri("/api/items/$parentId")
+                .exchange()
         println("DEBUG_DEL=" + del.expectBody(String::class.java).returnResult().responseBody)
         // 打印服务端日志中最近的约束错误
         println("DEBUG_HINT=查看 bootRun 日志的 DataIntegrityViolation 详情")
         del.expectStatus().isNoContent()
-        val board = authed.get().uri("/api/projects/CHE/items").exchange()
-            .expectStatus().isOk().expectBody(String::class.java).returnResult().responseBody!!
+        val board =
+            authed
+                .get()
+                .uri("/api/projects/CHE/items")
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(String::class.java)
+                .returnResult()
+                .responseBody!!
         assertTrue(!board.contains("父"))
         assertTrue(!board.contains("子"))
-        authed.get().uri("/api/items/$childId")
-            .exchange().expectStatus().isOk()
+        authed
+            .get()
+            .uri("/api/items/$childId")
+            .exchange()
+            .expectStatus()
+            .isOk()
 
         // 回收站列出父
-        val bin = json.readTree(
-            authed.get().uri("/api/recycle-bin").exchange()
-                .expectStatus().isOk().expectBody(String::class.java).returnResult().responseBody!!,
-        )
+        val bin =
+            json.readTree(
+                authed
+                    .get()
+                    .uri("/api/recycle-bin")
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody(String::class.java)
+                    .returnResult()
+                    .responseBody!!,
+            )
         assertEquals(1, bin.size())
         assertEquals("CHE-1", bin[0]["number"].asText())
 
         // 恢复父 → 子树全恢复(看板重现)
-        authed.post().uri("/api/recycle-bin/$parentId/restore")
-            .exchange().expectStatus().isNoContent()
-        assertTrue(authed.get().uri("/api/projects/CHE/items").exchange()
-            .expectBody(String::class.java).returnResult().responseBody!!.contains("父"))
+        authed
+            .post()
+            .uri("/api/recycle-bin/$parentId/restore")
+            .exchange()
+            .expectStatus()
+            .isNoContent()
+        assertTrue(
+            authed
+                .get()
+                .uri("/api/projects/CHE/items")
+                .exchange()
+                .expectBody(String::class.java)
+                .returnResult()
+                .responseBody!!
+                .contains("父"),
+        )
 
         // 再删 + 物理删 → 详情 404(真删,需求级联清)
-        authed.delete().uri("/api/items/$parentId").exchange().expectStatus().isNoContent()
-        authed.delete().uri("/api/recycle-bin/$parentId").exchange().expectStatus().isNoContent()
-        authed.get().uri("/api/items/$parentId").exchange().expectStatus().isNotFound()
+        authed
+            .delete()
+            .uri("/api/items/$parentId")
+            .exchange()
+            .expectStatus()
+            .isNoContent()
+        authed
+            .delete()
+            .uri("/api/recycle-bin/$parentId")
+            .exchange()
+            .expectStatus()
+            .isNoContent()
+        authed
+            .get()
+            .uri("/api/items/$parentId")
+            .exchange()
+            .expectStatus()
+            .isNotFound()
     }
 
     @Test
@@ -236,34 +396,80 @@ class ItemsApiTest : AbstractApiTest() {
         createProject(authed, "CHE")
         val item = createItem(authed, "CHE", "x")
 
-        authed.patch().uri("/api/items/${item["itemId"].asText()}")
+        authed
+            .patch()
+            .uri("/api/items/${item["itemId"].asText()}")
             .body(mapOf("type" to "bug"))
-            .exchange().expectStatus().isOk()
-        authed.patch().uri("/api/items/${item["itemId"].asText()}")
+            .exchange()
+            .expectStatus()
+            .isOk()
+        authed
+            .patch()
+            .uri("/api/items/${item["itemId"].asText()}")
             .body(mapOf("type" to "not-a-type"))
-            .exchange().expectStatus().isBadRequest()
+            .exchange()
+            .expectStatus()
+            .isBadRequest()
     }
 
     // ===== YPJ-56:看板创建归属(spec 0040)=====
 
-    private fun createSprint56(authed: RestTestClient, key: String, name: String): JsonNode =
-        json.readTree(authed.post().uri("/api/projects/$key/sprints")
+    private fun createSprint56(
+        authed: RestTestClient,
+        key: String,
+        name: String,
+    ): JsonNode = json.readTree(
+        authed
+            .post()
+            .uri("/api/projects/$key/sprints")
             .body(mapOf("name" to name, "startDate" to "2026-10-01", "endDate" to "2026-10-15"))
-            .exchange().expectBody(String::class.java).returnResult().responseBody!!)
+            .exchange()
+            .expectBody(String::class.java)
+            .returnResult()
+            .responseBody!!,
+    )
 
-    private fun setSprintStatus56(authed: RestTestClient, key: String, sprintId: String, status: String) {
-        authed.patch().uri("/api/projects/$key/sprints/$sprintId").body(mapOf("status" to status)).exchange()
-            .expectBody(String::class.java).returnResult()
+    private fun setSprintStatus56(
+        authed: RestTestClient,
+        key: String,
+        sprintId: String,
+        status: String,
+    ) {
+        authed
+            .patch()
+            .uri("/api/projects/$key/sprints/$sprintId")
+            .body(mapOf("status" to status))
+            .exchange()
+            .expectBody(String::class.java)
+            .returnResult()
     }
 
-    private fun countItems56(authed: RestTestClient, key: String): Int =
-        json.readTree(authed.get().uri("/api/projects/$key/items").exchange()
-            .expectBody(String::class.java).returnResult().responseBody!!).size()
+    private fun countItems56(
+        authed: RestTestClient,
+        key: String,
+    ): Int = json
+        .readTree(
+            authed
+                .get()
+                .uri("/api/projects/$key/items")
+                .exchange()
+                .expectBody(String::class.java)
+                .returnResult()
+                .responseBody!!,
+        ).size()
 
-    private fun createWithSprint56(authed: RestTestClient, key: String, title: String, sprintId: String?) =
-        authed.post().uri("/api/projects/$key/items")
-            .body(mapOf("title" to title, "sprintId" to sprintId)).exchange()
-            .expectBody(String::class.java).returnResult()
+    private fun createWithSprint56(
+        authed: RestTestClient,
+        key: String,
+        title: String,
+        sprintId: String?,
+    ) = authed
+        .post()
+        .uri("/api/projects/$key/items")
+        .body(mapOf("title" to title, "sprintId" to sprintId))
+        .exchange()
+        .expectBody(String::class.java)
+        .returnResult()
 
     @Test
     fun `创建带 sprintId 归入 sprint(YPJ-56)`() {
@@ -275,11 +481,27 @@ class ItemsApiTest : AbstractApiTest() {
         val r = createWithSprint56(authed, "KBO", "t1", sid)
         assertEquals(201, r.status.value(), r.responseBody)
         val itemId = json.readTree(r.responseBody!!)["itemId"].asText()
-        val members = json.readTree(authed.get().uri("/api/projects/KBO/sprints/$sid/items").exchange()
-            .expectBody(String::class.java).returnResult().responseBody!!)
+        val members =
+            json.readTree(
+                authed
+                    .get()
+                    .uri("/api/projects/KBO/sprints/$sid/items")
+                    .exchange()
+                    .expectBody(String::class.java)
+                    .returnResult()
+                    .responseBody!!,
+            )
         assertTrue(members.any { it["itemId"].asText() == itemId })
-        val backlog = json.readTree(authed.get().uri("/api/projects/KBO/backlog").exchange()
-            .expectBody(String::class.java).returnResult().responseBody!!)
+        val backlog =
+            json.readTree(
+                authed
+                    .get()
+                    .uri("/api/projects/KBO/backlog")
+                    .exchange()
+                    .expectBody(String::class.java)
+                    .returnResult()
+                    .responseBody!!,
+            )
         assertTrue(backlog.none { it["itemId"].asText() == itemId })
     }
 
@@ -290,8 +512,16 @@ class ItemsApiTest : AbstractApiTest() {
         val r = createWithSprint56(authed, "KBB", "t2", null)
         assertEquals(201, r.status.value(), r.responseBody)
         val itemId = json.readTree(r.responseBody!!)["itemId"].asText()
-        val backlog = json.readTree(authed.get().uri("/api/projects/KBB/backlog").exchange()
-            .expectBody(String::class.java).returnResult().responseBody!!)
+        val backlog =
+            json.readTree(
+                authed
+                    .get()
+                    .uri("/api/projects/KBB/backlog")
+                    .exchange()
+                    .expectBody(String::class.java)
+                    .returnResult()
+                    .responseBody!!,
+            )
         assertTrue(backlog.any { it["itemId"].asText() == itemId })
     }
 
@@ -337,18 +567,35 @@ class ItemsApiTest : AbstractApiTest() {
         createProject(authed, "PRE")
         val parent = createItem(authed, "PRE", "父条目")
         val child = createItem(authed, "PRE", "子条目")
-        authed.patch().uri("/api/items/${child["itemId"].asText()}")
+        authed
+            .patch()
+            .uri("/api/items/${child["itemId"].asText()}")
             .body(mapOf("parentItemId" to parent["itemId"].asText()))
             .exchange()
-            .expectStatus().isOk()
-        val listBody = authed.get().uri("/api/projects/PRE/items").exchange()
-            .expectStatus().isOk()
-            .expectBody(String::class.java).returnResult().responseBody!!
+            .expectStatus()
+            .isOk()
+        val listBody =
+            authed
+                .get()
+                .uri("/api/projects/PRE/items")
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(String::class.java)
+                .returnResult()
+                .responseBody!!
         val childRow = json.readTree(listBody).first { it["itemId"].asText() == child["itemId"].asText() }
         assertEquals("PRE-1", childRow["parentNumber"].asText())
-        val gotBody = authed.get().uri("/api/items/${child["itemId"].asText()}").exchange()
-            .expectStatus().isOk()
-            .expectBody(String::class.java).returnResult().responseBody!!
+        val gotBody =
+            authed
+                .get()
+                .uri("/api/items/${child["itemId"].asText()}")
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(String::class.java)
+                .returnResult()
+                .responseBody!!
         assertEquals("PRE-1", json.readTree(gotBody)["parentNumber"].asText())
     }
 }

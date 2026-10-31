@@ -1,7 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { Button, Checkbox, Chip, Popover, Stack, Typography } from "@mui/material";
+import {
+  Button,
+  Checkbox,
+  Chip,
+  Popover,
+  Stack,
+  Typography,
+} from "@mui/material";
 import ViewColumnIcon from "@mui/icons-material/ViewColumn";
 import { t } from "@/lib/texts";
 
@@ -31,7 +38,12 @@ export function ColumnConfigPopover({
         color={open ? "primary" : "default"}
         onClick={(e) => setAnchor(e.currentTarget)}
       />
-      <Popover open={open} anchorEl={anchor} onClose={() => setAnchor(null)} anchorOrigin={{ vertical: "bottom", horizontal: "left" }}>
+      <Popover
+        open={open}
+        anchorEl={anchor}
+        onClose={() => setAnchor(null)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+      >
         <Stack sx={{ p: 2, minWidth: 200 }} spacing={0.5}>
           <Typography variant="caption" color="text.secondary">
             {t.view.colConfig}
@@ -44,7 +56,11 @@ export function ColumnConfigPopover({
                 onChange={() => onToggle(c.id)}
                 sx={{ my: -0.5 }}
               />
-              <Typography variant="body2" sx={{ cursor: "pointer" }} onClick={() => onToggle(c.id)}>
+              <Typography
+                variant="body2"
+                sx={{ cursor: "pointer" }}
+                onClick={() => onToggle(c.id)}
+              >
                 {c.label}
               </Typography>
             </Stack>

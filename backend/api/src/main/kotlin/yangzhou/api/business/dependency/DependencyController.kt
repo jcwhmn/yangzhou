@@ -13,10 +13,13 @@ import java.util.UUID
 
 @RestController
 @RequestMapping("/api")
-class DependencyController(private val service: DependencyService) {
-
+class DependencyController(
+    private val service: DependencyService,
+) {
     @GetMapping("/items/{itemId}/dependencies")
-    fun list(@PathVariable itemId: UUID): DependencyService.DependencyListDto = service.list(itemId)
+    fun list(
+        @PathVariable itemId: UUID,
+    ): DependencyService.DependencyListDto = service.list(itemId)
 
     @PostMapping("/items/{itemId}/dependencies")
     @ResponseStatus(HttpStatus.CREATED)
@@ -27,5 +30,7 @@ class DependencyController(private val service: DependencyService) {
 
     @DeleteMapping("/dependencies/{dependencyItemId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    fun remove(@PathVariable dependencyItemId: UUID) = service.remove(dependencyItemId)
+    fun remove(
+        @PathVariable dependencyItemId: UUID,
+    ) = service.remove(dependencyItemId)
 }

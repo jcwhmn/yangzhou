@@ -78,7 +78,16 @@ export const t = {
     status: "状态",
     type: "类型",
     requirements: "需求",
-    detailTabs: ["评论", "日志", "判定", "需求", "依赖+清单", "工时", "GitHub", "属性"],
+    detailTabs: [
+      "评论",
+      "日志",
+      "判定",
+      "需求",
+      "依赖+清单",
+      "工时",
+      "GitHub",
+      "属性",
+    ],
     itemAttributes: "自定义属性",
     attrAdd: "加一行",
     attrEmpty: "暂无自定义属性",
@@ -145,7 +154,8 @@ export const t = {
     button: "成员池",
     title: "项目成员池",
     poolConfigured: "已配置池:仅池内成员可被指派/进候选。",
-    poolEmpty: "未配置池:全 workspace 成员可被指派。添加成员后,仅池内成员可被指派/进候选。",
+    poolEmpty:
+      "未配置池:全 workspace 成员可被指派。添加成员后,仅池内成员可被指派/进候选。",
     addable: "可添加的成员",
     busyLegend: "🟢 有进行中 item · ⚪ 空闲",
     allInPool: "(全员已在池中)",
@@ -195,7 +205,8 @@ export const t = {
     confirmTitle: "存在未满足项",
     cancel: "取消",
     virtualSuffix: "(虚拟)",
-    gapSummary: (missing: number, delta: number) => `缺门${missing}·差${delta}级`,
+    gapSummary: (missing: number, delta: number) =>
+      `缺门${missing}·差${delta}级`,
   },
   assignDialog: {
     assignMe: "指派给我",
@@ -221,7 +232,8 @@ export const t = {
   },
   gh: {
     patTitle: "GitHub PAT(workspace 级)",
-    patHint: "fine-grained token,勾选所需仓库;contents:write + pulls:read。保存后只显示尾 4 位。",
+    patHint:
+      "fine-grained token,勾选所需仓库;contents:write + pulls:read。保存后只显示尾 4 位。",
     patInput: "粘贴 PAT",
     patSave: "保存 PAT",
     patConfigured: (hint: string) => `已配置(${hint})`,
@@ -269,7 +281,11 @@ export const t = {
     advanceTo: (name: string) => `推进到 ${name}`,
     advanceFailed: "推进失败",
     bell: "通知",
-    kinds: { status_changed: "状态变更", assigned: "被指派", commented: "评论" } as Record<string, string>,
+    kinds: {
+      status_changed: "状态变更",
+      assigned: "被指派",
+      commented: "评论",
+    } as Record<string, string>,
   },
   time: {
     title: (key: string) => `${key} · 工时`,
@@ -292,7 +308,8 @@ export const t = {
     suggest: "从 GitHub 生成建议",
     suggestEmpty: "无关联分支,或分支 commit 不足以成段(需 ≥2 个提交)。",
     logSuggestion: "落账",
-    fmt: (m: number) => (m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`),
+    fmt: (m: number) =>
+      m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`,
   },
   activity: {
     created: "创建",
@@ -306,7 +323,8 @@ export const t = {
   verdicts: {
     satisfied: (a: string) => `✓ 满足(${a})`,
     surplus: (a: string) => `✓ 有余(${a})`,
-    gap: (a: string, d: number, r: number, act: number) => `△ 差 ${d} 级(${a}:需≥${r},有 ${act})`,
+    gap: (a: string, d: number, r: number, act: number) =>
+      `△ 差 ${d} 级(${a}:需≥${r},有 ${act})`,
     unrated: (a: string, r: number) => `△ 有但未评级(${a},需≥${r})——差距未知`,
     missing: (a: string) => `✗ 缺能力(${a})`,
   },

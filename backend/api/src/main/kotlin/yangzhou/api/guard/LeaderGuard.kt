@@ -23,7 +23,6 @@ class LeaderGuard(
     private val projectMembers: ProjectMemberRepository,
     private val members: MemberRepository,
 ) {
-
     /** 项目 key 入口(NotFound 先于 403)。 */
     fun requireLeader(projectKey: String) {
         val project = projects.findByKey(projectKey) ?: throw NotFoundException("项目不存在:$projectKey")
@@ -33,15 +32,18 @@ class LeaderGuard(
     fun requireLeader(projectObjectId: UUID) {
         val rows = projectMembers.findByProjectObjectId(projectObjectId)
         if (rows.none { it.role == ProjectMember.ROLE_LEADER }) return // R2
-        if (rows.none { it.role == ProjectMember.ROLE_LEADER && it.memberObjectId == currentMemberObjectId() })
+        if (rows.none { it.role == ProjectMember.ROLE_LEADER && it.memberObjectId == currentMemberObjectId() }) {
             throw ForbiddenException("需要项目 leader 权限")
+        }
     }
 
     private fun currentMemberObjectId(): UUID {
-        val principal = SecurityContextHolder.getContext().authentication?.principal as? String
-            ?: throw ForbiddenException("需要项目 leader 权限")
-        val objectId = runCatching { UUID.fromString(principal) }.getOrNull()
-            ?: throw ForbiddenException("需要项目 leader 权限")
+        val principal =
+            SecurityContextHolder.getContext().authentication?.principal as? String
+                ?: throw ForbiddenException("需要项目 leader 权限")
+        val objectId =
+            runCatching { UUID.fromString(principal) }.getOrNull()
+                ?: throw ForbiddenException("需要项目 leader 权限")
         return members.findByObjectId(objectId)?.objectId
             ?: throw ForbiddenException("需要项目 leader 权限")
     }

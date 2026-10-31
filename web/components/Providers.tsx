@@ -32,7 +32,9 @@ const theme = createTheme({
           "&:hover": { backgroundColor: tokens.field },
           "&.Mui-focused": {
             backgroundColor: tokens.paper,
-            "& .MuiOutlinedInput-notchedOutline": { borderColor: tokens.border },
+            "& .MuiOutlinedInput-notchedOutline": {
+              borderColor: tokens.border,
+            },
           },
         },
         notchedOutline: { borderColor: "transparent" },

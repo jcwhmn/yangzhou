@@ -12,7 +12,20 @@ data class AttachmentProperties(
     val accessKey: String = "",
     val secretKey: String = "",
     val maxSizeMb: Long = 20,
-    val allowedExtensions: List<String> = listOf(
-        "pdf", "png", "jpg", "jpeg", "gif", "webp", "txt", "md", "csv", "xlsx", "docx", "pptx", "zip",
-    ),
+    val allowedExtensions: List<String> =
+        listOf(
+            "pdf",
+            "png",
+            "jpg",
+            "jpeg",
+            "gif",
+            "webp",
+            "txt",
+            "md",
+            "csv",
+            "xlsx",
+            "docx",
+            "pptx",
+            "zip",
+        ),
 )

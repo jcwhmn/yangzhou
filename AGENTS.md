@@ -37,6 +37,7 @@ docs/      adr/ · spec/ · architecture/(puml 类图) · requirement/(PRD) · p
 - 切票边界自查(结论 ≤2 行):本票收尾干净?下一步依赖本会话推理?handoff 会不会复述 AGENTS/Linear 已有内容?→ clear / compact / handoff 三选一,自包含默认 clear。
 - sprint 收口(全部票 Done)时,主动提醒用户做 handoff(由用户执行)。
 - 外科手术式改动,不顺手重构无关代码。
+- 格式化走工具链(YPJ-121):backend `gradle ktlintFormat`、web `npm run format`;CI 有 format check,格式不对 build 红。行尾纪律真相源 = `.gitattributes`(默认 LF,ps1/bat/cmd CRLF)。
 - 最简可行实现,不加投机抽象。
 - 非平凡行为变更必须带测试。
 - 声称完成前跑通相关验证;后端以 `./gradlew build` + `./gradlew integrationTest` 绿 + bootRun 能启动为准(临时端口验证,起后即停;integrationTest 需 Docker,CI 兕底 nightly)。
@@ -64,7 +65,7 @@ docs/      adr/ · spec/ · architecture/(puml 类图) · requirement/(PRD) · p
 
 ## 持久层(ADR-0004;chess 实战约定平移)
 
-- **永不用 JDBC client(JdbcTemplate/JdbcOperations)**——跨表/投影/批量/级联一律 repository `@Query`/`@Modifying`(repositories.kt,ADR-0004 唯一授权扩展点;2026-10-17 定)
+- **永不用 JDBC client(JdbcTemplate/JdbcOperations)**——跨表/投影/批量/级联一律 repository `@Query`/`@Modifying`(Repositories.kt,ADR-0004 唯一授权扩展点;2026-10-17 定)
 - Spring Data JDBC + Flyway;禁 JPA/Hibernate/Exposed/BaseEntity 继承
 - 实体主构造直接声明 `id` / `objectId` / `createdAt` / `updatedAt`;`objectId` 在 Kotlin 生成
 - 对外只暴露公共 ID(`projectId` / `itemId`),永不暴露内部数字 id;FK 用 `object_id` UUID 列

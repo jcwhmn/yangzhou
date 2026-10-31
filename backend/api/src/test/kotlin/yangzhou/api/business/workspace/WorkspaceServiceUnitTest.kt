@@ -1,19 +1,18 @@
 package yangzhou.api.business.workspace
 
-import java.util.UUID
 import io.mockk.clearMocks
 import io.mockk.every
 import io.mockk.mockk
+import org.junit.jupiter.api.BeforeEach
 import yangzhou.persistence.Workspace
 import yangzhou.persistence.repository.WorkspaceRepository
-import org.junit.jupiter.api.BeforeEach
+import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 /** YPJ-87 单测补齐:WorkspaceService(单租户隐形,ADR-0001)。 */
 class WorkspaceServiceUnitTest {
-
     private val workspaces = mockk<WorkspaceRepository>(relaxed = true)
     private val service = WorkspaceService(workspaces)
 

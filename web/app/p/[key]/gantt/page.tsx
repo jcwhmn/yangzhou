@@ -40,16 +40,24 @@ export default function GanttPage() {
 
   // 时间轴:取所有日期的 min/max,前后各留 3 天;全空则今天~+30 天
   const axis = useMemo(() => {
-    const dates = (rows ?? []).flatMap((r) => [r.startDate, r.dueDate].filter(Boolean) as string[]);
+    const dates = (rows ?? []).flatMap(
+      (r) => [r.startDate, r.dueDate].filter(Boolean) as string[],
+    );
     const today = new Date();
-    const min = dates.length ? new Date(Math.min(...dates.map((d) => +new Date(d)))) : today;
-    const max = dates.length ? new Date(Math.max(...dates.map((d) => +new Date(d)))) : new Date(+today + 30 * DAY);
+    const min = dates.length
+      ? new Date(Math.min(...dates.map((d) => +new Date(d))))
+      : today;
+    const max = dates.length
+      ? new Date(Math.max(...dates.map((d) => +new Date(d))))
+      : new Date(+today + 30 * DAY);
     const start = new Date(+min - 3 * DAY);
     const end = new Date(+max + 4 * DAY);
     const span = Math.max(+end - +start, DAY);
     const ticks: string[] = [];
     // 按月取整:从起点次月 1 号起逐月一 tick(V65:跨度均分会产出 12-07 类非历法日期)
-    const cur = new Date(Date.UTC(start.getFullYear(), start.getMonth() + 1, 1));
+    const cur = new Date(
+      Date.UTC(start.getFullYear(), start.getMonth() + 1, 1),
+    );
     while (+cur <= +end) {
       ticks.push(cur.toISOString().slice(0, 10));
       cur.setUTCMonth(cur.getUTCMonth() + 1);
@@ -58,7 +66,12 @@ export default function GanttPage() {
   }, [rows]);
 
   const xOf = (date: string | null) =>
-    date === null ? null : Math.min(100, Math.max(0, ((+new Date(date) - +axis.start) / axis.span) * 100));
+    date === null
+      ? null
+      : Math.min(
+          100,
+          Math.max(0, ((+new Date(date) - +axis.start) / axis.span) * 100),
+        );
 
   function toggle(itemId: string) {
     setCollapsed((prev) => {
@@ -100,7 +113,11 @@ export default function GanttPage() {
           {/* 未排期折叠组 */}
           {unscheduled.length > 0 && (
             <Box sx={{ mb: 2 }}>
-              <Button size="small" variant="outlined" onClick={() => setShowUnscheduled((v) => !v)}>
+              <Button
+                size="small"
+                variant="outlined"
+                onClick={() => setShowUnscheduled((v) => !v)}
+              >
                 {showUnscheduled ? "▼" : "▶"} 未排期({unscheduled.length})
               </Button>
               {showUnscheduled &&
@@ -113,11 +130,31 @@ export default function GanttPage() {
           )}
 
           {/* 时间轴 */}
-          <Box sx={{ position: "relative", border: "1px solid", borderColor: "divider", borderRadius: 1, overflow: "hidden" }}>
+          <Box
+            sx={{
+              position: "relative",
+              border: "1px solid",
+              borderColor: "divider",
+              borderRadius: 1,
+              overflow: "hidden",
+            }}
+          >
             {/* 日期刻度 */}
-            <Stack direction="row" sx={{ borderBottom: "1px solid", borderColor: "divider", bgcolor: "background.default" }}>
+            <Stack
+              direction="row"
+              sx={{
+                borderBottom: "1px solid",
+                borderColor: "divider",
+                bgcolor: "background.default",
+              }}
+            >
               {axis.ticks.map((d) => (
-                <Typography key={d} variant="caption" color="text.secondary" sx={{ flex: 1, px: 0.5 }}>
+                <Typography
+                  key={d}
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ flex: 1, px: 0.5 }}
+                >
                   {d.slice(5)}
                 </Typography>
               ))}
@@ -149,7 +186,9 @@ export default function GanttPage() {
               const left = xOf(hasStart ? r.startDate : r.dueDate) ?? 0;
               const right = xOf(r.dueDate) ?? 100;
               const width = Math.max(hasStart ? right - left : 1.2, 1.2);
-              const hasKids = (rows ?? []).some((x) => x.parentItemId === r.itemId);
+              const hasKids = (rows ?? []).some(
+                (x) => x.parentItemId === r.itemId,
+              );
               const folded = collapsed.has(r.itemId);
               return (
                 <Box
@@ -165,15 +204,35 @@ export default function GanttPage() {
                   }}
                 >
                   {/* 行标题(左侧固定宽) */}
-                  <Box sx={{ width: 280, flexShrink: 0, pl: 1 + r.depth * 2, py: 0.5 }}>
+                  <Box
+                    sx={{
+                      width: 280,
+                      flexShrink: 0,
+                      pl: 1 + r.depth * 2,
+                      py: 0.5,
+                    }}
+                  >
                     <Stack direction="row" spacing={0.5} alignItems="center">
                       {hasKids && (
-                        <Button size="small" onClick={() => toggle(r.itemId)} sx={{ minWidth: 0, px: 0.5 }}>
+                        <Button
+                          size="small"
+                          onClick={() => toggle(r.itemId)}
+                          sx={{ minWidth: 0, px: 0.5 }}
+                        >
                           {folded ? "▶" : "▼"}
                         </Button>
                       )}
-                      <Chip label={r.number} size="small" variant="outlined" sx={{ height: 20 }} />
-                      <Typography variant="caption" noWrap sx={{ maxWidth: 150 }}>
+                      <Chip
+                        label={r.number}
+                        size="small"
+                        variant="outlined"
+                        sx={{ height: 20 }}
+                      />
+                      <Typography
+                        variant="caption"
+                        noWrap
+                        sx={{ maxWidth: 150 }}
+                      >
                         {r.title}
                       </Typography>
                     </Stack>
@@ -182,9 +241,26 @@ export default function GanttPage() {
                   {/* 条区(跳过左侧标题宽度的相对定位) */}
                   <Box sx={{ position: "relative", flex: 1, height: 44 }}>
                     {axis.todayX >= 0 && axis.todayX <= 100 && (
-                      <Box sx={{ position: "absolute", left: `${axis.todayX}%`, top: 0, bottom: 0, width: "2px", bgcolor: "info.main", opacity: 0.5 }} />
+                      <Box
+                        sx={{
+                          position: "absolute",
+                          left: `${axis.todayX}%`,
+                          top: 0,
+                          bottom: 0,
+                          width: "2px",
+                          bgcolor: "info.main",
+                          opacity: 0.5,
+                        }}
+                      />
                     )}
-                    <Box sx={{ position: "absolute", left: `${left}%`, width: `${width}%`, top: 10 }}>
+                    <Box
+                      sx={{
+                        position: "absolute",
+                        left: `${left}%`,
+                        width: `${width}%`,
+                        top: 10,
+                      }}
+                    >
                       {hasStart ? (
                         <Box
                           sx={{
@@ -208,20 +284,37 @@ export default function GanttPage() {
                     </Box>
                     <Link
                       href={`/p/${key}/i/${r.itemId}?from=gantt`}
-                      style={{ position: "absolute", left: 0, top: 0, right: 0, bottom: 0, display: "block" }}
+                      style={{
+                        position: "absolute",
+                        left: 0,
+                        top: 0,
+                        right: 0,
+                        bottom: 0,
+                        display: "block",
+                      }}
                       aria-label={r.number}
                     >
                       {" "}
                     </Link>
                   </Box>
 
-                  <Chip label={r.statusName} size="small" variant="outlined" sx={{ mr: 1, height: 20 }} />
+                  <Chip
+                    label={r.statusName}
+                    size="small"
+                    variant="outlined"
+                    sx={{ mr: 1, height: 20 }}
+                  />
                 </Box>
               );
             })}
           </Box>
-          <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: "block" }}>
-            蓝竖线 = 今天 · 菱形 = 里程碑(只有截止日期) · 红色 = 超期 · 点行进详情
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ mt: 1, display: "block" }}
+          >
+            蓝竖线 = 今天 · 菱形 = 里程碑(只有截止日期) · 红色 = 超期 ·
+            点行进详情
           </Typography>
         </>
       )}
@@ -231,7 +324,12 @@ export default function GanttPage() {
   function RowTitle({ r }: { r: GanttRow }) {
     return (
       <Stack direction="row" spacing={1} alignItems="center">
-        <Chip label={r.number} size="small" variant="outlined" sx={{ height: 20 }} />
+        <Chip
+          label={r.number}
+          size="small"
+          variant="outlined"
+          sx={{ height: 20 }}
+        />
         <Typography variant="caption">{r.title}</Typography>
       </Stack>
     );

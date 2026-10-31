@@ -1,7 +1,5 @@
 package yangzhou.api.general
 
-import tools.jackson.databind.JsonNode
-import tools.jackson.databind.node.ObjectNode
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
@@ -14,7 +12,9 @@ import org.springframework.web.servlet.HandlerInterceptor
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer
 import org.springframework.web.util.ContentCachingRequestWrapper
+import tools.jackson.databind.JsonNode
 import tools.jackson.databind.ObjectMapper
+import tools.jackson.databind.node.ObjectNode
 import java.nio.charset.StandardCharsets
 
 /**
@@ -23,8 +23,9 @@ import java.nio.charset.StandardCharsets
  * 级别:写操作 INFO / 其余 DEBUG(logger yangzhou.api.access,yml 可调)。
  */
 @Component
-class AccessLogFilter(private val mapper: ObjectMapper) : OncePerRequestFilter() {
-
+class AccessLogFilter(
+    private val mapper: ObjectMapper,
+) : OncePerRequestFilter() {
     override fun shouldNotFilter(request: HttpServletRequest): Boolean {
         val p = request.requestURI
         return p.startsWith("/scalar") || p.startsWith("/v3/api-docs") || p == "/error"
@@ -42,14 +43,15 @@ class AccessLogFilter(private val mapper: ObjectMapper) : OncePerRequestFilter()
         } finally {
             val method = request.method
             val body = if (method in WRITES) readBody(wrapped) else ""
-            val line = buildString {
-                append("method=").append(method)
-                append(" path=").append(request.requestURI)
-                append(" status=").append(response.status)
-                append(" durationMs=").append(System.currentTimeMillis() - start)
-                (wrapped.getAttribute(ATTR) as? String)?.let { append(" handler=").append(it) }
-                if (body.isNotEmpty()) append(" body=").append(body)
-            }
+            val line =
+                buildString {
+                    append("method=").append(method)
+                    append(" path=").append(request.requestURI)
+                    append(" status=").append(response.status)
+                    append(" durationMs=").append(System.currentTimeMillis() - start)
+                    (wrapped.getAttribute(ATTR) as? String)?.let { append(" handler=").append(it) }
+                    if (body.isNotEmpty()) append(" body=").append(body)
+                }
             if (method in WRITES) LOG.info(line) else LOG.debug(line)
         }
     }
@@ -58,11 +60,12 @@ class AccessLogFilter(private val mapper: ObjectMapper) : OncePerRequestFilter()
     private fun readBody(wrapped: ContentCachingRequestWrapper): String {
         val raw = String(wrapped.contentAsByteArray, StandardCharsets.UTF_8).trim()
         if (raw.isEmpty()) return ""
-        val masked = try {
-            mask(mapper.readTree(raw)).toString()
-        } catch (_: Exception) {
-            raw // 非 JSON:原样截断,不炸
-        }
+        val masked =
+            try {
+                mask(mapper.readTree(raw)).toString()
+            } catch (_: Exception) {
+                raw // 非 JSON:原样截断,不炸
+            }
         return truncate(masked.replace('\n', ' '))
     }
 
@@ -72,8 +75,11 @@ class AccessLogFilter(private val mapper: ObjectMapper) : OncePerRequestFilter()
             node.isObject -> {
                 val obj = node as ObjectNode
                 node.properties().toList().forEach { (name, child) ->
-                    if (name.lowercase() in SENSITIVE) obj.put(name, "***")
-                    else mask(child)
+                    if (name.lowercase() in SENSITIVE) {
+                        obj.put(name, "***")
+                    } else {
+                        mask(child)
+                    }
                 }
             }
             node.isArray -> node.forEach { mask(it) }
@@ -95,7 +101,6 @@ class AccessLogFilter(private val mapper: ObjectMapper) : OncePerRequestFilter()
 /** 把实际 handler(AuthController#login)带给 AccessLogFilter——filter 层拿不到 HandlerMethod。 */
 @Component
 class AccessLogHandlerInterceptor : HandlerInterceptor {
-
     override fun preHandle(
         request: HttpServletRequest,
         response: HttpServletResponse,
@@ -109,8 +114,9 @@ class AccessLogHandlerInterceptor : HandlerInterceptor {
 }
 
 @Configuration(proxyBeanMethods = false)
-class AccessLogWebConfig(private val interceptor: AccessLogHandlerInterceptor) : WebMvcConfigurer {
-
+class AccessLogWebConfig(
+    private val interceptor: AccessLogHandlerInterceptor,
+) : WebMvcConfigurer {
     override fun addInterceptors(registry: InterceptorRegistry) {
         registry.addInterceptor(interceptor)
     }

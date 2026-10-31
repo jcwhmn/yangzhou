@@ -16,8 +16,9 @@ import java.util.UUID
 
 @RestController
 @RequestMapping("/api")
-class WorkflowController(private val service: WorkflowService) {
-
+class WorkflowController(
+    private val service: WorkflowService,
+) {
     @PostMapping("/projects/{key}/statuses")
     @ResponseStatus(HttpStatus.CREATED)
     fun createStatus(
@@ -33,10 +34,14 @@ class WorkflowController(private val service: WorkflowService) {
 
     @DeleteMapping("/statuses/{statusId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    fun deleteStatus(@PathVariable statusId: UUID) = service.deleteStatus(statusId)
+    fun deleteStatus(
+        @PathVariable statusId: UUID,
+    ) = service.deleteStatus(statusId)
 
     @GetMapping("/projects/{key}/transitions")
-    fun listTransitions(@PathVariable key: String): List<WorkflowService.TransitionDto> = service.listTransitions(key)
+    fun listTransitions(
+        @PathVariable key: String,
+    ): List<WorkflowService.TransitionDto> = service.listTransitions(key)
 
     @PutMapping("/projects/{key}/transitions")
     fun replaceTransitions(

@@ -10,10 +10,12 @@ import java.util.UUID
 
 @RestController
 @RequestMapping("/api")
-class GithubCommitController(private val service: GithubCommitService) {
-
+class GithubCommitController(
+    private val service: GithubCommitService,
+) {
     @GetMapping("/items/{itemId}/commits")
     @ResponseStatus(HttpStatus.OK)
-    fun commits(@PathVariable itemId: UUID): List<GithubCommitService.RefCommitsDto> =
-        service.commitsForItem(itemId)
+    fun commits(
+        @PathVariable itemId: UUID,
+    ): List<GithubCommitService.RefCommitsDto> = service.commitsForItem(itemId)
 }

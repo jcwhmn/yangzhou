@@ -1,11 +1,11 @@
 package yangzhou.api.business.dashboard
 
+import org.springframework.stereotype.Service
 import yangzhou.api.business.milestone.MilestoneService
 import yangzhou.api.business.sprint.SprintService
 import yangzhou.api.business.standup.StandupDto
 import yangzhou.api.business.standup.StandupService
 import yangzhou.persistence.repository.ProjectRepository
-import org.springframework.stereotype.Service
 import java.util.UUID
 
 /** 跨项目在途组:只含有途(active sprint / in_progress milestone)的项目。 */
@@ -15,11 +15,22 @@ data class LiveGroupDto(
     val milestones: List<LiveMilestoneDto>,
 )
 
-data class LiveSprintDto(val sprintId: UUID, val name: String, val endDate: String?)
+data class LiveSprintDto(
+    val sprintId: UUID,
+    val name: String,
+    val endDate: String?,
+)
 
-data class LiveMilestoneDto(val milestoneId: UUID, val name: String, val targetDate: String?)
+data class LiveMilestoneDto(
+    val milestoneId: UUID,
+    val name: String,
+    val targetDate: String?,
+)
 
-data class DashboardDto(val standup: StandupDto, val live: List<LiveGroupDto>)
+data class DashboardDto(
+    val standup: StandupDto,
+    val live: List<LiveGroupDto>,
+)
 
 @Service
 class DashboardService(
@@ -29,17 +40,25 @@ class DashboardService(
     private val milestoneService: MilestoneService,
 ) {
     fun dashboard(): DashboardDto {
-        val live = projects.findAll().filter { it.archivedAt == null }
-            .map { p ->
-                LiveGroupDto(
-                    projectKey = p.key,
-                    sprints = sprintService.list(p.key).filter { it.status == "active" }
-                        .map { LiveSprintDto(it.sprintId, it.name, it.endDate) },
-                    milestones = milestoneService.list(p.key).filter { it.status == "in_progress" }
-                        .map { LiveMilestoneDto(it.milestoneId, it.name, it.targetDate) },
-                )
-            }
-            .filter { it.sprints.isNotEmpty() || it.milestones.isNotEmpty() }
+        val live =
+            projects
+                .findAll()
+                .filter { it.archivedAt == null }
+                .map { p ->
+                    LiveGroupDto(
+                        projectKey = p.key,
+                        sprints =
+                        sprintService
+                            .list(p.key)
+                            .filter { it.status == "active" }
+                            .map { LiveSprintDto(it.sprintId, it.name, it.endDate) },
+                        milestones =
+                        milestoneService
+                            .list(p.key)
+                            .filter { it.status == "in_progress" }
+                            .map { LiveMilestoneDto(it.milestoneId, it.name, it.targetDate) },
+                    )
+                }.filter { it.sprints.isNotEmpty() || it.milestones.isNotEmpty() }
         return DashboardDto(standup = standupService.standup(null), live = live)
     }
 }

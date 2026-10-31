@@ -1,5 +1,6 @@
 package yangzhou.api.business.release
 
+import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
@@ -10,8 +11,6 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
-import yangzhou.persistence.ItemGroup
-import jakarta.validation.Valid
 import java.util.UUID
 
 /**
@@ -21,10 +20,13 @@ import java.util.UUID
  */
 @RestController
 @RequestMapping("/api")
-class ReleaseController(private val service: ReleaseService) {
-
+class ReleaseController(
+    private val service: ReleaseService,
+) {
     @GetMapping("/projects/{key}/releases")
-    fun list(@PathVariable key: String): List<ReleaseService.ReleaseDto> = service.list(key)
+    fun list(
+        @PathVariable key: String,
+    ): List<ReleaseService.ReleaseDto> = service.list(key)
 
     @PostMapping("/projects/{key}/releases")
     @ResponseStatus(HttpStatus.CREATED)
@@ -42,5 +44,8 @@ class ReleaseController(private val service: ReleaseService) {
 
     @DeleteMapping("/projects/{key}/releases/{releaseId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    fun delete(@PathVariable key: String, @PathVariable releaseId: UUID) = service.delete(key, releaseId)
+    fun delete(
+        @PathVariable key: String,
+        @PathVariable releaseId: UUID,
+    ) = service.delete(key, releaseId)
 }

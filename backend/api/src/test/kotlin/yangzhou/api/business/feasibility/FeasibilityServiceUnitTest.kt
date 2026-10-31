@@ -3,6 +3,8 @@ package yangzhou.api.business.feasibility
 import io.mockk.clearMocks
 import io.mockk.every
 import io.mockk.mockk
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Nested
 import yangzhou.api.business.member.MemberService
 import yangzhou.api.business.workspace.WorkspaceService
 import yangzhou.api.error.NotFoundException
@@ -18,22 +20,18 @@ import yangzhou.persistence.repository.CapabilityRepository
 import yangzhou.persistence.repository.ItemRepository
 import yangzhou.persistence.repository.ProjectRepository
 import yangzhou.persistence.repository.RequirementRepository
-import java.util.Optional
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Nested
 
 /**
  * YPJ-80 mockk 子票①:FeasibilityService 装配/聚合分支单测。
  * 引擎(MatchingEngine)真跑不 mock;repository 协作者 mockk(relaxed),不起 Spring 不碰 DB。
  */
 class FeasibilityServiceUnitTest {
-
     private val projects = mockk<ProjectRepository>(relaxed = true)
     private val itemRepo = mockk<ItemRepository>(relaxed = true)
     private val requirementRepo = mockk<RequirementRepository>(relaxed = true)
@@ -42,13 +40,21 @@ class FeasibilityServiceUnitTest {
     private val memberService = mockk<MemberService>(relaxed = true)
     private val workspaceService = mockk<WorkspaceService>(relaxed = true)
 
-    private val service = FeasibilityService(
-        projects, itemRepo, requirementRepo, definitions, capabilities, memberService, workspaceService,
-    )
+    private val service =
+        FeasibilityService(
+            projects,
+            itemRepo,
+            requirementRepo,
+            definitions,
+            capabilities,
+            memberService,
+            workspaceService,
+        )
 
     private val ws = Workspace(id = 1L, objectId = UUID(0, 1))
     private val project = Project(id = 100L, objectId = UUID(0, 100), workspaceObjectId = UUID(0, 1), key = "YPJ", name = "yangzhou")
-    private val me = Member(id = 5L, objectId = UUID(0, 5), workspaceObjectId = UUID(0, 1), username = "me", passwordHash = "x", displayName = "我")
+    private val me =
+        Member(id = 5L, objectId = UUID(0, 5), workspaceObjectId = UUID(0, 1), username = "me", passwordHash = "x", displayName = "我")
     private val attrKotlin = AttributeDefinition(id = 10L, objectId = UUID(0, 10), workspaceObjectId = UUID(0, 1), name = "kotlin")
     private val attrReact = AttributeDefinition(id = 11L, objectId = UUID(0, 11), workspaceObjectId = UUID(0, 1), name = "react")
 
@@ -58,24 +64,48 @@ class FeasibilityServiceUnitTest {
         every { workspaceService.required() } returns ws
         every { definitions.findByWorkspaceObjectId(UUID(0, 1)) } returns listOf(attrKotlin, attrReact)
         every { memberService.current() } returns me
-        every { capabilities.findByMemberObjectId(UUID(0, 5)) } returns listOf(Capability(memberObjectId = UUID(0, 5), attributeDefinitionObjectId = UUID(0, 10), level = 3))
+        every { capabilities.findByMemberObjectId(UUID(0, 5)) } returns
+            listOf(Capability(memberObjectId = UUID(0, 5), attributeDefinitionObjectId = UUID(0, 10), level = 3))
         every { projects.findAll() } returns listOf(project)
         // 泛型 save 显式回传实参:relaxed 对 <S> 返回占位对象,service 侧链式使用即 CCE
-        every { projects.save(any()) } answers { val arg: Project = firstArg(); arg }
-        every { itemRepo.save(any()) } answers { val arg: Item = firstArg(); arg }
+        every { projects.save(any()) } answers {
+            val arg: Project = firstArg()
+            arg
+        }
+        every { itemRepo.save(any()) } answers {
+            val arg: Item = firstArg()
+            arg
+        }
     }
 
-    private fun item(id: Long, number: Int, vararg reqs: Requirement): Item {
-        val it = Item(id = id, objectId = UUID(0, id), projectObjectId = UUID(0, 100), number = number, title = "item $number", statusObjectId = UUID.randomUUID())
+    private fun item(
+        id: Long,
+        number: Int,
+        vararg reqs: Requirement,
+    ): Item {
+        val it =
+            Item(
+                id = id,
+                objectId = UUID(0, id),
+                projectObjectId = UUID(0, 100),
+                number = number,
+                title = "item $number",
+                statusObjectId = UUID.randomUUID(),
+            )
         every { requirementRepo.findByItemObjectId(UUID(0, id)) } returns reqs.toList()
         every { itemRepo.findByObjectId(it.objectId) } returns it
         return it
     }
 
-    private fun req(attrId: UUID, min: Int?) =
-        Requirement(itemObjectId = UUID(0, 999), attributeDefinitionObjectId = attrId, minLevel = min)
+    private fun req(
+        attrId: UUID,
+        min: Int?,
+    ) = Requirement(itemObjectId = UUID(0, 999), attributeDefinitionObjectId = attrId, minLevel = min)
 
-    private fun stubItems(items: List<Item>, projectObjectId: UUID = UUID(0, 100)) {
+    private fun stubItems(
+        items: List<Item>,
+        projectObjectId: UUID = UUID(0, 100),
+    ) {
         every { itemRepo.findByProjectObjectIdAndDeletedAtIsNullOrderByNumber(projectObjectId) } returns items
     }
 
@@ -107,7 +137,11 @@ class FeasibilityServiceUnitTest {
             assertEquals("RED", result.signal)
             assertEquals(1, result.missingCount) // react 无任何 capability → missing
             assertEquals(1, result.totalDelta) // kotlin 需 4 有 3 → delta 1
-            val kinds = result.items.single().verdicts.associate { it.attribute to it.kind }
+            val kinds =
+                result.items
+                    .single()
+                    .verdicts
+                    .associate { it.attribute to it.kind }
             assertEquals("gap", kinds["kotlin"])
             assertEquals("missing", kinds["react"])
         }
@@ -134,7 +168,11 @@ class FeasibilityServiceUnitTest {
             stubItems(both)
 
             val saved = mutableListOf<Project>()
-            every { projects.save(any()) } answers { val arg: Project = firstArg(); saved.add(arg); arg }
+            every { projects.save(any()) } answers {
+                val arg: Project = firstArg()
+                saved.add(arg)
+                arg
+            }
             assertEquals("RED", service.recomputeProjectSignal(UUID(0, 100)))
             assertEquals("RED", saved.single().feasSignal)
         }

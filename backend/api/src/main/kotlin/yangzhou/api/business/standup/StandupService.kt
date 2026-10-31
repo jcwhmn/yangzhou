@@ -1,6 +1,7 @@
 package yangzhou.api.business.standup
 
 import org.springframework.stereotype.Service
+import yangzhou.api.business.dependency.DependencyService
 import yangzhou.api.business.member.MemberService
 import yangzhou.api.error.NotFoundException
 import yangzhou.persistence.repository.ItemActivityRepository
@@ -8,7 +9,6 @@ import yangzhou.persistence.repository.ItemRepository
 import yangzhou.persistence.repository.MemberRepository
 import yangzhou.persistence.repository.ProjectRepository
 import yangzhou.persistence.repository.StatusRepository
-import yangzhou.api.business.dependency.DependencyService
 import java.time.Duration
 import java.time.LocalDate
 import java.time.ZoneId
@@ -29,17 +29,20 @@ class StandupService(
     private val dependencyService: DependencyService,
     private val memberService: MemberService,
 ) {
-
     fun standup(memberObjectId: UUID?): StandupDto {
-        val member = memberObjectId?.let { members.findByObjectId(it) ?: throw NotFoundException("成员不存在") }
-            ?: memberService.current()
+        val member =
+            memberObjectId?.let { members.findByObjectId(it) ?: throw NotFoundException("成员不存在") }
+                ?: memberService.current()
         val memberObjectId = member.objectId!!
 
         val zone = ZoneId.systemDefault()
         val todayStart = LocalDate.now(zone).atStartOfDay(zone).toInstant()
         val yesterdayStart = todayStart.minus(Duration.ofDays(1))
-        val movedYesterday = activities.findByKindAndCreatedAtBetween("status_changed", yesterdayStart, todayStart)
-            .map { it.itemObjectId }.toSet()
+        val movedYesterday =
+            activities
+                .findByKindAndCreatedAtBetween("status_changed", yesterdayStart, todayStart)
+                .map { it.itemObjectId }
+                .toSet()
 
         val done = mutableListOf<StandupItemDto>()
         val today = mutableListOf<StandupItemDto>()
@@ -53,13 +56,14 @@ class StandupService(
             items.findByProjectObjectIdAndDeletedAtIsNullOrderByNumber(pid).forEach { item ->
                 if (item.assigneeObjectId != member.objectId) return@forEach
                 val status = statusById[item.statusObjectId] ?: return@forEach
-                val dto = StandupItemDto(
-                    itemId = item.objectId,
-                    number = "$key-${item.number}",
-                    projectKey = key,
-                    title = item.title,
-                    statusName = status.name,
-                )
+                val dto =
+                    StandupItemDto(
+                        itemId = item.objectId,
+                        number = "$key-${item.number}",
+                        projectKey = key,
+                        title = item.title,
+                        statusName = status.name,
+                    )
                 val iid = item.objectId!!
                 if (iid in movedYesterday) done.add(dto)
                 if (!status.isFinal) {

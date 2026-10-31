@@ -18,25 +18,40 @@ import java.util.UUID
 /** 项目成员池(V3.5-B):POST/GET/DELETE /api/projects/{key}/members。 */
 @RestController
 @RequestMapping("/api")
-class ProjectMemberController(private val service: ProjectMemberService) {
-
+class ProjectMemberController(
+    private val service: ProjectMemberService,
+) {
     @PostMapping("/projects/{key}/members")
     @ResponseStatus(HttpStatus.CREATED)
-    fun add(@PathVariable key: String, @Valid @RequestBody request: AddProjectMemberRequest): ProjectMemberService.MemberDto =
-        service.add(key, request.memberId)
+    fun add(
+        @PathVariable key: String,
+        @Valid @RequestBody request: AddProjectMemberRequest,
+    ): ProjectMemberService.MemberDto = service.add(key, request.memberId)
 
     @GetMapping("/projects/{key}/members")
-    fun list(@PathVariable key: String): List<ProjectMemberService.MemberDto> = service.list(key)
+    fun list(
+        @PathVariable key: String,
+    ): List<ProjectMemberService.MemberDto> = service.list(key)
 
     @DeleteMapping("/projects/{key}/members/{memberId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    fun remove(@PathVariable key: String, @PathVariable memberId: UUID) = service.remove(key, memberId)
+    fun remove(
+        @PathVariable key: String,
+        @PathVariable memberId: UUID,
+    ) = service.remove(key, memberId)
 
     @PutMapping("/projects/{key}/members/{memberId}/role")
-    fun setRole(@PathVariable key: String, @PathVariable memberId: UUID, @Valid @RequestBody request: SetRoleRequest): ProjectMemberService.MemberDto =
-        service.setRole(key, memberId, request.role)
+    fun setRole(
+        @PathVariable key: String,
+        @PathVariable memberId: UUID,
+        @Valid @RequestBody request: SetRoleRequest,
+    ): ProjectMemberService.MemberDto = service.setRole(key, memberId, request.role)
 }
 
-data class AddProjectMemberRequest(@field:NotNull val memberId: UUID)
+data class AddProjectMemberRequest(
+    @field:NotNull val memberId: UUID,
+)
 
-data class SetRoleRequest(@field:NotBlank val role: String)
+data class SetRoleRequest(
+    @field:NotBlank val role: String,
+)
