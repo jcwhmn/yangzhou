@@ -6,6 +6,19 @@ import { config } from "../config";
 let cachedToken: string | null = null;
 
 /** worker 级缓存一个 token(bootstrap 幂等,已有账号 409 → login) */
+/** 失败时带后端统一错误体的 message,便于定位(e2e 基建;YPJ-125 期间 409 无信息促生)。 */
+async function assertOk(res: Response, what: string): Promise<void> {
+  if (res.ok) return;
+  const body = await res.text().catch(() => "");
+  let detail = body;
+  try {
+    detail = (JSON.parse(body) as { message?: string }).message ?? body;
+  } catch {
+    /* 非 JSON 原样保留 */
+  }
+  throw new Error(`${what}: ${res.status} ${detail}`.trimEnd());
+}
+
 export async function apiToken(): Promise<string> {
   if (cachedToken) return cachedToken;
   const boot = await fetch(`${config.apiURL}/api/auth/bootstrap`, {
@@ -16,8 +29,7 @@ export async function apiToken(): Promise<string> {
       password: config.password,
     }),
   });
-  if (!boot.ok && boot.status !== 409)
-    throw new Error(`bootstrap ${boot.status}`);
+  if (!boot.ok && boot.status !== 409) await assertOk(boot, "bootstrap");
   const login = await fetch(`${config.apiURL}/api/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -26,7 +38,7 @@ export async function apiToken(): Promise<string> {
       password: config.password,
     }),
   });
-  if (!login.ok) throw new Error(`login ${login.status}`);
+  if (!login.ok) await assertOk(login, "login");
   cachedToken = ((await login.json()) as { token: string }).token;
   return cachedToken;
 }
@@ -45,7 +57,7 @@ export async function apiCall<T = unknown>(
     },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(`${method} ${path}: ${res.status}`);
+  if (!res.ok) await assertOk(res, `${method} ${path}`);
   return res.status === 204 ? (undefined as T) : ((await res.json()) as T);
 }
 
@@ -70,8 +82,7 @@ export async function apiCreateProject(key: string): Promise<void> {
     body: JSON.stringify({ key, name: `E2E ${key}` }),
   });
   // 409 = 并行下同名 key 已存在(理论不发生),容忍
-  if (!res.ok && res.status !== 409)
-    throw new Error(`创建项目 ${key}: ${res.status}`);
+  if (!res.ok && res.status !== 409) await assertOk(res, `创建项目 ${key}`);
 }
 
 export async function apiCreateMember(displayName: string): Promise<void> {
@@ -85,7 +96,7 @@ export async function apiCreateMember(displayName: string): Promise<void> {
   });
   // 409 = 并行下同名成员已存在,容忍
   if (!res.ok && res.status !== 409)
-    throw new Error(`建成员 ${displayName}: ${res.status}`);
+    await assertOk(res, `建成员 ${displayName}`);
 }
 
 export async function apiCreateItem(
@@ -100,7 +111,7 @@ export async function apiCreateItem(
     },
     body: JSON.stringify({ title }),
   });
-  if (!res.ok) throw new Error(`创建 item: ${res.status}`);
+  if (!res.ok) await assertOk(res, "创建 item");
   return ((await res.json()) as { itemId: string }).itemId;
 }
 
@@ -124,7 +135,7 @@ export async function apiCreateSprint(
     },
     body: JSON.stringify({ name, startDate: null, endDate: null }),
   });
-  if (!res.ok) throw new Error(`创建 sprint: ${res.status}`);
+  if (!res.ok) await assertOk(res, "创建 sprint");
   return ((await res.json()) as { sprintId: string }).sprintId;
 }
 
@@ -146,7 +157,7 @@ export async function apiAssignMe(itemId: string): Promise<void> {
     },
     body: JSON.stringify({ assigneeItemId: meId }),
   });
-  if (!res.ok) throw new Error(`指派: ${res.status}`);
+  if (!res.ok) await assertOk(res, "指派");
 }
 
 /** 页面导航前注入 token(绕 UI 登录;登录/登出行为本身在 auth.spec 用 UI 测) */
