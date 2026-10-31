@@ -1,6 +1,13 @@
 "use client";
 
-import { Button, Card, CardContent, Chip, Stack, Typography } from "@mui/material";
+import {
+  Button,
+  Card,
+  CardContent,
+  Chip,
+  Stack,
+  Typography,
+} from "@mui/material";
 import { PageShell } from "@/components/PageShell";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
@@ -75,16 +82,39 @@ export default function RecycleBinPage() {
         {(rows ?? []).map((r) => (
           <Card key={r.itemId} variant="outlined">
             <CardContent sx={{ py: 1.5, "&:last-child": { pb: 1.5 } }}>
-              <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+              <Stack
+                direction="row"
+                spacing={1}
+                alignItems="center"
+                flexWrap="wrap"
+                useFlexGap
+              >
                 <Chip size="small" variant="outlined" label={r.number} />
                 <Typography variant="body2">{r.title}</Typography>
-                <Typography variant="caption" color="text.secondary" sx={{ ml: "auto" }}>
-                  {r.projectName} · 删除于 {r.deletedAt ? new Date(r.deletedAt).toLocaleString("zh-CN") : "?"}
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ ml: "auto" }}
+                >
+                  {r.projectName} · 删除于{" "}
+                  {r.deletedAt
+                    ? new Date(r.deletedAt).toLocaleString("zh-CN")
+                    : "?"}
                 </Typography>
-                <Button size="small" variant="contained" disabled={busy === r.itemId} onClick={() => restore(r.itemId)}>
+                <Button
+                  size="small"
+                  variant="contained"
+                  disabled={busy === r.itemId}
+                  onClick={() => restore(r.itemId)}
+                >
                   恢复
                 </Button>
-                <Button size="small" color="error" disabled={busy === r.itemId} onClick={() => purge(r.itemId)}>
+                <Button
+                  size="small"
+                  color="error"
+                  disabled={busy === r.itemId}
+                  onClick={() => purge(r.itemId)}
+                >
                   彻底删除
                 </Button>
               </Stack>

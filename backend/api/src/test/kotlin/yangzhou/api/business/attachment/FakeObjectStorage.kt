@@ -10,7 +10,10 @@ class FakeObjectStorage : ObjectStorage {
     val gets = mutableListOf<String>()
     val deletes = mutableListOf<String>()
 
-    override fun presignPut(key: String, contentType: String): String {
+    override fun presignPut(
+        key: String,
+        contentType: String,
+    ): String {
         puts += key to contentType
         return "http://fake/put/$key"
     }

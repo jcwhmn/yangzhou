@@ -10,10 +10,10 @@ import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 import tools.jackson.databind.ObjectMapper
-import java.util.concurrent.Executors
 import yangzhou.persistence.repository.ProjectRepoRepository
 import yangzhou.persistence.repository.ProjectRepository
 import yangzhou.persistence.repository.WorkspaceRepository
+import java.util.concurrent.Executors
 
 /** YPJ-85:GitHub webhook 匿名回调,秒级触发既有同步;签名不符/secret 未配置一律 403 全拒。 */
 @RestController
@@ -38,7 +38,12 @@ class GithubWebhookController(
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(mapOf("status" to "forbidden"))
         }
         if (event !in EVENTS) return ResponseEntity.ok(mapOf("status" to "ignored"))
-        val repo = mapper.readTree(rawBody).path("repository").path("full_name").asString(null)
+        val repo =
+            mapper
+                .readTree(rawBody)
+                .path("repository")
+                .path("full_name")
+                .asString(null)
         if (repo.isNullOrEmpty()) return ResponseEntity.ok(mapOf("status" to "ignored"))
         val mounts = projectRepos.findByRepo(repo)
         if (mounts.isEmpty()) return ResponseEntity.ok(mapOf("status" to "ignored"))
@@ -48,9 +53,10 @@ class GithubWebhookController(
             return ResponseEntity.accepted().body(mapOf("status" to "accepted"))
         }
         // GitHub webhook 10s 超时:syncRepo 全量拉 branches+PRs 可能超时 → 后台执行,立即 202
-        val targets = mounts.mapNotNull { m ->
-            projects.findByObjectId(m.projectObjectId)?.let { m.repo to it }
-        }
+        val targets =
+            mounts.mapNotNull { m ->
+                projects.findByObjectId(m.projectObjectId)?.let { m.repo to it }
+            }
         executor.submit {
             for ((r, project) in targets) {
                 try {
@@ -65,8 +71,9 @@ class GithubWebhookController(
 
     companion object {
         private val EVENTS = setOf("push", "pull_request")
-        private val executor = Executors.newSingleThreadExecutor { r ->
-            Thread(r, "github-webhook-sync").apply { isDaemon = true }
-        }
+        private val executor =
+            Executors.newSingleThreadExecutor { r ->
+                Thread(r, "github-webhook-sync").apply { isDaemon = true }
+            }
     }
 }

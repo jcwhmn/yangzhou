@@ -13,8 +13,8 @@ if (fs.existsSync(envFile)) {
 export const config = {
   /** 前端 dev server(Playwright baseURL / webServer 探活) */
   baseURL: process.env.E2E_BASE_URL ?? "http://localhost:3000",
-  /** 后端 API(用例的 API 预置/清理直连;页面请求走前端代理) */
-  apiURL: process.env.E2E_API_URL ?? "http://localhost:8080",
+  /** 后端 API(用例的 API 预置/清理直连;页面请求走前端代理)。YPJ-118 起 8082=test 容器(8080=prod) */
+  apiURL: process.env.E2E_API_URL ?? "http://localhost:8082",
   username: process.env.E2E_USERNAME ?? "me",
   password: process.env.E2E_PASSWORD ?? "secret123",
 };

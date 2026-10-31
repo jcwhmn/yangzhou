@@ -3,6 +3,8 @@ package yangzhou.api.business.dependency
 import io.mockk.clearMocks
 import io.mockk.every
 import io.mockk.mockk
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Nested
 import yangzhou.api.error.BadRequestException
 import yangzhou.api.error.ConflictException
 import yangzhou.api.error.NotFoundException
@@ -14,19 +16,15 @@ import yangzhou.persistence.repository.ItemDependencyRepository
 import yangzhou.persistence.repository.ItemRepository
 import yangzhou.persistence.repository.ProjectRepository
 import yangzhou.persistence.repository.StatusRepository
-import java.time.Instant
 import java.util.UUID
-import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Nested
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /** YPJ-86 单测补齐:DependencyService 全分支(含成环 BFS 与 blocked 聚合)。 */
 class DependencyServiceUnitTest {
-
     private val dependencies = mockk<ItemDependencyRepository>(relaxed = true)
     private val items = mockk<ItemRepository>(relaxed = true)
     private val projects = mockk<ProjectRepository>(relaxed = true)
@@ -37,7 +35,12 @@ class DependencyServiceUnitTest {
     private val projB = UUID(0, 2)
     private val projectA = Project(id = 1L, objectId = projA, workspaceObjectId = UUID(0, 9), key = "CHE", name = "CHE")
 
-    private fun item(id: Long?, number: Int, project: UUID = projA, status: Status) = Item(
+    private fun item(
+        id: Long?,
+        number: Int,
+        project: UUID = projA,
+        status: Status,
+    ) = Item(
         id = id,
         objectId = id?.let { UUID(0, it) } ?: UUID.randomUUID(),
         projectObjectId = project,
@@ -46,8 +49,15 @@ class DependencyServiceUnitTest {
         statusObjectId = status.objectId,
     )
 
-    private fun status(name: String, final: Boolean = false, position: Int = 0) = Status(
-        projectObjectId = projA, name = name, isFinal = final, position = position,
+    private fun status(
+        name: String,
+        final: Boolean = false,
+        position: Int = 0,
+    ) = Status(
+        projectObjectId = projA,
+        name = name,
+        isFinal = final,
+        position = position,
     )
 
     @BeforeEach
@@ -58,7 +68,6 @@ class DependencyServiceUnitTest {
 
     @Nested
     inner class Add {
-
         @Test
         fun selfDependencyRejected() {
             val id = UUID.randomUUID()
@@ -106,7 +115,8 @@ class DependencyServiceUnitTest {
             every { items.findByObjectId(a.objectId) } returns a
             every { items.findByObjectId(b.objectId) } returns b
             every { dependencies.existsByItemObjectIdAndDependsOnItemObjectId(UUID(0, 1), UUID(0, 2)) } returns false
-            every { dependencies.findByDependsOnItemObjectId(UUID(0, 1)) } returns listOf(ItemDependency(itemObjectId = UUID(0, 2), dependsOnItemObjectId = UUID(0, 1)))
+            every { dependencies.findByDependsOnItemObjectId(UUID(0, 1)) } returns
+                listOf(ItemDependency(itemObjectId = UUID(0, 2), dependsOnItemObjectId = UUID(0, 1)))
             assertFailsWith<BadRequestException> { service.add(a.objectId, b.objectId) }
         }
 
@@ -130,7 +140,6 @@ class DependencyServiceUnitTest {
 
     @Nested
     inner class ListRefs {
-
         @Test
         fun blockedAggregatesUnfinishedDeps() {
             val open = status("To Do")
@@ -138,10 +147,11 @@ class DependencyServiceUnitTest {
             val a = item(1L, 1, status = open)
             every { items.findByObjectId(a.objectId) } returns a
             every { statuses.findByProjectObjectIdOrderByPosition(projA) } returns listOf(open, done)
-            every { dependencies.findByItemObjectId(UUID(0, 1)) } returns listOf(
-                ItemDependency(itemObjectId = UUID(0, 1), dependsOnItemObjectId = UUID(0, 2)),   // 未终态 → 阻塞
-                ItemDependency(itemObjectId = UUID(0, 1), dependsOnItemObjectId = UUID(0, 3)),   // 终态 → 不阻塞
-            )
+            every { dependencies.findByItemObjectId(UUID(0, 1)) } returns
+                listOf(
+                    ItemDependency(itemObjectId = UUID(0, 1), dependsOnItemObjectId = UUID(0, 2)), // 未终态 → 阻塞
+                    ItemDependency(itemObjectId = UUID(0, 1), dependsOnItemObjectId = UUID(0, 3)), // 终态 → 不阻塞
+                )
             every { items.findByObjectId(UUID(0, 2)) } returns (item(2L, 2, status = open))
             every { items.findByObjectId(UUID(0, 3)) } returns (item(3L, 3, status = done))
             val result = service.list(a.objectId)
@@ -159,7 +169,6 @@ class DependencyServiceUnitTest {
 
     @Nested
     inner class Remove {
-
         @Test
         fun missingRowRejected() {
             every { dependencies.findByObjectId(any()) } returns null
@@ -177,7 +186,6 @@ class DependencyServiceUnitTest {
 
     @Nested
     inner class BlockedItemObjectIds {
-
         @Test
         fun unfinishedTargetBlocksDependent() {
             val open = status("To Do")
@@ -188,11 +196,12 @@ class DependencyServiceUnitTest {
             every { items.findByProjectObjectIdAndDeletedAtIsNullOrderByNumber(projA) } returns listOf(a, b, c)
             every { statuses.findByProjectObjectIdOrderByPosition(projA) } returns listOf(open, done)
             // a 依赖未终态 c → a 阻塞;b 依赖未终态 target 但 target 不在项目 → 不计;a 依赖 b(终态)→ 不阻塞
-            every { dependencies.findByItemObjectIdIn(listOf(UUID(0, 1), UUID(0, 2), UUID(0, 3))) } returns listOf(
-                ItemDependency(itemObjectId = UUID(0, 1), dependsOnItemObjectId = UUID(0, 3)),
-                ItemDependency(itemObjectId = UUID(0, 2), dependsOnItemObjectId = UUID(0, 99)),
-                ItemDependency(itemObjectId = UUID(0, 1), dependsOnItemObjectId = UUID(0, 2)),
-            )
+            every { dependencies.findByItemObjectIdIn(listOf(UUID(0, 1), UUID(0, 2), UUID(0, 3))) } returns
+                listOf(
+                    ItemDependency(itemObjectId = UUID(0, 1), dependsOnItemObjectId = UUID(0, 3)),
+                    ItemDependency(itemObjectId = UUID(0, 2), dependsOnItemObjectId = UUID(0, 99)),
+                    ItemDependency(itemObjectId = UUID(0, 1), dependsOnItemObjectId = UUID(0, 2)),
+                )
             assertEquals(setOf(UUID(0, 1)), service.blockedItemObjectIds(projA))
         }
     }

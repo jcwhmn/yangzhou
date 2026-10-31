@@ -14,16 +14,21 @@ import java.util.UUID
 /** V9-S6 回收站:软删 item 的恢复与物理删。 */
 @RestController
 @RequestMapping("/api/recycle-bin")
-class RecycleBinController(private val itemService: ItemService) {
-
+class RecycleBinController(
+    private val itemService: ItemService,
+) {
     @GetMapping
     fun list(): List<ItemService.RecycleItemDto> = itemService.recycleBin()
 
     @PostMapping("/{itemId}/restore")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    fun restore(@PathVariable itemId: UUID) = itemService.restore(itemId)
+    fun restore(
+        @PathVariable itemId: UUID,
+    ) = itemService.restore(itemId)
 
     @DeleteMapping("/{itemId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    fun purge(@PathVariable itemId: UUID) = itemService.purge(itemId)
+    fun purge(
+        @PathVariable itemId: UUID,
+    ) = itemService.purge(itemId)
 }

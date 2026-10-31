@@ -4,6 +4,8 @@ import io.mockk.clearMocks
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Nested
 import yangzhou.api.business.workspace.WorkspaceService
 import yangzhou.api.error.BadRequestException
 import yangzhou.api.error.ConflictException
@@ -22,15 +24,12 @@ import yangzhou.persistence.repository.ProjectViewRepository
 import yangzhou.persistence.repository.StatusRepository
 import yangzhou.persistence.repository.TimeEntryRepository
 import java.util.UUID
-import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Nested
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 /** YPJ-87 单测补齐:MemberService(虚拟成员/删除约束/github username/lastProject)。 */
 class MemberServiceUnitTest {
-
     private val members = mockk<MemberRepository>(relaxed = true)
     private val capabilities = mockk<CapabilityRepository>(relaxed = true)
     private val workspaceService = mockk<WorkspaceService>(relaxed = true)
@@ -42,20 +41,36 @@ class MemberServiceUnitTest {
     private val timeEntries = mockk<TimeEntryRepository>(relaxed = true)
     private val projectViews = mockk<ProjectViewRepository>(relaxed = true)
     private val notifications = mockk<NotificationRepository>(relaxed = true)
-    private val service = MemberService(
-        members, capabilities, workspaceService, items, statuses,
-        comments, itemActivities, itemStatusHistories, timeEntries, projectViews, notifications,
-    )
+    private val service =
+        MemberService(
+            members,
+            capabilities,
+            workspaceService,
+            items,
+            statuses,
+            comments,
+            itemActivities,
+            itemStatusHistories,
+            timeEntries,
+            projectViews,
+            notifications,
+        )
 
     private val wsId = UUID(0, 9)
+
     private fun member(
         id: Long? = 5L,
         name: String = "alice",
         passwordHash: String? = null,
         githubUsername: String? = null,
     ) = Member(
-        id = id, objectId = id?.let { UUID(0, it) } ?: UUID.randomUUID(), workspaceObjectId = wsId, username = null, passwordHash = passwordHash,
-        displayName = name, githubUsername = githubUsername,
+        id = id,
+        objectId = id?.let { UUID(0, it) } ?: UUID.randomUUID(),
+        workspaceObjectId = wsId,
+        username = null,
+        passwordHash = passwordHash,
+        displayName = name,
+        githubUsername = githubUsername,
     )
 
     private val virtual = member()
@@ -63,8 +78,17 @@ class MemberServiceUnitTest {
     @BeforeEach
     fun setup() {
         clearMocks(
-            members, capabilities, workspaceService, items, statuses,
-            comments, itemActivities, itemStatusHistories, timeEntries, projectViews, notifications,
+            members,
+            capabilities,
+            workspaceService,
+            items,
+            statuses,
+            comments,
+            itemActivities,
+            itemStatusHistories,
+            timeEntries,
+            projectViews,
+            notifications,
         )
         every { workspaceService.required() } returns Workspace(id = 1L, objectId = wsId)
         every { members.findByObjectId(virtual.objectId) } returns virtual
@@ -72,7 +96,6 @@ class MemberServiceUnitTest {
 
     @Nested
     inner class Current {
-
         @Test
         fun onlyCredentialedMemberCounts() {
             every { members.findAll() } returns listOf(virtual, member(id = 1L, name = "me", passwordHash = "h"))
@@ -88,7 +111,6 @@ class MemberServiceUnitTest {
 
     @Nested
     inner class CreateVirtual {
-
         @Test
         fun duplicateNameRejected() {
             every { members.findByWorkspaceObjectId(wsId) } returns listOf(virtual)
@@ -109,7 +131,6 @@ class MemberServiceUnitTest {
 
     @Nested
     inner class Delete {
-
         @Test
         fun loginAccountRejected() {
             val me = member(id = 1L, name = "me", passwordHash = "h")
@@ -120,10 +141,16 @@ class MemberServiceUnitTest {
         @Test
         fun activeAssigneeRejected() {
             val status = Status(projectObjectId = UUID(0, 1), name = "To Do")
-            val item = yangzhou.persistence.Item(
-                id = 1L, objectId = UUID(0, 1), projectObjectId = UUID(0, 1), number = 1, title = "t",
-                assigneeObjectId = virtual.objectId, statusObjectId = status.objectId,
-            )
+            val item =
+                yangzhou.persistence.Item(
+                    id = 1L,
+                    objectId = UUID(0, 1),
+                    projectObjectId = UUID(0, 1),
+                    number = 1,
+                    title = "t",
+                    assigneeObjectId = virtual.objectId,
+                    statusObjectId = status.objectId,
+                )
             every { items.findByAssigneeObjectIdAndDeletedAtIsNull(virtual.objectId) } returns listOf(item)
             every { statuses.findByObjectId(status.objectId) } returns status
             assertFailsWith<ConflictException> { service.delete(virtual.objectId) }
@@ -153,7 +180,6 @@ class MemberServiceUnitTest {
 
     @Nested
     inner class SetGithubUsername {
-
         @Test
         fun invalidFormatRejected() {
             assertFailsWith<BadRequestException> { service.setGithubUsername(virtual.objectId, "has space") }
@@ -186,7 +212,6 @@ class MemberServiceUnitTest {
 
     @Nested
     inner class SetLastProject {
-
         @Test
         fun trimmedKeySaved() {
             every { members.save(any()) } answers { firstArg() }

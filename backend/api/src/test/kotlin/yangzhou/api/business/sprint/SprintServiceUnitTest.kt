@@ -4,6 +4,8 @@ import io.mockk.clearMocks
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Nested
 import yangzhou.api.business.item.ItemService
 import yangzhou.api.error.BadRequestException
 import yangzhou.api.error.ConflictException
@@ -21,21 +23,16 @@ import yangzhou.persistence.repository.ProjectRepository
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
-import java.util.Optional
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertTrue
-import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Nested
 
 /**
  * YPJ-81 mockk 子票②:SprintService 指派/状态规则单测。
  * 不起 Spring;repository 协作者 mockk(relaxed);Clock.fixed 钉死留痕时刻。
  */
 class SprintServiceUnitTest {
-
     private val projects = mockk<ProjectRepository>(relaxed = true)
     private val groups = mockk<ItemGroupRepository>(relaxed = true)
     private val memberships = mockk<ItemGroupMemberRepository>(relaxed = true)
@@ -48,13 +45,22 @@ class SprintServiceUnitTest {
     private val savedRows = mutableListOf<ItemGroupMember>()
 
     private val leaderGuard = mockk<yangzhou.api.guard.LeaderGuard>(relaxed = true)
-    private val service = SprintService(
-        leaderGuard,
-        projects, groups, memberships, itemRepo, itemService, memberHistory, clock, groupTypes,
-    )
+    private val service =
+        SprintService(
+            leaderGuard,
+            projects,
+            groups,
+            memberships,
+            itemRepo,
+            itemService,
+            memberHistory,
+            clock,
+            groupTypes,
+        )
 
     private val project = Project(id = 100L, objectId = UUID(0, 100), workspaceObjectId = UUID(0, 1), key = "YPJ", name = "yangzhou")
-    private val item = Item(id = 9L, objectId = UUID(0, 9), projectObjectId = UUID(0, 100), number = 7, title = "任务", statusObjectId = UUID.randomUUID())
+    private val item =
+        Item(id = 9L, objectId = UUID(0, 9), projectObjectId = UUID(0, 100), number = 7, title = "任务", statusObjectId = UUID.randomUUID())
     private val sprintOid = UUID(0, 55)
     private val sprint = ItemGroup(id = 55L, objectId = sprintOid, projectObjectId = UUID(0, 100), name = "V23", status = "planned")
     private val otherOid = UUID(0, 66)
@@ -68,11 +74,21 @@ class SprintServiceUnitTest {
         every { groups.findByProjectObjectIdAndObjectId(UUID(0, 100), otherOid) } returns otherSprint
         every { itemRepo.findByObjectId(item.objectId) } returns item
         savedRows.clear()
-        every { memberships.save(any()) } answers { val arg: ItemGroupMember = firstArg(); savedRows.add(arg); arg } // 泛型 save 坑(P0);记录落库行供断言
+        every { memberships.save(any()) } answers {
+            val arg: ItemGroupMember = firstArg()
+            savedRows.add(arg)
+            arg
+        } // 泛型 save 坑(P0);记录落库行供断言
         every { itemService.get(item.objectId) } returns mockk()
     }
 
-    private fun currentRow(groupObjectId: UUID = UUID(0, 55)) = ItemGroupMember(id = 77L, objectId = UUID(0, 77), groupObjectId = groupObjectId, itemObjectId = UUID(0, 9), createdAt = Instant.EPOCH) // createdAt 钉死:data class 相等性依赖它
+    private fun currentRow(groupObjectId: UUID = UUID(0, 55)) = ItemGroupMember(
+        id = 77L,
+        objectId = UUID(0, 77),
+        groupObjectId = groupObjectId,
+        itemObjectId = UUID(0, 9),
+        createdAt = Instant.EPOCH,
+    ) // createdAt 钉死:data class 相等性依赖它
 
     private fun stubCurrent(row: ItemGroupMember?) {
         if (row == null) {
@@ -179,7 +195,10 @@ class SprintServiceUnitTest {
 
         @Test
         fun `合法变更 - status 落库,其余字段保留`() {
-            every { groups.save(any()) } answers { val arg: ItemGroup = firstArg(); arg }
+            every { groups.save(any()) } answers {
+                val arg: ItemGroup = firstArg()
+                arg
+            }
 
             val dto = service.update("YPJ", sprintOid, SprintService.UpdateSprintRequest(status = "active"))
 

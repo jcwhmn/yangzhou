@@ -12,21 +12,49 @@ import kotlin.test.assertTrue
  * 黑盒走 REST:CRUD、非空删除 409、指派/移出/替换、completed 拒指派、backlog 谓词、完成后历史仍在。
  */
 class SprintApiTest : AbstractApiTest() {
-
-    private fun createSprint(authed: RestTestClient, key: String, name: String, body: Map<String, Any?> = mapOf("name" to name)): JsonNode {
-        val r = authed.post().uri("/api/projects/$key/sprints").body(body).exchange()
-            .expectBody(String::class.java).returnResult()
+    private fun createSprint(
+        authed: RestTestClient,
+        key: String,
+        name: String,
+        body: Map<String, Any?> = mapOf("name" to name),
+    ): JsonNode {
+        val r =
+            authed
+                .post()
+                .uri("/api/projects/$key/sprints")
+                .body(body)
+                .exchange()
+                .expectBody(String::class.java)
+                .returnResult()
         assertEquals(201, r.status.value(), r.responseBody)
         return json.readTree(r.responseBody!!)
     }
 
-    private fun assignSprint(authed: RestTestClient, itemId: String, sprintId: String?) =
-        authed.put().uri("/api/items/$itemId/sprint").body(mapOf("sprintId" to sprintId)).exchange()
-            .expectBody(String::class.java).returnResult()
+    private fun assignSprint(
+        authed: RestTestClient,
+        itemId: String,
+        sprintId: String?,
+    ) = authed
+        .put()
+        .uri("/api/items/$itemId/sprint")
+        .body(mapOf("sprintId" to sprintId))
+        .exchange()
+        .expectBody(String::class.java)
+        .returnResult()
 
-    private fun getSprints(authed: RestTestClient, key: String, path: String): JsonNode =
-        json.readTree(authed.get().uri("/api/projects/$key/$path").exchange()
-            .expectBody(String::class.java).returnResult().responseBody!!)
+    private fun getSprints(
+        authed: RestTestClient,
+        key: String,
+        path: String,
+    ): JsonNode = json.readTree(
+        authed
+            .get()
+            .uri("/api/projects/$key/$path")
+            .exchange()
+            .expectBody(String::class.java)
+            .returnResult()
+            .responseBody!!,
+    )
 
     @Test
     fun `sprint CRUD 与校验`() {
@@ -41,17 +69,35 @@ class SprintApiTest : AbstractApiTest() {
 
         assertEquals(1, getSprints(authed, "SPR", "sprints").size())
 
-        val patched = json.readTree(authed.patch().uri("/api/projects/SPR/sprints/$sid")
-            .body(mapOf("name" to "Sprint 1 改", "startDate" to "", "status" to "active"))
-            .exchange().expectBody(String::class.java).returnResult().responseBody!!)
+        val patched =
+            json.readTree(
+                authed
+                    .patch()
+                    .uri("/api/projects/SPR/sprints/$sid")
+                    .body(mapOf("name" to "Sprint 1 改", "startDate" to "", "status" to "active"))
+                    .exchange()
+                    .expectBody(String::class.java)
+                    .returnResult()
+                    .responseBody!!,
+            )
         assertEquals("Sprint 1 改", patched["name"].asText())
         assertEquals("active", patched["status"].asText())
         assertTrue(patched["startDate"].isNull)
 
-        authed.patch().uri("/api/projects/SPR/sprints/$sid").body(mapOf("status" to "doing"))
-            .exchange().expectStatus().isBadRequest()
-        authed.post().uri("/api/projects/SPR/sprints").body(mapOf("name" to "  "))
-            .exchange().expectStatus().isBadRequest()
+        authed
+            .patch()
+            .uri("/api/projects/SPR/sprints/$sid")
+            .body(mapOf("status" to "doing"))
+            .exchange()
+            .expectStatus()
+            .isBadRequest()
+        authed
+            .post()
+            .uri("/api/projects/SPR/sprints")
+            .body(mapOf("name" to "  "))
+            .exchange()
+            .expectStatus()
+            .isBadRequest()
     }
 
     @Test
@@ -86,13 +132,23 @@ class SprintApiTest : AbstractApiTest() {
         val item = createItem(authed, "HIS", "历史 item")["itemId"].asText()
 
         assignSprint(authed, item, s)
-        authed.patch().uri("/api/projects/HIS/sprints/$s").body(mapOf("status" to "completed"))
-            .exchange().expectStatus().isOk()
+        authed
+            .patch()
+            .uri("/api/projects/HIS/sprints/$s")
+            .body(mapOf("status" to "completed"))
+            .exchange()
+            .expectStatus()
+            .isOk()
 
         // 完成后:历史 items 仍在;item 当前 sprint 视为空 → 回 backlog;指回该 sprint → 409
         assertEquals(1, getSprints(authed, "HIS", "sprints/$s/items").size())
         assertTrue(getSprints(authed, "HIS", "backlog").any { it["itemId"].asText() == item })
-        val again = authed.put().uri("/api/items/$item/sprint").body(mapOf("sprintId" to s)).exchange()
+        val again =
+            authed
+                .put()
+                .uri("/api/items/$item/sprint")
+                .body(mapOf("sprintId" to s))
+                .exchange()
         again.expectStatus().isEqualTo(409)
         val other = createSprint(authed, "HIS", "S43")["sprintId"].asText()
         assertEquals(200, assignSprint(authed, item, other).status.value())
@@ -112,9 +168,19 @@ class SprintApiTest : AbstractApiTest() {
 
         // 非空删除 → 409;清空后 → 204 且列表为空
         assignSprint(authed, item, s)
-        authed.delete().uri("/api/projects/DEL/sprints/$s").exchange().expectStatus().isEqualTo(409)
+        authed
+            .delete()
+            .uri("/api/projects/DEL/sprints/$s")
+            .exchange()
+            .expectStatus()
+            .isEqualTo(409)
         assignSprint(authed, item, null)
-        authed.delete().uri("/api/projects/DEL/sprints/$s").exchange().expectStatus().isNoContent()
+        authed
+            .delete()
+            .uri("/api/projects/DEL/sprints/$s")
+            .exchange()
+            .expectStatus()
+            .isNoContent()
         assertEquals(0, getSprints(authed, "DEL", "sprints").size())
     }
 }

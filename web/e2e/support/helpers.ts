@@ -11,13 +11,20 @@ export async function apiToken(): Promise<string> {
   const boot = await fetch(`${config.apiURL}/api/auth/bootstrap`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username: config.username, password: config.password }),
+    body: JSON.stringify({
+      username: config.username,
+      password: config.password,
+    }),
   });
-  if (!boot.ok && boot.status !== 409) throw new Error(`bootstrap ${boot.status}`);
+  if (!boot.ok && boot.status !== 409)
+    throw new Error(`bootstrap ${boot.status}`);
   const login = await fetch(`${config.apiURL}/api/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username: config.username, password: config.password }),
+    body: JSON.stringify({
+      username: config.username,
+      password: config.password,
+    }),
   });
   if (!login.ok) throw new Error(`login ${login.status}`);
   cachedToken = ((await login.json()) as { token: string }).token;
@@ -25,10 +32,17 @@ export async function apiToken(): Promise<string> {
 }
 
 /** 通用 API 调用:预置小操作直接内联,不再逐个包 helper */
-export async function apiCall<T = unknown>(method: string, path: string, body?: unknown): Promise<T> {
+export async function apiCall<T = unknown>(
+  method: string,
+  path: string,
+  body?: unknown,
+): Promise<T> {
   const res = await fetch(`${config.apiURL}${path}`, {
     method,
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${await apiToken()}` },
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${await apiToken()}`,
+    },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   if (!res.ok) throw new Error(`${method} ${path}: ${res.status}`);
@@ -39,33 +53,51 @@ let seq = 0;
 
 /** 并行安全的唯一项目 key(9 位:随机 hex6 + 进程内序号2;≤10 留 1 位给表单用例的「P」后缀) */
 export function uniqueKey(): string {
-  return ("K" + randomUUID().replace(/-/g, "").slice(0, 6).toUpperCase() + (seq++).toString(36).toUpperCase().padStart(2, "0")).slice(0, 9);
+  return (
+    "K" +
+    randomUUID().replace(/-/g, "").slice(0, 6).toUpperCase() +
+    (seq++).toString(36).toUpperCase().padStart(2, "0")
+  ).slice(0, 9);
 }
 
 export async function apiCreateProject(key: string): Promise<void> {
   const res = await fetch(`${config.apiURL}/api/projects`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${await apiToken()}` },
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${await apiToken()}`,
+    },
     body: JSON.stringify({ key, name: `E2E ${key}` }),
   });
   // 409 = 并行下同名 key 已存在(理论不发生),容忍
-  if (!res.ok && res.status !== 409) throw new Error(`创建项目 ${key}: ${res.status}`);
+  if (!res.ok && res.status !== 409)
+    throw new Error(`创建项目 ${key}: ${res.status}`);
 }
 
 export async function apiCreateMember(displayName: string): Promise<void> {
   const res = await fetch(`${config.apiURL}/api/members`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${await apiToken()}` },
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${await apiToken()}`,
+    },
     body: JSON.stringify({ displayName }),
   });
   // 409 = 并行下同名成员已存在,容忍
-  if (!res.ok && res.status !== 409) throw new Error(`建成员 ${displayName}: ${res.status}`);
+  if (!res.ok && res.status !== 409)
+    throw new Error(`建成员 ${displayName}: ${res.status}`);
 }
 
-export async function apiCreateItem(key: string, title: string): Promise<string> {
+export async function apiCreateItem(
+  key: string,
+  title: string,
+): Promise<string> {
   const res = await fetch(`${config.apiURL}/api/projects/${key}/items`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${await apiToken()}` },
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${await apiToken()}`,
+    },
     body: JSON.stringify({ title }),
   });
   if (!res.ok) throw new Error(`创建 item: ${res.status}`);
@@ -73,14 +105,23 @@ export async function apiCreateItem(key: string, title: string): Promise<string>
 }
 
 export async function apiMeId(): Promise<string> {
-  const members = await apiCall<{ memberId: string; virtual: boolean }[]>("GET", "/api/members");
+  const members = await apiCall<{ memberId: string; virtual: boolean }[]>(
+    "GET",
+    "/api/members",
+  );
   return members.find((m) => !m.virtual)!.memberId;
 }
 
-export async function apiCreateSprint(key: string, name: string): Promise<string> {
+export async function apiCreateSprint(
+  key: string,
+  name: string,
+): Promise<string> {
   const res = await fetch(`${config.apiURL}/api/projects/${key}/sprints`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${await apiToken()}` },
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${await apiToken()}`,
+    },
     body: JSON.stringify({ name, startDate: null, endDate: null }),
   });
   if (!res.ok) throw new Error(`创建 sprint: ${res.status}`);
@@ -88,7 +129,10 @@ export async function apiCreateSprint(key: string, name: string): Promise<string
 }
 
 /** 0047:池=合法指派范围;虚拟成员入池后才可指派/进候选 */
-export async function apiAddPoolMember(projectKey: string, memberId: string): Promise<void> {
+export async function apiAddPoolMember(
+  projectKey: string,
+  memberId: string,
+): Promise<void> {
   await apiCall("POST", `/api/projects/${projectKey}/members`, { memberId });
 }
 
@@ -96,7 +140,10 @@ export async function apiAssignMe(itemId: string): Promise<void> {
   const meId = await apiMeId();
   const res = await fetch(`${config.apiURL}/api/items/${itemId}/assignee`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${await apiToken()}` },
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${await apiToken()}`,
+    },
     body: JSON.stringify({ assigneeItemId: meId }),
   });
   if (!res.ok) throw new Error(`指派: ${res.status}`);
@@ -104,20 +151,34 @@ export async function apiAssignMe(itemId: string): Promise<void> {
 
 /** 页面导航前注入 token(绕 UI 登录;登录/登出行为本身在 auth.spec 用 UI 测) */
 export async function injectToken(page: Page): Promise<void> {
-  await page.addInitScript((t) => localStorage.setItem("yz-token", t), await apiToken());
+  await page.addInitScript(
+    (t) => localStorage.setItem("yz-token", t),
+    await apiToken(),
+  );
 }
 
 /** MUI select 打开:hydration 期 SSR 原生 select 会被替换,首点可能落空;菜单没开就补一下 */
 export async function openSelect(page: Page, label: string): Promise<void> {
   const box = page.getByRole("combobox", { name: label, exact: true });
   await box.click();
-  const opened = await page.getByRole("listbox").waitFor({ state: "visible", timeout: 1500 }).then(() => true, () => false);
+  const opened = await page
+    .getByRole("listbox")
+    .waitFor({ state: "visible", timeout: 1500 })
+    .then(
+      () => true,
+      () => false,
+    );
   if (!opened) await box.click();
 }
 
 /** MUI select 选选项:页面 settle 期菜单可能开了又被关,点在卸载节点上会无声无效;
  *  以「combobox 显示值变为目标文本」为选中生效的硬信号,否则重开菜单重试 */
-export async function selectOption(page: Page, label: string, name: string, expectText?: string): Promise<void> {
+export async function selectOption(
+  page: Page,
+  label: string,
+  name: string,
+  expectText?: string,
+): Promise<void> {
   const box = page.getByRole("combobox", { name: label, exact: true });
   const opt = page.getByRole("option", { name });
   const lb = page.getByRole("listbox");
@@ -130,18 +191,30 @@ export async function selectOption(page: Page, label: string, name: string, expe
       await opt.click({ timeout: 2000 }).catch(() => {});
     }
     // 回读双轨:Dropdown=原生 input(toHaveValue);旧 MUI Select 是 div(toHaveText)。B 阶段全量替换后可收敛为单轨。
-    const isInput = await box.evaluate((el) => el instanceof HTMLInputElement).catch(() => false);
+    const isInput = await box
+      .evaluate((el) => el instanceof HTMLInputElement)
+      .catch(() => false);
     const readback = isInput
       ? expect(box).toHaveValue(expectText ?? name, { timeout: 2500 })
       : expect(box).toHaveText(expectText ?? name, { timeout: 2500 });
-    if (await readback.then(() => true, () => false)) return;
+    if (
+      await readback.then(
+        () => true,
+        () => false,
+      )
+    )
+      return;
   }
   throw new Error(`下拉「${label}」未能选中「${name}」`);
 }
 
 // 分段日期输入(spec 0019 / YPJ-19):group aria-label=label,三段 月/日/年;focus+Home 强制光标位首后 fill,
 // 组件 beforeinput 逐位接管——insertText 落点确定,不与预填拼串;末段 blur 提交
-export async function fillDate(page: Page | Locator, label: string, iso: string): Promise<void> {
+export async function fillDate(
+  page: Page | Locator,
+  label: string,
+  iso: string,
+): Promise<void> {
   const [y, m, d] = iso.split("-");
   const g = page.getByRole("group", { name: label, exact: true });
   const put = async (seg: string, digits: string) => {
@@ -157,5 +230,7 @@ export async function fillDate(page: Page | Locator, label: string, iso: string)
 }
 
 export function expectDate(page: Page | Locator, label: string, iso: string) {
-  return expect(page.getByRole("group", { name: label, exact: true })).toHaveAttribute("data-value", iso);
+  return expect(
+    page.getByRole("group", { name: label, exact: true }),
+  ).toHaveAttribute("data-value", iso);
 }

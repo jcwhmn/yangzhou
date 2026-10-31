@@ -9,14 +9,16 @@ import org.springframework.stereotype.Component
 import org.springframework.web.filter.OncePerRequestFilter
 
 @Component
-class JwtAuthFilter(private val jwt: JwtService) : OncePerRequestFilter() {
-
+class JwtAuthFilter(
+    private val jwt: JwtService,
+) : OncePerRequestFilter() {
     override fun doFilterInternal(
         request: HttpServletRequest,
         response: HttpServletResponse,
         chain: FilterChain,
     ) {
-        request.getHeader("Authorization")
+        request
+            .getHeader("Authorization")
             ?.takeIf { it.startsWith("Bearer ") }
             ?.let { jwt.verify(it.removePrefix("Bearer ")) }
             ?.let { subject ->

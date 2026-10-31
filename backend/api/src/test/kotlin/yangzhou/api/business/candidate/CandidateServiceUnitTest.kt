@@ -3,15 +3,14 @@ package yangzhou.api.business.candidate
 import io.mockk.clearMocks
 import io.mockk.every
 import io.mockk.mockk
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Nested
 import yangzhou.api.business.feasibility.FeasibilityService
 import yangzhou.api.business.member.MemberService
 import yangzhou.api.business.projectmember.ProjectMemberService
 import yangzhou.api.business.workspace.WorkspaceService
 import yangzhou.api.error.NotFoundException
 import yangzhou.domain.Attribute
-import yangzhou.domain.Capability as DomainCapability
-import yangzhou.domain.Member as DomainMember
-import yangzhou.domain.Item as DomainItem
 import yangzhou.persistence.Item
 import yangzhou.persistence.Member
 import yangzhou.persistence.repository.ItemRepository
@@ -22,15 +21,15 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Nested
+import yangzhou.domain.Capability as DomainCapability
+import yangzhou.domain.Item as DomainItem
+import yangzhou.domain.Member as DomainMember
 
 /**
  * YPJ-80 mockk 子票①:CandidateService 装配/分支单测。
  * 引擎真跑(rankCandidates);feasibility 域装配协作者 mockk(其本票①已单测)。
  */
 class CandidateServiceUnitTest {
-
     private val items = mockk<ItemRepository>(relaxed = true)
     private val members = mockk<MemberRepository>(relaxed = true)
     private val memberService = mockk<MemberService>(relaxed = true)
@@ -40,13 +39,31 @@ class CandidateServiceUnitTest {
 
     private val service = CandidateService(items, members, memberService, workspaceService, feasibility, projectMembers)
 
-    private val item = Item(id = 1L, objectId = UUID(0, 1), projectObjectId = UUID(0, 100), number = 7, title = "任务", statusObjectId = UUID.randomUUID())
+    private val item =
+        Item(id = 1L, objectId = UUID(0, 1), projectObjectId = UUID(0, 100), number = 7, title = "任务", statusObjectId = UUID.randomUUID())
     private val domainItem = DomainItem("YPJ-7", "任务", listOf(yangzhou.domain.Requirement(Attribute("kotlin"), 2)))
 
     // 三成员:A 胜任(kotlin 3)、C 差距(kotlin 1)、B 池外被过滤
-    private val alice = Member(id = 1L, objectId = UUID(0, 1), workspaceObjectId = UUID(0, 1), username = "alice", passwordHash = null, displayName = "Alice")
-    private val carol = Member(id = 3L, objectId = UUID(0, 3), workspaceObjectId = UUID(0, 1), username = "carol", passwordHash = "h", displayName = "Carol")
-    private val bob = Member(id = 2L, objectId = UUID(0, 2), workspaceObjectId = UUID(0, 1), username = "bob", passwordHash = "h", displayName = "Bob")
+    private val alice =
+        Member(
+            id = 1L,
+            objectId = UUID(0, 1),
+            workspaceObjectId = UUID(0, 1),
+            username = "alice",
+            passwordHash = null,
+            displayName = "Alice",
+        )
+    private val carol =
+        Member(
+            id = 3L,
+            objectId = UUID(0, 3),
+            workspaceObjectId = UUID(0, 1),
+            username = "carol",
+            passwordHash = "h",
+            displayName = "Carol",
+        )
+    private val bob =
+        Member(id = 2L, objectId = UUID(0, 2), workspaceObjectId = UUID(0, 1), username = "bob", passwordHash = "h", displayName = "Bob")
 
     private val aliceDomain = DomainMember("Alice", listOf(DomainCapability(Attribute("kotlin"), 3)))
     private val carolDomain = DomainMember("Carol", listOf(DomainCapability(Attribute("kotlin"), 1)))

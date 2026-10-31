@@ -3,7 +3,8 @@ package yangzhou.api.business.time
 import io.mockk.clearMocks
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.verify
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Nested
 import yangzhou.api.business.github.GithubCommitService
 import yangzhou.api.business.member.MemberService
 import yangzhou.api.business.projectmember.ProjectMemberService
@@ -18,21 +19,17 @@ import yangzhou.persistence.repository.MemberRepository
 import yangzhou.persistence.repository.ProjectRepository
 import yangzhou.persistence.repository.TimeEntryRepository
 import java.time.Instant
-import java.util.Optional
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
-import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Nested
 
 /**
  * YPJ-83 mockk 子票④:TimeEntryService 校验分支 + 建议纯函数单测。
  * 协作者 mockk(relaxed);泛型 save 显式 firstArg(P0);被测代码用 Instant.now(),断言不钉具体时刻。
  */
 class TimeEntryServiceUnitTest {
-
     private val timeEntries = mockk<TimeEntryRepository>(relaxed = true)
     private val items = mockk<ItemRepository>(relaxed = true)
     private val projects = mockk<ProjectRepository>(relaxed = true)
@@ -41,12 +38,21 @@ class TimeEntryServiceUnitTest {
     private val projectMembers = mockk<ProjectMemberService>(relaxed = true)
     private val githubCommits = mockk<GithubCommitService>(relaxed = true)
 
-    private val service = TimeEntryService(
-        timeEntries, items, projects, members, memberService, projectMembers, githubCommits,
-    )
+    private val service =
+        TimeEntryService(
+            timeEntries,
+            items,
+            projects,
+            members,
+            memberService,
+            projectMembers,
+            githubCommits,
+        )
 
-    private val item = Item(id = 9L, objectId = UUID(0, 9), projectObjectId = UUID(0, 100), number = 7, title = "任务", statusObjectId = UUID.randomUUID())
-    private val me = Member(id = 5L, objectId = UUID(0, 5), workspaceObjectId = UUID(0, 1), username = "me", passwordHash = "x", displayName = "我")
+    private val item =
+        Item(id = 9L, objectId = UUID(0, 9), projectObjectId = UUID(0, 100), number = 7, title = "任务", statusObjectId = UUID.randomUUID())
+    private val me =
+        Member(id = 5L, objectId = UUID(0, 5), workspaceObjectId = UUID(0, 1), username = "me", passwordHash = "x", displayName = "我")
 
     @BeforeEach
     fun setup() {
@@ -54,7 +60,10 @@ class TimeEntryServiceUnitTest {
         every { items.findByObjectId(item.objectId) } returns item
         every { memberService.current() } returns me
         every { projectMembers.assertAssignable(any(), any()) } returns Unit
-        every { timeEntries.save(any()) } answers { val arg: TimeEntry = firstArg(); arg.copy(id = 1L, objectId = UUID(0, 1)) } // 泛型 save 坑(P0)
+        every { timeEntries.save(any()) } answers {
+            val arg: TimeEntry = firstArg()
+            arg.copy(id = 1L, objectId = UUID(0, 1))
+        } // 泛型 save 坑(P0)
         every { items.findByObjectId(UUID(0, 9)) } returns (item)
     }
 
@@ -102,11 +111,22 @@ class TimeEntryServiceUnitTest {
 
         @Test
         fun `计时模式 先停表中未结束条目再开新表`() {
-            val running = TimeEntry(id = 1L, objectId = UUID(0, 1), itemObjectId = UUID(0, 9), memberObjectId = UUID(0, 5), startedAt = Instant.now().minusSeconds(3600))
+            val running =
+                TimeEntry(
+                    id = 1L,
+                    objectId = UUID(0, 1),
+                    itemObjectId = UUID(0, 9),
+                    memberObjectId = UUID(0, 5),
+                    startedAt = Instant.now().minusSeconds(3600),
+                )
             every { timeEntries.findByMemberObjectIdAndEndedAtIsNull(UUID(0, 5)) } returns listOf(running)
 
             val saved = mutableListOf<TimeEntry>()
-            every { timeEntries.save(any()) } answers { val arg: TimeEntry = firstArg(); saved.add(arg); arg }
+            every { timeEntries.save(any()) } answers {
+                val arg: TimeEntry = firstArg()
+                saved.add(arg)
+                arg
+            }
             val dto = service.create(item.objectId, null, "2026-10-07T14:00:00Z", "2026-10-07T15:00:00Z", null)
 
             assertEquals(60L, dto.minutes) // 终止记录:endedAt-startedAt 自动算时长
@@ -138,7 +158,14 @@ class TimeEntryServiceUnitTest {
         @Test
         fun `已结束 409`() {
             every { timeEntries.findByObjectId(any()) } returns
-                TimeEntry(id = 1L, objectId = UUID(0, 1), itemObjectId = UUID(0, 9), memberObjectId = UUID(0, 5), startedAt = Instant.now(), endedAt = Instant.now())
+                TimeEntry(
+                    id = 1L,
+                    objectId = UUID(0, 1),
+                    itemObjectId = UUID(0, 9),
+                    memberObjectId = UUID(0, 5),
+                    startedAt = Instant.now(),
+                    endedAt = Instant.now(),
+                )
 
             assertFailsWith<ConflictException> { service.stop(UUID.randomUUID()) }
         }
@@ -151,7 +178,14 @@ class TimeEntryServiceUnitTest {
 
         @Test
         fun `正常停 endedAt 落`() {
-            val open = TimeEntry(id = 1L, objectId = UUID(0, 1), itemObjectId = UUID(0, 9), memberObjectId = UUID(0, 5), startedAt = Instant.now().minusSeconds(600))
+            val open =
+                TimeEntry(
+                    id = 1L,
+                    objectId = UUID(0, 1),
+                    itemObjectId = UUID(0, 9),
+                    memberObjectId = UUID(0, 5),
+                    startedAt = Instant.now().minusSeconds(600),
+                )
             every { timeEntries.findByObjectId(any()) } returns open
             every { members.findByObjectId(UUID(0, 5)) } returns (me)
 
@@ -164,30 +198,38 @@ class TimeEntryServiceUnitTest {
     @Nested
     inner class BuildSuggestions {
         private fun commit(date: String?) = GithubCommitService.CommitDto(
-            sha = "abc", message = "m", author = "a", date = date, url = null,
+            sha = "abc",
+            message = "m",
+            author = "a",
+            date = date,
+            url = null,
         )
 
         @Test
         fun `少于 2 个有效 commit 剔除`() {
-            val refs = listOf(
-                GithubCommitService.RefCommitsDto("r", "YPJ-7-x", commits = listOf(commit("2026-10-07T14:00:00Z"))),
-            )
+            val refs =
+                listOf(
+                    GithubCommitService.RefCommitsDto("r", "YPJ-7-x", commits = listOf(commit("2026-10-07T14:00:00Z"))),
+                )
             assertTrue(TimeEntryService.buildSuggestions(refs).isEmpty())
         }
 
         @Test
         fun `正常 first last 时间轴与 commitCount`() {
-            val refs = listOf(
-                GithubCommitService.RefCommitsDto(
-                    "r", "YPJ-7-x",
-                    commits = listOf(
-                        commit("2026-10-07T16:00:00Z"),
-                        commit("2026-10-07T14:00:00Z"),
-                        commit("bad-date"),
-                        commit(null),
+            val refs =
+                listOf(
+                    GithubCommitService.RefCommitsDto(
+                        "r",
+                        "YPJ-7-x",
+                        commits =
+                        listOf(
+                            commit("2026-10-07T16:00:00Z"),
+                            commit("2026-10-07T14:00:00Z"),
+                            commit("bad-date"),
+                            commit(null),
+                        ),
                     ),
-                ),
-            )
+                )
 
             val suggestions = TimeEntryService.buildSuggestions(refs)
 

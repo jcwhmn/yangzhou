@@ -57,12 +57,20 @@ jobs:
         working-directory: web
         run: npm ci
 
+      - name: 格式检查(Prettier;YPJ-121)
+        working-directory: web
+        run: npx prettier --check .
+
       - name: 装 Playwright chromium(含系统依赖)
         working-directory: web
         run: npx playwright install --with-deps chromium
 
       - name: 跑 E2E
         working-directory: web
+        env:
+          # CI 拓扑:后端 bootRun 在 8080(YPJ-118 后本地默认 8082=test 容器,CI 无容器故显式覆盖)
+          E2E_API_URL: http://127.0.0.1:8080
+          BACKEND_URL: http://127.0.0.1:8080
         run: npx playwright test --grep @smoke
 
       - name: 失败留证据

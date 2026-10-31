@@ -1,0 +1,24 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# 缩进限定 Kotlin:放 [*] 会被 prettier(读 .editorconfig)劫持 web 的 2 空格
+[*.{kt,kts}]
+indent_style = space
+indent_size = 4
+ktlint_code_style = intellij_idea
+ktlint_standard_argument-list-wrapping = disabled
+
+# 测试中文/下划线命名是仓库惯例,命名规则误伤(YPJ-121;integrationTest 目录即集成边界)
+[**/src/{test,integrationTest}/**/*.kt]
+ktlint_standard_property-naming = disabled
+ktlint_standard_function-naming = disabled
+ktlint_standard_class-naming = disabled
+
+# markdown 行尾双空格 = 硬换行,不去行尾空白
+[*.md]
+trim_trailing_whitespace = false

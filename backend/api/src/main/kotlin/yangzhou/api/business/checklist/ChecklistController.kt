@@ -15,10 +15,13 @@ import java.util.UUID
 
 @RestController
 @RequestMapping("/api")
-class ChecklistController(private val service: ChecklistService) {
-
+class ChecklistController(
+    private val service: ChecklistService,
+) {
     @GetMapping("/items/{itemId}/checklist")
-    fun list(@PathVariable itemId: UUID): ChecklistService.ChecklistDto = service.list(itemId)
+    fun list(
+        @PathVariable itemId: UUID,
+    ): ChecklistService.ChecklistDto = service.list(itemId)
 
     @PostMapping("/items/{itemId}/checklist")
     @ResponseStatus(HttpStatus.CREATED)
@@ -35,5 +38,7 @@ class ChecklistController(private val service: ChecklistService) {
 
     @DeleteMapping("/checklist/{entryId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    fun remove(@PathVariable entryId: UUID) = service.remove(entryId)
+    fun remove(
+        @PathVariable entryId: UUID,
+    ) = service.remove(entryId)
 }

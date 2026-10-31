@@ -10,10 +10,13 @@ import java.util.UUID
 /** YPJ-45 Flow Metrics 只读 API(spec 0037 §四 / 0038)。纯读,无状态变更。 */
 @RestController
 @RequestMapping("/api")
-class MetricsController(private val service: MetricsService) {
-
+class MetricsController(
+    private val service: MetricsService,
+) {
     @GetMapping("/projects/{key}/metrics/workload")
-    fun workload(@PathVariable key: String): WorkloadResponse = service.workload(key)
+    fun workload(
+        @PathVariable key: String,
+    ): WorkloadResponse = service.workload(key)
 
     @GetMapping("/projects/{key}/metrics/throughput")
     fun throughput(
@@ -39,7 +42,9 @@ class MetricsController(private val service: MetricsService) {
     ): CfdResponse = service.cfd(key, from, to)
 
     @GetMapping("/projects/{key}/metrics/aging")
-    fun aging(@PathVariable key: String): AgingResponse = service.aging(key)
+    fun aging(
+        @PathVariable key: String,
+    ): AgingResponse = service.aging(key)
 
     @GetMapping("/projects/{key}/metrics/burndown")
     fun burndown(
@@ -66,7 +71,8 @@ class MetricsController(private val service: MetricsService) {
         @RequestParam to: String?,
     ): ReopenRateResponse = service.reopenRate(key, from, to)
 
-
     @GetMapping("/projects/{key}/metrics/velocity")
-    fun velocity(@PathVariable key: String): VelocityResponse = service.velocity(key)
+    fun velocity(
+        @PathVariable key: String,
+    ): VelocityResponse = service.velocity(key)
 }

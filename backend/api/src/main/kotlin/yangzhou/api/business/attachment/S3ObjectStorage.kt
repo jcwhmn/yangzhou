@@ -17,42 +17,72 @@ import java.net.URI
 import java.time.Duration
 
 /** S3 兼容驱动(RustFS/MinIO/AWS):path-style + 静态凭据;presign 10 分钟。 */
-class S3ObjectStorage(props: AttachmentProperties) : ObjectStorage {
+class S3ObjectStorage(
+    props: AttachmentProperties,
+) : ObjectStorage {
     private val bucket = props.bucket
 
-    private val presigner = S3Presigner.builder()
-        .endpointOverride(URI.create(props.endpoint))
-        .region(Region.of(props.region))
-        .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create(props.accessKey, props.secretKey)))
-        .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
-        .build()
+    private val presigner =
+        S3Presigner
+            .builder()
+            .endpointOverride(URI.create(props.endpoint))
+            .region(Region.of(props.region))
+            .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create(props.accessKey, props.secretKey)))
+            .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
+            .build()
 
-    private val s3 = S3Client.builder()
-        .endpointOverride(URI.create(props.endpoint))
-        .region(Region.of(props.region))
-        .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create(props.accessKey, props.secretKey)))
-        .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
-        .httpClient(UrlConnectionHttpClient.create())
-        .build()
+    private val s3 =
+        S3Client
+            .builder()
+            .endpointOverride(URI.create(props.endpoint))
+            .region(Region.of(props.region))
+            .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create(props.accessKey, props.secretKey)))
+            .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
+            .httpClient(UrlConnectionHttpClient.create())
+            .build()
 
-    override fun presignPut(key: String, contentType: String): String =
-        presigner.presignPutObject(
-            PutObjectPresignRequest.builder()
+    override fun presignPut(
+        key: String,
+        contentType: String,
+    ): String = presigner
+        .presignPutObject(
+            PutObjectPresignRequest
+                .builder()
                 .signatureDuration(SIGN_TTL)
-                .putObjectRequest(PutObjectRequest.builder().bucket(bucket).key(key).contentType(contentType).build())
-                .build(),
-        ).url().toString()
+                .putObjectRequest(
+                    PutObjectRequest
+                        .builder()
+                        .bucket(bucket)
+                        .key(key)
+                        .contentType(contentType)
+                        .build(),
+                ).build(),
+        ).url()
+        .toString()
 
-    override fun presignGet(key: String): String =
-        presigner.presignGetObject(
-            GetObjectPresignRequest.builder()
+    override fun presignGet(key: String): String = presigner
+        .presignGetObject(
+            GetObjectPresignRequest
+                .builder()
                 .signatureDuration(SIGN_TTL)
-                .getObjectRequest(GetObjectRequest.builder().bucket(bucket).key(key).build())
-                .build(),
-        ).url().toString()
+                .getObjectRequest(
+                    GetObjectRequest
+                        .builder()
+                        .bucket(bucket)
+                        .key(key)
+                        .build(),
+                ).build(),
+        ).url()
+        .toString()
 
     override fun delete(key: String) {
-        s3.deleteObject(DeleteObjectRequest.builder().bucket(bucket).key(key).build())
+        s3.deleteObject(
+            DeleteObjectRequest
+                .builder()
+                .bucket(bucket)
+                .key(key)
+                .build(),
+        )
     }
 
     companion object {

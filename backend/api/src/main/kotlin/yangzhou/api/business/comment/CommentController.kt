@@ -14,17 +14,24 @@ import java.util.UUID
 
 @RestController
 @RequestMapping("/api")
-class CommentController(private val service: CommentService) {
-
+class CommentController(
+    private val service: CommentService,
+) {
     @GetMapping("/items/{itemId}/comments")
-    fun list(@PathVariable itemId: UUID): List<CommentService.CommentDto> = service.list(itemId)
+    fun list(
+        @PathVariable itemId: UUID,
+    ): List<CommentService.CommentDto> = service.list(itemId)
 
     @PostMapping("/items/{itemId}/comments")
     @ResponseStatus(HttpStatus.CREATED)
-    fun create(@PathVariable itemId: UUID, @Valid @RequestBody request: CreateCommentRequest): CommentService.CommentDto =
-        service.create(itemId, request.body)
+    fun create(
+        @PathVariable itemId: UUID,
+        @Valid @RequestBody request: CreateCommentRequest,
+    ): CommentService.CommentDto = service.create(itemId, request.body)
 
     @DeleteMapping("/comments/{commentId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    fun delete(@PathVariable commentId: UUID) = service.delete(commentId)
+    fun delete(
+        @PathVariable commentId: UUID,
+    ) = service.delete(commentId)
 }
