@@ -216,6 +216,10 @@ export default function TableViewPage() {
     ),
   ];
 
+  // number 是"KEY-N"串,按尾数字自然排序(还原后端 int 序;YPJ-123)
+  const byNumber = (a: Item, b: Item) =>
+    a.number.localeCompare(b.number, undefined, { numeric: true });
+
   const sorted = [...(items ?? [])]
     .filter(
       (it) =>
@@ -229,16 +233,11 @@ export default function TableViewPage() {
     .sort((a, b) => {
       if (sort === "priority") {
         const rank = (p: string | null) => (p ? 4 - Number(p.slice(1)) : 9);
-        return (
-          rank(a.priority) - rank(b.priority) ||
-          a.number.localeCompare(b.number)
-        );
+        return rank(a.priority) - rank(b.priority) || byNumber(a, b);
       }
       if (sort === "status")
-        return (
-          a.status.localeCompare(b.status) || a.number.localeCompare(b.number)
-        );
-      return a.number.localeCompare(b.number);
+        return a.status.localeCompare(b.status) || byNumber(a, b);
+      return byNumber(a, b);
     });
 
   const selectedName =
@@ -415,6 +414,8 @@ export default function TableViewPage() {
                         <Link href={`/p/${key}/i/${it.itemId}?from=table`}>
                           <Typography variant="body2">{it.title}</Typography>
                         </Link>
+                      ) : c.id === "status" ? (
+                        it.status
                       ) : c.id === "priority" ? (
                         (it.priority ?? "")
                       ) : c.id === "assignee" ? (
@@ -464,7 +465,11 @@ export default function TableViewPage() {
                           ""
                         )
                       ) : c.id === "sprint" ? (
-                        (it.sprintName ?? "")
+                        (it.sprintName ?? (
+                          <Typography variant="body2" sx={{ opacity: 0.5 }}>
+                            {t.view.backlog}
+                          </Typography>
+                        ))
                       ) : c.id === "blocked" ? (
                         it.blocked ? (
                           "⛔"
