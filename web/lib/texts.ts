@@ -393,6 +393,7 @@ export const t = {
     name: "视图",
     defaultView: "默认视图",
     backlog: "backlog",
+    perPage: "每页",
     save: "保存",
     saveAs: "另存为",
     delete: "删除视图",
