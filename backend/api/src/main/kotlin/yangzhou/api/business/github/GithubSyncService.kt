@@ -3,8 +3,8 @@ package yangzhou.api.business.github
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import yangzhou.persistence.Item
-import yangzhou.persistence.ItemGitRef
 import yangzhou.persistence.ItemActivity
+import yangzhou.persistence.ItemGitRef
 import yangzhou.persistence.ItemStatusHistory
 import yangzhou.persistence.Project
 import yangzhou.persistence.repository.ItemActivityRepository
@@ -15,8 +15,8 @@ import yangzhou.persistence.repository.ProjectRepository
 import yangzhou.persistence.repository.ProjectWorkflowRuleRepository
 import yangzhou.persistence.repository.StatusRepository
 import yangzhou.persistence.repository.WorkspaceRepository
-import java.util.UUID
 import java.time.Instant
+import java.util.UUID
 
 /**
  * V6-S2 轮询同步:GitHub 分支/PR → item_git_ref 关联 + 按项目映射自动移列。
@@ -59,15 +59,22 @@ class GithubSyncService(
             try {
                 syncRepo(project, mount.repo, token)
             } catch (e: VcsApiException) {
-                if (e.status == 401) log.warn("GitHub 认证失败(401),请检查 workspace PAT:{}", mount.repo)
-                else log.warn("GitHub API 失败({}):{}", e.status, mount.repo)
+                if (e.status == 401) {
+                    log.warn("GitHub 认证失败(401),请检查 workspace PAT:{}", mount.repo)
+                } else {
+                    log.warn("GitHub API 失败({}):{}", e.status, mount.repo)
+                }
             } catch (e: Exception) {
                 log.warn("GitHub 同步失败,下轮重试:{}:{}", mount.repo, e.message)
             }
         }
     }
 
-    internal fun syncRepo(project: Project, repo: String, token: String) {
+    internal fun syncRepo(
+        project: Project,
+        repo: String,
+        token: String,
+    ) {
         for (name in gateway.listBranches(repo, token)) {
             val item = headItem(project, name) ?: continue
             if (gitRefs.findByRepoAndKindAndRef(repo, KIND_BRANCH, name).isNotEmpty()) continue
@@ -88,13 +95,22 @@ class GithubSyncService(
                 }
                 else -> {
                     // YPJ-39:PR 扇出——head 分支挂多票则各落一行;分支未入册回退 head 内嵌键(既有行为)
-                    val targets = gitRefs.findByRepoAndKindAndRef(repo, KIND_BRANCH, pr.headRef)
-                        .mapNotNull { items.findByObjectId(it.itemObjectId) }
-                        .distinctBy { it.objectId }
-                        .ifEmpty { listOfNotNull(headItem(project, pr.headRef)) }
+                    val targets =
+                        gitRefs
+                            .findByRepoAndKindAndRef(repo, KIND_BRANCH, pr.headRef)
+                            .mapNotNull { items.findByObjectId(it.itemObjectId) }
+                            .distinctBy { it.objectId }
+                            .ifEmpty { listOfNotNull(headItem(project, pr.headRef)) }
                     for (item in targets) {
                         gitRefs.save(
-                            ItemGitRef(itemObjectId = item.objectId!!, kind = KIND_PR, repo = repo, ref = pr.number.toString(), url = pr.url, state = pr.state),
+                            ItemGitRef(
+                                itemObjectId = item.objectId!!,
+                                kind = KIND_PR,
+                                repo = repo,
+                                ref = pr.number.toString(),
+                                url = pr.url,
+                                state = pr.state,
+                            ),
                         )
                         // V10-S5:PR author → github_username 映射成员 → 池内自动 assign(未配置池/找不到则留痕跳过)
                         val wsId = projects.findByObjectId(project.objectId)?.workspaceObjectId ?: continue
@@ -117,7 +133,10 @@ class GithubSyncService(
     }
 
     /** head/分支名内嵌 item 键解析(YPJ-39 自 PR 循环抽出复用):跨项目/解析不出返回 null。 */
-    private fun headItem(project: Project, name: String): Item? {
+    private fun headItem(
+        project: Project,
+        name: String,
+    ): Item? {
         val m = ITEM_KEY.find(name) ?: return null
         if (m.groupValues[1] != project.key) return null
         return items.findByProjectObjectIdAndNumber(project.objectId!!, m.groupValues[2].toInt())
@@ -130,17 +149,25 @@ class GithubSyncService(
     }
 
     /** 防呆:未配映射忽略;当前 final 封口;只按 position 前进;WIP 超限跳过并留痕。S3 建分支后也走此管道。 */
-    fun applyEvent(project: Project, itemObjectId: UUID, event: String, detail: String) {
+    fun applyEvent(
+        project: Project,
+        itemObjectId: UUID,
+        event: String,
+        detail: String,
+    ) {
         val projectObjectId = project.objectId ?: return
         val rule = rules.findByProjectObjectIdAndEventType(projectObjectId, event) ?: return
         val target = statuses.findByProjectObjectIdAndObjectId(projectObjectId, rule.statusObjectId) ?: return
         val item = items.findByObjectId(itemObjectId) ?: return
-        val current = statuses.findByProjectObjectIdOrderByPosition(projectObjectId)
-            .firstOrNull { it.objectId == item.statusObjectId }
+        val current =
+            statuses
+                .findByProjectObjectIdOrderByPosition(projectObjectId)
+                .firstOrNull { it.objectId == item.statusObjectId }
         if (current?.isFinal == true) return
         if (current != null && target.position <= current.position) return
         val limit = target.wipLimit
-        if (limit != null && limit > 0 &&
+        if (limit != null &&
+            limit > 0 &&
             items.findByProjectObjectIdAndStatusObjectId(projectObjectId, target.objectId).size >= limit
         ) {
             logActivity(itemObjectId, current?.name, "WIP 满跳过:${target.name}($event $detail)")
@@ -148,11 +175,23 @@ class GithubSyncService(
         }
         val saved = items.save(item.copy(statusObjectId = target.objectId))
         logActivity(itemObjectId, current?.name, "${target.name}($event $detail)")
-        historyRepo.save(ItemStatusHistory(itemObjectId = itemObjectId, fromStatusObjectId = current?.objectId, toStatusObjectId = target.objectId!!, source = "github"))
+        historyRepo.save(
+            ItemStatusHistory(
+                itemObjectId = itemObjectId,
+                fromStatusObjectId = current?.objectId,
+                toStatusObjectId = target.objectId!!,
+                source = "github",
+            ),
+        )
         notificationService.notifyStatusChange(saved, null, current?.name, target.name)
     }
 
-    private fun logActivity(itemObjectId: UUID, oldValue: String?, newValue: String?, kind: String = ACT_GITHUB) {
+    private fun logActivity(
+        itemObjectId: UUID,
+        oldValue: String?,
+        newValue: String?,
+        kind: String = ACT_GITHUB,
+    ) {
         activityRepo.save(ItemActivity(itemObjectId = itemObjectId, kind = kind, oldValue = oldValue, newValue = newValue))
     }
 }

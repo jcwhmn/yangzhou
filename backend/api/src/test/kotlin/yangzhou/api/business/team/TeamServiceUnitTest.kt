@@ -4,6 +4,8 @@ import io.mockk.clearMocks
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Nested
 import yangzhou.api.business.member.MemberService
 import yangzhou.api.business.workspace.WorkspaceService
 import yangzhou.api.error.ConflictException
@@ -15,8 +17,6 @@ import yangzhou.persistence.repository.MemberRepository
 import yangzhou.persistence.repository.TeamMemberRepository
 import yangzhou.persistence.repository.TeamRepository
 import java.util.UUID
-import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Nested
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -24,7 +24,6 @@ import kotlin.test.assertTrue
 
 /** YPJ-87 单测补齐:TeamService(纯分组池,视图过滤用)。 */
 class TeamServiceUnitTest {
-
     private val teams = mockk<TeamRepository>(relaxed = true)
     private val teamMembers = mockk<TeamMemberRepository>(relaxed = true)
     private val members = mockk<MemberRepository>(relaxed = true)
@@ -34,7 +33,8 @@ class TeamServiceUnitTest {
 
     private val wsId = UUID(0, 9)
     private val team = Team(id = 1L, objectId = UUID(0, 1), workspaceObjectId = wsId, name = "后端")
-    private val alice = Member(id = 5L, objectId = UUID(0, 5), workspaceObjectId = wsId, username = null, passwordHash = null, displayName = "alice")
+    private val alice =
+        Member(id = 5L, objectId = UUID(0, 5), workspaceObjectId = wsId, username = null, passwordHash = null, displayName = "alice")
 
     @BeforeEach
     fun setup() {
@@ -45,7 +45,6 @@ class TeamServiceUnitTest {
 
     @Nested
     inner class Create {
-
         @Test
         fun duplicateNameRejected() {
             every { teams.existsByWorkspaceObjectIdAndName(wsId, "后端") } returns true
@@ -64,7 +63,6 @@ class TeamServiceUnitTest {
 
     @Nested
     inner class Rename {
-
         @Test
         fun missingTeamRejected() {
             every { teams.findByObjectId(any()) } returns null
@@ -80,7 +78,6 @@ class TeamServiceUnitTest {
 
     @Nested
     inner class DeleteTeam {
-
         @Test
         fun deleted() {
             service.delete(team.objectId)
@@ -90,7 +87,6 @@ class TeamServiceUnitTest {
 
     @Nested
     inner class Members {
-
         @Test
         fun addMemberObjectIdempotent() {
             every { memberService.requireMember(alice.objectId) } returns alice
@@ -114,9 +110,15 @@ class TeamServiceUnitTest {
         fun toDtoMapsMemberNames() {
             val bob = alice.copy(id = 6L, objectId = UUID(0, 6), displayName = "bob")
             every { members.findAll() } returns listOf(alice, bob)
-            every { teamMembers.findByTeamObjectId(UUID(0, 1)) } returns listOf(
-                yangzhou.persistence.TeamMember(id = 10L, objectId = UUID(0, 10), teamObjectId = UUID(0, 1), memberObjectId = UUID(0, 6)),
-            )
+            every { teamMembers.findByTeamObjectId(UUID(0, 1)) } returns
+                listOf(
+                    yangzhou.persistence.TeamMember(
+                        id = 10L,
+                        objectId = UUID(0, 10),
+                        teamObjectId = UUID(0, 1),
+                        memberObjectId = UUID(0, 6),
+                    ),
+                )
             every { teams.save(any<Team>()) } answers { firstArg<Team>() }
             val dto = service.rename(team.objectId, "后端")
             assertEquals(listOf("bob"), dto.members.map { it.displayName })

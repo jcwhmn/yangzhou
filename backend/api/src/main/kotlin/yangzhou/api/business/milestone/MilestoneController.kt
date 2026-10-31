@@ -1,5 +1,6 @@
 package yangzhou.api.business.milestone
 
+import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
@@ -10,8 +11,6 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
-import yangzhou.persistence.Milestone
-import jakarta.validation.Valid
 import java.util.UUID
 
 /**
@@ -21,10 +20,13 @@ import java.util.UUID
  */
 @RestController
 @RequestMapping("/api")
-class MilestoneController(private val service: MilestoneService) {
-
+class MilestoneController(
+    private val service: MilestoneService,
+) {
     @GetMapping("/projects/{key}/milestones")
-    fun list(@PathVariable key: String): List<MilestoneService.MilestoneDto> = service.list(key)
+    fun list(
+        @PathVariable key: String,
+    ): List<MilestoneService.MilestoneDto> = service.list(key)
 
     @PostMapping("/projects/{key}/milestones")
     @ResponseStatus(HttpStatus.CREATED)
@@ -42,5 +44,8 @@ class MilestoneController(private val service: MilestoneService) {
 
     @DeleteMapping("/projects/{key}/milestones/{milestoneId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    fun delete(@PathVariable key: String, @PathVariable milestoneId: UUID) = service.delete(key, milestoneId)
+    fun delete(
+        @PathVariable key: String,
+        @PathVariable milestoneId: UUID,
+    ) = service.delete(key, milestoneId)
 }

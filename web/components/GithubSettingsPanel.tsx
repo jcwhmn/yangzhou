@@ -20,7 +20,11 @@ import { t } from "@/lib/texts";
 
 type Repo = { repoId: string; repo: string };
 type Status = { statusId: string; name: string; position: number };
-type Rule = { eventType: string; statusId: string | null; statusName: string | null };
+type Rule = {
+  eventType: string;
+  statusId: string | null;
+  statusName: string | null;
+};
 
 const EVENT_LABELS: Record<string, string> = {
   branch_created: t.gh.ruleBranch,
@@ -28,7 +32,12 @@ const EVENT_LABELS: Record<string, string> = {
   pr_merged: t.gh.rulePrMerged,
   pr_closed_unmerged: t.gh.rulePrClosed,
 };
-const EVENT_ORDER = ["branch_created", "pr_opened", "pr_merged", "pr_closed_unmerged"];
+const EVENT_ORDER = [
+  "branch_created",
+  "pr_opened",
+  "pr_merged",
+  "pr_closed_unmerged",
+];
 
 /** 项目级 GitHub 集成设置(V6-S4):仓库挂载 + 事件→状态映射 4 槽。 */
 export function GithubSettingsPanel({
@@ -87,7 +96,9 @@ export function GithubSettingsPanel({
   async function removeRepo(repoId: string) {
     setError("");
     try {
-      await api(`/api/projects/${projectKey}/repos/${repoId}`, { method: "DELETE" });
+      await api(`/api/projects/${projectKey}/repos/${repoId}`, {
+        method: "DELETE",
+      });
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "删除失败");
@@ -132,15 +143,31 @@ export function GithubSettingsPanel({
         )}
         <Stack spacing={0.5} sx={{ mb: 2 }}>
           {repos.map((r) => (
-            <Stack key={r.repoId} direction="row" spacing={1} alignItems="center">
+            <Stack
+              key={r.repoId}
+              direction="row"
+              spacing={1}
+              alignItems="center"
+            >
               <Chip label={`🐙 ${r.repo}`} />
-              <IconButton size="small" color="error" onClick={() => removeRepo(r.repoId)} aria-label="delete">
+              <IconButton
+                size="small"
+                color="error"
+                onClick={() => removeRepo(r.repoId)}
+                aria-label="delete"
+              >
                 <DeleteIcon fontSize="small" />
               </IconButton>
             </Stack>
           ))}
         </Stack>
-        <Stack component="form" direction="row" spacing={1} onSubmit={addRepo} sx={{ mb: 3 }}>
+        <Stack
+          component="form"
+          direction="row"
+          spacing={1}
+          onSubmit={addRepo}
+          sx={{ mb: 3 }}
+        >
           <TextField
             size="small"
             placeholder={t.gh.repoInput}
@@ -162,13 +189,21 @@ export function GithubSettingsPanel({
               <Typography variant="body2" sx={{ width: 140 }}>
                 {EVENT_LABELS[ev]}
               </Typography>
-<Dropdown
+              <Dropdown
                 size="small"
                 placeholder={t.gh.ruleNone}
                 value={rules[ev] ?? ""}
-                onChange={(v) => setRules((prev) => ({ ...prev, [ev]: v || null }))}
+                onChange={(v) =>
+                  setRules((prev) => ({ ...prev, [ev]: v || null }))
+                }
                 sx={{ minWidth: 200 }}
-                options={[{ value: "", label: t.gh.ruleNone }, ...statuses.map((s) => ({ value: s.statusId, label: s.name }))]}
+                options={[
+                  { value: "", label: t.gh.ruleNone },
+                  ...statuses.map((s) => ({
+                    value: s.statusId,
+                    label: s.name,
+                  })),
+                ]}
               />
             </Stack>
           ))}

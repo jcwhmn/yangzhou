@@ -8,8 +8,11 @@ import java.util.UUID
 
 @RestController
 @RequestMapping("/api")
-class StandupController(private val service: StandupService) {
-
+class StandupController(
+    private val service: StandupService,
+) {
     @GetMapping("/standup")
-    fun standup(@RequestParam("member", required = false) member: UUID?): StandupDto = service.standup(member)
+    fun standup(
+        @RequestParam("member", required = false) member: UUID?,
+    ): StandupDto = service.standup(member)
 }

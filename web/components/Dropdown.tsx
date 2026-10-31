@@ -17,7 +17,12 @@ import CheckIcon from "@mui/icons-material/Check";
 
 // 统一选择控件(spec 0018 / YPJ-18):替代 MUI Select / TextField-select。
 // e2e 硬约束:触发器 role=combobox、弹层 listbox、选项 option——openSelect/selectOption 依赖此角色链。
-export type DropdownOption = { value: string; label: string; disabled?: boolean; chip?: { label: string; color: "primary" | "warning" | "default" } };
+export type DropdownOption = {
+  value: string;
+  label: string;
+  disabled?: boolean;
+  chip?: { label: string; color: "primary" | "warning" | "default" };
+};
 
 export function Dropdown({
   label,
@@ -59,7 +64,10 @@ export function Dropdown({
         disabled={disabled}
         onClick={() => !disabled && setOpen(true)}
         onKeyDown={(e) => {
-          if (!disabled && (e.key === "Enter" || e.key === " " || e.key === "ArrowDown")) {
+          if (
+            !disabled &&
+            (e.key === "Enter" || e.key === " " || e.key === "ArrowDown")
+          ) {
             e.preventDefault();
             setOpen(true);
           }
@@ -96,7 +104,11 @@ export function Dropdown({
                 ) : (
                   <ExpandMoreIcon
                     fontSize="small"
-                    sx={{ color: "text.secondary", rotate: open ? "180deg" : "none", transition: "rotate 150ms" }}
+                    sx={{
+                      color: "text.secondary",
+                      rotate: open ? "180deg" : "none",
+                      transition: "rotate 150ms",
+                    }}
                   />
                 )}
               </InputAdornment>
@@ -110,7 +122,10 @@ export function Dropdown({
         onClose={() => setOpen(false)}
         anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
         transformOrigin={{ vertical: "top", horizontal: "left" }}
-        slotProps={{ paper: { sx: { maxHeight: 360 } }, list: { role: "listbox", "aria-label": label ?? ariaLabel } }}
+        slotProps={{
+          paper: { sx: { maxHeight: 360 } },
+          list: { role: "listbox", "aria-label": label ?? ariaLabel },
+        }}
       >
         {options.map((o) => (
           <MenuItem
@@ -124,7 +139,15 @@ export function Dropdown({
             }}
           >
             {o.label}
-            {o.chip && <Chip size="small" label={o.chip.label} color={o.chip.color} variant="outlined" sx={{ ml: 1 }} />}
+            {o.chip && (
+              <Chip
+                size="small"
+                label={o.chip.label}
+                color={o.chip.color}
+                variant="outlined"
+                sx={{ ml: 1 }}
+              />
+            )}
             {o.value === value && <CheckIcon fontSize="small" sx={{ ml: 1 }} />}
           </MenuItem>
         ))}

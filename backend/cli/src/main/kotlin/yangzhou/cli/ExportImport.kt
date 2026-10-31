@@ -133,8 +133,7 @@ object ExportImport {
         val rows = parseCsv(file.readText())
         if (rows.isEmpty()) error("CSV 无数据行")
         val headers = rows.first().keys
-        fun col(vararg names: String): String? =
-            names.firstOrNull { n -> headers.any { it.trim().equals(n, ignoreCase = true) } }
+        fun col(vararg names: String): String? = names.firstOrNull { n -> headers.any { it.trim().equals(n, ignoreCase = true) } }
 
         val titleCol = col("Title", "标题") ?: error("CSV 缺标题列(Title/标题)")
         val statusCol = col("Status", "状态")
@@ -162,8 +161,11 @@ object ExportImport {
                         api.json("POST", "/api/attributes", mapOf("name" to attr, "kind" to "label", "leveled" to level.isNotEmpty()))
                         knownAttrs += attr
                     }
-                    if (level.isEmpty()) mapOf<String, Any?>("attribute" to attr, "minLevel" to null)
-                    else mapOf<String, Any?>("attribute" to attr, "minLevel" to level.toInt())
+                    if (level.isEmpty()) {
+                        mapOf<String, Any?>("attribute" to attr, "minLevel" to null)
+                    } else {
+                        mapOf<String, Any?>("attribute" to attr, "minLevel" to level.toInt())
+                    }
                 }
             val body = api.json(
                 "POST",
@@ -189,8 +191,7 @@ object ExportImport {
     }
 
     /** CSV 字段转义:含逗号/引号/换行 → 引号包裹 + 引号双写(RFC4180)。 */
-    internal fun esc(v: String): String =
-        if (v.any { it == ',' || it == '"' || it == '\n' }) "\"${v.replace("\"", "\"\"")}\"" else v
+    internal fun esc(v: String): String = if (v.any { it == ',' || it == '"' || it == '\n' }) "\"${v.replace("\"", "\"\"")}\"" else v
 
     /** 解析 CSV 文本 → 行×列(带表头映射);支持引号包裹、双引号转义、字段内逗号与换行。 */
     fun parseCsv(text: String): List<Map<String, String>> {
@@ -203,15 +204,22 @@ object ExportImport {
             val c = text[i]
             when {
                 inQuotes -> when {
-                    c == '"' && i + 1 < text.length && text[i + 1] == '"' -> { field.append('"'); i++ }
+                    c == '"' && i + 1 < text.length && text[i + 1] == '"' -> {
+                        field.append('"')
+                        i++
+                    }
                     c == '"' -> inQuotes = false
                     else -> field.append(c)
                 }
                 c == '"' -> inQuotes = true
-                c == ',' -> { record += field.toString(); field = StringBuilder() }
+                c == ',' -> {
+                    record += field.toString()
+                    field = StringBuilder()
+                }
                 c == '\r' -> { /* CRLF 归一 */ }
                 c == '\n' -> {
-                    record += field.toString(); field = StringBuilder()
+                    record += field.toString()
+                    field = StringBuilder()
                     if (record.any { it.isNotEmpty() }) rows += record
                     record = mutableListOf()
                 }

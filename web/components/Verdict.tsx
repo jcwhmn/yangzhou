@@ -27,7 +27,12 @@ export function verdictText(v: Verdict): string {
     case "surplus":
       return t.verdicts.surplus(v.attribute);
     case "gap":
-      return t.verdicts.gap(v.attribute, v.delta ?? 0, v.required ?? 0, v.actual ?? 0);
+      return t.verdicts.gap(
+        v.attribute,
+        v.delta ?? 0,
+        v.required ?? 0,
+        v.actual ?? 0,
+      );
     case "unrated":
       return t.verdicts.unrated(v.attribute, v.required ?? 0);
     case "missing":
@@ -37,7 +42,9 @@ export function verdictText(v: Verdict): string {
 
 export function VerdictLine({ v }: { v: Verdict }) {
   return (
-    <div style={{ color: colors[v.kind], fontSize: 14, lineHeight: 1.9 }}>{verdictText(v)}</div>
+    <div style={{ color: colors[v.kind], fontSize: 14, lineHeight: 1.9 }}>
+      {verdictText(v)}
+    </div>
   );
 }
 
@@ -49,12 +56,28 @@ export const signalColor: Record<Signal, "success" | "warning" | "error"> = {
   RED: "error",
 };
 
-export function SignalChip({ signal, size = "medium" }: { signal: Signal; size?: "small" | "medium" }) {
-  return <Chip size={size as "small"} label={t.signal[signal]} color={signalColor[signal]} variant="outlined" />;
+export function SignalChip({
+  signal,
+  size = "medium",
+}: {
+  signal: Signal;
+  size?: "small" | "medium";
+}) {
+  return (
+    <Chip
+      size={size as "small"}
+      label={t.signal[signal]}
+      color={signalColor[signal]}
+      variant="outlined"
+    />
+  );
 }
 
 /** 候选行配色(YPJ-1):全满足绿 / 勉强(delta=1)与有差距同橙 / 部分满足琥珀 / 缺门红(V65 三琥珀归两档) */
-export function candidateColor(c: { signal: Signal; totalDelta: number }): string {
+export function candidateColor(c: {
+  signal: Signal;
+  totalDelta: number;
+}): string {
   if (c.signal === "RED") return tokens.error;
   if (c.signal === "GREEN") return tokens.success;
   return c.totalDelta === 1 ? tokens.warning : tokens.gap;

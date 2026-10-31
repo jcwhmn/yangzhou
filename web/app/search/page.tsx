@@ -1,6 +1,14 @@
 "use client";
 
-import { Box, Card, CardContent, Chip, Stack, TextField, Typography } from "@mui/material";
+import {
+  Box,
+  Card,
+  CardContent,
+  Chip,
+  Stack,
+  TextField,
+  Typography,
+} from "@mui/material";
 import { PageShell } from "@/components/PageShell";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -19,11 +27,20 @@ export default function SearchPage() {
   const [results, setResults] = useState<SearchResult[]>([]);
 
   useEffect(() => {
-    if (!query.trim()) { setResults([]); return; }
+    if (!query.trim()) {
+      setResults([]);
+      return;
+    }
     const timer = setTimeout(async () => {
       try {
-        setResults(await api<SearchResult[]>(`/api/search?q=${encodeURIComponent(query.trim())}`));
-      } catch { setResults([]); }
+        setResults(
+          await api<SearchResult[]>(
+            `/api/search?q=${encodeURIComponent(query.trim())}`,
+          ),
+        );
+      } catch {
+        setResults([]);
+      }
     }, 300);
     return () => clearTimeout(timer);
   }, [query]);
@@ -46,7 +63,11 @@ export default function SearchPage() {
       )}
       <Stack spacing={1}>
         {results.map((r) => (
-          <Link key={r.itemId} href={`/p/${r.projectKey}/i/${r.itemId}?from=search`} style={{ textDecoration: "none" }}>
+          <Link
+            key={r.itemId}
+            href={`/p/${r.projectKey}/i/${r.itemId}?from=search`}
+            style={{ textDecoration: "none" }}
+          >
             <Card>
               <CardContent sx={{ py: 1.5, "&:last-child": { pb: 1.5 } }}>
                 <Stack direction="row" spacing={1} alignItems="center">

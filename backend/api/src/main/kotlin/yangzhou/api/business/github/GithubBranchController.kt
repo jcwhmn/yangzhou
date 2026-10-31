@@ -12,14 +12,19 @@ import java.util.UUID
 
 @RestController
 @RequestMapping("/api")
-class GithubBranchController(private val service: GithubBranchService) {
-
+class GithubBranchController(
+    private val service: GithubBranchService,
+) {
     @PostMapping("/items/{itemId}/git-refs")
-    fun attachGitRef(@PathVariable itemId: UUID, @Valid @RequestBody request: AttachGitRefRequest): GithubBranchService.BranchDto =
-        service.attach(itemId, request.repo, request.ref)
+    fun attachGitRef(
+        @PathVariable itemId: UUID,
+        @Valid @RequestBody request: AttachGitRefRequest,
+    ): GithubBranchService.BranchDto = service.attach(itemId, request.repo, request.ref)
 
     @PostMapping("/items/{itemId}/branches")
     @ResponseStatus(HttpStatus.CREATED)
-    fun createBranch(@PathVariable itemId: UUID, @Valid @RequestBody request: CreateBranchRequest): GithubBranchService.BranchDto =
-        service.createBranch(itemId, request.repoId!!, request.baseBranch, request.name)
+    fun createBranch(
+        @PathVariable itemId: UUID,
+        @Valid @RequestBody request: CreateBranchRequest,
+    ): GithubBranchService.BranchDto = service.createBranch(itemId, request.repoId!!, request.baseBranch, request.name)
 }

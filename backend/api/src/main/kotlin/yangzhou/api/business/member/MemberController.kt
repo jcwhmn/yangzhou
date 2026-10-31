@@ -22,22 +22,25 @@ class MemberController(
     private val memberService: MemberService,
     private val capabilityService: CapabilityService,
 ) {
-
     @GetMapping("/members")
     fun list(): List<MemberService.MemberResponse> = memberService.list()
 
     @PostMapping("/members")
     @ResponseStatus(HttpStatus.CREATED)
-    fun create(@Valid @RequestBody request: CreateMemberRequest): MemberService.MemberResponse =
-        memberService.createVirtual(request.displayName.trim())
+    fun create(
+        @Valid @RequestBody request: CreateMemberRequest,
+    ): MemberService.MemberResponse = memberService.createVirtual(request.displayName.trim())
 
     @DeleteMapping("/members/{memberId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    fun delete(@PathVariable memberId: UUID) = memberService.delete(memberId)
+    fun delete(
+        @PathVariable memberId: UUID,
+    ) = memberService.delete(memberId)
 
     @PutMapping("/members/me/last-project")
-    fun setMyLastProject(@RequestBody request: SetLastProjectRequest): MemberService.MemberResponse =
-        memberService.setLastProjectKey(memberService.current().objectId, request.key)
+    fun setMyLastProject(
+        @RequestBody request: SetLastProjectRequest,
+    ): MemberService.MemberResponse = memberService.setLastProjectKey(memberService.current().objectId, request.key)
 
     @PutMapping("/members/{memberId}/last-project")
     fun setLastProject(
@@ -54,20 +57,22 @@ class MemberController(
     // ---------- 成员维度能力(虚拟成员/我 通用) ----------
 
     @GetMapping("/members/{memberId}/capabilities")
-    fun listCapabilities(@PathVariable memberId: UUID): List<CapabilityService.CapabilityDto> =
-        capabilityService.listFor(memberService.requireMember(memberId))
+    fun listCapabilities(
+        @PathVariable memberId: UUID,
+    ): List<CapabilityService.CapabilityDto> = capabilityService.listFor(memberService.requireMember(memberId))
 
     @PutMapping("/members/{memberId}/capabilities")
     fun upsertCapability(
         @PathVariable memberId: UUID,
         @Valid @RequestBody request: UpsertCapabilityRequest,
-    ): CapabilityService.CapabilityDto =
-        capabilityService.upsertFor(memberService.requireMember(memberId), request.attribute.trim(), request.level)
+    ): CapabilityService.CapabilityDto = capabilityService.upsertFor(memberService.requireMember(memberId), request.attribute.trim(), request.level)
 
     @DeleteMapping("/members/{memberId}/capabilities/{attribute}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    fun deleteCapability(@PathVariable memberId: UUID, @PathVariable attribute: String) =
-        capabilityService.deleteFor(memberService.requireMember(memberId), attribute)
+    fun deleteCapability(
+        @PathVariable memberId: UUID,
+        @PathVariable attribute: String,
+    ) = capabilityService.deleteFor(memberService.requireMember(memberId), attribute)
 }
 
 data class CreateMemberRequest(

@@ -18,7 +18,6 @@ import kotlin.test.assertTrue
  * 失败消息带 status + body,按异常类名区分 40P01 死锁 / 连接池超时 / 其他。
  */
 class ConcurrentPutHammerApiTest : AbstractApiTest() {
-
     @Test
     fun `并发混合 PUT——workspace 重算 × 项目重算——全 2xx`() {
         val authed = bootstrapAndAuth()
@@ -28,17 +27,26 @@ class ConcurrentPutHammerApiTest : AbstractApiTest() {
         val itemIds = mutableListOf<String>()
         repeat(5) { p ->
             repeat(2) { k ->
-                val item = createItem(
-                    authed, "HM$p", "锤$p-$k",
-                    listOf(mapOf("attribute" to attrs[k % attrs.size], "minLevel" to 2)),
-                )
+                val item =
+                    createItem(
+                        authed,
+                        "HM$p",
+                        "锤$p-$k",
+                        listOf(mapOf("attribute" to attrs[k % attrs.size], "minLevel" to 2)),
+                    )
                 itemIds.add(item["itemId"].asText())
             }
         }
-        val members = json.readTree(
-            authed.get().uri("/api/members")
-                .exchange().expectBody(String::class.java).returnResult().responseBody,
-        )
+        val members =
+            json.readTree(
+                authed
+                    .get()
+                    .uri("/api/members")
+                    .exchange()
+                    .expectBody(String::class.java)
+                    .returnResult()
+                    .responseBody,
+            )
         assertTrue(members.isArray && members.size() > 0, "无成员可打:/api/members 响应=$members")
         val memberId = members[0]["memberId"].asText()
 
@@ -49,44 +57,66 @@ class ConcurrentPutHammerApiTest : AbstractApiTest() {
 
         // 4 线程:成员能力 PUT → recomputeWorkspace(全部 project 行,item 全量重写)
         repeat(4) { t ->
-            futures += pool.submit(Callable {
-                val attr = attrs[t % attrs.size]
-                repeat(ROUNDS) { round ->
-                    val resp = client.send(
-                        HttpRequest.newBuilder()
-                            .uri(URI.create("http://localhost:$port/api/members/$memberId/capabilities"))
-                            .header("Authorization", "Bearer $token")
-                            .header("Content-Type", "application/json")
-                            .PUT(HttpRequest.BodyPublishers.ofString(
-                                json.writeValueAsString(mapOf("attribute" to attr, "level" to (round % 4 + 1)))))
-                            .build(),
-                        HttpResponse.BodyHandlers.ofString(),
-                    )
-                    assertTrue(resp.statusCode() == 200, "caps[$t] r$round -> ${resp.statusCode()}: ${resp.body()}")
-                }
-            })
+            futures +=
+                pool.submit(
+                    Callable {
+                        val attr = attrs[t % attrs.size]
+                        repeat(ROUNDS) { round ->
+                            val resp =
+                                client.send(
+                                    HttpRequest
+                                        .newBuilder()
+                                        .uri(URI.create("http://localhost:$port/api/members/$memberId/capabilities"))
+                                        .header("Authorization", "Bearer $token")
+                                        .header("Content-Type", "application/json")
+                                        .PUT(
+                                            HttpRequest.BodyPublishers.ofString(
+                                                json.writeValueAsString(mapOf("attribute" to attr, "level" to (round % 4 + 1))),
+                                            ),
+                                        ).build(),
+                                    HttpResponse.BodyHandlers.ofString(),
+                                )
+                            assertTrue(resp.statusCode() == 200, "caps[$t] r$round -> ${resp.statusCode()}: ${resp.body()}")
+                        }
+                    },
+                )
         }
 
         // 4 线程:item 需求整体替换 PUT → recomputeProjectSignal(该项目 item 行 + project 行)
         repeat(4) { t ->
-            futures += pool.submit(Callable {
-                val itemId = itemIds[t % itemIds.size]
-                repeat(ROUNDS) { round ->
-                    val resp = client.send(
-                        HttpRequest.newBuilder()
-                            .uri(URI.create("http://localhost:$port/api/items/$itemId/requirements"))
-                            .header("Authorization", "Bearer $token")
-                            .header("Content-Type", "application/json")
-                            .PUT(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(
-                                mapOf("requirements" to listOf(
-                                    mapOf("attribute" to attrs[(round + t) % attrs.size], "minLevel" to (round % 3 + 1)),
-                                )))))
-                            .build(),
-                        HttpResponse.BodyHandlers.ofString(),
-                    )
-                    assertTrue(resp.statusCode() == 200, "reqs[$t] r$round -> ${resp.statusCode()}: ${resp.body()}")
-                }
-            })
+            futures +=
+                pool.submit(
+                    Callable {
+                        val itemId = itemIds[t % itemIds.size]
+                        repeat(ROUNDS) { round ->
+                            val resp =
+                                client.send(
+                                    HttpRequest
+                                        .newBuilder()
+                                        .uri(URI.create("http://localhost:$port/api/items/$itemId/requirements"))
+                                        .header("Authorization", "Bearer $token")
+                                        .header("Content-Type", "application/json")
+                                        .PUT(
+                                            HttpRequest.BodyPublishers.ofString(
+                                                json.writeValueAsString(
+                                                    mapOf(
+                                                        "requirements" to
+                                                            listOf(
+                                                                mapOf(
+                                                                    "attribute" to attrs[(round + t) % attrs.size],
+                                                                    "minLevel" to (round % 3 + 1),
+                                                                ),
+                                                            ),
+                                                    ),
+                                                ),
+                                            ),
+                                        ).build(),
+                                    HttpResponse.BodyHandlers.ofString(),
+                                )
+                            assertTrue(resp.statusCode() == 200, "reqs[$t] r$round -> ${resp.statusCode()}: ${resp.body()}")
+                        }
+                    },
+                )
         }
 
         pool.shutdown()

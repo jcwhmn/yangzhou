@@ -4,6 +4,8 @@ import io.mockk.clearMocks
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Nested
 import yangzhou.api.config.AttachmentProperties
 import yangzhou.api.error.BadRequestException
 import yangzhou.api.error.NotFoundException
@@ -12,8 +14,6 @@ import yangzhou.persistence.Item
 import yangzhou.persistence.repository.AttachmentRepository
 import yangzhou.persistence.repository.ItemRepository
 import java.util.UUID
-import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Nested
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -21,17 +21,21 @@ import kotlin.test.assertTrue
 
 /** YPJ-88 单测补齐:AttachmentService(注册校验/预签名/删除容错)。 */
 class AttachmentServiceUnitTest {
-
     private val attachments = mockk<AttachmentRepository>(relaxed = true)
     private val items = mockk<ItemRepository>(relaxed = true)
     private val storage = mockk<ObjectStorage>(relaxed = true)
-    private val props = AttachmentProperties(
-        enabled = true, endpoint = "http://localhost:9000", bucket = "yangzhou",
-        maxSizeMb = 1, allowedExtensions = listOf("pdf", "png"),
-    )
+    private val props =
+        AttachmentProperties(
+            enabled = true,
+            endpoint = "http://localhost:9000",
+            bucket = "yangzhou",
+            maxSizeMb = 1,
+            allowedExtensions = listOf("pdf", "png"),
+        )
     private val service = AttachmentService(attachments, items, storage, props)
 
-    private val item = Item(id = 1L, objectId = UUID(0, 1), projectObjectId = UUID(0, 1), number = 1, title = "t", statusObjectId = UUID.randomUUID())
+    private val item =
+        Item(id = 1L, objectId = UUID(0, 1), projectObjectId = UUID(0, 1), number = 1, title = "t", statusObjectId = UUID.randomUUID())
 
     @BeforeEach
     fun setup() {
@@ -41,7 +45,6 @@ class AttachmentServiceUnitTest {
 
     @Nested
     inner class Register {
-
         @Test
         fun missingItemRejected() {
             every { items.findByObjectId(any()) } returns null
@@ -80,10 +83,18 @@ class AttachmentServiceUnitTest {
 
     @Nested
     inner class ListAttachments {
-
         @Test
         fun mappedRows() {
-            val row = Attachment(id = 1L, objectId = UUID(0, 1), itemObjectId = UUID(0, 1), filename = "a.pdf", contentType = "application/pdf", sizeBytes = 9, objectKey = "k")
+            val row =
+                Attachment(
+                    id = 1L,
+                    objectId = UUID(0, 1),
+                    itemObjectId = UUID(0, 1),
+                    filename = "a.pdf",
+                    contentType = "application/pdf",
+                    sizeBytes = 9,
+                    objectKey = "k",
+                )
             every { attachments.findByItemObjectId(UUID(0, 1)) } returns listOf(row)
             val dtos = service.list(item.objectId)
             assertEquals(1, dtos.size)
@@ -93,8 +104,16 @@ class AttachmentServiceUnitTest {
 
     @Nested
     inner class DownloadAndDelete {
-
-        private val row = Attachment(id = 1L, objectId = UUID(0, 1), itemObjectId = UUID(0, 1), filename = "a.pdf", contentType = "p", sizeBytes = 9, objectKey = "k1")
+        private val row =
+            Attachment(
+                id = 1L,
+                objectId = UUID(0, 1),
+                itemObjectId = UUID(0, 1),
+                filename = "a.pdf",
+                contentType = "p",
+                sizeBytes = 9,
+                objectKey = "k1",
+            )
 
         @BeforeEach
         fun stubRow() {

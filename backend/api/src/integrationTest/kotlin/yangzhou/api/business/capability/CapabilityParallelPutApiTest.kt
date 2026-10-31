@@ -12,7 +12,6 @@ import kotlin.test.assertTrue
 
 /** YPJ-10:并行能力 PUT → recomputeWorkspace 按 id 序更新 project 行,不再 40P01 死锁 → 500。 */
 class CapabilityParallelPutApiTest : AbstractApiTest() {
-
     @Test
     fun `并行能力 PUT——workspace 重算按 id 序更新项目——无死锁`() {
         val authed = bootstrapAndAuth()
@@ -24,23 +23,30 @@ class CapabilityParallelPutApiTest : AbstractApiTest() {
         val token = login("me", "secret123")["token"].asText()
         val client = HttpClient.newHttpClient()
         val pool = Executors.newFixedThreadPool(attrs.size)
-        val futures = attrs.map { attr ->
-            pool.submit(Callable {
-                repeat(6) { round ->
-                    val resp = client.send(
-                        HttpRequest.newBuilder()
-                            .uri(URI.create("http://localhost:$port/api/capabilities"))
-                            .header("Authorization", "Bearer $token")
-                            .header("Content-Type", "application/json")
-                            .PUT(HttpRequest.BodyPublishers.ofString(
-                                json.writeValueAsString(mapOf("attribute" to attr, "level" to (round % 4 + 1)))))
-                            .build(),
-                        HttpResponse.BodyHandlers.ofString(),
-                    )
-                    assertTrue(resp.statusCode() == 200, "PUT ${resp.statusCode()}: ${resp.body()}")
-                }
-            })
-        }
+        val futures =
+            attrs.map { attr ->
+                pool.submit(
+                    Callable {
+                        repeat(6) { round ->
+                            val resp =
+                                client.send(
+                                    HttpRequest
+                                        .newBuilder()
+                                        .uri(URI.create("http://localhost:$port/api/capabilities"))
+                                        .header("Authorization", "Bearer $token")
+                                        .header("Content-Type", "application/json")
+                                        .PUT(
+                                            HttpRequest.BodyPublishers.ofString(
+                                                json.writeValueAsString(mapOf("attribute" to attr, "level" to (round % 4 + 1))),
+                                            ),
+                                        ).build(),
+                                    HttpResponse.BodyHandlers.ofString(),
+                                )
+                            assertTrue(resp.statusCode() == 200, "PUT ${resp.statusCode()}: ${resp.body()}")
+                        }
+                    },
+                )
+            }
         pool.shutdown()
         futures.forEach { it.get() } // 工作线程断言失败在此重抛
     }

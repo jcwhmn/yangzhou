@@ -15,10 +15,13 @@ import java.util.UUID
 
 @RestController
 @RequestMapping("/api")
-class GroupTypeController(private val service: GroupTypeService) {
-
+class GroupTypeController(
+    private val service: GroupTypeService,
+) {
     @GetMapping("/projects/{key}/group-types")
-    fun listTypes(@PathVariable key: String): List<GroupTypeService.GroupTypeDto> = service.listTypes(key)
+    fun listTypes(
+        @PathVariable key: String,
+    ): List<GroupTypeService.GroupTypeDto> = service.listTypes(key)
 
     @PostMapping("/projects/{key}/group-types")
     @ResponseStatus(HttpStatus.CREATED)
@@ -36,7 +39,10 @@ class GroupTypeController(private val service: GroupTypeService) {
 
     @DeleteMapping("/projects/{key}/group-types/{typeKey}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    fun deleteType(@PathVariable key: String, @PathVariable typeKey: String) = service.deleteType(key, typeKey)
+    fun deleteType(
+        @PathVariable key: String,
+        @PathVariable typeKey: String,
+    ) = service.deleteType(key, typeKey)
 
     @GetMapping("/projects/{key}/groups")
     fun listGroups(
@@ -60,5 +66,8 @@ class GroupTypeController(private val service: GroupTypeService) {
 
     @DeleteMapping("/projects/{key}/groups/{groupId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    fun deleteGroup(@PathVariable key: String, @PathVariable groupId: UUID) = service.deleteGroup(key, groupId)
+    fun deleteGroup(
+        @PathVariable key: String,
+        @PathVariable groupId: UUID,
+    ) = service.deleteGroup(key, groupId)
 }

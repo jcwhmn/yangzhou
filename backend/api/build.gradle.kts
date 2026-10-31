@@ -13,11 +13,14 @@ sourceSets {
 }
 
 // YPJ-101(spec 0079):构建期把 git 最近 tag 注入 version.txt,无 git/shallow clone 落 dev
-val resolveVersion = providers.exec {
-    // 只认 v* 日期 tag(yz-v* 是 CLI 发版 tag,不算应用版本);无则 dev
-    commandLine("git", "describe", "--tags", "--abbrev=0", "--match", "v*").isIgnoreExitValue = true
-}.standardOutput.asText.map { it.trim().ifEmpty { "dev" } }
-    .orElse("dev")
+val resolveVersion =
+    providers
+        .exec {
+            // 只认 v* 日期 tag(yz-v* 是 CLI 发版 tag,不算应用版本);无则 dev
+            commandLine("git", "describe", "--tags", "--abbrev=0", "--match", "v*").isIgnoreExitValue = true
+        }.standardOutput.asText
+        .map { it.trim().ifEmpty { "dev" } }
+        .orElse("dev")
 
 // configuration cache 要求不可捕获脚本引用:配置期固化成 String(每构建一次,成本可忽略)
 val appVersion = resolveVersion.get()

@@ -1,8 +1,6 @@
 package yangzhou.api.business.metrics
 
 import com.fasterxml.jackson.databind.JsonNode
-import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.web.servlet.client.RestTestClient
 import yangzhou.api.AbstractApiTest
 import java.util.UUID
@@ -26,8 +24,6 @@ import kotlin.test.assertTrue
  *  item8 无组  10-09T09 建 →10-11 In Progress              (aging 第二行)
  */
 class MetricsApiTest : AbstractApiTest() {
-
-
     private lateinit var authed: RestTestClient
     private lateinit var status: Map<String, String> // 状态名 → objectId
     private var meId: String = ""
@@ -41,8 +37,16 @@ class MetricsApiTest : AbstractApiTest() {
         createProject(authed, "MTR")
         status = get("/api/projects/MTR")["statuses"].associate { it["name"].asText() to it["statusId"].asText() }
         meId = get("/api/members")[0]["memberId"].asText()
-        s1 = post("/api/projects/MTR/sprints", mapOf("name" to "S1", "startDate" to "2026-10-01", "endDate" to "2026-10-14"))["sprintId"].asText()
-        s2 = post("/api/projects/MTR/sprints", mapOf("name" to "S2", "startDate" to "2026-10-15", "endDate" to "2026-10-28"))["sprintId"].asText()
+        s1 =
+            post(
+                "/api/projects/MTR/sprints",
+                mapOf("name" to "S1", "startDate" to "2026-10-01", "endDate" to "2026-10-14"),
+            )["sprintId"].asText()
+        s2 =
+            post(
+                "/api/projects/MTR/sprints",
+                mapOf("name" to "S2", "startDate" to "2026-10-15", "endDate" to "2026-10-28"),
+            )["sprintId"].asText()
     }
 
     private fun newItem(
@@ -59,36 +63,95 @@ class MetricsApiTest : AbstractApiTest() {
         if (sprintId != null) put("/api/items/$itemId/sprint", mapOf("sprintId" to sprintId))
         val iid = jdbc.queryForObject("select object_id from item where object_id = ?::uuid", java.util.UUID::class.java, itemId)
         jdbc.update("update item set created_at = ?::timestamptz where object_id = ?", createdAt, iid)
-        jdbc.update("update item_status_history set created_at = ?::timestamptz where item_object_id = ? and source = 'created'", createdAt, iid)
+        jdbc.update(
+            "update item_status_history set created_at = ?::timestamptz where item_object_id = ? and source = 'created'",
+            createdAt,
+            iid,
+        )
         for ((fromName, toName, at) in transitions) {
             val fromId = fromName?.let { statusInternalId(it) }
             jdbc.update(
-                "insert into item_status_history (object_id, item_object_id, from_status_object_id, to_status_object_id, source, created_at, updated_at) " +
+                "insert into item_status_history (object_id, item_object_id, from_status_object_id, " +
+                    "to_status_object_id, source, created_at, updated_at) " +
                     "values (?, ?, ?, ?, 'manual', ?::timestamptz, ?::timestamptz)",
-                UUID.randomUUID(), iid, fromId, statusInternalId(toName), at, at,
+                UUID.randomUUID(),
+                iid,
+                fromId,
+                statusInternalId(toName),
+                at,
+                at,
             )
         }
         if (currentStatus != null) {
             jdbc.update("update item set status_object_id = ?::uuid where object_id = ?", status[currentStatus]!!, iid)
         }
         if (sprintId != null && joinedAt != null) {
-            val gid = jdbc.queryForObject("select object_id from item_group where object_id = ?::uuid", java.util.UUID::class.java, sprintId)
-            jdbc.update("update item_group_member set created_at = ?::timestamptz where item_object_id = ? and group_object_id = ?", joinedAt, iid, gid)
-            jdbc.update("update item_group_member_history set added_at = ?::timestamptz where item_object_id = ? and group_object_id = ?", joinedAt, iid, gid)
+            val gid =
+                jdbc.queryForObject(
+                    "select object_id from item_group where object_id = ?::uuid",
+                    java.util.UUID::class.java,
+                    sprintId,
+                )
+            jdbc.update(
+                "update item_group_member set created_at = ?::timestamptz where item_object_id = ? and group_object_id = ?",
+                joinedAt,
+                iid,
+                gid,
+            )
+            jdbc.update(
+                "update item_group_member_history set added_at = ?::timestamptz where item_object_id = ? and group_object_id = ?",
+                joinedAt,
+                iid,
+                gid,
+            )
         }
         return itemId
     }
 
-    private fun statusInternalId(name: String): java.util.UUID =
-        jdbc.queryForObject("select object_id from status where object_id = ?::uuid", java.util.UUID::class.java, status[name])
+    private fun statusInternalId(name: String): java.util.UUID = jdbc.queryForObject("select object_id from status where object_id = ?::uuid", java.util.UUID::class.java, status[name])
 
     private fun seedAll() {
-        newItem("一", "2026-09-28T09:00:00Z", listOf(Triple("To Do", "In Progress", "2026-09-29T09:00:00Z"), Triple("In Progress", "Done", "2026-10-02T09:00:00Z")), "Done", s1, "2026-10-01T00:00:00Z", assignee = true)
-        newItem("二", "2026-10-01T09:00:00Z", listOf(Triple("To Do", "In Progress", "2026-10-03T09:00:00Z"), Triple("In Progress", "QA", "2026-10-05T09:00:00Z")), "QA", s1, "2026-10-03T00:00:00Z", assignee = true)
+        newItem(
+            "一",
+            "2026-09-28T09:00:00Z",
+            listOf(Triple("To Do", "In Progress", "2026-09-29T09:00:00Z"), Triple("In Progress", "Done", "2026-10-02T09:00:00Z")),
+            "Done",
+            s1,
+            "2026-10-01T00:00:00Z",
+            assignee = true,
+        )
+        newItem(
+            "二",
+            "2026-10-01T09:00:00Z",
+            listOf(Triple("To Do", "In Progress", "2026-10-03T09:00:00Z"), Triple("In Progress", "QA", "2026-10-05T09:00:00Z")),
+            "QA",
+            s1,
+            "2026-10-03T00:00:00Z",
+            assignee = true,
+        )
         newItem("三", "2026-10-05T09:00:00Z", emptyList(), "To Do", s1, "2026-10-05T00:00:00Z")
-        newItem("四", "2026-09-29T09:00:00Z", listOf(Triple("To Do", "In Progress", "2026-09-30T09:00:00Z"), Triple("In Progress", "Done", "2026-10-20T09:00:00Z")), "Done", s1, "2026-10-01T00:00:00Z")
-        newItem("五", "2026-10-06T09:00:00Z", listOf(Triple("To Do", "In Progress", "2026-10-07T09:00:00Z"), Triple("In Progress", "Done", "2026-10-08T09:00:00Z")), "Done")
-        newItem("六", "2026-10-15T09:00:00Z", listOf(Triple("To Do", "In Progress", "2026-10-16T09:00:00Z"), Triple("In Progress", "Done", "2026-10-17T09:00:00Z")), "Done", s2, "2026-10-15T00:00:00Z")
+        newItem(
+            "四",
+            "2026-09-29T09:00:00Z",
+            listOf(Triple("To Do", "In Progress", "2026-09-30T09:00:00Z"), Triple("In Progress", "Done", "2026-10-20T09:00:00Z")),
+            "Done",
+            s1,
+            "2026-10-01T00:00:00Z",
+        )
+        newItem(
+            "五",
+            "2026-10-06T09:00:00Z",
+            listOf(Triple("To Do", "In Progress", "2026-10-07T09:00:00Z"), Triple("In Progress", "Done", "2026-10-08T09:00:00Z")),
+            "Done",
+        )
+        newItem(
+            "六",
+            "2026-10-15T09:00:00Z",
+            listOf(Triple("To Do", "In Progress", "2026-10-16T09:00:00Z"), Triple("In Progress", "Done", "2026-10-17T09:00:00Z")),
+            "Done",
+            s2,
+            "2026-10-15T00:00:00Z",
+        )
         newItem("七", "2026-10-09T09:00:00Z", listOf(Triple(null, "Done", "2026-10-10T09:00:00Z")), "Done")
         newItem("八", "2026-10-09T09:00:00Z", listOf(Triple("To Do", "In Progress", "2026-10-11T09:00:00Z")), "In Progress")
     }
@@ -96,40 +159,76 @@ class MetricsApiTest : AbstractApiTest() {
     // ---------- helpers ----------
 
     private fun get(uri: String): JsonNode {
-        val r = authed.get().uri(uri).exchange().expectBody(String::class.java).returnResult()
+        val r =
+            authed
+                .get()
+                .uri(uri)
+                .exchange()
+                .expectBody(String::class.java)
+                .returnResult()
         if (r.status.value() >= 300) println("GET_FAIL $uri ${r.status.value()} ${r.responseBody}")
         assertEquals(200, r.status.value(), "GET $uri")
         return json.readTree(r.responseBody!!)
     }
 
-    private fun post(uri: String, body: Any): JsonNode {
-        val r = authed.post().uri(uri).body(body).exchange().expectBody(String::class.java).returnResult()
+    private fun post(
+        uri: String,
+        body: Any,
+    ): JsonNode {
+        val r =
+            authed
+                .post()
+                .uri(uri)
+                .body(body)
+                .exchange()
+                .expectBody(String::class.java)
+                .returnResult()
         if (r.status.value() >= 300) println("POST_FAIL $uri ${r.status.value()} ${r.responseBody}")
         assertTrue(r.status.is2xxSuccessful, "POST $uri")
         return json.readTree(r.responseBody!!)
     }
 
-    private fun put(uri: String, body: Any) {
-        val r = authed.put().uri(uri).body(body).exchange().expectBody(String::class.java).returnResult()
+    private fun put(
+        uri: String,
+        body: Any,
+    ) {
+        val r =
+            authed
+                .put()
+                .uri(uri)
+                .body(body)
+                .exchange()
+                .expectBody(String::class.java)
+                .returnResult()
         if (r.status.value() >= 300) println("PUT_FAIL $uri ${r.status.value()} ${r.responseBody}")
         assertTrue(r.status.is2xxSuccessful, "PUT $uri")
     }
 
-    private fun patch(uri: String, body: Any): JsonNode {
-        val r = authed.patch().uri(uri).body(body).exchange().expectBody(String::class.java).returnResult()
+    private fun patch(
+        uri: String,
+        body: Any,
+    ): JsonNode {
+        val r =
+            authed
+                .patch()
+                .uri(uri)
+                .body(body)
+                .exchange()
+                .expectBody(String::class.java)
+                .returnResult()
         if (r.status.value() >= 300) println("PATCH_FAIL $uri ${r.status.value()} ${r.responseBody}")
         assertTrue(r.status.is2xxSuccessful, "PATCH $uri")
         return json.readTree(r.responseBody!!)
     }
 
-    private fun counts(node: JsonNode): Map<String, Int> =
-        node.fields().asSequence().associate { it.key to it.value.asInt() }
+    private fun counts(node: JsonNode): Map<String, Int> = node.fields().asSequence().associate { it.key to it.value.asInt() }
 
     // ---------- 用例 ----------
 
     @Test
     fun workload_三桶与拆分() {
-        setupProject(); seedAll()
+        setupProject()
+        seedAll()
         val r = get("/api/projects/MTR/metrics/workload")
         assertEquals(1, r["backlogSize"].asInt())
         assertEquals(2, r["wip"].asInt())
@@ -137,7 +236,8 @@ class MetricsApiTest : AbstractApiTest() {
         val byStatus = r["byStatus"].associate { it["name"].asText() to it["count"].asInt() }
         assertEquals(mapOf("To Do" to 1, "In Progress" to 1, "In Review" to 0, "QA" to 1, "Done" to 5), byStatus)
         val byAssignee = r["byAssignee"].associate { (it["displayName"]?.takeUnless { n -> n.isNull }?.asText()) to it["count"].asInt() }
-        assertEquals(2, byAssignee["me"]); assertEquals(6, byAssignee[null])
+        assertEquals(2, byAssignee["me"])
+        assertEquals(6, byAssignee[null])
         assertEquals(8, r["byType"][0]["count"].asInt())
         assertTrue(r["definitions"]["workload"].asText().contains("WIP"))
     }
@@ -166,10 +266,14 @@ class MetricsApiTest : AbstractApiTest() {
 
     @Test
     fun throughput_周桶与groupId过滤() {
-        setupProject(); seedAll()
+        setupProject()
+        seedAll()
         val r = get("/api/projects/MTR/metrics/throughput?from=2026-09-25T00:00:00Z&to=2026-10-25T00:00:00Z&bucket=week")
         assertEquals(listOf(0, 1, 2, 1, 1), r["buckets"].map { it["completed"].asInt() }) // item6 10-17 落 10-12 周
-        assertEquals(listOf("2026-09-21", "2026-09-28", "2026-10-05", "2026-10-12", "2026-10-19"), r["buckets"].map { it["start"].asText() })
+        assertEquals(
+            listOf("2026-09-21", "2026-09-28", "2026-10-05", "2026-10-12", "2026-10-19"),
+            r["buckets"].map { it["start"].asText() },
+        )
         val s1Only = get("/api/projects/MTR/metrics/throughput?from=2026-09-25T00:00:00Z&to=2026-10-25T00:00:00Z&bucket=week&groupId=$s1")
         assertEquals(listOf(0, 1, 0, 0, 1), s1Only["buckets"].map { it["completed"].asInt() })
         val day = get("/api/projects/MTR/metrics/throughput?from=2026-10-01T00:00:00Z&to=2026-10-03T00:00:00Z&bucket=day")
@@ -178,7 +282,8 @@ class MetricsApiTest : AbstractApiTest() {
 
     @Test
     fun flowTimes_百分位与noCycle_未完成排除() {
-        setupProject(); seedAll()
+        setupProject()
+        seedAll()
         val r = get("/api/projects/MTR/metrics/flow-times?from=2026-09-25T00:00:00Z&to=2026-10-25T00:00:00Z")
         assertEquals(5, r["items"].size())
         assertEquals(1, r["noCycleCount"].asInt())
@@ -199,7 +304,8 @@ class MetricsApiTest : AbstractApiTest() {
 
     @Test
     fun cfd_按日重放() {
-        setupProject(); seedAll()
+        setupProject()
+        seedAll()
         val r = get("/api/projects/MTR/metrics/cfd?from=2026-09-28T00:00:00Z&to=2026-10-04T00:00:00Z")
         val byDate = r["series"].associate { it["date"].asText() to counts(it["counts"]) }
         val names = r["statuses"].associate { it["name"].asText() to it["statusId"].asText() }
@@ -212,7 +318,8 @@ class MetricsApiTest : AbstractApiTest() {
 
     @Test
     fun aging_进入时刻与队列宽() {
-        setupProject(); seedAll()
+        setupProject()
+        seedAll()
         val r = get("/api/projects/MTR/metrics/aging")
         val items = r["items"]
         assertEquals(2, items.size())
@@ -227,7 +334,8 @@ class MetricsApiTest : AbstractApiTest() {
 
     @Test
     fun burndown_理想与实际() {
-        setupProject(); seedAll()
+        setupProject()
+        seedAll()
         val r = get("/api/projects/MTR/metrics/burndown?groupId=$s1")
         assertEquals(4, r["total"].asInt())
         assertEquals(14, r["ideal"].size()) // 10-01..10-14(today ≥ 10-15)
@@ -240,7 +348,8 @@ class MetricsApiTest : AbstractApiTest() {
 
     @Test
     fun burnup_完成与scope() {
-        setupProject(); seedAll()
+        setupProject()
+        seedAll()
         val r = get("/api/projects/MTR/metrics/burnup?groupId=$s1")
         assertEquals(0, r["done"][0]["cumulative"].asInt())
         assertEquals(1, r["done"][1]["cumulative"].asInt()) // 10-02
@@ -252,7 +361,8 @@ class MetricsApiTest : AbstractApiTest() {
 
     @Test
     fun velocity_双sprint计数() {
-        setupProject(); seedAll()
+        setupProject()
+        seedAll()
         val r = get("/api/projects/MTR/metrics/velocity")
         assertEquals(2, r["sprints"].size())
         assertEquals("S1", r["sprints"][0]["name"].asText())
@@ -263,7 +373,8 @@ class MetricsApiTest : AbstractApiTest() {
 
     @Test
     fun rename_后数值不变_id级() {
-        setupProject(); seedAll()
+        setupProject()
+        seedAll()
         val before = get("/api/projects/MTR/metrics/flow-times?from=2026-09-25T00:00:00Z&to=2026-10-25T00:00:00Z")
         patch("/api/statuses/${status["Done"]}", mapOf("name" to "已完成"))
         val after = get("/api/projects/MTR/metrics/flow-times?from=2026-09-25T00:00:00Z&to=2026-10-25T00:00:00Z")
@@ -275,16 +386,38 @@ class MetricsApiTest : AbstractApiTest() {
 
     @Test
     fun 负例_未知项目_坏参数_未知组() {
-        setupProject(); seedAll()
-        authed.get().uri("/api/projects/NOPE/metrics/workload").exchange().expectStatus().isNotFound()
-        authed.get().uri("/api/projects/MTR/metrics/throughput?from=2026-09-25T00:00:00Z&to=2026-10-25T00:00:00Z&bucket=month")
-            .exchange().expectStatus().isBadRequest()
-        authed.get().uri("/api/projects/MTR/metrics/throughput?from=2026-10-25T00:00:00Z&to=2026-09-25T00:00:00Z")
-            .exchange().expectStatus().isBadRequest()
-        authed.get().uri("/api/projects/MTR/metrics/flow-times?from=2024-01-01T00:00:00Z&to=2026-01-01T00:00:00Z")
-            .exchange().expectStatus().isBadRequest() // 窗口上限 365 天
-        authed.get().uri("/api/projects/MTR/metrics/burndown?groupId=${UUID.randomUUID()}")
-            .exchange().expectStatus().isNotFound()
+        setupProject()
+        seedAll()
+        authed
+            .get()
+            .uri("/api/projects/NOPE/metrics/workload")
+            .exchange()
+            .expectStatus()
+            .isNotFound()
+        authed
+            .get()
+            .uri("/api/projects/MTR/metrics/throughput?from=2026-09-25T00:00:00Z&to=2026-10-25T00:00:00Z&bucket=month")
+            .exchange()
+            .expectStatus()
+            .isBadRequest()
+        authed
+            .get()
+            .uri("/api/projects/MTR/metrics/throughput?from=2026-10-25T00:00:00Z&to=2026-09-25T00:00:00Z")
+            .exchange()
+            .expectStatus()
+            .isBadRequest()
+        authed
+            .get()
+            .uri("/api/projects/MTR/metrics/flow-times?from=2024-01-01T00:00:00Z&to=2026-01-01T00:00:00Z")
+            .exchange()
+            .expectStatus()
+            .isBadRequest() // 窗口上限 365 天
+        authed
+            .get()
+            .uri("/api/projects/MTR/metrics/burndown?groupId=${UUID.randomUUID()}")
+            .exchange()
+            .expectStatus()
+            .isNotFound()
     }
 
     // ---------- YPJ-54:留痕与 scope/reopen ----------
@@ -294,9 +427,11 @@ class MetricsApiTest : AbstractApiTest() {
         setupProject()
         val id = createItem(authed, "MTR", "留痕")["itemId"].asText()
         val iid = jdbc.queryForObject("select object_id from item where object_id = ?::uuid", java.util.UUID::class.java, id)
+
         fun rows(openOnly: Boolean): Int = jdbc.queryForObject(
             "select count(*) from item_group_member_history where item_object_id = ? ${if (openOnly) "and removed_at is null" else ""}",
-            Int::class.java, iid,
+            Int::class.java,
+            iid,
         )
         put("/api/items/$id/sprint", mapOf("sprintId" to s1))
         assertEquals(1, rows(false))
@@ -316,8 +451,16 @@ class MetricsApiTest : AbstractApiTest() {
     fun create带sprintId_落episode() {
         setupProject()
         val r = post("/api/projects/MTR/items", mapOf("title" to "c1", "sprintId" to s1))
-        val iid = jdbc.queryForObject("select object_id from item where object_id = ?::uuid", java.util.UUID::class.java, r["itemId"].asText())
-        assertEquals(1, jdbc.queryForObject("select count(*) from item_group_member_history where item_object_id = ?", Int::class.java, iid))
+        val iid =
+            jdbc.queryForObject(
+                "select object_id from item where object_id = ?::uuid",
+                java.util.UUID::class.java,
+                r["itemId"].asText(),
+            )
+        assertEquals(
+            1,
+            jdbc.queryForObject("select count(*) from item_group_member_history where item_object_id = ?", Int::class.java, iid),
+        )
     }
 
     @Test
@@ -326,7 +469,9 @@ class MetricsApiTest : AbstractApiTest() {
         newItem("sca", "2026-10-02T09:00:00Z", sprintId = s1, joinedAt = "2026-10-02T09:00:00Z")
         val b = newItem("scb", "2026-09-28T09:00:00Z", sprintId = s1, joinedAt = "2026-09-28T09:00:00Z")
         jdbc.update(
-            "update item_group_member_history set removed_at = '2026-10-10T09:00:00Z'::timestamptz where item_object_id = (select object_id from item where object_id = ?::uuid)", b)
+            "update item_group_member_history set removed_at = '2026-10-10T09:00:00Z'::timestamptz where item_object_id = (select object_id from item where object_id = ?::uuid)",
+            b,
+        )
         jdbc.update("delete from item_group_member where item_object_id = (select object_id from item where object_id = ?::uuid)", b)
         val r = get("/api/projects/MTR/metrics/scope-change?groupId=$s1")
         assertEquals(1, r["original"].asInt()) // 10-01 00:00:b 在册
@@ -335,7 +480,12 @@ class MetricsApiTest : AbstractApiTest() {
         assertEquals(1, r["removes"].asInt())
         assertEquals(0, r["net"].asInt())
         val s3 = post("/api/projects/MTR/sprints", mapOf("name" to "S3"))["sprintId"].asText()
-        authed.get().uri("/api/projects/MTR/metrics/scope-change?groupId=$s3").exchange().expectStatus().isBadRequest()
+        authed
+            .get()
+            .uri("/api/projects/MTR/metrics/scope-change?groupId=$s3")
+            .exchange()
+            .expectStatus()
+            .isBadRequest()
     }
 
     @Test
@@ -344,7 +494,9 @@ class MetricsApiTest : AbstractApiTest() {
         newItem("bua", "2026-10-01T09:00:00Z", sprintId = s1, joinedAt = "2026-10-01T00:00:00Z")
         val b = newItem("bub", "2026-10-01T09:00:00Z", sprintId = s1, joinedAt = "2026-10-01T00:00:00Z")
         jdbc.update(
-            "update item_group_member_history set removed_at = '2026-10-05T12:00:00Z'::timestamptz where item_object_id = (select object_id from item where object_id = ?::uuid)", b)
+            "update item_group_member_history set removed_at = '2026-10-05T12:00:00Z'::timestamptz where item_object_id = (select object_id from item where object_id = ?::uuid)",
+            b,
+        )
         jdbc.update("delete from item_group_member where item_object_id = (select object_id from item where object_id = ?::uuid)", b)
         val r = get("/api/projects/MTR/metrics/burnup?groupId=$s1")
         assertEquals(2, r["scope"][3]["total"].asInt()) // 10-04 末:b 仍在册
@@ -354,11 +506,18 @@ class MetricsApiTest : AbstractApiTest() {
     @Test
     fun reopenRate_重开与窗口() {
         setupProject()
-        newItem("rr一", "2026-10-01T09:00:00Z",
+        newItem(
+            "rr一",
+            "2026-10-01T09:00:00Z",
             listOf(Triple(null, "Done", "2026-10-02T09:00:00Z"), Triple("Done", "In Progress", "2026-10-03T09:00:00Z")),
-            "In Progress")
-        newItem("rr二", "2026-10-01T09:00:00Z",
-            listOf(Triple(null, "Done", "2026-10-04T09:00:00Z")), "Done")
+            "In Progress",
+        )
+        newItem(
+            "rr二",
+            "2026-10-01T09:00:00Z",
+            listOf(Triple(null, "Done", "2026-10-04T09:00:00Z")),
+            "Done",
+        )
         val full = get("/api/projects/MTR/metrics/reopen-rate?from=2026-10-01T00:00:00Z&to=2026-10-31T00:00:00Z")
         assertEquals(2, full["completed"].asInt())
         assertEquals(1, full["reopened"].asInt())

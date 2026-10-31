@@ -57,6 +57,10 @@ jobs:
         working-directory: web
         run: npm ci
 
+      - name: 格式检查(Prettier;YPJ-121)
+        working-directory: web
+        run: npx prettier --check .
+
       - name: 装 Playwright chromium(含系统依赖)
         working-directory: web
         run: npx playwright install --with-deps chromium

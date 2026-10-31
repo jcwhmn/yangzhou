@@ -7,12 +7,14 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class AuthApiTest : AbstractApiTest() {
-
     @Test
     fun `bootstrap 创建首个用户并返回 token`() {
-        val response = rest.post().uri("/api/auth/bootstrap")
-            .body(mapOf("username" to "me", "password" to "secret123"))
-            .exchange()
+        val response =
+            rest
+                .post()
+                .uri("/api/auth/bootstrap")
+                .body(mapOf("username" to "me", "password" to "secret123"))
+                .exchange()
 
         response.expectStatus().isCreated()
         val body = json.readTree(response.expectBody(String::class.java).returnResult().responseBody!!)
@@ -22,34 +24,57 @@ class AuthApiTest : AbstractApiTest() {
 
     @Test
     fun `重复 bootstrap 返回 409`() {
-        rest.post().uri("/api/auth/bootstrap")
+        rest
+            .post()
+            .uri("/api/auth/bootstrap")
             .body(mapOf("username" to "me", "password" to "secret123"))
-            .exchange().expectStatus().isCreated()
+            .exchange()
+            .expectStatus()
+            .isCreated()
 
-        rest.post().uri("/api/auth/bootstrap")
+        rest
+            .post()
+            .uri("/api/auth/bootstrap")
             .body(mapOf("username" to "other", "password" to "secret123"))
-            .exchange().expectStatus().isEqualTo(409)
+            .exchange()
+            .expectStatus()
+            .isEqualTo(409)
     }
 
     @Test
     fun `登录成功返回 token,密码错误 401 且消息笼统`() {
-        rest.post().uri("/api/auth/bootstrap")
+        rest
+            .post()
+            .uri("/api/auth/bootstrap")
             .body(mapOf("username" to "me", "password" to "secret123"))
             .exchange()
 
         assertEquals("me", login("me", "secret123")["username"].asText())
 
-        rest.post().uri("/api/auth/login")
+        rest
+            .post()
+            .uri("/api/auth/login")
             .body(mapOf("username" to "me", "password" to "wrong"))
             .exchange()
-            .expectStatus().isUnauthorized()
+            .expectStatus()
+            .isUnauthorized()
     }
 
     @Test
     fun `未认证访问受保护端点返回 401,带 token 可访问`() {
-        rest.get().uri("/api/projects").exchange().expectStatus().isUnauthorized()
+        rest
+            .get()
+            .uri("/api/projects")
+            .exchange()
+            .expectStatus()
+            .isUnauthorized()
 
         val authed: RestTestClient = bootstrapAndAuth()
-        authed.get().uri("/api/projects").exchange().expectStatus().isOk()
+        authed
+            .get()
+            .uri("/api/projects")
+            .exchange()
+            .expectStatus()
+            .isOk()
     }
 }

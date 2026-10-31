@@ -8,10 +8,12 @@ import kotlin.test.assertTrue
 
 /** YPJ-85:webhook 签名纯函数——正确签名/篡改/错 secret/格式异常。 */
 class WebhookSignatureTest {
-
     private val secret = "test-secret"
 
-    private fun sign(body: String, secret: String = this.secret): String {
+    private fun sign(
+        body: String,
+        secret: String = this.secret,
+    ): String {
         val mac = Mac.getInstance("HmacSHA256")
         mac.init(SecretKeySpec(secret.toByteArray(), "HmacSHA256"))
         return "sha256=" + mac.doFinal(body.toByteArray()).joinToString("") { "%02x".format(it) }

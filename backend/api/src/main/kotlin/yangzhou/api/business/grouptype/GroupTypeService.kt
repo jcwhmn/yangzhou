@@ -5,14 +5,13 @@ import org.springframework.transaction.annotation.Transactional
 import yangzhou.api.error.BadRequestException
 import yangzhou.api.error.ConflictException
 import yangzhou.api.error.NotFoundException
+import yangzhou.api.guard.LeaderGuard
 import yangzhou.persistence.ItemGroup
-import yangzhou.persistence.ItemGroupMember
 import yangzhou.persistence.ItemGroupType
 import yangzhou.persistence.repository.ItemGroupMemberHistoryRepository
 import yangzhou.persistence.repository.ItemGroupMemberRepository
 import yangzhou.persistence.repository.ItemGroupRepository
 import yangzhou.persistence.repository.ItemGroupTypeRepository
-import yangzhou.api.guard.LeaderGuard
 import yangzhou.persistence.repository.ProjectRepository
 import java.time.Instant
 import java.time.LocalDate
@@ -32,10 +31,20 @@ class GroupTypeService(
     private val memberships: ItemGroupMemberRepository,
     private val memberHistory: ItemGroupMemberHistoryRepository,
 ) {
+    data class GroupTypeDto(
+        val typeKey: String,
+        val name: String,
+        val builtin: Boolean,
+    )
 
-    data class GroupTypeDto(val typeKey: String, val name: String, val builtin: Boolean)
-    data class CreateGroupTypeRequest(val typeKey: String, val name: String)
-    data class UpdateGroupTypeRequest(val name: String)
+    data class CreateGroupTypeRequest(
+        val typeKey: String,
+        val name: String,
+    )
+
+    data class UpdateGroupTypeRequest(
+        val name: String,
+    )
 
     data class GroupDto(
         val groupId: UUID,
@@ -64,8 +73,7 @@ class GroupTypeService(
     private val groupStatusValues = setOf("planned", "active", "completed")
     private val builtinKeys = setOf("sprint", "release")
 
-    private fun project(key: String) =
-        projects.findByKey(key) ?: throw NotFoundException("项目不存在:$key")
+    private fun project(key: String) = projects.findByKey(key) ?: throw NotFoundException("项目不存在:$key")
 
     private fun ItemGroupType.toDto() = GroupTypeDto(typeKey, name, builtin)
 
@@ -78,15 +86,22 @@ class GroupTypeService(
         endDate = endDate?.toString(),
     )
 
-    private fun customType(key: String, typeKey: String): ItemGroupType {
+    private fun customType(
+        key: String,
+        typeKey: String,
+    ): ItemGroupType {
         val p = project(key)
-        val t = types.findByProjectObjectIdAndTypeKey(p.objectId!!, typeKey)
-            ?: throw NotFoundException("group 类型不存在:$typeKey")
+        val t =
+            types.findByProjectObjectIdAndTypeKey(p.objectId!!, typeKey)
+                ?: throw NotFoundException("group 类型不存在:$typeKey")
         if (t.typeKey in builtinKeys) throw BadRequestException("sprint/release 请用专属端点")
         return t
     }
 
-    private fun parseDate(text: String?, field: String): LocalDate? {
+    private fun parseDate(
+        text: String?,
+        field: String,
+    ): LocalDate? {
         if (text.isNullOrBlank()) return null
         return try {
             LocalDate.parse(text)
@@ -97,14 +112,17 @@ class GroupTypeService(
 
     // ---------- 类型 CRUD ----------
 
-    fun listTypes(key: String): List<GroupTypeDto> =
-        types.findByProjectObjectIdOrderByCreatedAt(project(key).objectId!!).map { it.toDto() }
+    fun listTypes(key: String): List<GroupTypeDto> = types.findByProjectObjectIdOrderByCreatedAt(project(key).objectId!!).map { it.toDto() }
 
     @Transactional
-    fun createType(key: String, request: CreateGroupTypeRequest): GroupTypeDto {
+    fun createType(
+        key: String,
+        request: CreateGroupTypeRequest,
+    ): GroupTypeDto {
         leaderGuard.requireLeader(key)
-        val typeKey = request.typeKey?.trim().takeUnless { it.isNullOrEmpty() }
-            ?: throw BadRequestException("typeKey 必填")
+        val typeKey =
+            request.typeKey?.trim().takeUnless { it.isNullOrEmpty() }
+                ?: throw BadRequestException("typeKey 必填")
         if (!Regex("[a-z][a-z0-9-]{1,19}").matches(typeKey)) {
             throw BadRequestException("typeKey 需匹配 [a-z][a-z0-9-]{1,19}")
         }
@@ -118,22 +136,32 @@ class GroupTypeService(
     }
 
     @Transactional
-    fun updateType(key: String, typeKey: String, request: UpdateGroupTypeRequest): GroupTypeDto {
+    fun updateType(
+        key: String,
+        typeKey: String,
+        request: UpdateGroupTypeRequest,
+    ): GroupTypeDto {
         leaderGuard.requireLeader(key)
-        val t = types.findByProjectObjectIdAndTypeKey(project(key).objectId!!, typeKey)
-            ?: throw NotFoundException("group 类型不存在:$typeKey")
-        val name = request.name?.trim().takeUnless { it.isNullOrEmpty() }
-            ?: throw BadRequestException("name 必填")
+        val t =
+            types.findByProjectObjectIdAndTypeKey(project(key).objectId!!, typeKey)
+                ?: throw NotFoundException("group 类型不存在:$typeKey")
+        val name =
+            request.name?.trim().takeUnless { it.isNullOrEmpty() }
+                ?: throw BadRequestException("name 必填")
         return types.save(t.copy(name = name)).toDto()
     }
 
     /** builtin 不可删;类型下仍有组即删除会丢组,409 拒绝(先删组或改类型)。 */
     @Transactional
-    fun deleteType(key: String, typeKey: String) {
+    fun deleteType(
+        key: String,
+        typeKey: String,
+    ) {
         leaderGuard.requireLeader(key)
         val pid = project(key).objectId!!
-        val t = types.findByProjectObjectIdAndTypeKey(pid, typeKey)
-            ?: throw NotFoundException("group 类型不存在:$typeKey")
+        val t =
+            types.findByProjectObjectIdAndTypeKey(pid, typeKey)
+                ?: throw NotFoundException("group 类型不存在:$typeKey")
         if (t.builtin) throw ConflictException("内建类型不可删除:$typeKey")
         if (groups.findByProjectObjectIdOrderByCreatedAt(pid).any { it.type == typeKey }) {
             throw ConflictException("类型下仍有组,请先删除:$typeKey")
@@ -143,37 +171,50 @@ class GroupTypeService(
 
     // ---------- 自定义类型的通用组 CRUD ----------
 
-    fun listGroups(key: String, typeKey: String): List<GroupDto> {
+    fun listGroups(
+        key: String,
+        typeKey: String,
+    ): List<GroupDto> {
         val t = customType(key, typeKey)
-        return groups.findByProjectObjectIdOrderByCreatedAt(project(key).objectId!!)
+        return groups
+            .findByProjectObjectIdOrderByCreatedAt(project(key).objectId!!)
             .filter { it.type == typeKey }
             .map { it.toDto(typeKey) }
     }
 
     @Transactional
-    fun createGroup(key: String, request: CreateGroupRequest): GroupDto {
+    fun createGroup(
+        key: String,
+        request: CreateGroupRequest,
+    ): GroupDto {
         leaderGuard.requireLeader(key)
-        val typeKey = request.typeKey?.trim().takeUnless { it.isNullOrEmpty() }
-            ?: throw BadRequestException("typeKey 必填")
+        val typeKey =
+            request.typeKey?.trim().takeUnless { it.isNullOrEmpty() }
+                ?: throw BadRequestException("typeKey 必填")
         val t = customType(key, typeKey)
         val name = request.name?.trim().takeUnless { it.isNullOrEmpty() } ?: throw BadRequestException("name 必填")
         val status = request.status ?: "planned"
         if (status !in groupStatusValues) throw BadRequestException("status 只能是 planned/active/completed")
-        val saved = groups.save(
-            ItemGroup(
-                projectObjectId = project(key).objectId!!,
-                type = t.typeKey,
-                name = name,
-                status = status,
-                startDate = parseDate(request.startDate, "startDate"),
-                endDate = parseDate(request.endDate, "endDate"),
-            ),
-        )
+        val saved =
+            groups.save(
+                ItemGroup(
+                    projectObjectId = project(key).objectId!!,
+                    type = t.typeKey,
+                    name = name,
+                    status = status,
+                    startDate = parseDate(request.startDate, "startDate"),
+                    endDate = parseDate(request.endDate, "endDate"),
+                ),
+            )
         return saved.toDto(t.typeKey)
     }
 
     @Transactional
-    fun updateGroup(key: String, groupId: UUID, request: UpdateGroupRequest): GroupDto {
+    fun updateGroup(
+        key: String,
+        groupId: UUID,
+        request: UpdateGroupRequest,
+    ): GroupDto {
         leaderGuard.requireLeader(key)
         val g = findGroup(key, groupId)
         val name = request.name?.trim()
@@ -181,27 +222,33 @@ class GroupTypeService(
         if (request.status != null && request.status !in groupStatusValues) {
             throw BadRequestException("status 只能是 planned/active/completed")
         }
-        val updated = g.copy(
-            name = name ?: g.name,
-            status = request.status ?: g.status,
-            startDate = when {
-                request.startDate == null -> g.startDate
-                request.startDate.isEmpty() -> null
-                else -> parseDate(request.startDate, "startDate")
-            },
-            endDate = when {
-                request.endDate == null -> g.endDate
-                request.endDate.isEmpty() -> null
-                else -> parseDate(request.endDate, "endDate")
-            },
-            updatedAt = Instant.now(),
-        )
+        val updated =
+            g.copy(
+                name = name ?: g.name,
+                status = request.status ?: g.status,
+                startDate =
+                when {
+                    request.startDate == null -> g.startDate
+                    request.startDate.isEmpty() -> null
+                    else -> parseDate(request.startDate, "startDate")
+                },
+                endDate =
+                when {
+                    request.endDate == null -> g.endDate
+                    request.endDate.isEmpty() -> null
+                    else -> parseDate(request.endDate, "endDate")
+                },
+                updatedAt = Instant.now(),
+            )
         return groups.save(updated).toDto(g.type)
     }
 
     /** 自定义组删除:membership 是展示性组织,级联删(含留痕行);release 的「成员即交付历史」语义不适用于自定义组。 */
     @Transactional
-    fun deleteGroup(key: String, groupId: UUID) {
+    fun deleteGroup(
+        key: String,
+        groupId: UUID,
+    ) {
         leaderGuard.requireLeader(key)
         val g = findGroup(key, groupId)
         val gid = g.objectId!!
@@ -212,7 +259,10 @@ class GroupTypeService(
         groups.delete(g)
     }
 
-    private fun findGroup(key: String, groupId: UUID): ItemGroup {
+    private fun findGroup(
+        key: String,
+        groupId: UUID,
+    ): ItemGroup {
         val p = project(key)
         val g = groups.findByProjectObjectIdAndObjectId(p.objectId!!, groupId) ?: throw NotFoundException("group 不存在")
         if (g.type in builtinKeys) throw BadRequestException("sprint/release 请用专属端点")

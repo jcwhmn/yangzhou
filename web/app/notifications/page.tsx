@@ -43,7 +43,9 @@ export default function NotificationsPage() {
   }, [load]);
 
   async function markRead(notificationId: string) {
-    await api(`/api/notifications/${notificationId}/read`, { method: "PUT" }).catch(() => {});
+    await api(`/api/notifications/${notificationId}/read`, {
+      method: "PUT",
+    }).catch(() => {});
   }
 
   async function markAllRead() {
@@ -71,7 +73,11 @@ export default function NotificationsPage() {
       await load();
     } catch (e) {
       // 服务端复验失败(迁移表/WIP/开工须有主)原样冒出
-      setError(e instanceof Error ? `${t.notif.advanceFailed}:${e.message}` : t.notif.advanceFailed);
+      setError(
+        e instanceof Error
+          ? `${t.notif.advanceFailed}:${e.message}`
+          : t.notif.advanceFailed,
+      );
     } finally {
       setAdvancing(null);
     }
@@ -81,7 +87,11 @@ export default function NotificationsPage() {
     <PageShell>
       <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
         <Typography variant="h5">{t.notif.title}</Typography>
-        <Button size="small" onClick={markAllRead} disabled={rows.every((r) => r.read)}>
+        <Button
+          size="small"
+          onClick={markAllRead}
+          disabled={rows.every((r) => r.read)}
+        >
           {t.notif.markAll}
         </Button>
       </Stack>
@@ -106,22 +116,42 @@ export default function NotificationsPage() {
             }}
             onClick={() => !n.read && markRead(n.notificationId)}
           >
-            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
-              {!n.read && <Chip size="small" color="error" label="●" sx={{ px: 0.5 }} />}
-              <Chip size="small" variant="outlined" label={t.notif.kinds[n.kind] ?? n.kind} />
+            <Stack
+              direction="row"
+              spacing={1}
+              alignItems="center"
+              flexWrap="wrap"
+              useFlexGap
+            >
+              {!n.read && (
+                <Chip size="small" color="error" label="●" sx={{ px: 0.5 }} />
+              )}
+              <Chip
+                size="small"
+                variant="outlined"
+                label={t.notif.kinds[n.kind] ?? n.kind}
+              />
               <Chip size="small" label={n.number} />
               <Link href={`/p/${n.projectKey}/i/${n.itemId}`}>
                 <Typography variant="body2" sx={{ textDecoration: "none" }}>
                   {n.title}
                 </Typography>
               </Link>
-              <Typography variant="caption" color="text.secondary" sx={{ ml: "auto" }}>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ ml: "auto" }}
+              >
                 {n.actor ? `${n.actor} · ` : "GitHub · "}
                 {new Date(n.createdAt).toLocaleString("zh-CN")}
               </Typography>
             </Stack>
             {(n.oldValue || n.newValue) && (
-              <Typography variant="caption" color="text.secondary" display="block">
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                display="block"
+              >
                 {n.oldValue ?? ""} → {n.newValue ?? ""}
               </Typography>
             )}

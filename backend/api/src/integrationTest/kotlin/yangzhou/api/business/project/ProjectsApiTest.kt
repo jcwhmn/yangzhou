@@ -6,7 +6,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class ProjectsApiTest : AbstractApiTest() {
-
     @Test
     fun `建项目自带默认四态 workflow,Done 终态`() {
         val authed = bootstrapAndAuth()
@@ -23,10 +22,18 @@ class ProjectsApiTest : AbstractApiTest() {
         val authed = bootstrapAndAuth()
         createProject(authed, "CHE")
 
-        val rules = json.readTree(
-            authed.get().uri("/api/projects/CHE/workflow-rules").exchange()
-                .expectStatus().isOk().expectBody(String::class.java).returnResult().responseBody!!,
-        )
+        val rules =
+            json.readTree(
+                authed
+                    .get()
+                    .uri("/api/projects/CHE/workflow-rules")
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody(String::class.java)
+                    .returnResult()
+                    .responseBody!!,
+            )
 
         assertEquals(
             listOf("branch_created", "pr_opened", "pr_merged", "pr_closed_unmerged"),
@@ -43,12 +50,20 @@ class ProjectsApiTest : AbstractApiTest() {
         val authed = bootstrapAndAuth()
         createProject(authed, "CHE")
 
-        authed.post().uri("/api/projects")
+        authed
+            .post()
+            .uri("/api/projects")
             .body(mapOf("key" to "CHE", "name" to "again"))
-            .exchange().expectStatus().isEqualTo(409)
+            .exchange()
+            .expectStatus()
+            .isEqualTo(409)
 
-        authed.post().uri("/api/projects")
+        authed
+            .post()
+            .uri("/api/projects")
             .body(mapOf("key" to "che", "name" to "lower"))
-            .exchange().expectStatus().isBadRequest()
+            .exchange()
+            .expectStatus()
+            .isBadRequest()
     }
 }

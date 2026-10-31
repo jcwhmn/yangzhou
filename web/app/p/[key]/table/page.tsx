@@ -45,7 +45,12 @@ type Item = {
   blocked: boolean;
   sprintName: string | null;
 };
-type ViewDto = { viewId: string; name: string; filters: Record<string, string | null>; columns: Record<string, boolean> };
+type ViewDto = {
+  viewId: string;
+  name: string;
+  filters: Record<string, string | null>;
+  columns: Record<string, boolean>;
+};
 type Filters = { status: string; assignee: string; priority: string };
 
 const EMPTY_FILTERS: Filters = { status: "", assignee: "", priority: "" };
@@ -69,7 +74,9 @@ export default function TableViewPage() {
     }
   }
 
-  const [cols, setCols] = useState<Record<string, boolean>>(() => readCols(key));
+  const [cols, setCols] = useState<Record<string, boolean>>(() =>
+    readCols(key),
+  );
 
   // 视图状态
   const [views, setViews] = useState<ViewDto[]>([]);
@@ -93,8 +100,12 @@ export default function TableViewPage() {
     try {
       const [its, sts, vs] = await Promise.all([
         api<Item[]>(`/api/projects/${key}/items`),
-        api<{ statuses: Status[] }>(`/api/projects/${key}`).then((p) => p.statuses),
-        api<ViewDto[]>(`/api/projects/${key}/views`).catch(() => [] as ViewDto[]),
+        api<{ statuses: Status[] }>(`/api/projects/${key}`).then(
+          (p) => p.statuses,
+        ),
+        api<ViewDto[]>(`/api/projects/${key}/views`).catch(
+          () => [] as ViewDto[],
+        ),
       ]);
       setItems(its);
       setStatuses(sts);
@@ -109,7 +120,10 @@ export default function TableViewPage() {
   }, [load]);
 
   function toggleCol(c: string) {
-    setCols((prev) => ({ ...prev, [c]: !(prev[c] ?? (columns.find((x) => x.id === c)?.visible ?? true)) }));
+    setCols((prev) => ({
+      ...prev,
+      [c]: !(prev[c] ?? columns.find((x) => x.id === c)?.visible ?? true),
+    }));
     setDirty(true);
   }
 
@@ -120,7 +134,11 @@ export default function TableViewPage() {
 
   function applyView(v: ViewDto) {
     setSelectedView(v.viewId);
-    setFilters({ status: v.filters.status ?? "", assignee: v.filters.assignee ?? "", priority: v.filters.priority ?? "" });
+    setFilters({
+      status: v.filters.status ?? "",
+      assignee: v.filters.assignee ?? "",
+      priority: v.filters.priority ?? "",
+    });
     setCols({ ...v.columns });
     setDirty(false);
   }
@@ -128,14 +146,24 @@ export default function TableViewPage() {
   async function saveCurrent(name: string) {
     const body = {
       name,
-      filters: { status: filters.status || null, assignee: filters.assignee || null, priority: filters.priority || null },
+      filters: {
+        status: filters.status || null,
+        assignee: filters.assignee || null,
+        priority: filters.priority || null,
+      },
       columns: cols,
     };
     try {
       if (selectedView && nameOpen === "save") {
-        await api(`/api/projects/${key}/views/${selectedView}`, { method: "PATCH", body: JSON.stringify(body) });
+        await api(`/api/projects/${key}/views/${selectedView}`, {
+          method: "PATCH",
+          body: JSON.stringify(body),
+        });
       } else {
-        const v = await api<ViewDto>(`/api/projects/${key}/views`, { method: "POST", body: JSON.stringify(body) });
+        const v = await api<ViewDto>(`/api/projects/${key}/views`, {
+          method: "POST",
+          body: JSON.stringify(body),
+        });
         setViews((prev) => [...prev, v]);
         setSelectedView(v.viewId);
       }
@@ -149,7 +177,9 @@ export default function TableViewPage() {
   async function deleteView() {
     if (!selectedView) return;
     try {
-      await api(`/api/projects/${key}/views/${selectedView}`, { method: "DELETE" });
+      await api(`/api/projects/${key}/views/${selectedView}`, {
+        method: "DELETE",
+      });
       setViews((prev) => prev.filter((v) => v.viewId !== selectedView));
       setSelectedView(null);
       setFilters(EMPTY_FILTERS);
@@ -174,31 +204,56 @@ export default function TableViewPage() {
     { id: "sprint", label: "Sprint", visible: cols.sprint ?? true },
   ];
 
-  const visibleCols = columns.filter((c) => c.id === "number" || c.id === "title" || (cols[c.id] ?? c.visible));
+  const visibleCols = columns.filter(
+    (c) => c.id === "number" || c.id === "title" || (cols[c.id] ?? c.visible),
+  );
 
-  const assignees = [...new Set((items ?? []).map((i) => i.assignee).filter((a): a is string => a != null))];
+  const assignees = [
+    ...new Set(
+      (items ?? [])
+        .map((i) => i.assignee)
+        .filter((a): a is string => a != null),
+    ),
+  ];
 
   const sorted = [...(items ?? [])]
     .filter(
       (it) =>
         (!filters.status || it.status === filters.status) &&
-        (!filters.assignee || (filters.assignee === "__none__" ? it.assignee == null : it.assignee === filters.assignee)) &&
+        (!filters.assignee ||
+          (filters.assignee === "__none__"
+            ? it.assignee == null
+            : it.assignee === filters.assignee)) &&
         (!filters.priority || it.priority === filters.priority),
     )
     .sort((a, b) => {
       if (sort === "priority") {
         const rank = (p: string | null) => (p ? 4 - Number(p.slice(1)) : 9);
-        return rank(a.priority) - rank(b.priority) || a.number.localeCompare(b.number);
+        return (
+          rank(a.priority) - rank(b.priority) ||
+          a.number.localeCompare(b.number)
+        );
       }
-      if (sort === "status") return a.status.localeCompare(b.status) || a.number.localeCompare(b.number);
+      if (sort === "status")
+        return (
+          a.status.localeCompare(b.status) || a.number.localeCompare(b.number)
+        );
       return a.number.localeCompare(b.number);
     });
 
-  const selectedName = views.find((v) => v.viewId === selectedView)?.name ?? t.view.defaultView;
+  const selectedName =
+    views.find((v) => v.viewId === selectedView)?.name ?? t.view.defaultView;
 
   return (
     <PageShell>
-      <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }} flexWrap="wrap" useFlexGap>
+      <Stack
+        direction="row"
+        spacing={2}
+        alignItems="center"
+        sx={{ mb: 2 }}
+        flexWrap="wrap"
+        useFlexGap
+      >
         <Typography variant="h5">{`${String(key)} · 表格`}</Typography>
         <Dropdown
           ariaLabel="排序"
@@ -229,7 +284,10 @@ export default function TableViewPage() {
             }
           }}
           sx={{ width: 180 }}
-          options={[{ value: "", label: t.view.defaultView }, ...views.map((v) => ({ value: v.viewId, label: v.name }))]}
+          options={[
+            { value: "", label: t.view.defaultView },
+            ...views.map((v) => ({ value: v.viewId, label: v.name })),
+          ]}
         />
         <Button
           size="small"
@@ -262,7 +320,14 @@ export default function TableViewPage() {
       </Stack>
 
       {/* 筛选 + 列配置(YPJ-47/28) */}
-      <Stack direction="row" spacing={1} sx={{ mb: 1 }} flexWrap="wrap" useFlexGap alignItems="center">
+      <Stack
+        direction="row"
+        spacing={1}
+        sx={{ mb: 1 }}
+        flexWrap="wrap"
+        useFlexGap
+        alignItems="center"
+      >
         <Dropdown
           ariaLabel={t.view.filterStatus}
           size="small"
@@ -281,7 +346,10 @@ export default function TableViewPage() {
           onChange={(v) => setFilter({ assignee: v })}
           sx={{ width: 130 }}
           placeholder={t.view.filterAssignee}
-          options={[...assignees, "__none__"].map((a) => ({ value: a, label: a === "__none__" ? t.view.unassigned : a }))}
+          options={[...assignees, "__none__"].map((a) => ({
+            value: a,
+            label: a === "__none__" ? t.view.unassigned : a,
+          }))}
         />
         <Dropdown
           ariaLabel={t.view.filterPriority}
@@ -291,11 +359,16 @@ export default function TableViewPage() {
           onChange={(v) => setFilter({ priority: v })}
           sx={{ width: 130 }}
           placeholder={t.view.filterPriority}
-          options={["P0", "P1", "P2", "P3"].map((p) => ({ value: p, label: p }))}
+          options={["P0", "P1", "P2", "P3"].map((p) => ({
+            value: p,
+            label: p,
+          }))}
         />
         <ColumnConfigPopover
           columns={columns.filter((c) => c.id !== "number" && c.id !== "title")}
-          visible={(id) => cols[id] ?? (columns.find((c) => c.id === id)?.visible ?? true)}
+          visible={(id) =>
+            cols[id] ?? columns.find((c) => c.id === id)?.visible ?? true
+          }
           onToggle={toggleCol}
           onReset={() => {
             setCols({});
@@ -310,7 +383,9 @@ export default function TableViewPage() {
       </Stack>
 
       {error && <Typography color="error">{error}</Typography>}
-      {items !== null && items.length === 0 && <Typography color="text.secondary">暂无 item。</Typography>}
+      {items !== null && items.length === 0 && (
+        <Typography color="text.secondary">暂无 item。</Typography>
+      )}
       {items !== null && items.length > 0 && (
         <TableContainer>
           <Table size="small">
@@ -328,38 +403,74 @@ export default function TableViewPage() {
                     <TableCell key={c.id}>
                       {c.id === "number" ? (
                         <Link href={`/p/${key}/i/${it.itemId}?from=table`}>
-                          <Typography variant="body2" sx={{ whiteSpace: "nowrap" }}>{(it.parentNumber ? it.parentNumber + " › " : "") + it.number}</Typography>
+                          <Typography
+                            variant="body2"
+                            sx={{ whiteSpace: "nowrap" }}
+                          >
+                            {(it.parentNumber ? it.parentNumber + " › " : "") +
+                              it.number}
+                          </Typography>
                         </Link>
                       ) : c.id === "title" ? (
                         <Link href={`/p/${key}/i/${it.itemId}?from=table`}>
                           <Typography variant="body2">{it.title}</Typography>
                         </Link>
                       ) : c.id === "priority" ? (
-                        it.priority ?? ""
+                        (it.priority ?? "")
                       ) : c.id === "assignee" ? (
-                        <AssignPopover itemId={it.itemId} assignee={it.assignee} onChanged={load}>
+                        <AssignPopover
+                          itemId={it.itemId}
+                          assignee={it.assignee}
+                          onChanged={load}
+                        >
                           {(onClick) => (
                             <Chip
                               size="small"
                               variant="outlined"
-                              label={it.assignee ? `👤 ${it.assignee}` : t.assign.none}
+                              label={
+                                it.assignee
+                                  ? `👤 ${it.assignee}`
+                                  : t.assign.none
+                              }
                               onClick={onClick}
                               sx={it.assignee ? undefined : { opacity: 0.55 }}
                             />
                           )}
                         </AssignPopover>
                       ) : c.id === "startDate" ? (
-                        it.startDate ?? ""
+                        (it.startDate ?? "")
                       ) : c.id === "dueDate" ? (
-                        <span style={{ color: it.overdue ? "red" : it.dueSoon ? "orange" : "inherit" }}>{it.dueDate ?? ""}</span>
+                        <span
+                          style={{
+                            color: it.overdue
+                              ? "red"
+                              : it.dueSoon
+                                ? "orange"
+                                : "inherit",
+                          }}
+                        >
+                          {it.dueDate ?? ""}
+                        </span>
                       ) : c.id === "overdue" ? (
-                        it.overdue ? "是" : "否"
+                        it.overdue ? (
+                          "是"
+                        ) : (
+                          "否"
+                        )
                       ) : c.id === "feasSignal" ? (
-                        it.feasSignal ? t.signal[it.feasSignal] : ""
+                        it.feasSignal ? (
+                          t.signal[it.feasSignal]
+                        ) : (
+                          ""
+                        )
                       ) : c.id === "sprint" ? (
-                        it.sprintName ?? ""
+                        (it.sprintName ?? "")
                       ) : c.id === "blocked" ? (
-                        it.blocked ? "⛔" : ""
+                        it.blocked ? (
+                          "⛔"
+                        ) : (
+                          ""
+                        )
                       ) : (
                         ""
                       )}
@@ -374,7 +485,9 @@ export default function TableViewPage() {
 
       {/* 命名 Dialog(save 首存 / saveAs 另存共用) */}
       <Dialog open={nameOpen !== null} onClose={() => setNameOpen(null)}>
-        <DialogTitle>{nameOpen === "saveAs" ? t.view.saveAs : t.view.save}</DialogTitle>
+        <DialogTitle>
+          {nameOpen === "saveAs" ? t.view.saveAs : t.view.save}
+        </DialogTitle>
         <DialogContent>
           <TextField
             autoFocus
@@ -388,7 +501,11 @@ export default function TableViewPage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setNameOpen(null)}>{t.assign.cancel}</Button>
-          <Button variant="contained" disabled={!viewName.trim()} onClick={() => void saveCurrent(viewName.trim())}>
+          <Button
+            variant="contained"
+            disabled={!viewName.trim()}
+            onClick={() => void saveCurrent(viewName.trim())}
+          >
             {t.view.save}
           </Button>
         </DialogActions>

@@ -3,13 +3,12 @@ package yangzhou.api.business.item
 import com.fasterxml.jackson.databind.JsonNode
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.context.annotation.Import
-import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.web.servlet.client.RestTestClient
 import yangzhou.api.AbstractApiTest
 import yangzhou.api.business.github.FakeGatewayConfig
 import yangzhou.api.business.github.FakeGithubGateway
-import yangzhou.api.business.github.RepoPr
 import yangzhou.api.business.github.GithubSyncService
+import yangzhou.api.business.github.RepoPr
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -17,41 +16,55 @@ import kotlin.test.assertNull
 /** YPJ-44:item 级状态迁移审计——三条写入路径(create / manual / github)+ 守卫路径不写行(spec 0032)。 */
 @Import(FakeGatewayConfig::class)
 class ItemStatusHistoryApiTest : AbstractApiTest() {
-
     @Autowired
     lateinit var fake: FakeGithubGateway
 
     @Autowired
     lateinit var syncService: GithubSyncService
 
-
     private lateinit var authed: RestTestClient
 
     @org.junit.jupiter.api.BeforeEach
     fun resetFake() {
-        fake.branches = mutableMapOf(); fake.prs = mutableMapOf(); fake.failWith = null
+        fake.branches = mutableMapOf()
+        fake.prs = mutableMapOf()
+        fake.failWith = null
     }
 
     /** PAT + CHE 项目(默认 3 槽)+ 挂载 octo/r + item hist-x(初始 To Do)。 */
     private fun setup(): String {
         authed = bootstrapAndAuth()
-        authed.put().uri("/api/workspace/github-token")
+        authed
+            .put()
+            .uri("/api/workspace/github-token")
             .body(mapOf("token" to "test-token"))
-            .exchange().expectStatus().isOk()
+            .exchange()
+            .expectStatus()
+            .isOk()
         createProject(authed, "CHE")
-        authed.post().uri("/api/projects/CHE/repos")
+        authed
+            .post()
+            .uri("/api/projects/CHE/repos")
             .body(mapOf("repo" to "octo/r"))
-            .exchange().expectStatus().isCreated()
+            .exchange()
+            .expectStatus()
+            .isCreated()
         return createItem(authed, "CHE", "hist-x")["itemId"].asText()
     }
 
     private fun statuses(): JsonNode = json.readTree(
-        authed.get().uri("/api/projects/CHE").exchange()
-            .expectStatus().isOk().expectBody(String::class.java).returnResult().responseBody!!,
+        authed
+            .get()
+            .uri("/api/projects/CHE")
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody(String::class.java)
+            .returnResult()
+            .responseBody!!,
     )["statuses"]
 
-    private fun statusId(name: String): String =
-        statuses().first { it["name"].asText() == name }["statusId"].asText()
+    private fun statusId(name: String): String = statuses().first { it["name"].asText() == name }["statusId"].asText()
 
     private fun statusRowId(name: String): java.util.UUID = jdbc.queryForList(
         "select object_id from status where name = ? and project_object_id = (select object_id from project where key = 'CHE')",
@@ -71,12 +84,21 @@ class ItemStatusHistoryApiTest : AbstractApiTest() {
         val done = statusId("Done")
 
         // 建在 In Review(显式初始状态)→ 1 行 created(from NULL)
-        val mid = json.readTree(
-            authed.post().uri("/api/projects/CHE/items")
-                .body(mapOf("title" to "hist-m", "statusItemId" to inReview))
-                .exchange().expectStatus().isCreated()
-                .expectBody(String::class.java).returnResult().responseBody!!,
-        )["itemId"].asText()
+        val mid =
+            json
+                .readTree(
+                    authed
+                        .post()
+                        .uri("/api/projects/CHE/items")
+                        .body(mapOf("title" to "hist-m", "statusItemId" to inReview))
+                        .exchange()
+                        .expectStatus()
+                        .isCreated()
+                        .expectBody(String::class.java)
+                        .returnResult()
+                        .responseBody!!,
+                )["itemId"]
+                .asText()
         val rows = history("hist-m")
         assertEquals(1, rows.size)
         assertEquals("created", rows[0]["source"])
@@ -84,9 +106,13 @@ class ItemStatusHistoryApiTest : AbstractApiTest() {
         assertEquals(statusRowId("In Review"), rows[0]["to_status_object_id"])
 
         // In Review → Done(无规则行 = 自由迁移)→ +1 manual
-        authed.patch().uri("/api/items/$mid")
+        authed
+            .patch()
+            .uri("/api/items/$mid")
             .body(mapOf("statusItemId" to done))
-            .exchange().expectStatus().isOk()
+            .exchange()
+            .expectStatus()
+            .isOk()
         val after = history("hist-m")
         assertEquals(2, after.size)
         assertEquals("manual", after[1]["source"])
@@ -94,9 +120,13 @@ class ItemStatusHistoryApiTest : AbstractApiTest() {
         assertEquals(statusRowId("Done"), after[1]["to_status_object_id"])
 
         // 同状态 no-op → 行数不变
-        authed.patch().uri("/api/items/$mid")
+        authed
+            .patch()
+            .uri("/api/items/$mid")
             .body(mapOf("statusItemId" to done))
-            .exchange().expectStatus().isOk()
+            .exchange()
+            .expectStatus()
+            .isOk()
         assertEquals(2, history("hist-m").size)
     }
 
@@ -139,9 +169,13 @@ class ItemStatusHistoryApiTest : AbstractApiTest() {
                 "and project_object_id = (select object_id from project where key = 'CHE')",
         )
         // 预置:另一 item 直接建在 In Review,占满 WIP(绕开"开工须有主"守卫)
-        authed.post().uri("/api/projects/CHE/items")
+        authed
+            .post()
+            .uri("/api/projects/CHE/items")
             .body(mapOf("title" to "hist-w", "statusItemId" to statusId("In Review")))
-            .exchange().expectStatus().isCreated()
+            .exchange()
+            .expectStatus()
+            .isCreated()
 
         fake.prs["octo/r"] = listOf(RepoPr(1, "CHE-1-x", "open", "https://github.com/octo/r/pull/1"))
         syncService.syncAll()

@@ -1,14 +1,13 @@
 package yangzhou.api.business.feasibility
 
 import org.springframework.stereotype.Service
-import yangzhou.domain.matching.Candidate
+import yangzhou.api.business.member.MemberService
+import yangzhou.api.business.workspace.WorkspaceService
+import yangzhou.api.error.NotFoundException
 import yangzhou.domain.matching.MatchResult
 import yangzhou.domain.matching.MatchingEngine
 import yangzhou.domain.matching.RollupResult
 import yangzhou.domain.matching.Verdict
-import yangzhou.api.business.member.MemberService
-import yangzhou.api.error.NotFoundException
-import yangzhou.api.business.workspace.WorkspaceService
 import yangzhou.persistence.repository.AttributeDefinitionRepository
 import yangzhou.persistence.repository.CapabilityRepository
 import yangzhou.persistence.repository.ItemRepository
@@ -30,7 +29,6 @@ class FeasibilityService(
     private val memberService: MemberService,
     private val workspaceService: WorkspaceService,
 ) {
-
     data class VerdictDto(
         val kind: String, // satisfied | surplus | gap | unrated | missing
         val attribute: String,
@@ -62,17 +60,19 @@ class FeasibilityService(
         val member = domainMember()
         val projectItems = itemRepo.findByProjectObjectIdAndDeletedAtIsNullOrderByNumber(project.objectId!!)
         val domainItems = projectItems.map { itemToDomain(it) }
-        val rollup: RollupResult = MatchingEngine.rollupProject(
-            yangzhou.domain.Project(project.key, domainItems),
-            member,
-        )
+        val rollup: RollupResult =
+            MatchingEngine.rollupProject(
+                yangzhou.domain.Project(project.key, domainItems),
+                member,
+            )
         val byNumber = projectItems.associateBy { "${project.key}-${it.number}" }
         return ProjectResultDto(
             projectKey = project.key,
             signal = rollup.worst.name,
             missingCount = rollup.results.sumOf { it.second.missingCount },
             totalDelta = rollup.results.sumOf { it.second.totalDelta },
-            items = rollup.results.map { (item, match) ->
+            items =
+            rollup.results.map { (item, match) ->
                 ItemResultDto(
                     itemId = byNumber[item.id]!!.objectId,
                     number = item.id,
@@ -88,8 +88,9 @@ class FeasibilityService(
 
     fun item(itemId: UUID): ItemResultDto {
         val item = itemRepo.findByObjectId(itemId) ?: throw NotFoundException("item 不存在")
-        val project = projects.findAll().firstOrNull { it.objectId == item.projectObjectId }
-            ?: throw NotFoundException("项目不存在")
+        val project =
+            projects.findAll().firstOrNull { it.objectId == item.projectObjectId }
+                ?: throw NotFoundException("项目不存在")
         val match: MatchResult = MatchingEngine.matchItem(itemToDomain(item), domainMember())
         return ItemResultDto(
             itemId = item.objectId,
@@ -146,23 +147,31 @@ class FeasibilityService(
         projects.findAll().map { it.key }.forEach { key ->
             runCatching { project(key) }.getOrNull()?.let { proj ->
                 proj.items.forEach { item ->
-                    item.verdicts.filter { it.kind == "gap" || it.kind == "unrated" || it.kind == "missing" }
+                    item.verdicts
+                        .filter { it.kind == "gap" || it.kind == "unrated" || it.kind == "missing" }
                         .forEach { v -> byAttr.getOrPut(v.attribute) { mutableListOf() }.add(proj to item) }
                 }
             }
         }
-        return byAttr.map { (attr, list) ->
-            ShortfallDto(
-                attribute = attr,
-                deltaSum = list.sumOf { (p, i) -> 0 + i.verdicts.filter { v -> v.attribute == attr }.sumOf { it.delta ?: 0 } },
-                missingCount = list.count { (p, i) -> i.verdicts.any { it.attribute == attr && it.kind == "missing" } },
-                unratedCount = list.count { (p, i) -> i.verdicts.any { it.attribute == attr && it.kind == "unrated" } },
-                items = list.map { (p, i) -> ShortfallItemDto(p.projectKey, i.itemId, i.number, i.title) }.distinctBy { it.itemId },
-            )
-        }.sortedByDescending { it.missingCount * 100 + it.deltaSum }
+        return byAttr
+            .map { (attr, list) ->
+                ShortfallDto(
+                    attribute = attr,
+                    deltaSum = list.sumOf { (p, i) -> 0 + i.verdicts.filter { v -> v.attribute == attr }.sumOf { it.delta ?: 0 } },
+                    missingCount = list.count { (p, i) -> i.verdicts.any { it.attribute == attr && it.kind == "missing" } },
+                    unratedCount = list.count { (p, i) -> i.verdicts.any { it.attribute == attr && it.kind == "unrated" } },
+                    items = list.map { (p, i) -> ShortfallItemDto(p.projectKey, i.itemId, i.number, i.title) }.distinctBy { it.itemId },
+                )
+            }.sortedByDescending { it.missingCount * 100 + it.deltaSum }
     }
 
-    data class ShortfallItemDto(val projectKey: String, val itemId: UUID, val number: String, val title: String)
+    data class ShortfallItemDto(
+        val projectKey: String,
+        val itemId: UUID,
+        val number: String,
+        val title: String,
+    )
+
     data class ShortfallDto(
         val attribute: String,
         val deltaSum: Int,
@@ -178,20 +187,23 @@ class FeasibilityService(
     /** 装配:任一持久层成员 → 引擎输入(候选服务复用)。 */
     fun domainMemberOf(me: yangzhou.persistence.Member): yangzhou.domain.Member {
         val attrNames = definitions.findByWorkspaceObjectId(workspaceService.required().objectId!!).associate { it.objectId!! to it.name }
-        val caps = capabilities.findByMemberObjectId(me.objectId!!).mapNotNull { c ->
-            attrNames[c.attributeDefinitionObjectId]?.let { yangzhou.domain.Capability(yangzhou.domain.Attribute(it), c.level) }
-        }
+        val caps =
+            capabilities.findByMemberObjectId(me.objectId!!).mapNotNull { c ->
+                attrNames[c.attributeDefinitionObjectId]?.let { yangzhou.domain.Capability(yangzhou.domain.Attribute(it), c.level) }
+            }
         return yangzhou.domain.Member(me.displayName, caps)
     }
 
     fun itemToDomain(item: yangzhou.persistence.Item): yangzhou.domain.Item {
         val attrs = definitions.findByWorkspaceObjectId(workspaceService.required().objectId!!).associate { it.objectId!! to it.name }
-        val reqs = requirementRepo.findByItemObjectId(item.objectId!!)
-            .mapNotNull { r ->
-                attrs[r.attributeDefinitionObjectId]?.let {
-                    yangzhou.domain.Requirement(yangzhou.domain.Attribute(it), r.minLevel)
+        val reqs =
+            requirementRepo
+                .findByItemObjectId(item.objectId!!)
+                .mapNotNull { r ->
+                    attrs[r.attributeDefinitionObjectId]?.let {
+                        yangzhou.domain.Requirement(yangzhou.domain.Attribute(it), r.minLevel)
+                    }
                 }
-            }
         // domain Item.objectId 就是「编号」——引擎输出直接可读
         val project = projects.findAll().firstOrNull { p -> p.objectId == item.projectObjectId }
         val number = "${project?.key ?: "?"}-${item.number}"

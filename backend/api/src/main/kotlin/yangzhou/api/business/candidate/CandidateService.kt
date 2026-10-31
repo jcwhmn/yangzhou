@@ -3,8 +3,8 @@ package yangzhou.api.business.candidate
 import org.springframework.stereotype.Service
 import yangzhou.api.business.feasibility.FeasibilityService
 import yangzhou.api.business.member.MemberService
-import yangzhou.api.error.NotFoundException
 import yangzhou.api.business.workspace.WorkspaceService
+import yangzhou.api.error.NotFoundException
 import yangzhou.domain.matching.MatchingEngine
 import yangzhou.domain.matching.Verdict
 import yangzhou.persistence.repository.ItemRepository
@@ -24,7 +24,6 @@ class CandidateService(
     private val feasibility: FeasibilityService,
     private val projectMembers: yangzhou.api.business.projectmember.ProjectMemberService,
 ) {
-
     data class VerdictDto(
         val kind: String,
         val attribute: String,

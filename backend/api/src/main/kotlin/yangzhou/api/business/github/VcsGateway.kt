@@ -7,21 +7,45 @@ import java.time.Instant
  * token 由调用方传入(PAT 存 workspace,永不进日志)。
  */
 interface VcsGateway {
-    fun listBranches(repo: String, token: String): List<String>
-    fun listPullRequests(repo: String, token: String): List<RepoPr>
+    fun listBranches(
+        repo: String,
+        token: String,
+    ): List<String>
+
+    fun listPullRequests(
+        repo: String,
+        token: String,
+    ): List<RepoPr>
 
     /** 按 head 分支定位 PR(open/merged/closed 全量);无 → null。默认实现遍历列表,真实现用平台 head 过滤(不受首页窗口限制)。 */
-    fun findPrByHead(repo: String, headRef: String, token: String): RepoPr? =
-        listPullRequests(repo, token).firstOrNull { it.headRef == headRef }
+    fun findPrByHead(
+        repo: String,
+        headRef: String,
+        token: String,
+    ): RepoPr? = listPullRequests(repo, token).firstOrNull { it.headRef == headRef }
 
     /** 从 fromBranch 建新分支;已存在 → GithubApiException(422)。 */
-    fun createBranch(repo: String, branch: String, fromBranch: String, token: String)
+    fun createBranch(
+        repo: String,
+        branch: String,
+        fromBranch: String,
+        token: String,
+    )
 
     /** sha/分支上的提交(第一页,新→旧,since 过滤分支创建前);ref 已删 → 空表(真实现归一)。 */
-    fun listCommits(repo: String, sha: String, since: Instant?, token: String): List<RepoCommit>
+    fun listCommits(
+        repo: String,
+        sha: String,
+        since: Instant?,
+        token: String,
+    ): List<RepoCommit>
 
     /** PR 上的提交(第一页,新→旧;API 不支持 since,由调用方按 date 过滤);PR 不存在 → 空表。 */
-    fun listPullRequestCommits(repo: String, number: Int, token: String): List<RepoCommit>
+    fun listPullRequestCommits(
+        repo: String,
+        number: Int,
+        token: String,
+    ): List<RepoCommit>
 }
 
 /** state ∈ open|merged|closed(GitHub 的 merged=closed+merged,在此归一)。 */
@@ -42,10 +66,15 @@ data class RepoCommit(
     val url: String? = null,
 )
 
-class VcsApiException(val status: Int, message: String) : RuntimeException(message)
+class VcsApiException(
+    val status: Int,
+    message: String,
+) : RuntimeException(message)
 
 /** 平台无关事件集(wire 值 = workflow_rules.event 存量字符串,不可改);未来平台事件超集在此扩。 */
-enum class VcsEvent(val wire: String) {
+enum class VcsEvent(
+    val wire: String,
+) {
     BRANCH_CREATED("branch_created"),
     PR_OPENED("pr_opened"),
     PR_MERGED("pr_merged"),

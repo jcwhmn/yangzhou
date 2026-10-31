@@ -7,7 +7,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class JudgeTest {
-
     @Test
     fun `presence requirement is satisfied when member has the capability`() {
         val req = Requirement(Attribute("Postgres"), minLevel = null)

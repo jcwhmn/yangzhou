@@ -11,7 +11,10 @@ export class ApiError extends Error {
   }
 }
 
-export async function api<T = unknown>(path: string, init: RequestInit = {}): Promise<T> {
+export async function api<T = unknown>(
+  path: string,
+  init: RequestInit = {},
+): Promise<T> {
   const token = localStorage.getItem("yz-token");
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
@@ -49,7 +52,10 @@ export function clearToken() {
 }
 
 /** 全新服务器 bootstrap,否则 login(同 CLI 语义)。 */
-export async function bootstrapOrLogin(username: string, password: string): Promise<string> {
+export async function bootstrapOrLogin(
+  username: string,
+  password: string,
+): Promise<string> {
   const post = () =>
     fetch(`${API_BASE}/api/auth/bootstrap`, {
       method: "POST",
@@ -65,7 +71,9 @@ export async function bootstrapOrLogin(username: string, password: string): Prom
     });
   }
   if (!res.ok) {
-    const body = await res.json().catch(() => ({ message: String(res.status) }));
+    const body = await res
+      .json()
+      .catch(() => ({ message: String(res.status) }));
     throw new ApiError(res.status, body.message ?? "登录失败");
   }
   const data = (await res.json()) as { token: string };
