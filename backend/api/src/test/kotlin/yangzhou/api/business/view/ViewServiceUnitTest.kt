@@ -135,4 +135,82 @@ class ViewServiceUnitTest {
             assertEquals(listOf("mine"), service.list("CHE").map { it.name })
         }
     }
+
+    @Nested
+    inner class SortQuery {
+        private val sortJson = """[{"field":"title","dir":"asc"}]"""
+
+        private fun mine() = ProjectView(
+            id = 10L,
+            objectId = UUID(0, 10),
+            projectObjectId = UUID(0, 1),
+            creatorObjectId = UUID(0, 5),
+            name = "mine",
+            filters = "{}",
+            columns = "{}",
+            sort = sortJson,
+            query = "q1",
+        )
+
+        private fun stubCreate() {
+            every { views.existsByProjectObjectIdAndCreatorObjectIdAndName(UUID(0, 1), UUID(0, 5), "mine") } returns false
+            every { views.save(any()) } answers { firstArg<ProjectView>().copy(id = 10L, objectId = UUID(0, 10)) }
+        }
+
+        @Test
+        fun createPassThroughSortQuery() {
+            stubCreate()
+            val dto =
+                service.create(
+                    "CHE",
+                    ViewService.CreateViewRequest("mine", sort = mapper.readTree(sortJson), query = "搜索词"),
+                )
+            assertEquals("搜索词", dto.query)
+            assertEquals("title", dto.sort!![0]["field"].asText())
+            verify {
+                views.save(
+                    withArg<ProjectView> {
+                        assertEquals(sortJson, it.sort)
+                        assertEquals("搜索词", it.query)
+                    },
+                )
+            }
+        }
+
+        @Test
+        fun createWithoutSortQueryStoresNull() {
+            stubCreate()
+            val dto = service.create("CHE", ViewService.CreateViewRequest("mine"))
+            assertEquals(null, dto.sort)
+            assertEquals(null, dto.query)
+        }
+
+        @Test
+        fun patchOnlySortKeepsQueryAndEmptyStringClears() {
+            val view = mine()
+            every { views.findByObjectIdAndCreatorObjectId(view.objectId, UUID(0, 5)) } returns view
+            every { views.save(any()) } answers { firstArg<ProjectView>() }
+            val dto = service.update("CHE", view.objectId, ViewService.UpdateViewRequest(sort = mapper.readTree("[]")))
+            assertEquals(0, dto.sort!!.size()) // 仅改 sort
+            assertEquals("q1", dto.query) // query 不传不改
+            val cleared = service.update("CHE", view.objectId, ViewService.UpdateViewRequest(query = ""))
+            assertEquals("", cleared.query) // 空串 = 显式清空
+        }
+
+        @Test
+        fun oversizedSortQueryRejected() {
+            val view = mine()
+            every { views.findByObjectIdAndCreatorObjectId(view.objectId, UUID(0, 5)) } returns view
+            assertFailsWith<BadRequestException> {
+                service.update("CHE", view.objectId, ViewService.UpdateViewRequest(query = "x".repeat(5000)))
+            }
+            assertFailsWith<BadRequestException> {
+                service.update(
+                    "CHE",
+                    view.objectId,
+                    ViewService.UpdateViewRequest(sort = mapper.readTree("""{"k":"${"x".repeat(5000)}"}""")),
+                )
+            }
+        }
+    }
 }

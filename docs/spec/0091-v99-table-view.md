@@ -197,8 +197,58 @@
 3. PATCH 语义:仅改列配置再保存 → 排序/搜索词不丢
 4. 另一账号看不到该视图(私有语义回归)
 
+## 6. YPJ-131 列顺序(列配置面板上下移,随视图持久化)
+
+### 需求
+
+- 表格列顺序可调:列配置面板内每列 ↑/↓ 移动,表头实时生效
+- 顺序为一等持久属性(用户拍板 2026-11-01,否决 columns JSON 混保留键):视图保存内容扩为 **columns + filters + sorts + query + colOrder**
+- **编号钉首位不可移动**(用户拍板);标题恒显但可移动
+- 切视图恢复各自顺序;默认视图顺序走 localStorage(与列可见性同机制)
+- 「恢复默认」= 可见性 + 顺序一起回默认
+- 非目标:表头拖拽重排、列宽调整、全局列顺序管理
+
+### 详细设计
+
+**后端(契约变更:additive,可空字段;依赖 YPJ-127 合入后动工)**
+
+- 迁移 `V44__view_col_order.sql`:`project_view` 加 `col_order TEXT NULL`
+- `ProjectView` 实体加可空 `colOrder`
+- `ViewService`:`ViewDto`/Create/Update Request 加 `colOrder: JsonNode? = null`;存储字符串、`toDto` 读回;PATCH 不传不改;后端**透传不解释**(4KB 上限,与 sort/query 同法;客户端契约 = 列 id 字符串数组)
+- `backend/script/api.http`:views 区块补 colOrder 示例
+
+**前端**
+
+- `ViewDto` 加 `colOrder?: string[] | null`;新增 `colOrder` state
+- `normalizeOrder(saved)`:过滤未知 id、按代码顺序补新列、剔「number」——编号不入数组,渲染恒在最前
+- `visibleCols` = [number, ...按 colOrder 排的可移动列] 再滤可见性
+- `ColumnConfigPopover`:列表改全列(除编号);标题行 checkbox 恒显禁用;每行 ↑/↓ IconButton(首行禁↑/末行禁↓);「恢复默认」由父层扩为可见性+顺序
+- localStorage `yz-table-colorder:<key>`(默认视图);applyView/saveCurrent/deleteView/重置四处接线;dirty 判定纳入 colOrder
+- `texts.ts`:↑/↓ aria-label 文案外置
+
+**否决的备选**:columns JSON 混保留键 order(用户否决——顺序是重要属性,须一等持久);表头拖拽(dnd-kit 新依赖违最简,HTML5 DnD e2e 难测);colOrder 仅 localStorage 不入视图(与 127 保存语义不一致,弃)。
+
+### 测试
+
+- 集成(REST 黑盒):建视图带 colOrder → 回读一致;PATCH 仅改 colOrder → 其余不变;不传不改;**写前读 backend-testing skill**(cleanDatabase 表清单核对)
+- E2E:`view.spec.ts` 补用例(面板上移优先级 → 断言表头顺序,注意 MUI 菜单退场动画 listbox toBeHidden;存视图切回恢复;恢复默认)
+
+### 手工测试用例
+
+1. 面板把「优先级」上移数次 → 表头实时变;刷新后顺序保持(默认视图走 localStorage)
+2. 调序存「我的视图」→ 切默认 → 切回:顺序恢复;另存新视图互不影响
+3. 「恢复默认」→ 可见性+顺序回默认;编号恒首位(面板无编号行,表头 number 恒第一)
+4. PATCH 语义:仅调列可见性再保存 → colOrder 不丢
+
 ---
 
 ## As-built(完工后补)
+
+### §5 YPJ-127(2026-11-01)
+
+- 实现与设计一致:V43(`sort`/`query` TEXT NULL)→ ProjectView 实体 → ViewService(DTO/Request 可空字段;sort/query 走 `rawJson` 透传 4KB,query 走 `cappedQuery`)→ `toDto` 读回;PATCH 不传不改
+- **偏离**:saveCurrent 发 `query: query` 原值(空串),非设计字面的 `query || null`——PATCH「不传=不改」语义下,不传即 null,永远无法清空搜索词;故空串 = 显式清空(后端存空串非 NULL)
+- 验证:`gradle test`/`build`/`integrationTest` 全绿;e2e 全量 60 passed;手工用例 §5 四条 dev(3001)验证通过
+- §1–§4(123–126)As-built 仍欠,另清
 
 - (待各子票完工逐节补)

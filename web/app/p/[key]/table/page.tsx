@@ -56,6 +56,8 @@ type ViewDto = {
   name: string;
   filters: Record<string, string | null>;
   columns: Record<string, boolean>;
+  sort?: { field: string; dir: "asc" | "desc" }[] | null;
+  query?: string | null;
 };
 type Filters = { status: string; assignee: string; priority: string };
 
@@ -124,6 +126,7 @@ export default function TableViewPage() {
     setCols(readCols(key));
     setFilters(EMPTY_FILTERS);
     setQuery("");
+    setSorts(DEFAULT_SORTS);
     setSelectedView(null);
     setDirty(false);
   }, [key]);
@@ -177,6 +180,8 @@ export default function TableViewPage() {
       priority: v.filters.priority ?? "",
     });
     setCols({ ...v.columns });
+    setSorts(v.sort ?? DEFAULT_SORTS);
+    setQuery(v.query ?? "");
     setDirty(false);
   }
 
@@ -189,6 +194,8 @@ export default function TableViewPage() {
         priority: filters.priority || null,
       },
       columns: cols,
+      sort: sorts,
+      query: query,
     };
     try {
       if (selectedView && nameOpen === "save") {
@@ -221,6 +228,8 @@ export default function TableViewPage() {
       setSelectedView(null);
       setFilters(EMPTY_FILTERS);
       setCols(readCols(key));
+      setSorts(DEFAULT_SORTS);
+      setQuery("");
       setDirty(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "删除失败");
@@ -301,6 +310,7 @@ export default function TableViewPage() {
   // 单击循环 升→降→移除;移除后空回默认;Shift+点击追加次级键(YPJ-124)
   function toggleSort(field: string, shift: boolean) {
     setPage(0);
+    setDirty(true);
     setSorts((prev) => {
       const idx = prev.findIndex((k) => k.field === field);
       if (idx === -1)
@@ -373,6 +383,8 @@ export default function TableViewPage() {
               setSelectedView(null);
               setFilters(EMPTY_FILTERS);
               setCols(readCols(key));
+              setSorts(DEFAULT_SORTS);
+              setQuery("");
               setDirty(false);
             }
           }}
@@ -429,6 +441,7 @@ export default function TableViewPage() {
           onChange={(e) => {
             setQuery(e.target.value);
             setPage(0);
+            setDirty(true);
           }}
           sx={{ width: 220 }}
           slotProps={{
