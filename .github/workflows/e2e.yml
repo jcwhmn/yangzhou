@@ -2,9 +2,9 @@ name: e2e
 
 on:
   push:
-    paths: [web/**, backend/**, .github/workflows/e2e.yml]
+    paths: [web/**, backend/api/**, backend/domain/**, backend/persistence/**, .github/workflows/e2e.yml]  # YPJ-119:cli 变更不触发 E2E(不起镜像)
   pull_request:
-    paths: [web/**, backend/**, .github/workflows/e2e.yml]
+    paths: [web/**, backend/api/**, backend/domain/**, backend/persistence/**, .github/workflows/e2e.yml]  # YPJ-119:cli 变更不触发 E2E(不起镜像)
 
 jobs:
   e2e:

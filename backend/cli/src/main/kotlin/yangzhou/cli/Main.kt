@@ -26,6 +26,7 @@ fun main(args: Array<String>) {
 
 private fun usage() {
     println(
+
         """
 
         yz — yangzhou 命令行
@@ -89,6 +90,7 @@ private fun usage() {
         会话文件:${ApiClient.sessionFile().absolutePath}
 
         """.trimIndent(),
+
     )
 }
 
@@ -104,6 +106,7 @@ private fun run(args: List<String>) {
     while (i < args.size) {
         val a = args[i]
 
+        if (a == "--help" || a == "-h") return usage() // 帮助请求不是错误,退出 0(YPJ-119)
         when {
             a == "--req" -> {
                 reqs += args[i + 1]
@@ -152,12 +155,8 @@ private fun run(args: List<String>) {
             "rm" -> {
                 // 与 projects delete 同规:粘贴名单(顿号/逗号)与空格分隔等价
 
-                val names =
-                    rest
-                        .flatMap { it.split('、', ',') }
-                        .map { it.trim() }
-                        .filter { it.isNotEmpty() }
-                        .ifEmpty { error("缺少成员名(可多个)") }
+                val names = rest.flatMap { it.split('、', ',') }.map { it.trim() }.filter { it.isNotEmpty() }
+                    .ifEmpty { error("缺少成员名(可多个)") }
 
                 var failed = 0
 
@@ -188,9 +187,13 @@ private fun run(args: List<String>) {
                 body.forEach {
                     println(
                         "%-8s %-8s %s".format(
+
                             it["displayName"].asString(),
+
                             if (it["virtual"].asBoolean()) "虚拟" else "登录",
+
                             it["username"]?.let { u -> if (u.isNull) "-" else u.asString() } ?: "-",
+
                         ),
                     )
                 }
@@ -201,10 +204,9 @@ private fun run(args: List<String>) {
 
                 val attr = rest.getOrNull(1) ?: error("缺少属性名")
 
-                val level =
-                    rest.getOrNull(2)?.let {
-                        it.toIntOrNull()?.takeIf { l -> l in 1..4 } ?: error("等级只能是 1-4 或不填(未评级)")
-                    }
+                val level = rest.getOrNull(2)?.let {
+                    it.toIntOrNull()?.takeIf { l -> l in 1..4 } ?: error("等级只能是 1-4 或不填(未评级)")
+                }
 
                 val memberId = memberIdByDisplayName(api, name) ?: error("成员不存在:$name")
 
@@ -215,7 +217,10 @@ private fun run(args: List<String>) {
                 println("已设置:$name · $attr = ${if (lvl.isNull) "未评级" else lvl.asInt()}")
             }
 
-            else -> usage()
+            else -> {
+                usage()
+                error("未知子命令:" + verb)
+            }
         }
     }
 
@@ -238,15 +243,14 @@ private fun run(args: List<String>) {
 
                 body.forEach { team ->
 
-                    println(
-                        "${team["name"].asString()}:${team["members"].joinToString(
-                            "、",
-                        ) { m -> m["displayName"].asString() }.ifEmpty { "(空)" }}",
-                    )
+                    println("${team["name"].asString()}:${team["members"].joinToString("、") { m -> m["displayName"].asString() }.ifEmpty { "(空)" }}")
                 }
             }
 
-            else -> usage()
+            else -> {
+                usage()
+                error("未知子命令:" + verb)
+            }
         }
     }
 
@@ -266,36 +270,44 @@ private fun run(args: List<String>) {
 
             body.forEach {
                 println(
+
                     "%-5s %-8s %-8s %-8s %-5s %s".format(
+
                         "#${it["rank"].asInt()}",
+
                         it["displayName"].asString(),
+
                         if (it["virtual"].asBoolean()) "虚拟" else "我",
+
                         when (it["signal"].asString()) {
                             "GREEN" -> "[绿]"
                             "YELLOW" -> "[黄]"
                             else -> "[红]"
                         },
+
                         it["missingCount"].asInt(),
+
                         "${it["totalDelta"].asInt()}级",
+
                     ),
+
                 )
 
                 it["verdicts"].forEach { v ->
 
                     val attr = v["attribute"].asString()
 
-                    val line =
-                        when (v["kind"].asString()) {
-                            "satisfied" -> "      ✓ 满足($attr)"
+                    val line = when (v["kind"].asString()) {
+                        "satisfied" -> "      ✓ 满足($attr)"
 
-                            "surplus" -> "      ✓ 有余($attr)"
+                        "surplus" -> "      ✓ 有余($attr)"
 
-                            "gap" -> "      △ 差 ${v["delta"].asInt()} 级($attr:需≥${v["required"].asInt()},有 ${v["actual"].asInt()})"
+                        "gap" -> "      △ 差 ${v["delta"].asInt()} 级($attr:需≥${v["required"].asInt()},有 ${v["actual"].asInt()})"
 
-                            "unrated" -> "      △ 有但未评级($attr,需≥${v["required"].asInt()})——差距未知"
+                        "unrated" -> "      △ 有但未评级($attr,需≥${v["required"].asInt()})——差距未知"
 
-                            else -> "      ✗ 缺能力($attr)"
-                        }
+                        else -> "      ✗ 缺能力($attr)"
+                    }
 
                     println(line)
                 }
@@ -308,18 +320,17 @@ private fun run(args: List<String>) {
 
         val name = flags["clear"]?.takeIf { it.isNotEmpty() } ?: positional.getOrNull(2)
 
-        val assigneeId: String? =
-            if (name == null || name == "--") {
-                null
-            } else {
-                val members = api.json("GET", "/api/members")
+        val assigneeId: String? = if (name == null || name == "--") {
+            null
+        } else {
+            val members = api.json("GET", "/api/members")
 
-                var found: String? = null
+            var found: String? = null
 
-                members.forEach { m -> if (m["displayName"].asString() == name) found = m["memberId"].asString() }
+            members.forEach { m -> if (m["displayName"].asString() == name) found = m["memberId"].asString() }
 
-                found ?: error("成员不存在:$name(可用:${members.joinToString("/") { m -> m["displayName"].asString() }})")
-            }
+            found ?: error("成员不存在:$name(可用:${members.joinToString("/") { m -> m["displayName"].asString() }})")
+        }
 
         val body = api.json("PUT", "/api/items/$itemId/assignee", mapOf("assigneeItemId" to assigneeId))
 
@@ -356,11 +367,13 @@ private fun run(args: List<String>) {
                 val date = c["date"]
 
                 println(
+
                     "  ${c["sha"].asString().take(7)} ${c["message"].asString()}" +
 
                         (if (!author.isNull) " · ${author.asString()}" else "") +
 
                         (if (!date.isNull) " · ${date.asString().take(10)}" else ""),
+
                 )
             }
         }
@@ -429,12 +442,10 @@ private fun run(args: List<String>) {
             var parentId: String? = null
 
             if (parentName != null) {
-                val parent =
-                    api
-                        .json("GET", "/api/attributes")
-                        .firstOrNull { it["name"].asString() == parentName && it["kind"].asString() == "category" }
+                val parent = api.json("GET", "/api/attributes")
+                    .firstOrNull { it["name"].asString() == parentName && it["kind"].asString() == "category" }
 
-                        ?: error("分类不存在:\$parentName")
+                    ?: error("分类不存在:\$parentName")
 
                 parentId = parent["attributeId"].asString()
             }
@@ -447,9 +458,7 @@ private fun run(args: List<String>) {
 
             printJson(body, flags)
 
-            println(
-                "属性 " + body["name"].asString() + "(" + body["kind"].asString() + (if (body["leveled"].asBoolean()) "/分级" else "") + ")已创建",
-            )
+            println("属性 " + body["name"].asString() + "(" + body["kind"].asString() + (if (body["leveled"].asBoolean()) "/分级" else "") + ")已创建")
         }
 
         "attrs list" -> {
@@ -486,26 +495,14 @@ private fun run(args: List<String>) {
             println("KEY     名称     状态数  归档")
 
             body.forEach {
-                println(
-                    "%-7s %-8s %-7s %s".format(
-                        it["key"].asString(),
-                        it["name"].asString(),
-                        it["statuses"].size(),
-                        if (it["archived"].asBoolean()) "是" else "否",
-                    ),
-                )
+                println("%-7s %-8s %-7s %s".format(it["key"].asString(), it["name"].asString(), it["statuses"].size(), if (it["archived"].asBoolean()) "是" else "否"))
             }
         }
 
         "projects delete" -> {
             // 粘贴 login 回显列表(顿号/逗号分隔)与空格分隔等价
 
-            val keys =
-                rest
-                    .flatMap { it.split('、', ',') }
-                    .map { it.trim() }
-                    .filter { it.isNotEmpty() }
-                    .ifEmpty { error("缺少项目 KEY(可多个)") }
+            val keys = rest.flatMap { it.split('、', ',') }.map { it.trim() }.filter { it.isNotEmpty() }.ifEmpty { error("缺少项目 KEY(可多个)") }
 
             var failed = 0
 
@@ -519,11 +516,13 @@ private fun run(args: List<String>) {
                         val p = api.json("GET", "/api/projects/$key/deletion-preview")
 
                         println(
+
                             "将物理删除项目 ${p["key"].asString()}(${p["name"].asString()}):" +
 
-                                "item ${p["itemCount"].asInt()}、sprint/release ${p["groupCount"].asInt()}、" +
+                                "item ${p["itemCount"].asInt()}、sprint/release ${p["groupCount"].asInt()}、里程碑 ${p["milestoneCount"].asInt()}、" +
 
-                                "里程碑 ${p["milestoneCount"].asInt()}、视图 ${p["viewCount"].asInt()}、状态 ${p["statusCount"].asInt()}、成员关系 ${p["memberCount"].asInt()}",
+                                "视图 ${p["viewCount"].asInt()}、状态 ${p["statusCount"].asInt()}、成员关系 ${p["memberCount"].asInt()}",
+
                         )
                     }
                 } catch (e: IllegalStateException) {
@@ -564,31 +563,38 @@ private fun run(args: List<String>) {
 
             val title = rest.getOrNull(1) ?: error("缺少标题")
 
-            val requirements =
-                reqs.map { raw ->
+            val requirements = reqs.map { raw ->
 
-                    val m = Regex("^(.+?)(?:>=(\\d))?$").find(raw.trim()) ?: error("需求格式:属性 或 属性>=N,得到:$raw")
+                val m = Regex("^(.+?)(?:>=(\\d))?$").find(raw.trim()) ?: error("需求格式:属性 或 属性>=N,得到:$raw")
 
-                    val (attr, level) = m.destructured
+                val (attr, level) = m.destructured
 
-                    if (level.isEmpty()) {
-                        mapOf<String, Any?>("attribute" to attr, "minLevel" to null)
-                    } else {
-                        mapOf<String, Any?>("attribute" to attr, "minLevel" to level.toInt())
-                    }
+                if (level.isEmpty()) {
+                    mapOf<String, Any?>("attribute" to attr, "minLevel" to null)
+                } else {
+                    mapOf<String, Any?>("attribute" to attr, "minLevel" to level.toInt())
                 }
+            }
 
-            val body =
-                api.json(
-                    "POST",
-                    "/api/projects/$key/items",
-                    mapOf(
-                        "title" to title,
-                        "description" to flags["desc"],
-                        "sprintId" to flags["sprint"]?.let { resolveSprintId(api, key, it) },
-                        "requirements" to requirements,
-                    ),
-                )
+            val body = api.json(
+
+                "POST",
+
+                "/api/projects/$key/items",
+
+                mapOf(
+
+                    "title" to title,
+
+                    "description" to flags["desc"],
+
+                    "sprintId" to flags["sprint"]?.let { resolveSprintId(api, key, it) },
+
+                    "requirements" to requirements,
+
+                ),
+
+            )
 
             printJson(body, flags)
 
@@ -608,16 +614,13 @@ private fun run(args: List<String>) {
 
             body.forEach { item ->
 
-                val reqsText =
-                    item["requirements"].joinToString(",") {
-                        val lvl = it["minLevel"]
+                val reqsText = item["requirements"].joinToString(",") {
+                    val lvl = it["minLevel"]
 
-                        if (lvl.isNull) it["attribute"].asString() else "${it["attribute"].asString()}≥${lvl.asInt()}"
-                    }
+                    if (lvl.isNull) it["attribute"].asString() else "${it["attribute"].asString()}≥${lvl.asInt()}"
+                }
 
-                println(
-                    "%-7s %-13s %-23s %s".format(item["number"].asString(), item["status"].asString(), item["title"].asString(), reqsText),
-                )
+                println("%-7s %-13s %-23s %s".format(item["number"].asString(), item["status"].asString(), item["title"].asString(), reqsText))
             }
         }
 
@@ -632,14 +635,12 @@ private fun run(args: List<String>) {
 
             val project = api.json("GET", "/api/projects/${item["number"].asString().substringBefore("-")}")
 
-            val statusId =
-                project["statuses"]
-                    .firstOrNull { it["name"].asString().equals(statusName, ignoreCase = true) }
+            val statusId = project["statuses"]
+                .firstOrNull { it["name"].asString().equals(statusName, ignoreCase = true) }
 
-                    ?.get("statusId")
-                    ?.asString()
+                ?.get("statusId")?.asString()
 
-                    ?: error("项目无此状态:$statusName(可用:${project["statuses"].joinToString("/") { s -> s["name"].asString() }})")
+                ?: error("项目无此状态:$statusName(可用:${project["statuses"].joinToString("/") { s -> s["name"].asString() }})")
 
             val body = api.json("PATCH", "/api/items/$itemId", mapOf("statusItemId" to statusId))
 
@@ -665,10 +666,8 @@ private fun run(args: List<String>) {
                     }
 
                     "--items" -> {
-                        alsoItems =
-                            (rest.getOrNull(ai + 1) ?: error("--items 需要值")).split(',', '、').map { it.trim() }.filter { it.isNotEmpty() }
-                        ai +=
-                            2
+                        alsoItems = (rest.getOrNull(ai + 1) ?: error("--items 需要值")).split(',', '、').map { it.trim() }.filter { it.isNotEmpty() }
+                        ai += 2
                     }
 
                     else -> error("未知参数:${rest[ai]}")
@@ -681,10 +680,9 @@ private fun run(args: List<String>) {
 
             val repos = api.json("GET", "/api/projects/$projectKey/repos")
 
-            val repoId =
-                repos[0]?.get("repoId")?.asString()
+            val repoId = repos[0]?.get("repoId")?.asString()
 
-                    ?: error("项目未挂载仓库(先在 web 或 API 挂 repo)")
+                ?: error("项目未挂载仓库(先在 web 或 API 挂 repo)")
 
             val body = api.json("POST", "/api/items/$itemId/branches", mapOf("repoId" to repoId, "baseBranch" to base, "name" to name))
 
@@ -694,14 +692,7 @@ private fun run(args: List<String>) {
                 val extraId = resolveItemId(api, extra)
 
                 try {
-                    api.json(
-                        "POST",
-                        "/api/items/$extraId/git-refs",
-                        mapOf(
-                            "repo" to body["repo"].asString(),
-                            "ref" to body["branch"].asString(),
-                        ),
-                    )
+                    api.json("POST", "/api/items/$extraId/git-refs", mapOf("repo" to body["repo"].asString(), "ref" to body["branch"].asString()))
 
                     println("已补挂:$extra")
                 } catch (e: Exception) {
@@ -713,10 +704,9 @@ private fun run(args: List<String>) {
         "caps set" -> {
             val attr = rest.getOrNull(0) ?: error("缺少属性名")
 
-            val level =
-                rest.getOrNull(1)?.let {
-                    it.toIntOrNull()?.takeIf { l -> l in 1..4 } ?: error("等级只能是 1-4 或不填(未评级)")
-                }
+            val level = rest.getOrNull(1)?.let {
+                it.toIntOrNull()?.takeIf { l -> l in 1..4 } ?: error("等级只能是 1-4 或不填(未评级)")
+            }
 
             val body = api.json("PUT", "/api/capabilities", mapOf("attribute" to attr, "level" to level))
 
@@ -749,16 +739,16 @@ private fun run(args: List<String>) {
             }
         }
 
-        else -> usage()
+        else -> {
+            usage()
+            error("未知命令:" + noun + " " + verb)
+        }
     }
 }
 
 /** 成员名 → memberId(显示名精确匹配)。 */
 
-private fun memberIdByDisplayName(
-    api: ApiClient,
-    name: String,
-): String? {
+private fun memberIdByDisplayName(api: ApiClient, name: String): String? {
     var found: String? = null
 
     api.json("GET", "/api/members").forEach { m ->
@@ -771,11 +761,7 @@ private fun memberIdByDisplayName(
 
 /** --sprint 引用:UUID 直过;否则按项目 sprint 名称精确匹配(0/多匹配报错列候选)。 */
 
-private fun resolveSprintId(
-    api: ApiClient,
-    key: String,
-    ref: String,
-): String {
+private fun resolveSprintId(api: ApiClient, key: String, ref: String): String {
     if (Regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$").matches(ref)) return ref
 
     val sprints = api.json("GET", "/api/projects/$key/sprints")
@@ -793,10 +779,7 @@ private fun resolveSprintId(
 
 /** KEY-N(如 CHE-1)→ itemId;直接给 UUID 也认。 */
 
-private fun resolveItemId(
-    api: ApiClient,
-    ref: String,
-): String {
+private fun resolveItemId(api: ApiClient, ref: String): String {
     if (ref.contains('-') && !ref.contains(' ')) {
         val key = ref.substringBefore('-')
 
@@ -810,11 +793,7 @@ private fun resolveItemId(
     error("找不到 item:$ref")
 }
 
-private fun feasibility(
-    api: ApiClient,
-    key: String?,
-    flags: Map<String, String>,
-) {
+private fun feasibility(api: ApiClient, key: String?, flags: Map<String, String>) {
     if (key == null) error("缺少项目 KEY")
 
     val itemId = flags["item"]
@@ -839,14 +818,13 @@ private fun feasibility(
 }
 
 private fun printItemFeasibility(item: tools.jackson.databind.JsonNode) {
-    val signal =
-        when (item["signal"].asString()) {
-            "GREEN" -> "[绿]"
+    val signal = when (item["signal"].asString()) {
+        "GREEN" -> "[绿]"
 
-            "YELLOW" -> "[黄]"
+        "YELLOW" -> "[黄]"
 
-            else -> "[红]"
-        }
+        else -> "[红]"
+    }
 
     println("%-8s %-24s %s".format(item["number"].asString(), item["title"].asString(), signal))
 
@@ -854,27 +832,23 @@ private fun printItemFeasibility(item: tools.jackson.databind.JsonNode) {
 
         val attr = v["attribute"].asString()
 
-        val line =
-            when (v["kind"].asString()) {
-                "satisfied" -> "    ✓ 满足($attr)"
+        val line = when (v["kind"].asString()) {
+            "satisfied" -> "    ✓ 满足($attr)"
 
-                "surplus" -> "    ✓ 有余($attr)"
+            "surplus" -> "    ✓ 有余($attr)"
 
-                "gap" -> "    △ 差 ${v["delta"].asInt()} 级($attr:需≥${v["required"].asInt()},有 ${v["actual"].asInt()})"
+            "gap" -> "    △ 差 ${v["delta"].asInt()} 级($attr:需≥${v["required"].asInt()},有 ${v["actual"].asInt()})"
 
-                "unrated" -> "    △ 有但未评级($attr,需≥${v["required"].asInt()})——差距未知"
+            "unrated" -> "    △ 有但未评级($attr,需≥${v["required"].asInt()})——差距未知"
 
-                else -> "    ✗ 缺能力($attr)"
-            }
+            else -> "    ✗ 缺能力($attr)"
+        }
 
         println(line)
     }
 }
 
-private fun printJson(
-    body: tools.jackson.databind.JsonNode,
-    flags: Map<String, String>,
-) {
+private fun printJson(body: tools.jackson.databind.JsonNode, flags: Map<String, String>) {
     if (flags.containsKey("json")) println(body.toString())
 }
 
