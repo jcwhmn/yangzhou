@@ -112,3 +112,41 @@ test("分页:21 条默认每页 20 两页,翻页/改页大小生效", async ({
   await page.getByRole("option", { name: "50", exact: true }).click();
   await expect(page.locator("tbody tr")).toHaveCount(21);
 });
+
+test("表内搜索:标题/编号不区分大小写子串,清空恢复全量", async ({
+  page,
+  projectKey,
+}) => {
+  await createItemResilient(projectKey, "TB ALPHA");
+  await createItemResilient(projectKey, "TB beta");
+  await createItemResilient(projectKey, "TB gamma");
+
+  await page.goto(`/p/${projectKey}/table`);
+  await expect(page.getByRole("row").nth(1)).toBeVisible();
+
+  const trailOf = async () => {
+    const nums = await page
+      .locator("tbody tr td:first-child")
+      .allTextContents();
+    return nums.map((s) => Number(s.trim().split("-").pop()));
+  };
+  const search = page.getByPlaceholder("搜索编号、标题、负责人…");
+
+  // 标题:小写查询命中大写数据
+  await search.fill("alpha");
+  await expect(page.locator("tbody tr")).toHaveCount(1);
+  await expect.poll(trailOf).toEqual([1]);
+
+  // 编号:小写 key 前缀命中大写 KEY-<n>(全部 3 行)
+  await search.fill(projectKey.toLowerCase());
+  await expect(page.locator("tbody tr")).toHaveCount(3);
+
+  // 编号:"-2" 仅命中 KEY-2(key 无连字符,且总数 <20 无 -2x 干扰)
+  await search.fill("-2");
+  await expect(page.locator("tbody tr")).toHaveCount(1);
+  await expect.poll(trailOf).toEqual([2]);
+
+  // 清空 → 全量恢复
+  await search.fill("");
+  await expect(page.locator("tbody tr")).toHaveCount(3);
+});
