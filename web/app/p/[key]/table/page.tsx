@@ -451,6 +451,14 @@ export default function TableViewPage() {
                         active={idx >= 0}
                         direction={idx >= 0 ? sorts[idx].dir : "asc"}
                         onClick={(e) => toggleSort(c.id, e.shiftKey)}
+                        sx={{
+                          // MUI 默认非激活列 hover 才见箭头,可发现性差;常显(半透明,激活实色)
+                          ".MuiTableSortLabel-icon": { opacity: 0.3 },
+                          "&:hover .MuiTableSortLabel-icon": { opacity: 0.6 },
+                          "&.Mui-active .MuiTableSortLabel-icon": {
+                            opacity: 1,
+                          },
+                        }}
                       >
                         {c.label}
                         {sorts.length > 1 && idx >= 0 && (
