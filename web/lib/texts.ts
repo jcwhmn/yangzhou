@@ -393,6 +393,7 @@ export const t = {
     name: "视图",
     defaultView: "默认视图",
     backlog: "backlog",
+    searchPlaceholder: "搜索编号、标题、负责人…",
     perPage: "每页",
     save: "保存",
     saveAs: "另存为",

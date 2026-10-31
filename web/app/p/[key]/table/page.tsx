@@ -5,6 +5,7 @@ import {
   LinearProgress,
   Button,
   Chip,
+  InputAdornment,
   Dialog,
   DialogActions,
   DialogContent,
@@ -30,6 +31,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { t } from "@/lib/texts";
 import { AssignPopover } from "@/components/AssignPopover";
+import SearchIcon from "@mui/icons-material/Search";
 
 type Status = { statusId: string; name: string; position: number };
 type Item = {
@@ -47,6 +49,7 @@ type Item = {
   priority: string | null;
   blocked: boolean;
   sprintName: string | null;
+  attributes: { name: string; value: string | null }[];
 };
 type ViewDto = {
   viewId: string;
@@ -70,6 +73,20 @@ function readPageSize(): number {
 
 const DEFAULT_SORTS: SortKey[] = [{ field: "number", dir: "asc" }];
 
+/** YPJ-126 表内搜索:不区分大小写子串匹配可见字段(不含 description,YPJ-122)。 */
+function matches(it: Item, q: string): boolean {
+  if (!q) return true;
+  const s = q.toLowerCase();
+  return (
+    it.number.toLowerCase().includes(s) ||
+    (it.parentNumber ?? "").toLowerCase().includes(s) ||
+    it.title.toLowerCase().includes(s) ||
+    (it.assignee ?? "").toLowerCase().includes(s) ||
+    (it.sprintName ?? "").toLowerCase().includes(s) ||
+    (it.attributes ?? []).some((a) => (a.value ?? "").toLowerCase().includes(s))
+  );
+}
+
 /** V10-S4 表格视图;YPJ-47 视图配置(spec 0045):筛选(客户端)+ 视图保存/切换 + 列配置 Popover(YPJ-28 合并)。 */
 export default function TableViewPage() {
   const { key } = useParams<{ key: string }>();
@@ -79,6 +96,7 @@ export default function TableViewPage() {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(readPageSize);
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
+  const [query, setQuery] = useState("");
   const [error, setError] = useState("");
 
   // 列可见性:默认视图走 localStorage(按项目 key 区分,YPJ-32);选中视图时以视图数据为准
@@ -105,6 +123,7 @@ export default function TableViewPage() {
   useEffect(() => {
     setCols(readCols(key));
     setFilters(EMPTY_FILTERS);
+    setQuery("");
     setSelectedView(null);
     setDirty(false);
   }, [key]);
@@ -301,6 +320,7 @@ export default function TableViewPage() {
   const sorted = [...(items ?? [])]
     .filter(
       (it) =>
+        matches(it, query) &&
         (!filters.status || it.status === filters.status) &&
         (!filters.assignee ||
           (filters.assignee === "__none__"
@@ -401,6 +421,26 @@ export default function TableViewPage() {
         useFlexGap
         alignItems="center"
       >
+        <TextField
+          aria-label={t.view.searchPlaceholder}
+          placeholder={t.view.searchPlaceholder}
+          size="small"
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setPage(0);
+          }}
+          sx={{ width: 220 }}
+          slotProps={{
+            input: {
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon fontSize="small" />
+                </InputAdornment>
+              ),
+            },
+          }}
+        />
         <Dropdown
           ariaLabel={t.view.filterStatus}
           size="small"
