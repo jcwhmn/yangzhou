@@ -214,6 +214,7 @@ data class Status(
     val icon: String? = null,
     val isFinal: Boolean = false,
     val isStart: Boolean = false,
+    val isInProgress: Boolean = false,
     val wipLimit: Int? = null,
     val position: Int = 0,
     @CreatedDate

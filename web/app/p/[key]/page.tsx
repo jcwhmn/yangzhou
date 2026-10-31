@@ -63,6 +63,7 @@ export default function BoardPage() {
   const [newTitle, setNewTitle] = useState("");
   const [dragOver, setDragOver] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [sprintInfo, setSprintInfo] = useState(""); // YPJ-120:开始动作自动入 sprint 的轻提示
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<Filter>("all");
   const [activeSprints, setActiveSprints] = useState<SprintLite[]>([]);
@@ -170,11 +171,20 @@ export default function BoardPage() {
           i.itemId === itemId ? { ...i, status: status.name } : i,
         ),
       );
-      await api(`/api/items/${itemId}`, {
-        method: "PATCH",
-        body: JSON.stringify({ statusItemId: status.statusId }),
-      });
+      const resp = await api<{ autoAssignedSprintName?: string | null }>(
+        `/api/items/${itemId}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({ statusItemId: status.statusId }),
+        },
+      );
       await load();
+      if (resp.autoAssignedSprintName) {
+        setSprintInfo(
+          `已自动加入 sprint「${resp.autoAssignedSprintName}」;不想进可手动移出`,
+        );
+        setTimeout(() => setSprintInfo(""), 6000);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : t.board.moveFailed);
       await load();
@@ -234,6 +244,15 @@ export default function BoardPage() {
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
           {error}
+        </Alert>
+      )}
+      {sprintInfo && (
+        <Alert
+          severity="success"
+          sx={{ mb: 2 }}
+          onClose={() => setSprintInfo("")}
+        >
+          {sprintInfo}
         </Alert>
       )}
 

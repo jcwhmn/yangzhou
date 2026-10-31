@@ -1301,3 +1301,35 @@ Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {"role":"member"}
+### ============================================================
+### ============ 19. Workflow 状态进行态(YPJ-120;spec 0089) ============
+### ============================================================
+
+### 建自定义状态(isInProgress=true;handler 存变量 stCustom)
+POST {{host}}/api/projects/{{pkey}}/statuses
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "name": "自定义中-{{suffix}}", "isInProgress": true }
+
+> {% 
+client.global.set("stCustom", response.body.statusId);
+%}
+
+### PATCH 状态进行态(回显 isInProgress)
+PATCH {{host}}/api/statuses/{{stCustom}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "isInProgress": false }
+
+### 项目详情回显:statuses[].isInProgress(预置 In Progress=true,存量库由 V42 回填)
+GET {{host}}/api/projects/{{pkey}}
+Authorization: Bearer {{token}}
+
+### 开始 item(离开 To Do 进 In Progress;无 sprint 时自动挂最早 active sprint,响应 autoAssignedSprintName 非空)
+PATCH {{host}}/api/items/{{itemId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "statusItemId": "{{statusTo}}" }

@@ -42,13 +42,13 @@ class WorkflowServiceUnitTest {
     inner class CreateStatus {
         @Test
         fun duplicateNameRejected() {
-            assertFailsWith<ConflictException> { service.createStatus("CHE", "To Do", null, false, false, null) }
+            assertFailsWith<ConflictException> { service.createStatus("CHE", "To Do", null, false, false, false, null) }
         }
 
         @Test
         fun positionAutoAppended() {
             every { statuses.save(any()) } answers { firstArg<Status>().copy(id = 3L, objectId = UUID(0, 3)) }
-            assertEquals(2, service.createStatus("CHE", "QA", null, false, false, null).position) // max+1
+            assertEquals(2, service.createStatus("CHE", "QA", null, false, false, false, null).position) // max+1
         }
     }
 

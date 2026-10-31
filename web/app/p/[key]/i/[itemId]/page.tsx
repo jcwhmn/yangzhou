@@ -336,6 +336,8 @@ export default function ItemDetailPage() {
 
   const [saved, setSaved] = useState(false);
 
+  const [sprintHint, setSprintHint] = useState(""); // YPJ-120:开始动作自动入 sprint 的轻提示
+
   const [error, setError] = useState("");
 
   const [memberNames, setMemberNames] = useState<Map<string, string>>(
@@ -545,12 +547,23 @@ export default function ItemDetailPage() {
     if (!target) return;
 
     try {
-      await api(`/api/items/${itemId}`, {
-        method: "PATCH",
-        body: JSON.stringify({ statusItemId: target.statusId }),
-      });
+      const resp = await api<{ autoAssignedSprintName?: string | null }>(
+        `/api/items/${itemId}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({ statusItemId: target.statusId }),
+        },
+      );
 
       await load();
+
+      if (resp.autoAssignedSprintName) {
+        setSprintHint(
+          `已自动加入 sprint「${resp.autoAssignedSprintName}」;不想进可手动移出`,
+        );
+
+        setTimeout(() => setSprintHint(""), 6000);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "更新失败");
     }
@@ -1075,6 +1088,12 @@ export default function ItemDetailPage() {
               {saved && (
                 <Typography variant="body2" color="text.secondary">
                   {t.item.saved}
+                </Typography>
+              )}
+
+              {sprintHint && (
+                <Typography variant="body2" color="success.main">
+                  {sprintHint}
                 </Typography>
               )}
 

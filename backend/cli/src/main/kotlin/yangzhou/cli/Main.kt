@@ -21,6 +21,7 @@ fun main(args: Array<String>) {
 
 private fun usage() {
     println(
+
         """
         yz — yangzhou 命令行
         用法:yz <命令> [参数] [选项]
@@ -55,6 +56,7 @@ private fun usage() {
 
         会话文件:${ApiClient.sessionFile().absolutePath}
         """.trimIndent(),
+
     )
 }
 
@@ -65,6 +67,8 @@ private fun run(args: List<String>) {
     var i = 0
     while (i < args.size) {
         val a = args[i]
+
+        if (a == "--help" || a == "-h") return usage() // 帮助请求不是错误,退出 0(YPJ-119)
         when {
             a == "--req" -> {
                 reqs += args[i + 1]
@@ -123,9 +127,13 @@ private fun run(args: List<String>) {
                 body.forEach {
                     println(
                         "%-8s %-8s %s".format(
+
                             it["displayName"].asString(),
+
                             if (it["virtual"].asBoolean()) "虚拟" else "登录",
+
                             it["username"]?.let { u -> if (u.isNull) "-" else u.asString() } ?: "-",
+
                         ),
                     )
                 }
@@ -141,7 +149,11 @@ private fun run(args: List<String>) {
                 val lvl = body["level"]
                 println("已设置:$name · $attr = ${if (lvl.isNull) "未评级" else lvl.asInt()}")
             }
-            else -> usage()
+
+            else -> {
+                usage()
+                error("未知子命令:" + verb)
+            }
         }
     }
     if (noun == "teams") {
@@ -156,10 +168,15 @@ private fun run(args: List<String>) {
                 if (flags.containsKey("json")) return printRaw(body.toString())
                 if (body.size() == 0) return println("(无分组)")
                 body.forEach { team ->
+
                     println("${team["name"].asString()}:${team["members"].joinToString("、") { m -> m["displayName"].asString() }.ifEmpty { "(空)" }}")
                 }
             }
-            else -> usage()
+
+            else -> {
+                usage()
+                error("未知子命令:" + verb)
+            }
         }
     }
     if (noun == "candidates" || noun == "assign") {
@@ -172,18 +189,27 @@ private fun run(args: List<String>) {
             println("名次  成员     性质     信号     缺门  差距")
             body.forEach {
                 println(
+
                     "%-5s %-8s %-8s %-8s %-5s %s".format(
+
                         "#${it["rank"].asInt()}",
+
                         it["displayName"].asString(),
+
                         if (it["virtual"].asBoolean()) "虚拟" else "我",
+
                         when (it["signal"].asString()) {
                             "GREEN" -> "[绿]"
                             "YELLOW" -> "[黄]"
                             else -> "[红]"
                         },
+
                         it["missingCount"].asInt(),
+
                         "${it["totalDelta"].asInt()}级",
+
                     ),
+
                 )
                 it["verdicts"].forEach { v ->
                     val attr = v["attribute"].asString()
@@ -228,9 +254,11 @@ private fun run(args: List<String>) {
                 val author = c["author"]
                 val date = c["date"]
                 println(
+
                     "  ${c["sha"].asString().take(7)} ${c["message"].asString()}" +
                         (if (!author.isNull) " · ${author.asString()}" else "") +
                         (if (!date.isNull) " · ${date.asString().take(10)}" else ""),
+
                 )
             }
         }
@@ -325,6 +353,7 @@ private fun run(args: List<String>) {
                     } else {
                         val p = api.json("GET", "/api/projects/$key/deletion-preview")
                         println(
+
                             "将物理删除项目 ${p["key"].asString()}(${p["name"].asString()}):" +
                                 "item ${p["itemCount"].asInt()}、sprint/release ${p["groupCount"].asInt()}、里程碑 ${p["milestoneCount"].asInt()}、" +
                                 "视图 ${p["viewCount"].asInt()}、状态 ${p["statusCount"].asInt()}、成员关系 ${p["memberCount"].asInt()}",
@@ -496,7 +525,10 @@ private fun run(args: List<String>) {
             }
         }
 
-        else -> usage()
+        else -> {
+            usage()
+            error("未知命令:" + noun + " " + verb)
+        }
     }
 }
 
