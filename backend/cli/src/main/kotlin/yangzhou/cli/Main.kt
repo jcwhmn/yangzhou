@@ -66,10 +66,22 @@ private fun run(args: List<String>) {
     while (i < args.size) {
         val a = args[i]
         when {
-            a == "--req" -> { reqs += args[i + 1]; i += 2 }
-            a == "--json" -> { flags["json"] = ""; i += 1 } // 无值旗标,可放任意位置
-            a.startsWith("-") -> { flags[a.trimStart('-')] = args.getOrNull(i + 1) ?: ""; i += 2 }
-            else -> { positional += a; i += 1 }
+            a == "--req" -> {
+                reqs += args[i + 1]
+                i += 2
+            }
+            a == "--json" -> {
+                flags["json"] = ""
+                i += 1
+            } // 无值旗标,可放任意位置
+            a.startsWith("-") -> {
+                flags[a.trimStart('-')] = args.getOrNull(i + 1) ?: ""
+                i += 2
+            }
+            else -> {
+                positional += a
+                i += 1
+            }
         }
     }
     val noun = positional.getOrNull(0)
@@ -109,11 +121,13 @@ private fun run(args: List<String>) {
                 if (flags.containsKey("json")) return printRaw(body.toString())
                 println("成员     性质     用户名")
                 body.forEach {
-                    println("%-8s %-8s %s".format(
-                        it["displayName"].asString(),
-                        if (it["virtual"].asBoolean()) "虚拟" else "登录",
-                        it["username"]?.let { u -> if (u.isNull) "-" else u.asString() } ?: "-",
-                    ))
+                    println(
+                        "%-8s %-8s %s".format(
+                            it["displayName"].asString(),
+                            if (it["virtual"].asBoolean()) "虚拟" else "登录",
+                            it["username"]?.let { u -> if (u.isNull) "-" else u.asString() } ?: "-",
+                        ),
+                    )
                 }
             }
             "set" -> {
@@ -162,7 +176,11 @@ private fun run(args: List<String>) {
                         "#${it["rank"].asInt()}",
                         it["displayName"].asString(),
                         if (it["virtual"].asBoolean()) "虚拟" else "我",
-                        when (it["signal"].asString()) { "GREEN" -> "[绿]"; "YELLOW" -> "[黄]"; else -> "[红]" },
+                        when (it["signal"].asString()) {
+                            "GREEN" -> "[绿]"
+                            "YELLOW" -> "[黄]"
+                            else -> "[红]"
+                        },
                         it["missingCount"].asInt(),
                         "${it["totalDelta"].asInt()}级",
                     ),
@@ -183,7 +201,9 @@ private fun run(args: List<String>) {
         }
         // assign
         val name = flags["clear"]?.takeIf { it.isNotEmpty() } ?: positional.getOrNull(2)
-        val assigneeId: String? = if (name == null || name == "--") null else {
+        val assigneeId: String? = if (name == null || name == "--") {
+            null
+        } else {
             val members = api.json("GET", "/api/members")
             var found: String? = null
             members.forEach { m -> if (m["displayName"].asString() == name) found = m["memberId"].asString() }
@@ -338,8 +358,11 @@ private fun run(args: List<String>) {
             val requirements = reqs.map { raw ->
                 val m = Regex("^(.+?)(?:>=(\\d))?$").find(raw.trim()) ?: error("需求格式:属性 或 属性>=N,得到:$raw")
                 val (attr, level) = m.destructured
-                if (level.isEmpty()) mapOf<String, Any?>("attribute" to attr, "minLevel" to null)
-                else mapOf<String, Any?>("attribute" to attr, "minLevel" to level.toInt())
+                if (level.isEmpty()) {
+                    mapOf<String, Any?>("attribute" to attr, "minLevel" to null)
+                } else {
+                    mapOf<String, Any?>("attribute" to attr, "minLevel" to level.toInt())
+                }
             }
             val body = api.json(
                 "POST",
@@ -383,7 +406,9 @@ private fun run(args: List<String>) {
         "items assign" -> {
             val itemId = resolveItemId(api, rest.getOrNull(0) ?: error("缺少 item ID(支持 YPJ-58 或 UUID)"))
             val ref = rest.getOrNull(1) ?: error("缺少 sprint 引用(sprint 名/UUID/backlog)")
-            val sprintId: String? = if (ref.equals("backlog", ignoreCase = true)) null else {
+            val sprintId: String? = if (ref.equals("backlog", ignoreCase = true)) {
+                null
+            } else {
                 val item = api.json("GET", "/api/items/$itemId")
                 resolveSprintId(api, item["number"].asString().substringBefore("-"), ref)
             }
@@ -414,12 +439,18 @@ private fun run(args: List<String>) {
             var ai = 2
             while (ai < rest.size) {
                 when (rest[ai]) {
-                    "--base" -> { base = rest.getOrNull(ai + 1) ?: error("--base 需要值"); ai += 2 }
-                    "--items" -> { alsoItems = (rest.getOrNull(ai + 1) ?: error("--items 需要值")).split(',', '、').map { it.trim() }.filter { it.isNotEmpty() }; ai += 2 }
+                    "--base" -> {
+                        base = rest.getOrNull(ai + 1) ?: error("--base 需要值")
+                        ai += 2
+                    }
+                    "--items" -> {
+                        alsoItems = (rest.getOrNull(ai + 1) ?: error("--items 需要值")).split(',', '、').map { it.trim() }.filter { it.isNotEmpty() }
+                        ai += 2
+                    }
                     else -> error("未知参数:${rest[ai]}")
                 }
             }
-            
+
             val item = api.json("GET", "/api/items/$itemId")
             val projectKey = item["number"].asString().substringBefore("-")
             val repos = api.json("GET", "/api/projects/$projectKey/repos")
