@@ -5,11 +5,11 @@ import jakarta.validation.constraints.Pattern
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import yangzhou.api.business.github.VcsEvent
+import yangzhou.api.business.workspace.WorkspaceService
 import yangzhou.api.error.ConflictException
 import yangzhou.api.error.NotFoundException
 import yangzhou.api.guard.LeaderGuard
-import yangzhou.api.business.workspace.WorkspaceService
-import yangzhou.api.business.github.VcsEvent
 import yangzhou.persistence.Project
 import yangzhou.persistence.ProjectWorkflowRule
 import yangzhou.persistence.Status
@@ -69,12 +69,11 @@ class ProjectService(
         return get(key)
     }
 
-    fun list(): List<ProjectDto> =
-        projects.findAll().map { it.key }.mapNotNull { key ->
-            runCatching { get(key) }
-                .onFailure { log.warn("项目组装失败,列表中跳过 key={}", key, it) }
-                .getOrNull()
-        }
+    fun list(): List<ProjectDto> = projects.findAll().map { it.key }.mapNotNull { key ->
+        runCatching { get(key) }
+            .onFailure { log.warn("项目组装失败,列表中跳过 key={}", key, it) }
+            .getOrNull()
+    }
 
     fun get(key: String): ProjectDto {
         val project = projects.findByKey(key) ?: throw NotFoundException("项目不存在:$key")
@@ -151,22 +150,21 @@ class ProjectService(
             return depth
         }
 
-        fun walk(parent: UUID?): List<GanttRow> =
-            (byParent[parent] ?: emptyList()).sortedBy { it.number }.flatMap { item ->
-                val status = statusById[item.statusObjectId]
-                val row = GanttRow(
-                    itemId = item.objectId,
-                    parentItemId = item.parentObjectId,
-                    number = "${project.key}-${item.number}",
-                    title = item.title,
-                    startDate = item.startDate?.toString(),
-                    dueDate = item.dueDate?.toString(),
-                    statusName = status?.name ?: "?",
-                    overdue = item.dueDate?.let { it < today } == true && status?.isFinal != true,
-                    depth = depthOf(item),
-                )
-                listOf(row) + walk(item.objectId)
-            }
+        fun walk(parent: UUID?): List<GanttRow> = (byParent[parent] ?: emptyList()).sortedBy { it.number }.flatMap { item ->
+            val status = statusById[item.statusObjectId]
+            val row = GanttRow(
+                itemId = item.objectId,
+                parentItemId = item.parentObjectId,
+                number = "${project.key}-${item.number}",
+                title = item.title,
+                startDate = item.startDate?.toString(),
+                dueDate = item.dueDate?.toString(),
+                statusName = status?.name ?: "?",
+                overdue = item.dueDate?.let { it < today } == true && status?.isFinal != true,
+                depth = depthOf(item),
+            )
+            listOf(row) + walk(item.objectId)
+        }
 
         return GanttDto(rows = walk(null))
     }

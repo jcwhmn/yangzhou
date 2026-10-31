@@ -4,8 +4,10 @@ import io.mockk.clearMocks
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
-import yangzhou.api.business.notification.NotificationService
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Nested
 import yangzhou.api.business.member.MemberService
+import yangzhou.api.business.notification.NotificationService
 import yangzhou.api.error.NotFoundException
 import yangzhou.persistence.Comment
 import yangzhou.persistence.Item
@@ -13,23 +15,22 @@ import yangzhou.persistence.Member
 import yangzhou.persistence.repository.CommentRepository
 import yangzhou.persistence.repository.ItemRepository
 import java.util.UUID
-import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Nested
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 /** YPJ-88 单测补齐:CommentService(人工讨论 + 通知扇出)。 */
 class CommentServiceUnitTest {
-
     private val comments = mockk<CommentRepository>(relaxed = true)
     private val itemRepo = mockk<ItemRepository>(relaxed = true)
     private val memberService = mockk<MemberService>(relaxed = true)
     private val notificationService = mockk<NotificationService>(relaxed = true)
     private val service = CommentService(comments, itemRepo, memberService, notificationService)
 
-    private val item = Item(id = 1L, objectId = UUID(0, 1), projectObjectId = UUID(0, 1), number = 1, title = "t", statusObjectId = UUID.randomUUID())
-    private val me = Member(id = 5L, objectId = UUID(0, 5), workspaceObjectId = UUID(0, 9), username = "me", passwordHash = "h", displayName = "me")
+    private val item =
+        Item(id = 1L, objectId = UUID(0, 1), projectObjectId = UUID(0, 1), number = 1, title = "t", statusObjectId = UUID.randomUUID())
+    private val me =
+        Member(id = 5L, objectId = UUID(0, 5), workspaceObjectId = UUID(0, 9), username = "me", passwordHash = "h", displayName = "me")
 
     @BeforeEach
     fun setup() {
@@ -40,7 +41,6 @@ class CommentServiceUnitTest {
 
     @Nested
     inner class Create {
-
         @Test
         fun missingItemRejected() {
             every { itemRepo.findByObjectId(any()) } returns null
@@ -58,7 +58,6 @@ class CommentServiceUnitTest {
 
     @Nested
     inner class ListComments {
-
         @Test
         fun newestFirst() {
             val c1 = Comment(id = 1L, objectId = UUID(0, 1), itemObjectId = UUID(0, 1), authorMemberObjectId = UUID(0, 5), body = "first")
@@ -76,7 +75,6 @@ class CommentServiceUnitTest {
 
     @Nested
     inner class DeleteComment {
-
         @Test
         fun missingCommentRejected() {
             every { comments.findByObjectId(any()) } returns null

@@ -2,7 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import { Box, IconButton, Popover, Typography, type SxProps, type Theme } from "@mui/material";
+import {
+  Box,
+  IconButton,
+  Popover,
+  Typography,
+  type SxProps,
+  type Theme,
+} from "@mui/material";
 import ClearIcon from "@mui/icons-material/Clear";
 import DateRangeIcon from "@mui/icons-material/DateRange";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
@@ -32,7 +39,9 @@ function parseIso(iso: string): Segs {
 }
 
 function isoOf(s: Segs): string {
-  return s.mm.length === 2 && s.dd.length === 2 && s.yyyy.length === 4 ? `${s.yyyy}-${s.mm}-${s.dd}` : "";
+  return s.mm.length === 2 && s.dd.length === 2 && s.yyyy.length === 4
+    ? `${s.yyyy}-${s.mm}-${s.dd}`
+    : "";
 }
 
 function daysInMonth(y: number, m: number): number {
@@ -41,7 +50,11 @@ function daysInMonth(y: number, m: number): number {
 
 function todaySegs(): Segs {
   const n = new Date();
-  return { yyyy: String(n.getFullYear()), mm: pad2(n.getMonth() + 1), dd: pad2(n.getDate()) };
+  return {
+    yyyy: String(n.getFullYear()),
+    mm: pad2(n.getMonth() + 1),
+    dd: pad2(n.getDate()),
+  };
 }
 
 export function DateInput({
@@ -59,7 +72,11 @@ export function DateInput({
   size?: "small";
   sx?: SxProps<Theme>;
 }) {
-  const segText: Record<keyof Segs, string> = { mm: t.date.month, dd: t.date.day, yyyy: t.date.year };
+  const segText: Record<keyof Segs, string> = {
+    mm: t.date.month,
+    dd: t.date.day,
+    yyyy: t.date.year,
+  };
   const name = label ?? ariaLabel;
   const [segs, setSegs] = useState<Segs>(() => parseIso(value));
   const [calOpen, setCalOpen] = useState(false);
@@ -94,7 +111,12 @@ export function DateInput({
       return;
     }
     let { yyyy } = segs;
-    if (segs.mm.length === 2 && segs.dd.length === 2 && yyyy.length > 0 && yyyy.length < 4) {
+    if (
+      segs.mm.length === 2 &&
+      segs.dd.length === 2 &&
+      yyyy.length > 0 &&
+      yyyy.length < 4
+    ) {
       const n = Number(yyyy);
       yyyy =
         yyyy.length === 1
@@ -108,7 +130,8 @@ export function DateInput({
     const y = Number(full.yyyy);
     const m = Number(full.mm);
     const d = Number(full.dd);
-    const problem: keyof Segs | null = m < 1 || m > 12 ? "mm" : d < 1 || d > daysInMonth(y, m) ? "dd" : null;
+    const problem: keyof Segs | null =
+      m < 1 || m > 12 ? "mm" : d < 1 || d > daysInMonth(y, m) ? "dd" : null;
     if (problem) {
       setInvalidSeg(problem);
       focusSeg(problem, true);
@@ -145,7 +168,10 @@ export function DateInput({
       return;
     }
     const num = Number(clean);
-    if (clean.length === 2 && (num === 0 || (k === "mm" && num > 12) || (k === "dd" && num > 31))) {
+    if (
+      clean.length === 2 &&
+      (num === 0 || (k === "mm" && num > 12) || (k === "dd" && num > 31))
+    ) {
       setInvalidSeg(k); // §6.1/§7.1:成段非法拒绝(不钳制)
       return;
     }
@@ -223,7 +249,8 @@ export function DateInput({
 
   // 年段 Tab:跳出控件进下一个控件(DOM 会先停在段内 📅/× 按钮,手动跳过)
   const focusNextAfterGroup = () => {
-    const sel = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex="0"]';
+    const sel =
+      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex="0"]';
     const list = Array.from(document.querySelectorAll<HTMLElement>(sel));
     const start = list.indexOf(rootRef.current ?? document.body);
     for (const el of list.slice(start + 1)) {
@@ -238,15 +265,20 @@ export function DateInput({
   const onSegClick = (k: keyof Segs, e: React.MouseEvent<HTMLInputElement>) => {
     const el = e.currentTarget;
     window.setTimeout(() => {
-      if (document.activeElement === el) selectDigitEl(el, el.selectionStart ?? 0);
+      if (document.activeElement === el)
+        selectDigitEl(el, el.selectionStart ?? 0);
     }, 0);
   };
 
   // insertText 的逐位路径:让 Playwright fill / 输入法候选上屏与真实键入同语义(否则 fill 会把 "01"
   // 追加到预填 "10" 后拼成 "1001");keydown 数字已拦截走 writeDigit,不会双写。
-  const onSegBeforeInput = (k: keyof Segs, e: React.FormEvent<HTMLInputElement>) => {
+  const onSegBeforeInput = (
+    k: keyof Segs,
+    e: React.FormEvent<HTMLInputElement>,
+  ) => {
     const ev = e.nativeEvent as InputEvent;
-    if (ev.inputType !== "insertText" || !ev.data || !/^[0-9]+$/.test(ev.data)) return;
+    if (ev.inputType !== "insertText" || !ev.data || !/^[0-9]+$/.test(ev.data))
+      return;
     e.preventDefault();
     const el = segRefs[k].current;
     if (!el) return;
@@ -257,7 +289,10 @@ export function DateInput({
     }
   };
 
-  const onSegKeyDown = (k: keyof Segs, e: React.KeyboardEvent<HTMLInputElement>) => {
+  const onSegKeyDown = (
+    k: keyof Segs,
+    e: React.KeyboardEvent<HTMLInputElement>,
+  ) => {
     const i = ORDER.indexOf(k);
     const el = e.currentTarget;
     const pos = el.selectionStart ?? 0;
@@ -306,9 +341,17 @@ export function DateInput({
     if (!iso && !mdy) return;
     e.preventDefault();
     if (iso) {
-      setSegs({ yyyy: iso[1], mm: pad2(Number(iso[2])), dd: pad2(Number(iso[3])) });
+      setSegs({
+        yyyy: iso[1],
+        mm: pad2(Number(iso[2])),
+        dd: pad2(Number(iso[3])),
+      });
     } else if (mdy) {
-      setSegs({ mm: pad2(Number(mdy[1])), dd: pad2(Number(mdy[2])), yyyy: mdy[3] });
+      setSegs({
+        mm: pad2(Number(mdy[1])),
+        dd: pad2(Number(mdy[2])),
+        yyyy: mdy[3],
+      });
     }
   };
 
@@ -341,7 +384,12 @@ export function DateInput({
   };
 
   return (
-    <Box sx={[{ display: "inline-flex", flexDirection: "column" }, ...(Array.isArray(sx) ? sx : [sx])]}>
+    <Box
+      sx={[
+        { display: "inline-flex", flexDirection: "column" },
+        ...(Array.isArray(sx) ? sx : [sx]),
+      ]}
+    >
       <Box
         ref={rootRef}
         role="group"
@@ -369,7 +417,8 @@ export function DateInput({
         }}
         onClick={() => {
           const ae = document.activeElement;
-          if (ae instanceof HTMLElement && rootRef.current?.contains(ae)) return;
+          if (ae instanceof HTMLElement && rootRef.current?.contains(ae))
+            return;
           const first = ORDER.find((k) => segs[k].length < MAXLEN[k]) ?? "yyyy";
           focusSeg(first);
         }}
@@ -378,11 +427,15 @@ export function DateInput({
           <Typography
             component="span"
             sx={{
-              position: "absolute",
-              top: 0,
-              transform: "translateY(-50%)",
+              position: "absolute",
+
+              top: 0,
+
+              transform: "translateY(-50%)",
+
               left: 10,
-              bgcolor: tokens.field,
+              bgcolor: tokens.field,
+
               px: 0.5,
               fontSize: 11,
               lineHeight: 1.2,
@@ -408,7 +461,9 @@ export function DateInput({
           onBeforeInput={(e) => onSegBeforeInput("mm", e)}
           ref={segRefs.mm}
         />
-        <Box component="span" sx={{ px: 0.25, color: "text.secondary" }}>/</Box>
+        <Box component="span" sx={{ px: 0.25, color: "text.secondary" }}>
+          /
+        </Box>
         <input
           className={`seg${invalidSeg === "dd" ? " seg-invalid" : ""}`}
           aria-invalid={invalidSeg === "dd" || undefined}
@@ -425,7 +480,9 @@ export function DateInput({
           onBeforeInput={(e) => onSegBeforeInput("dd", e)}
           ref={segRefs.dd}
         />
-        <Box component="span" sx={{ px: 0.25, color: "text.secondary" }}>/</Box>
+        <Box component="span" sx={{ px: 0.25, color: "text.secondary" }}>
+          /
+        </Box>
         <input
           className={`seg${invalidSeg === "yyyy" ? " seg-invalid" : ""}`}
           aria-invalid={invalidSeg === "yyyy" || undefined}
@@ -486,7 +543,13 @@ export function DateInput({
 }
 
 // mini 月历(spec 0019 §2.8):‹ › 切月,点日回填+提交+关闭,选中=field 底色,今天=描边
-function MiniCalendar({ initialIso, onPick }: { initialIso: string; onPick: (iso: string) => void }) {
+function MiniCalendar({
+  initialIso,
+  onPick,
+}: {
+  initialIso: string;
+  onPick: (iso: string) => void;
+}) {
   const init = parseIso(initialIso);
   const [ym, setYm] = useState({ y: Number(init.yyyy), m: Number(init.mm) });
   const startDow = new Date(ym.y, ym.m - 1, 1).getDay();
@@ -495,37 +558,69 @@ function MiniCalendar({ initialIso, onPick }: { initialIso: string; onPick: (iso
   const move = (delta: number) =>
     setYm((p) => {
       const m = p.m + delta;
-      return m < 1 ? { y: p.y - 1, m: 12 } : m > 12 ? { y: p.y + 1, m: 1 } : { y: p.y, m };
+      return m < 1
+        ? { y: p.y - 1, m: 12 }
+        : m > 12
+          ? { y: p.y + 1, m: 1 }
+          : { y: p.y, m };
     });
 
   return (
     <Box sx={{ p: 1.5 }}>
       <Box sx={{ display: "flex", alignItems: "center", mb: 0.5 }}>
-        <IconButton size="small" aria-label={t.date.prevYear} onClick={() => move(-12)}>
+        <IconButton
+          size="small"
+          aria-label={t.date.prevYear}
+          onClick={() => move(-12)}
+        >
           <KeyboardDoubleArrowLeftIcon fontSize="small" />
         </IconButton>
-        <IconButton size="small" aria-label={t.date.prevMonth} onClick={() => move(-1)}>
+        <IconButton
+          size="small"
+          aria-label={t.date.prevMonth}
+          onClick={() => move(-1)}
+        >
           <ChevronLeftIcon fontSize="small" />
         </IconButton>
         <Box sx={{ flex: 1, textAlign: "center", fontSize: 14 }}>
           {ym.y}.{pad2(ym.m)}
         </Box>
-        <IconButton size="small" aria-label={t.date.nextMonth} onClick={() => move(1)}>
+        <IconButton
+          size="small"
+          aria-label={t.date.nextMonth}
+          onClick={() => move(1)}
+        >
           <ChevronRightIcon fontSize="small" />
         </IconButton>
-        <IconButton size="small" aria-label={t.date.nextYear} onClick={() => move(12)}>
+        <IconButton
+          size="small"
+          aria-label={t.date.nextYear}
+          onClick={() => move(12)}
+        >
           <KeyboardDoubleArrowRightIcon fontSize="small" />
         </IconButton>
       </Box>
       <Box
-        sx={{ display: "grid", gridTemplateColumns: "repeat(7, 28px)", gap: "2px" }}
+        sx={{
+          display: "grid",
+          gridTemplateColumns: "repeat(7, 28px)",
+          gap: "2px",
+        }}
         onKeyDown={(e) => {
           // 月历键盘导航(V1 PRD §6.2):←/→/↑/↓ 移 ±1/±7 日格,Enter/Space 走 button 原生选中
-          const delta = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 }[e.key];
+          const delta = {
+            ArrowLeft: -1,
+            ArrowRight: 1,
+            ArrowUp: -7,
+            ArrowDown: 7,
+          }[e.key];
           if (!delta) return;
-          const cells = Array.from(e.currentTarget.querySelectorAll<HTMLElement>("button[data-iso]"));
+          const cells = Array.from(
+            e.currentTarget.querySelectorAll<HTMLElement>("button[data-iso]"),
+          );
           const i = cells.indexOf(document.activeElement as HTMLElement);
-          const target = cells[Math.max(0, Math.min(i + delta, cells.length - 1))];
+          const target =
+            cells[Math.max(0, Math.min(i + delta, cells.length - 1))];
           if (target) {
             e.preventDefault();
             target.focus();
@@ -533,7 +628,15 @@ function MiniCalendar({ initialIso, onPick }: { initialIso: string; onPick: (iso
         }}
       >
         {t.date.weekdays.map((w) => (
-          <Box key={w} sx={{ textAlign: "center", fontSize: 12, color: "text.secondary", py: 0.5 }}>
+          <Box
+            key={w}
+            sx={{
+              textAlign: "center",
+              fontSize: 12,
+              color: "text.secondary",
+              py: 0.5,
+            }}
+          >
             {w}
           </Box>
         ))}
@@ -575,7 +678,14 @@ function MiniCalendar({ initialIso, onPick }: { initialIso: string; onPick: (iso
           component="button"
           type="button"
           onClick={() => onPick(todayIso)}
-          sx={{ fontSize: 12, color: "text.secondary", cursor: "pointer", border: "none", background: "none", py: 0.5 }}
+          sx={{
+            fontSize: 12,
+            color: "text.secondary",
+            cursor: "pointer",
+            border: "none",
+            background: "none",
+            py: 0.5,
+          }}
         >
           {t.date.today}
         </Box>

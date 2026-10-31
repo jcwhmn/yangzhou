@@ -3,14 +3,14 @@ package yangzhou.api.business.github
 import jakarta.validation.constraints.NotBlank
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import yangzhou.api.business.workspace.WorkspaceService
 import yangzhou.api.error.BadRequestException
 import yangzhou.api.error.ConflictException
 import yangzhou.api.error.NotFoundException
-import yangzhou.api.business.workspace.WorkspaceService
+import yangzhou.api.guard.LeaderGuard
 import yangzhou.persistence.ProjectRepo
 import yangzhou.persistence.ProjectWorkflowRule
 import yangzhou.persistence.repository.ProjectRepoRepository
-import yangzhou.api.guard.LeaderGuard
 import yangzhou.persistence.repository.ProjectRepository
 import yangzhou.persistence.repository.ProjectWorkflowRuleRepository
 import yangzhou.persistence.repository.StatusRepository
@@ -35,10 +35,12 @@ class GithubConfigService(
     private val statuses: StatusRepository,
     private val workspaceService: WorkspaceService,
 ) {
-
     // ---------- workspace PAT ----------
 
-    data class TokenResponse(val configured: Boolean, val tokenHint: String?)
+    data class TokenResponse(
+        val configured: Boolean,
+        val tokenHint: String?,
+    )
 
     fun tokenStatus(): TokenResponse {
         val token = workspaceService.required().githubToken ?: return TokenResponse(false, null)
@@ -64,15 +66,20 @@ class GithubConfigService(
 
     // ---------- 项目仓库 ----------
 
-    data class RepoDto(val repoId: UUID, val repo: String)
+    data class RepoDto(
+        val repoId: UUID,
+        val repo: String,
+    )
 
-    fun listRepos(projectKey: String): List<RepoDto> =
-        requireProject(projectKey).let { p ->
-            repos.findByProjectObjectId(p.objectId!!).map { RepoDto(it.objectId, it.repo) }
-        }
+    fun listRepos(projectKey: String): List<RepoDto> = requireProject(projectKey).let { p ->
+        repos.findByProjectObjectId(p.objectId!!).map { RepoDto(it.objectId, it.repo) }
+    }
 
     @Transactional
-    fun addRepo(projectKey: String, repo: String): RepoDto {
+    fun addRepo(
+        projectKey: String,
+        repo: String,
+    ): RepoDto {
         leaderGuard.requireLeader(projectKey)
         val project = requireProject(projectKey)
         val trimmed = repo.trim()
@@ -87,7 +94,10 @@ class GithubConfigService(
     }
 
     @Transactional
-    fun deleteRepo(projectKey: String, repoId: UUID) {
+    fun deleteRepo(
+        projectKey: String,
+        repoId: UUID,
+    ) {
         leaderGuard.requireLeader(projectKey)
         val project = requireProject(projectKey)
         val repo = repos.findByObjectId(repoId) ?: throw NotFoundException("仓库挂载不存在")
@@ -97,13 +107,19 @@ class GithubConfigService(
 
     // ---------- 事件→状态映射 ----------
 
-    data class RuleDto(val eventType: String, val statusId: UUID?, val statusName: String?)
+    data class RuleDto(
+        val eventType: String,
+        val statusId: UUID?,
+        val statusName: String?,
+    )
 
     fun listRules(projectKey: String): List<RuleDto> {
         val project = requireProject(projectKey)
         val byEvent = rules.findByProjectObjectId(project.objectId!!).associateBy { it.eventType }
-        val statusNames = statuses.findByProjectObjectIdOrderByPosition(project.objectId!!)
-            .associate { it.objectId to it.name }
+        val statusNames =
+            statuses
+                .findByProjectObjectIdOrderByPosition(project.objectId!!)
+                .associate { it.objectId to it.name }
         return GITHUB_EVENT_TYPES.map { event ->
             byEvent[event]?.let {
                 RuleDto(event, it.statusObjectId, statusNames[it.statusObjectId])
@@ -112,7 +128,10 @@ class GithubConfigService(
     }
 
     @Transactional
-    fun replaceRules(projectKey: String, input: List<RuleInput>): List<RuleDto> {
+    fun replaceRules(
+        projectKey: String,
+        input: List<RuleInput>,
+    ): List<RuleDto> {
         leaderGuard.requireLeader(projectKey)
         val project = requireProject(projectKey)
         val validStatuses = statuses.findByProjectObjectIdOrderByPosition(project.objectId!!).associateBy { it.objectId }
@@ -136,8 +155,7 @@ class GithubConfigService(
         return listRules(projectKey)
     }
 
-    private fun requireProject(key: String) =
-        projects.findByKey(key) ?: throw NotFoundException("项目不存在:$key")
+    private fun requireProject(key: String) = projects.findByKey(key) ?: throw NotFoundException("项目不存在:$key")
 }
 
 data class SetTokenRequest(

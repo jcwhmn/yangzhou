@@ -8,8 +8,8 @@ import org.springframework.data.jdbc.repository.config.EnableJdbcAuditing
 import yangzhou.api.business.member.MemberService
 import java.time.Clock
 import java.time.OffsetDateTime
-import java.util.UUID
 import java.util.Optional
+import java.util.UUID
 
 /**
  * audit 四元组统一接管(spec 0051):
@@ -19,7 +19,6 @@ import java.util.Optional
 @Configuration
 @EnableJdbcAuditing(dateTimeProviderRef = "auditingDateTimeProvider")
 class AuditingConfig {
-
     @Bean
     fun auditorProvider(members: MemberService): AuditorAware<UUID> = AuditorAware {
         try {

@@ -2,7 +2,10 @@
 import { expect } from "./support/fixtures";
 import { test } from "./support/fixtures";
 
-test("建项目表单——创建并打开看板(默认五列) @smoke", async ({ page, projectKey }) => {
+test("建项目表单——创建并打开看板(默认五列) @smoke", async ({
+  page,
+  projectKey,
+}) => {
   await page.goto("/");
   await page.getByLabel("KEY(如 CHE)").fill(`${projectKey}P`);
   await page.getByLabel("名称").fill("E2E UI 建的项目");
@@ -39,8 +42,16 @@ test("收藏——卡片☆切换与导航下拉直达", async ({ page, projectK
   await expect(card.getByText("★")).toBeVisible();
   // 导航 ⭐ 下拉列出本项目
   await page.getByRole("button", { name: "⭐ 收藏" }).click();
-  await expect(page.getByRole("menu").getByRole("link", { name: `E2E ${projectKey}` })).toBeVisible();
+  await expect(
+    page.getByRole("menu").getByRole("link", { name: `E2E ${projectKey}` }),
+  ).toBeVisible();
   // 收起(下拉内移除)→ 菜单里消失
-  await page.getByRole("menu").getByRole("button", { name: "移除" }).first().click();
-  await expect(page.getByRole("menu").getByRole("link", { name: `E2E ${projectKey}` })).toHaveCount(0);
+  await page
+    .getByRole("menu")
+    .getByRole("button", { name: "移除" })
+    .first()
+    .click();
+  await expect(
+    page.getByRole("menu").getByRole("link", { name: `E2E ${projectKey}` }),
+  ).toHaveCount(0);
 });

@@ -7,8 +7,11 @@ import javax.crypto.spec.SecretKeySpec
 
 /** GitHub webhook 签名校验:X-Hub-Signature-256 = "sha256=" + hex(HMAC-SHA256(secret, rawBody))。 */
 object WebhookSignature {
-
-    fun verify(secret: String, body: String, header: String): Boolean {
+    fun verify(
+        secret: String,
+        body: String,
+        header: String,
+    ): Boolean {
         if (!header.startsWith("sha256=")) return false
         val provided = runCatching { header.removePrefix("sha256=").hexToByteArray() }.getOrNull() ?: return false
         val mac = Mac.getInstance("HmacSHA256")

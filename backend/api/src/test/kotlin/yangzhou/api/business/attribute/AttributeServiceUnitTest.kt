@@ -3,8 +3,9 @@ package yangzhou.api.business.attribute
 import io.mockk.clearMocks
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.slot
 import io.mockk.verify
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Nested
 import org.springframework.dao.DataIntegrityViolationException
 import yangzhou.api.business.workspace.WorkspaceService
 import yangzhou.api.error.BadRequestException
@@ -14,20 +15,18 @@ import yangzhou.persistence.AttributeDefinition
 import yangzhou.persistence.Workspace
 import yangzhou.persistence.repository.AttributeDefinitionRepository
 import java.util.UUID
-import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Nested
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 /** YPJ-86 单测补齐:AttributeService 全分支(nested class 按方法分组)。 */
 class AttributeServiceUnitTest {
-
     private val definitions = mockk<AttributeDefinitionRepository>(relaxed = true)
     private val workspaceService = mockk<WorkspaceService>(relaxed = true)
     private val service = AttributeService(definitions, workspaceService)
 
     private val wsId = UUID(0, 7)
+
     private fun def(
         id: Long?,
         name: String,
@@ -44,7 +43,6 @@ class AttributeServiceUnitTest {
 
     @Nested
     inner class Create {
-
         @Test
         fun invalidKindRejected() {
             for (kind in listOf("skillx", "", "CATEGORY")) {
@@ -83,7 +81,10 @@ class AttributeServiceUnitTest {
             every { definitions.findByWorkspaceObjectIdAndObjectId(wsId, cat.objectId) } returns cat
             every { definitions.save(any()) } answers { firstArg() }
             var savedParent: UUID? = null
-            every { definitions.save(any()) } answers { savedParent = firstArg<AttributeDefinition>().parentObjectId; firstArg() }
+            every { definitions.save(any()) } answers {
+                savedParent = firstArg<AttributeDefinition>().parentObjectId
+                firstArg()
+            }
             val dto = service.create("kotlin", "skill", true, cat.objectId)
             assertEquals(UUID(0, 1), savedParent)
         }
@@ -91,7 +92,6 @@ class AttributeServiceUnitTest {
 
     @Nested
     inner class Update {
-
         @Test
         fun missingAttributeRejected() {
             every { definitions.findByWorkspaceObjectIdAndObjectId(wsId, any()) } returns null
@@ -133,7 +133,6 @@ class AttributeServiceUnitTest {
 
     @Nested
     inner class Delete {
-
         @Test
         fun missingAttributeRejected() {
             every { definitions.findByWorkspaceObjectIdAndObjectId(wsId, any()) } returns null
@@ -169,7 +168,6 @@ class AttributeServiceUnitTest {
 
     @Nested
     inner class List {
-
         @Test
         fun leavesCarryCategoryName() {
             val cat = def(1L, "lang", kind = "category")

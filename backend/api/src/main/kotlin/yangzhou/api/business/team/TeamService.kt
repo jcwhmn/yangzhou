@@ -1,13 +1,12 @@
 package yangzhou.api.business.team
 
-import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import yangzhou.api.business.member.MemberService
+import yangzhou.api.business.workspace.WorkspaceService
 import yangzhou.api.error.ConflictException
 import yangzhou.api.error.NotFoundException
-import yangzhou.api.business.workspace.WorkspaceService
 import yangzhou.persistence.Team
 import yangzhou.persistence.TeamMember
 import yangzhou.persistence.repository.MemberRepository
@@ -27,12 +26,18 @@ class TeamService(
     private val memberService: MemberService,
     private val workspaceService: WorkspaceService,
 ) {
+    data class TeamMemberDto(
+        val memberId: UUID,
+        val displayName: String,
+    )
 
-    data class TeamMemberDto(val memberId: UUID, val displayName: String)
-    data class TeamDto(val teamId: UUID, val name: String, val members: List<TeamMemberDto>)
+    data class TeamDto(
+        val teamId: UUID,
+        val name: String,
+        val members: List<TeamMemberDto>,
+    )
 
-    fun list(): List<TeamDto> =
-        teams.findByWorkspaceObjectId(workspaceService.required().objectId!!).map { toDto(it) }
+    fun list(): List<TeamDto> = teams.findByWorkspaceObjectId(workspaceService.required().objectId!!).map { toDto(it) }
 
     @Transactional
     fun create(name: String): TeamDto {
@@ -43,7 +48,10 @@ class TeamService(
     }
 
     @Transactional
-    fun rename(teamId: UUID, name: String): TeamDto {
+    fun rename(
+        teamId: UUID,
+        name: String,
+    ): TeamDto {
         val team = teams.findByObjectId(teamId) ?: throw NotFoundException("分组不存在")
         val updated = teams.save(team.copy(name = name))
         return toDto(updated)
@@ -56,7 +64,10 @@ class TeamService(
     }
 
     @Transactional
-    fun addMember(teamId: UUID, memberId: UUID): TeamDto {
+    fun addMember(
+        teamId: UUID,
+        memberId: UUID,
+    ): TeamDto {
         val team = teams.findByObjectId(teamId) ?: throw NotFoundException("分组不存在")
         memberService.requireMember(memberId)
         val internalMember = members.findByObjectId(memberId)!!
@@ -69,10 +80,15 @@ class TeamService(
     }
 
     @Transactional
-    fun removeMember(teamId: UUID, memberId: UUID): TeamDto {
+    fun removeMember(
+        teamId: UUID,
+        memberId: UUID,
+    ): TeamDto {
         val team = teams.findByObjectId(teamId) ?: throw NotFoundException("分组不存在")
         val internalMember = members.findByObjectId(memberId) ?: throw NotFoundException("成员不存在")
-        teamMembers.findByTeamObjectId(team.objectId!!).firstOrNull { it.memberObjectId == internalMember.objectId }
+        teamMembers
+            .findByTeamObjectId(team.objectId!!)
+            .firstOrNull { it.memberObjectId == internalMember.objectId }
             ?.let { teamMembers.delete(it) }
         return toDto(team)
     }
@@ -83,7 +99,8 @@ class TeamService(
         return TeamDto(
             teamId = team.objectId,
             name = team.name,
-            members = list.mapNotNull { tm ->
+            members =
+            list.mapNotNull { tm ->
                 byInternal[tm.memberObjectId]?.let { TeamMemberDto(it.objectId, it.displayName) }
             },
         )
@@ -94,4 +111,6 @@ data class CreateTeamRequest(
     @field:NotBlank val name: String,
 )
 
-data class AddTeamMemberRequest(val memberId: UUID)
+data class AddTeamMemberRequest(
+    val memberId: UUID,
+)

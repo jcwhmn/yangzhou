@@ -54,7 +54,10 @@ export default function BacklogPage() {
     e.preventDefault();
     if (!newTitle.trim()) return;
     try {
-      await api(`/api/projects/${key}/items`, { method: "POST", body: JSON.stringify({ title: newTitle.trim() }) });
+      await api(`/api/projects/${key}/items`, {
+        method: "POST",
+        body: JSON.stringify({ title: newTitle.trim() }),
+      });
       setNewTitle("");
       setItems(await api<Item[]>(`/api/projects/${key}/backlog`));
     } catch (err) {
@@ -62,7 +65,16 @@ export default function BacklogPage() {
     }
   }
 
-  const columns = ["编号", "标题", "优先级", "状态", "负责人", "开始", "截止", "可行性"];
+  const columns = [
+    "编号",
+    "标题",
+    "优先级",
+    "状态",
+    "负责人",
+    "开始",
+    "截止",
+    "可行性",
+  ];
 
   return (
     <PageShell>
@@ -71,7 +83,13 @@ export default function BacklogPage() {
         {items !== null && (
           <Typography color="text.secondary">{`${items.length} item`}</Typography>
         )}
-        <Stack component="form" direction="row" spacing={1} sx={{ ml: "auto" }} onSubmit={addItem}>
+        <Stack
+          component="form"
+          direction="row"
+          spacing={1}
+          sx={{ ml: "auto" }}
+          onSubmit={addItem}
+        >
           <TextField
             size="small"
             placeholder={t.board.addItem}
@@ -102,7 +120,10 @@ export default function BacklogPage() {
                 <TableRow key={it.itemId} hover>
                   <TableCell>
                     <Link href={`/p/${key}/i/${it.itemId}?from=backlog`}>
-                      <Typography variant="body2" sx={{ whiteSpace: "nowrap" }}>{(it.parentNumber ? it.parentNumber + " › " : "") + it.number}</Typography>
+                      <Typography variant="body2" sx={{ whiteSpace: "nowrap" }}>
+                        {(it.parentNumber ? it.parentNumber + " › " : "") +
+                          it.number}
+                      </Typography>
                     </Link>
                   </TableCell>
                   <TableCell>
@@ -116,13 +137,19 @@ export default function BacklogPage() {
                     <AssignPopover
                       itemId={it.itemId}
                       assignee={it.assignee}
-                      onChanged={() => api<Item[]>(`/api/projects/${key}/backlog`).then(setItems).catch(() => {})}
+                      onChanged={() =>
+                        api<Item[]>(`/api/projects/${key}/backlog`)
+                          .then(setItems)
+                          .catch(() => {})
+                      }
                     >
                       {(onClick) => (
                         <Chip
                           size="small"
                           variant="outlined"
-                          label={it.assignee ? `👤 ${it.assignee}` : t.assign.none}
+                          label={
+                            it.assignee ? `👤 ${it.assignee}` : t.assign.none
+                          }
                           onClick={onClick}
                           sx={it.assignee ? undefined : { opacity: 0.55 }}
                         />
@@ -131,11 +158,21 @@ export default function BacklogPage() {
                   </TableCell>
                   <TableCell>{it.startDate ?? "—"}</TableCell>
                   <TableCell>
-                    <span style={{ color: it.overdue ? "red" : it.dueSoon ? "orange" : "inherit" }}>
+                    <span
+                      style={{
+                        color: it.overdue
+                          ? "red"
+                          : it.dueSoon
+                            ? "orange"
+                            : "inherit",
+                      }}
+                    >
                       {it.dueDate ?? "—"}
                     </span>
                   </TableCell>
-                  <TableCell>{it.feasSignal ? t.signal[it.feasSignal] : "—"}</TableCell>
+                  <TableCell>
+                    {it.feasSignal ? t.signal[it.feasSignal] : "—"}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>

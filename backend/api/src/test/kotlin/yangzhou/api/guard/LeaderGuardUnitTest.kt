@@ -19,7 +19,6 @@ import kotlin.test.assertFailsWith
 
 /** YPJ-102 单测(spec 0081):LeaderGuard 规则矩阵。R1 落在 ProjectService.create,此处测 R2/门槛判定。 */
 class LeaderGuardUnitTest {
-
     private val projects = mockk<ProjectRepository>(relaxed = true)
     private val projectMembers = mockk<ProjectMemberRepository>(relaxed = true)
     private val membersRepo = mockk<MemberRepository>(relaxed = true)
@@ -30,13 +29,16 @@ class LeaderGuardUnitTest {
     private val plainId = UUID(0, 2)
     private val outsiderId = UUID(0, 3)
 
-    private val leaderRow = ProjectMember(id = 11L, projectObjectId = projectObjectId, memberObjectId = leaderId, role = ProjectMember.ROLE_LEADER)
-    private val plainRow = ProjectMember(id = 12L, projectObjectId = projectObjectId, memberObjectId = plainId, role = ProjectMember.ROLE_MEMBER)
+    private val leaderRow =
+        ProjectMember(id = 11L, projectObjectId = projectObjectId, memberObjectId = leaderId, role = ProjectMember.ROLE_LEADER)
+    private val plainRow =
+        ProjectMember(id = 12L, projectObjectId = projectObjectId, memberObjectId = plainId, role = ProjectMember.ROLE_MEMBER)
 
     @BeforeEach
     fun clearAuth() {
         SecurityContextHolder.clearContext()
-        every { projects.findByKey("LDR") } returns yangzhou.persistence.Project(id = 1, objectId = projectObjectId, workspaceObjectId = UUID(0, 9), key = "LDR", name = "LDR")
+        every { projects.findByKey("LDR") } returns
+            yangzhou.persistence.Project(id = 1, objectId = projectObjectId, workspaceObjectId = UUID(0, 9), key = "LDR", name = "LDR")
         every { projectMembers.findByProjectObjectId(projectObjectId) } returns listOf(leaderRow, plainRow)
     }
 
@@ -44,7 +46,15 @@ class LeaderGuardUnitTest {
         val objectId = UUID.randomUUID()
         SecurityContextHolder.getContext().authentication =
             UsernamePasswordAuthenticationToken(objectId.toString(), null, emptyList())
-        every { membersRepo.findByObjectId(objectId) } returns Member(id = 1, objectId = memberObjectId, workspaceObjectId = UUID(0, 9), username = null, passwordHash = null, displayName = "m$memberObjectId")
+        every { membersRepo.findByObjectId(objectId) } returns
+            Member(
+                id = 1,
+                objectId = memberObjectId,
+                workspaceObjectId = UUID(0, 9),
+                username = null,
+                passwordHash = null,
+                displayName = "m$memberObjectId",
+            )
     }
 
     @Nested

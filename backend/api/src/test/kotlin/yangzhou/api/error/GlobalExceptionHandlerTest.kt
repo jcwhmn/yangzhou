@@ -1,7 +1,5 @@
 package yangzhou.api.error
 
-import yangzhou.api.error.GlobalExceptionHandler
-
 import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.Logger
 import ch.qos.logback.classic.spi.ILoggingEvent
@@ -11,6 +9,7 @@ import io.mockk.mockk
 import jakarta.servlet.http.HttpServletRequest
 import org.slf4j.LoggerFactory
 import yangzhou.api.error.ConflictException
+import yangzhou.api.error.GlobalExceptionHandler
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -21,7 +20,6 @@ import kotlin.test.assertTrue
 
 /** 0055:失败请求必须落 log——5xx ERROR 带栈,4xx WARN;纯单测不走 Spring。 */
 class GlobalExceptionHandlerTest {
-
     private val handler = GlobalExceptionHandler()
     private val appender = ListAppender<ILoggingEvent>()
     private val logger: Logger = LoggerFactory.getLogger(GlobalExceptionHandler::class.java) as Logger
@@ -65,9 +63,14 @@ class GlobalExceptionHandlerTest {
 
     @Test
     fun `路径参数类型不匹配 - 400 BAD_REQUEST`() {
-        val e = org.springframework.web.method.annotation.MethodArgumentTypeMismatchException(
-            "YPJ-1", java.util.UUID::class.java, "itemObjectId", null, null,
-        )
+        val e =
+            org.springframework.web.method.annotation.MethodArgumentTypeMismatchException(
+                "YPJ-1",
+                java.util.UUID::class.java,
+                "itemObjectId",
+                null,
+                null,
+            )
         val res = handler.typeMismatch(e, req)
         assertEquals(400, res.statusCode.value())
         assertEquals("BAD_REQUEST", res.body!!.code)

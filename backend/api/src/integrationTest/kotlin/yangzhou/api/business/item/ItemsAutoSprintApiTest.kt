@@ -16,13 +16,12 @@ class ItemsAutoSprintApiTest : AbstractApiTest() {
         return authed to itemId
     }
 
-    private fun createSprint(authed: RestTestClient, name: String): String =
-        authed.post().uri("/api/projects/CHE/sprints")
-            .body(mapOf("name" to name))
-            .exchange()
-            .expectStatus().isCreated()
-            .expectBody(String::class.java).returnResult().responseBody!!
-            .let { json.readTree(it) }["sprintId"].asText()
+    private fun createSprint(authed: RestTestClient, name: String): String = authed.post().uri("/api/projects/CHE/sprints")
+        .body(mapOf("name" to name))
+        .exchange()
+        .expectStatus().isCreated()
+        .expectBody(String::class.java).returnResult().responseBody!!
+        .let { json.readTree(it) }["sprintId"].asText()
 
     /** POST 建出的 sprint 默认 planned;激活是用户动作(sprints move active)。 */
     private fun activateSprint(authed: RestTestClient, sprintId: String) {
@@ -43,19 +42,17 @@ class ItemsAutoSprintApiTest : AbstractApiTest() {
     )["statuses"]
 
     /** 开工须有主(V4-S3):离开 start 态前必须指派。 */
-    private fun assignToMe(authed: RestTestClient, itemId: String) =
-        authed.put().uri("/api/items/$itemId/assignee")
-            .body(mapOf("assigneeItemId" to meMemberId(authed)))
-            .exchange().expectStatus().isOk()
+    private fun assignToMe(authed: RestTestClient, itemId: String) = authed.put().uri("/api/items/$itemId/assignee")
+        .body(mapOf("assigneeItemId" to meMemberId(authed)))
+        .exchange().expectStatus().isOk()
 
-    private fun patchStatus(authed: RestTestClient, itemId: String, toStatusId: String) =
-        json.readTree(
-            authed.patch().uri("/api/items/$itemId")
-                .body(mapOf("statusItemId" to toStatusId))
-                .exchange()
-                .expectStatus().isOk()
-                .expectBody(String::class.java).returnResult().responseBody!!,
-        ).also { println("PATCH_RESP=$it") } // YPJ-120 调试,验证后删
+    private fun patchStatus(authed: RestTestClient, itemId: String, toStatusId: String) = json.readTree(
+        authed.patch().uri("/api/items/$itemId")
+            .body(mapOf("statusItemId" to toStatusId))
+            .exchange()
+            .expectStatus().isOk()
+            .expectBody(String::class.java).returnResult().responseBody!!,
+    ).also { println("PATCH_RESP=$it") } // YPJ-120 调试,验证后删
 
     @Test
     fun `开始无 sprint 的 item 自动挂最早创建的 active sprint`() {

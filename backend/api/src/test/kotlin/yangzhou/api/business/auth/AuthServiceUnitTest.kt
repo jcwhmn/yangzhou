@@ -1,10 +1,11 @@
 package yangzhou.api.business.auth
 
-import java.util.UUID
 import io.mockk.clearMocks
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Nested
 import org.springframework.security.authentication.BadCredentialsException
 import org.springframework.security.crypto.password.PasswordEncoder
 import yangzhou.api.business.workspace.WorkspaceService
@@ -14,15 +15,13 @@ import yangzhou.persistence.Member
 import yangzhou.persistence.Workspace
 import yangzhou.persistence.repository.MemberRepository
 import yangzhou.persistence.repository.WorkspaceRepository
-import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Nested
+import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 /** YPJ-89 单测补齐:AuthService(bootstrap 一次性/登录凭据校验)。 */
 class AuthServiceUnitTest {
-
     private val members = mockk<MemberRepository>(relaxed = true)
     private val workspaces = mockk<WorkspaceRepository>(relaxed = true)
     private val workspaceService = mockk<WorkspaceService>(relaxed = true)
@@ -30,9 +29,15 @@ class AuthServiceUnitTest {
     private val jwt = mockk<JwtService>(relaxed = true)
     private val service = AuthService(members, workspaces, workspaceService, encoder, jwt)
 
-    private val me = Member(
-        id = 1L, objectId = UUID(0, 1), workspaceObjectId = UUID(0, 9), username = "me", passwordHash = "hash", displayName = "me",
-    )
+    private val me =
+        Member(
+            id = 1L,
+            objectId = UUID(0, 1),
+            workspaceObjectId = UUID(0, 9),
+            username = "me",
+            passwordHash = "hash",
+            displayName = "me",
+        )
 
     @BeforeEach
     fun setup() {
@@ -45,7 +50,6 @@ class AuthServiceUnitTest {
 
     @Nested
     inner class Bootstrap {
-
         @Test
         fun secondBootstrapRejected() {
             every { members.count() } returns 1L
@@ -64,7 +68,6 @@ class AuthServiceUnitTest {
 
     @Nested
     inner class Login {
-
         @Test
         fun wrongPasswordRejected() {
             every { members.findByUsername("me") } returns me

@@ -27,7 +27,12 @@ type ProjectDto = {
   name: string;
   archived: boolean;
   feasSignal: Signal | null;
-  statuses: { statusId: string; name: string; isFinal: boolean; position: number }[];
+  statuses: {
+    statusId: string;
+    name: string;
+    isFinal: boolean;
+    position: number;
+  }[];
 };
 
 type Shortfall = {
@@ -35,15 +40,44 @@ type Shortfall = {
   deltaSum: number;
   missingCount: number;
   unratedCount: number;
-  items: { projectKey: string; itemId: string; number: string; title: string }[];
+  items: {
+    projectKey: string;
+    itemId: string;
+    number: string;
+    title: string;
+  }[];
 };
 
-type StandupItem = { itemId: string; number: string; projectKey: string; title: string; statusName: string };
-type Standup = { doneYesterday: StandupItem[]; today: StandupItem[]; blocked: StandupItem[] };
-type NotifDto = { notificationId: string; itemId: string; number: string; projectKey: string; title: string };
+type StandupItem = {
+  itemId: string;
+  number: string;
+  projectKey: string;
+  title: string;
+  statusName: string;
+};
+type Standup = {
+  doneYesterday: StandupItem[];
+  today: StandupItem[];
+  blocked: StandupItem[];
+};
+type NotifDto = {
+  notificationId: string;
+  itemId: string;
+  number: string;
+  projectKey: string;
+  title: string;
+};
 type LiveSprint = { sprintId: string; name: string; endDate: string | null };
-type LiveMilestone = { milestoneId: string; name: string; targetDate: string | null };
-type LiveGroup = { projectKey: string; sprints: LiveSprint[]; milestones: LiveMilestone[] };
+type LiveMilestone = {
+  milestoneId: string;
+  name: string;
+  targetDate: string | null;
+};
+type LiveGroup = {
+  projectKey: string;
+  sprints: LiveSprint[];
+  milestones: LiveMilestone[];
+};
 type DashboardDto = { standup: Standup; live: LiveGroup[] };
 
 export default function ProjectsPage() {
@@ -67,7 +101,10 @@ export default function ProjectsPage() {
 
   // 全局驾驶舱:后端一次聚合(我的三桶 + 各项目活跃 sprint/进行中 milestone),通知另取
   async function loadDashboard() {
-    const [d, ns] = await Promise.all([api<DashboardDto>("/api/dashboard"), api<NotifDto[]>("/api/notifications")]);
+    const [d, ns] = await Promise.all([
+      api<DashboardDto>("/api/dashboard"),
+      api<NotifDto[]>("/api/notifications"),
+    ]);
     setStandup(d.standup);
     setLive(d.live);
     setRecent(ns.slice(0, 5));
@@ -84,7 +121,10 @@ export default function ProjectsPage() {
     try {
       await api("/api/projects", {
         method: "POST",
-        body: JSON.stringify({ key: key.trim(), name: name.trim() || key.trim() }),
+        body: JSON.stringify({
+          key: key.trim(),
+          name: name.trim() || key.trim(),
+        }),
       });
       setKey("");
       setName("");
@@ -98,7 +138,11 @@ export default function ProjectsPage() {
     const method = favKeys.includes(projectKey) ? "DELETE" : "PUT";
     try {
       await api(`/api/projects/${projectKey}/favorite`, { method });
-      setFavKeys((prev) => (method === "PUT" ? [...prev, projectKey] : prev.filter((k) => k !== projectKey)));
+      setFavKeys((prev) =>
+        method === "PUT"
+          ? [...prev, projectKey]
+          : prev.filter((k) => k !== projectKey),
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "收藏失败");
     }
@@ -106,10 +150,18 @@ export default function ProjectsPage() {
 
   const visibleProjects = useMemo(() => {
     let list = [...projects];
-    if (search) list = list.filter((p) => p.key.toLowerCase().includes(search.toLowerCase()) || p.name.toLowerCase().includes(search.toLowerCase()));
+    if (search)
+      list = list.filter(
+        (p) =>
+          p.key.toLowerCase().includes(search.toLowerCase()) ||
+          p.name.toLowerCase().includes(search.toLowerCase()),
+      );
     if (sortBy === "name") list.sort((a, b) => a.name.localeCompare(b.name));
-    else if (sortBy === "signal") { const rank = (s: string | null) => (s === "RED" ? 0 : s === "YELLOW" ? 1 : s === "GREEN" ? 2 : 3); list.sort((a, b) => rank(a.feasSignal) - rank(b.feasSignal)); }
-    else list.sort((a, b) => a.key.localeCompare(b.key));
+    else if (sortBy === "signal") {
+      const rank = (s: string | null) =>
+        s === "RED" ? 0 : s === "YELLOW" ? 1 : s === "GREEN" ? 2 : 3;
+      list.sort((a, b) => rank(a.feasSignal) - rank(b.feasSignal));
+    } else list.sort((a, b) => a.key.localeCompare(b.key));
     if (!showArchived) list = list.filter((p) => !p.archived);
     return list;
   }, [projects, search, sortBy, showArchived]);
@@ -119,19 +171,41 @@ export default function ProjectsPage() {
         {t.dashboard.title}
       </Typography>
       {standup && (
-        <Stack direction="row" spacing={2} sx={{ mb: 4 }} useFlexGap flexWrap="wrap">
-          {([
-            { title: t.dashboard.today, items: standup.today, muted: false },
-            { title: t.dashboard.blocked, items: standup.blocked, muted: false },
-            { title: t.dashboard.doneYesterday, items: standup.doneYesterday, muted: true },
-          ] as const).map((col) => (
-            <Card key={col.title} variant="outlined" sx={{ flex: "1 1 240px", minWidth: 240 }}>
+        <Stack
+          direction="row"
+          spacing={2}
+          sx={{ mb: 4 }}
+          useFlexGap
+          flexWrap="wrap"
+        >
+          {(
+            [
+              { title: t.dashboard.today, items: standup.today, muted: false },
+              {
+                title: t.dashboard.blocked,
+                items: standup.blocked,
+                muted: false,
+              },
+              {
+                title: t.dashboard.doneYesterday,
+                items: standup.doneYesterday,
+                muted: true,
+              },
+            ] as const
+          ).map((col) => (
+            <Card
+              key={col.title}
+              variant="outlined"
+              sx={{ flex: "1 1 240px", minWidth: 240 }}
+            >
               <CardContent>
                 <Typography variant="subtitle2" sx={{ mb: 1 }}>
                   {col.title}({col.items.length})
                 </Typography>
                 {col.items.length === 0 ? (
-                  <Typography variant="body2" color="text.secondary">{t.dashboard.none}</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {t.dashboard.none}
+                  </Typography>
                 ) : (
                   col.items.map((it) => (
                     <Typography
@@ -146,7 +220,12 @@ export default function ProjectsPage() {
                         color: col.muted ? "text.secondary" : "text.primary",
                       }}
                     >
-                      <Box component="span" sx={{ color: "primary.main", mr: 1 }}>{it.number}</Box>
+                      <Box
+                        component="span"
+                        sx={{ color: "primary.main", mr: 1 }}
+                      >
+                        {it.number}
+                      </Box>
                       {it.title}
                     </Typography>
                   ))
@@ -158,12 +237,26 @@ export default function ProjectsPage() {
       )}
       {live.some((g) => g.sprints.length > 0 || g.milestones.length > 0) && (
         <Box sx={{ mb: 4 }}>
-          <Typography variant="h6" gutterBottom>{t.dashboard.inProgress}</Typography>
+          <Typography variant="h6" gutterBottom>
+            {t.dashboard.inProgress}
+          </Typography>
           <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
             {live
               .flatMap((g) => [
-                ...g.sprints.map((s) => ({ id: `s-${g.projectKey}-${s.sprintId}`, key: g.projectKey, label: t.dashboard.sprint, name: s.name, date: s.endDate })),
-                ...g.milestones.map((m) => ({ id: `m-${g.projectKey}-${m.milestoneId}`, key: g.projectKey, label: t.dashboard.milestone, name: m.name, date: m.targetDate })),
+                ...g.sprints.map((s) => ({
+                  id: `s-${g.projectKey}-${s.sprintId}`,
+                  key: g.projectKey,
+                  label: t.dashboard.sprint,
+                  name: s.name,
+                  date: s.endDate,
+                })),
+                ...g.milestones.map((m) => ({
+                  id: `m-${g.projectKey}-${m.milestoneId}`,
+                  key: g.projectKey,
+                  label: t.dashboard.milestone,
+                  name: m.name,
+                  date: m.targetDate,
+                })),
               ])
               .map((x) => (
                 <Card key={x.id} variant="outlined" sx={{ py: 1, px: 1.5 }}>
@@ -171,7 +264,11 @@ export default function ProjectsPage() {
                     <Chip label={x.key} size="small" />
                     <Chip label={x.label} size="small" variant="outlined" />
                     <Typography variant="body2">{x.name}</Typography>
-                    {x.date && <Typography variant="caption" color="text.secondary">{x.date}</Typography>}
+                    {x.date && (
+                      <Typography variant="caption" color="text.secondary">
+                        {x.date}
+                      </Typography>
+                    )}
                   </Stack>
                 </Card>
               ))}
@@ -180,9 +277,25 @@ export default function ProjectsPage() {
       )}
       {recent.length > 0 && (
         <Box sx={{ mb: 4 }}>
-          <Stack direction="row" spacing={2} alignItems="baseline" sx={{ mb: 0.5 }}>
+          <Stack
+            direction="row"
+            spacing={2}
+            alignItems="baseline"
+            sx={{ mb: 0.5 }}
+          >
             <Typography variant="h6">{t.dashboard.recent}</Typography>
-            <Typography variant="body2" component={Link} href="/notifications" sx={{ color: "primary.main", textDecoration: "none", "&:hover": { textDecoration: "underline" } }}>{t.dashboard.viewAll}</Typography>
+            <Typography
+              variant="body2"
+              component={Link}
+              href="/notifications"
+              sx={{
+                color: "primary.main",
+                textDecoration: "none",
+                "&:hover": { textDecoration: "underline" },
+              }}
+            >
+              {t.dashboard.viewAll}
+            </Typography>
           </Stack>
           {recent.map((n) => (
             <Typography
@@ -190,9 +303,15 @@ export default function ProjectsPage() {
               variant="body2"
               component={Link}
               href={`/p/${n.projectKey}/i/${n.itemId}`}
-              sx={{ display: "block", textDecoration: "none", color: "text.primary" }}
+              sx={{
+                display: "block",
+                textDecoration: "none",
+                color: "text.primary",
+              }}
             >
-              <Box component="span" sx={{ color: "primary.main", mr: 1 }}>{n.number}</Box>
+              <Box component="span" sx={{ color: "primary.main", mr: 1 }}>
+                {n.number}
+              </Box>
               {n.title}
             </Typography>
           ))}
@@ -201,16 +320,40 @@ export default function ProjectsPage() {
       <Typography variant="h5" gutterBottom>
         {t.projects.title}
       </Typography>
-      <Stack component="form" direction="row" spacing={1} onSubmit={create} sx={{ mb: 3 }}>
-        <TextField size="small" label={t.projects.createKey} value={key} onChange={(e) => setKey(e.target.value.toUpperCase())} required />
-        <TextField size="small" label={t.projects.createName} value={name} onChange={(e) => setName(e.target.value)} />
+      <Stack
+        component="form"
+        direction="row"
+        spacing={1}
+        onSubmit={create}
+        sx={{ mb: 3 }}
+      >
+        <TextField
+          size="small"
+          label={t.projects.createKey}
+          value={key}
+          onChange={(e) => setKey(e.target.value.toUpperCase())}
+          required
+        />
+        <TextField
+          size="small"
+          label={t.projects.createName}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
         <Button type="submit" variant="contained">
           创建项目
         </Button>
       </Stack>
       {favHint && (
-        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2, p: 1, bgcolor: "action.hover", borderRadius: 1 }}>
-          <Typography variant="body2">点项目卡右上角 ☆ 收藏常用项目,之后从导航 ⭐ 收藏直达。</Typography>
+        <Stack
+          direction="row"
+          spacing={1}
+          alignItems="center"
+          sx={{ mb: 2, p: 1, bgcolor: "action.hover", borderRadius: 1 }}
+        >
+          <Typography variant="body2">
+            点项目卡右上角 ☆ 收藏常用项目,之后从导航 ⭐ 收藏直达。
+          </Typography>
           <Button
             size="small"
             onClick={() => {
@@ -222,14 +365,33 @@ export default function ProjectsPage() {
           </Button>
         </Stack>
       )}
-      {error && <Typography color="error" sx={{ mb: 1 }}>{error}</Typography>}
-      {projects.length === 0 && <Typography color="text.secondary">{t.projects.empty}</Typography>}
-      <Box sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 2, mb: 4 }}>
+      {error && (
+        <Typography color="error" sx={{ mb: 1 }}>
+          {error}
+        </Typography>
+      )}
+      {projects.length === 0 && (
+        <Typography color="text.secondary">{t.projects.empty}</Typography>
+      )}
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))",
+          gap: 2,
+          mb: 4,
+        }}
+      >
         {visibleProjects.map((p) => (
           <Card key={p.key} sx={{ position: "relative" }}>
             <Button
               size="small"
-              sx={{ position: "absolute", top: 2, right: 2, zIndex: 1, minWidth: 0 }}
+              sx={{
+                position: "absolute",
+                top: 2,
+                right: 2,
+                zIndex: 1,
+                minWidth: 0,
+              }}
               onClick={() => toggleFav(p.key)}
               aria-label="favorite"
             >
@@ -245,7 +407,13 @@ export default function ProjectsPage() {
                       label={t.signal[p.feasSignal]}
                       size="small"
                       variant="outlined"
-                      color={p.feasSignal === "RED" ? "error" : p.feasSignal === "YELLOW" ? "warning" : "success"}
+                      color={
+                        p.feasSignal === "RED"
+                          ? "error"
+                          : p.feasSignal === "YELLOW"
+                            ? "warning"
+                            : "success"
+                      }
                     />
                   )}
                 </Stack>
@@ -255,9 +423,22 @@ export default function ProjectsPage() {
         ))}
       </Box>
 
-      <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }} flexWrap="wrap" useFlexGap>
-        <TextField size="small" placeholder="搜索项目…" value={search} onChange={(e) => setSearch(e.target.value)} sx={{ width: 220 }} />
-<Dropdown
+      <Stack
+        direction="row"
+        spacing={1}
+        alignItems="center"
+        sx={{ mb: 2 }}
+        flexWrap="wrap"
+        useFlexGap
+      >
+        <TextField
+          size="small"
+          placeholder="搜索项目…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          sx={{ width: 220 }}
+        />
+        <Dropdown
           ariaLabel="排序"
           size="small"
           value={sortBy}
@@ -270,8 +451,16 @@ export default function ProjectsPage() {
           ]}
         />
         <FormControlLabel
-          control={<Checkbox size="small" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />}
-          label={<Typography variant="caption">{t.projects.showArchived}</Typography>}
+          control={
+            <Checkbox
+              size="small"
+              checked={showArchived}
+              onChange={(e) => setShowArchived(e.target.checked)}
+            />
+          }
+          label={
+            <Typography variant="caption">{t.projects.showArchived}</Typography>
+          }
         />
       </Stack>
       <Typography variant="h5" gutterBottom>
@@ -287,18 +476,52 @@ export default function ProjectsPage() {
           {shortfallList.map((s) => (
             <Card key={s.attribute} variant="outlined">
               <CardContent sx={{ py: 1.5, "&:last-child": { pb: 1.5 } }}>
-                <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                <Stack
+                  direction="row"
+                  spacing={1}
+                  alignItems="center"
+                  flexWrap="wrap"
+                >
                   <Typography variant="subtitle1">{s.attribute}</Typography>
-                  {s.missingCount > 0 && <Chip size="small" color="error" variant="outlined" label={t.shortfall.missing(s.missingCount)} />}
-                  {s.deltaSum > 0 && <Chip size="small" color="warning" variant="outlined" label={t.shortfall.delta(s.deltaSum)} />}
-                  {s.unratedCount > 0 && <Chip size="small" variant="outlined" label={t.shortfall.unrated(s.unratedCount)} />}
+                  {s.missingCount > 0 && (
+                    <Chip
+                      size="small"
+                      color="error"
+                      variant="outlined"
+                      label={t.shortfall.missing(s.missingCount)}
+                    />
+                  )}
+                  {s.deltaSum > 0 && (
+                    <Chip
+                      size="small"
+                      color="warning"
+                      variant="outlined"
+                      label={t.shortfall.delta(s.deltaSum)}
+                    />
+                  )}
+                  {s.unratedCount > 0 && (
+                    <Chip
+                      size="small"
+                      variant="outlined"
+                      label={t.shortfall.unrated(s.unratedCount)}
+                    />
+                  )}
                 </Stack>
-                <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mt: 0.5 }}>
+                <Stack
+                  direction="row"
+                  spacing={1}
+                  flexWrap="wrap"
+                  sx={{ mt: 0.5 }}
+                >
                   {s.items.map((it, i) => (
                     <Link
                       key={i}
                       href={`/p/${it.projectKey}/i/${it.itemId}`}
-                      style={{ fontSize: 13, color: "primary.main", textDecoration: "none" }}
+                      style={{
+                        fontSize: 13,
+                        color: "primary.main",
+                        textDecoration: "none",
+                      }}
                     >
                       {it.number}
                     </Link>

@@ -34,7 +34,11 @@ export default function StandupPage() {
   const load = useCallback(async () => {
     setError("");
     try {
-      setData(await api<Standup>(`/api/standup${memberId ? `?member=${memberId}` : ""}`));
+      setData(
+        await api<Standup>(
+          `/api/standup${memberId ? `?member=${memberId}` : ""}`,
+        ),
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : "加载失败");
     }
@@ -54,14 +58,20 @@ export default function StandupPage() {
     if (memberId) load();
   }, [memberId, load]);
 
-  function group(title: string, color: "success" | "primary" | "error", list: StandupItem[] | undefined) {
+  function group(
+    title: string,
+    color: "success" | "primary" | "error",
+    list: StandupItem[] | undefined,
+  ) {
     return (
       <Box sx={{ mb: 3 }}>
         <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
           <Typography variant="h6">{title}</Typography>
           <Chip size="small" label={list?.length ?? 0} color={color} />
         </Stack>
-        {(!list || list.length === 0) && <Typography color="text.secondary">(无)</Typography>}
+        {(!list || list.length === 0) && (
+          <Typography color="text.secondary">(无)</Typography>
+        )}
         <Stack spacing={1}>
           {(list ?? []).map((it) => (
             <Card key={`${it.projectKey}-${it.itemId}`} variant="outlined">
@@ -71,7 +81,11 @@ export default function StandupPage() {
                   <Link href={`/p/${it.projectKey}/i/${it.itemId}`}>
                     <Typography variant="body2">{it.title}</Typography>
                   </Link>
-                  <Chip size="small" label={it.statusName} sx={{ ml: "auto" }} />
+                  <Chip
+                    size="small"
+                    label={it.statusName}
+                    sx={{ ml: "auto" }}
+                  />
                 </Stack>
               </CardContent>
             </Card>
@@ -85,13 +99,16 @@ export default function StandupPage() {
     <PageShell>
       <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
         <Typography variant="h5">站会</Typography>
-<Dropdown
+        <Dropdown
           ariaLabel="成员"
           size="small"
           value={memberId}
           onChange={(v) => setMemberId(v)}
           sx={{ minWidth: 160 }}
-          options={members.map((m) => ({ value: m.memberId, label: m.displayName + (m.virtual ? "(虚拟)" : "") }))}
+          options={members.map((m) => ({
+            value: m.memberId,
+            label: m.displayName + (m.virtual ? "(虚拟)" : ""),
+          }))}
         />
       </Stack>
       {error && (

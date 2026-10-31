@@ -1,6 +1,13 @@
 "use client";
 
-import { Box, Button, Card, CardContent, Stack, Typography } from "@mui/material";
+import {
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Stack,
+  Typography,
+} from "@mui/material";
 import { PageShell } from "@/components/PageShell";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -23,17 +30,24 @@ export default function TimeSummaryPage() {
 
   const load = useCallback(async () => {
     try {
-      setSummary(await api<MemberSummary[]>(`/api/projects/${key}/time-summary`));
+      setSummary(
+        await api<MemberSummary[]>(`/api/projects/${key}/time-summary`),
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : t.time.failed);
     }
   }, [key]);
 
   useEffect(() => {
-    load().catch((e) => setError(e instanceof Error ? e.message : t.time.failed));
+    load().catch((e) =>
+      setError(e instanceof Error ? e.message : t.time.failed),
+    );
   }, [load]);
 
-  const projectTotal = (summary ?? []).reduce((acc, m) => acc + m.totalMinutes, 0);
+  const projectTotal = (summary ?? []).reduce(
+    (acc, m) => acc + m.totalMinutes,
+    0,
+  );
 
   return (
     <PageShell>
@@ -43,7 +57,10 @@ export default function TimeSummaryPage() {
         </Button>
         <Typography variant="h5">{t.time.title(String(key))}</Typography>
         {projectTotal > 0 && (
-          <Typography variant="h6" sx={{ color: "text.primary", fontWeight: 600 }}>
+          <Typography
+            variant="h6"
+            sx={{ color: "text.primary", fontWeight: 600 }}
+          >
             {t.time.total}:{t.time.fmt(projectTotal)}
           </Typography>
         )}
@@ -62,11 +79,22 @@ export default function TimeSummaryPage() {
             <CardContent sx={{ py: 1.5, "&:last-child": { pb: 1.5 } }}>
               <Stack direction="row" spacing={2} alignItems="center">
                 <Typography variant="subtitle1">{m.displayName}</Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ ml: "auto" }}>
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ ml: "auto" }}
+                >
                   {t.time.fmt(m.totalMinutes)} · {t.time.entries} {m.entryCount}
                 </Typography>
               </Stack>
-              <Box sx={{ mt: 1, height: 6, borderRadius: 1, bgcolor: "action.hover" }}>
+              <Box
+                sx={{
+                  mt: 1,
+                  height: 6,
+                  borderRadius: 1,
+                  bgcolor: "action.hover",
+                }}
+              >
                 {projectTotal > 0 && m.totalMinutes > 0 && (
                   <Box
                     sx={{

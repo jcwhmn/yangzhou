@@ -5,10 +5,9 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import org.junit.jupiter.api.BeforeEach
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.test.context.ActiveProfiles
 import org.springframework.boot.test.web.server.LocalServerPort
-import org.springframework.http.HttpHeaders
 import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.client.RestTestClient
@@ -22,7 +21,6 @@ import kotlin.test.assertEquals
 @ActiveProfiles("test")
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 abstract class AbstractApiTest {
-
     companion object {
         private val postgres = PostgreSQLContainer("postgres:17-alpine")
 
@@ -79,12 +77,37 @@ abstract class AbstractApiTest {
         ).forEach { jdbc.execute("update $it set created_by_object_id = null, updated_by_object_id = null") }
         jdbc.execute("update item set updated_by_object_id = null")
         listOf(
-            "project_workflow_rule", "project_view", "item_git_ref", "project_repo", "time_entry",
-            "item_group_type", "item_group_member_history", "item_group_member", "item_group", "milestone",
-            "item_dependency", "item_activity", "item_status_history", "checklist_item", "comment", "favorite",
-            "notification", "status_transition",
-            "attachment", "item_attribute", "requirement", "item", "status", "project_member", "project",
-            "capability", "attribute_definition", "team_member", "team", "member", "workspace",
+            "project_workflow_rule",
+            "project_view",
+            "item_git_ref",
+            "project_repo",
+            "time_entry",
+            "item_group_type",
+            "item_group_member_history",
+            "item_group_member",
+            "item_group",
+            "milestone",
+            "item_dependency",
+            "item_activity",
+            "item_status_history",
+            "checklist_item",
+            "comment",
+            "favorite",
+            "notification",
+            "status_transition",
+            "attachment",
+            "item_attribute",
+            "requirement",
+            "item",
+            "status",
+            "project_member",
+            "project",
+            "capability",
+            "attribute_definition",
+            "team_member",
+            "team",
+            "member",
+            "workspace",
         ).forEach { jdbc.execute("delete from $it") }
         rest = RestTestClient.bindToServer().baseUrl("http://localhost:$port").build()
     }
@@ -92,64 +115,104 @@ abstract class AbstractApiTest {
     // ---------- 测试助手(domain 语言,不暴露实现) ----------
 
     protected fun bootstrapAndAuth(): RestTestClient {
-        rest.post().uri("/api/auth/bootstrap")
+        rest
+            .post()
+            .uri("/api/auth/bootstrap")
             .body(mapOf("username" to "me", "password" to "secret123"))
             .exchange()
         val token = login("me", "secret123")["token"].asText()
         return rest.mutate().defaultHeaders { it.setBearerAuth(token) }.build()
     }
 
-    protected fun login(username: String, password: String): JsonNode =
-        rest.post().uri("/api/auth/login")
-            .body(mapOf("username" to username, "password" to password))
-            .exchange()
-            .expectStatus().isOk()
-            .expectBody(String::class.java)
-            .returnResult()
-            .responseBody!!
-            .let { json.readTree(it) }
+    protected fun login(
+        username: String,
+        password: String,
+    ): JsonNode = rest
+        .post()
+        .uri("/api/auth/login")
+        .body(mapOf("username" to username, "password" to password))
+        .exchange()
+        .expectStatus()
+        .isOk()
+        .expectBody(String::class.java)
+        .returnResult()
+        .responseBody!!
+        .let { json.readTree(it) }
 
     protected fun createSkillAttribute(
         authed: RestTestClient,
         name: String,
         leveled: Boolean = true,
-    ): JsonNode = authed.post().uri("/api/attributes")
+    ): JsonNode = authed
+        .post()
+        .uri("/api/attributes")
         .body(mapOf("name" to name, "kind" to "skill", "leveled" to leveled))
         .exchange()
-        .expectStatus().isCreated()
-        .expectBody(String::class.java).returnResult()
+        .expectStatus()
+        .isCreated()
+        .expectBody(String::class.java)
+        .returnResult()
         .let { r ->
             if (r.status.value() != 201) println("CREATE_FAIL=" + r.responseBody)
             json.readTree(r.responseBody!!)
         }
 
-    protected fun setCapability(authed: RestTestClient, attribute: String, level: Int?) =
-        authed.put().uri("/api/capabilities")
-            .body(mapOf("attribute" to attribute, "level" to level))
-            .exchange()
-            .expectStatus().isOk()
+    protected fun setCapability(
+        authed: RestTestClient,
+        attribute: String,
+        level: Int?,
+    ) = authed
+        .put()
+        .uri("/api/capabilities")
+        .body(mapOf("attribute" to attribute, "level" to level))
+        .exchange()
+        .expectStatus()
+        .isOk()
 
-    protected fun createProject(authed: RestTestClient, key: String, name: String = key): JsonNode =
-        authed.post().uri("/api/projects")
-            .body(mapOf("key" to key, "name" to name))
-            .exchange()
-            .expectStatus().isCreated()
-            .expectBody(String::class.java).returnResult().responseBody!!
-            .let { json.readTree(it) }
+    protected fun createProject(
+        authed: RestTestClient,
+        key: String,
+        name: String = key,
+    ): JsonNode = authed
+        .post()
+        .uri("/api/projects")
+        .body(mapOf("key" to key, "name" to name))
+        .exchange()
+        .expectStatus()
+        .isCreated()
+        .expectBody(String::class.java)
+        .returnResult()
+        .responseBody!!
+        .let { json.readTree(it) }
 
     /** 0047:创建者(me)自动入池,测试常需要其 memberId。 */
-    protected fun meMemberId(authed: RestTestClient): String =
-        json.readTree(
-            authed.get().uri("/api/members").exchange()
-                .expectStatus().isOk().expectBody(String::class.java).returnResult().responseBody!!,
-        ).first { !it["virtual"].asBoolean() }["memberId"].asText()
+    protected fun meMemberId(authed: RestTestClient): String = json
+        .readTree(
+            authed
+                .get()
+                .uri("/api/members")
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(String::class.java)
+                .returnResult()
+                .responseBody!!,
+        ).first { !it["virtual"].asBoolean() }["memberId"]
+        .asText()
 
     /** 0047:池语义严格化后,指派虚拟成员的用例需先入池。memberId = workspace 成员 objectId。 */
-    protected fun addPoolMember(authed: RestTestClient, projectKey: String, memberId: String) {
-        authed.post().uri("/api/projects/$projectKey/members")
+    protected fun addPoolMember(
+        authed: RestTestClient,
+        projectKey: String,
+        memberId: String,
+    ) {
+        authed
+            .post()
+            .uri("/api/projects/$projectKey/members")
             .body(mapOf("memberId" to memberId))
             .exchange()
-            .expectStatus().isCreated()
+            .expectStatus()
+            .isCreated()
     }
 
     protected fun createItem(
@@ -159,18 +222,23 @@ abstract class AbstractApiTest {
         requirements: List<Map<String, Any?>> = emptyList(),
         parentItemId: String? = null,
     ): JsonNode {
-        val body = mutableMapOf(
-            "title" to title,
-            "requirements" to requirements.map { req ->
-                mapOf("attribute" to req["attribute"], "minLevel" to req["minLevel"])
-            },
-        )
+        val body =
+            mutableMapOf(
+                "title" to title,
+                "requirements" to
+                    requirements.map { req ->
+                        mapOf("attribute" to req["attribute"], "minLevel" to req["minLevel"])
+                    },
+            )
         if (parentItemId != null) body["parentItemId"] = parentItemId
-        val r = authed.post().uri("/api/projects/$projectKey/items")
-            .body(body)
-            .exchange()
-            .expectBody(String::class.java)
-            .returnResult()
+        val r =
+            authed
+                .post()
+                .uri("/api/projects/$projectKey/items")
+                .body(body)
+                .exchange()
+                .expectBody(String::class.java)
+                .returnResult()
         if (r.status.value() != 201) println("CREATE_FAIL body=" + r.responseBody)
         assertEquals(201, r.status.value(), "create item failed: " + r.responseBody)
         return json.readTree(r.responseBody!!)

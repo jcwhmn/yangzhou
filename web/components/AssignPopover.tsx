@@ -16,7 +16,12 @@ import {
 } from "@mui/material";
 import { api } from "@/lib/api";
 import { t } from "@/lib/texts";
-import { VerdictLine, candidateColor, type Signal, type Verdict } from "@/components/Verdict";
+import {
+  VerdictLine,
+  candidateColor,
+  type Signal,
+  type Verdict,
+} from "@/components/Verdict";
 
 export type AssignCandidate = {
   rank: number;
@@ -30,8 +35,13 @@ export type AssignCandidate = {
 };
 
 /** 未足项 = 缺门,或缺级/未评级判定(详情页指派给我与各 surface 共用此判定) */
-export const hasUnmet = (c: Pick<AssignCandidate, "missingCount" | "verdicts">) =>
-  c.missingCount > 0 || c.verdicts.some((v) => v.kind === "gap" || v.kind === "missing" || v.kind === "unrated");
+export const hasUnmet = (
+  c: Pick<AssignCandidate, "missingCount" | "verdicts">,
+) =>
+  c.missingCount > 0 ||
+  c.verdicts.some(
+    (v) => v.kind === "gap" || v.kind === "missing" || v.kind === "unrated",
+  );
 
 export function AssignPopover({
   itemId,
@@ -67,7 +77,10 @@ export function AssignPopover({
   }
 
   async function assign(memberId: string | null) {
-    await api(`/api/items/${itemId}/assignee`, { method: "PUT", body: JSON.stringify({ assigneeItemId: memberId }) });
+    await api(`/api/items/${itemId}/assignee`, {
+      method: "PUT",
+      body: JSON.stringify({ assigneeItemId: memberId }),
+    });
     setConfirmCand(null);
     close();
     onChanged?.();
@@ -83,12 +96,27 @@ export function AssignPopover({
         anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
         transformOrigin={{ vertical: "top", horizontal: "left" }}
         // React portal 事件沿组件树冒泡:不切开,内层「指派」点击会冒到看板卡片的路由 onClick
-        slotProps={{ paper: { onClick: (e: React.MouseEvent) => e.stopPropagation() } }}
+        slotProps={{
+          paper: { onClick: (e: React.MouseEvent) => e.stopPropagation() },
+        }}
       >
-        <Stack sx={{ p: 1.5, minWidth: 320, maxWidth: 400, maxHeight: 480, overflowY: "auto" }} spacing={1}>
+        <Stack
+          sx={{
+            p: 1.5,
+            minWidth: 320,
+            maxWidth: 400,
+            maxHeight: 480,
+            overflowY: "auto",
+          }}
+          spacing={1}
+        >
           <Typography variant="subtitle2">{t.assign.whoTitle}</Typography>
           {assignee && (
-            <Button size="small" sx={{ alignSelf: "flex-start" }} onClick={() => assign(null)}>
+            <Button
+              size="small"
+              sx={{ alignSelf: "flex-start" }}
+              onClick={() => assign(null)}
+            >
               {t.assignDialog.clear}
             </Button>
           )}
@@ -109,7 +137,12 @@ export function AssignPopover({
               <Box
                 key={c.memberId}
                 data-testid="cand-row"
-                sx={{ borderLeft: "3px solid " + color, pl: 1, py: 0.5, opacity: current ? 0.66 : 1 }}
+                sx={{
+                  borderLeft: "3px solid " + color,
+                  pl: 1,
+                  py: 0.5,
+                  opacity: current ? 0.66 : 1,
+                }}
               >
                 <Stack direction="row" spacing={1} alignItems="center">
                   <Chip size="small" label={`#${c.rank}`} />
@@ -118,7 +151,12 @@ export function AssignPopover({
                     {c.virtual ? t.assign.virtualSuffix : ""}
                   </Typography>
                   {current && (
-                    <Chip size="small" color="primary" variant="outlined" label={t.assign.current} />
+                    <Chip
+                      size="small"
+                      color="primary"
+                      variant="outlined"
+                      label={t.assign.current}
+                    />
                   )}
                   <Chip
                     size="small"
@@ -126,7 +164,12 @@ export function AssignPopover({
                     sx={{ color, borderColor: color }}
                     label={t.assign.gapSummary(c.missingCount, c.totalDelta)}
                   />
-                  <Button size="small" variant="contained" sx={{ ml: "auto" }} onClick={() => tryAssign(c)}>
+                  <Button
+                    size="small"
+                    variant="contained"
+                    sx={{ ml: "auto" }}
+                    onClick={() => tryAssign(c)}
+                  >
                     {t.assign.assignBtn}
                   </Button>
                 </Stack>
@@ -142,7 +185,9 @@ export function AssignPopover({
         open={confirmCand !== null}
         onClose={() => setConfirmCand(null)}
         // 同 Popover:Dialog 也 portal,阻断向 surface 卡片的冒泡
-        slotProps={{ paper: { onClick: (e: React.MouseEvent) => e.stopPropagation() } }}
+        slotProps={{
+          paper: { onClick: (e: React.MouseEvent) => e.stopPropagation() },
+        }}
       >
         <DialogTitle>{t.assign.confirmTitle}</DialogTitle>
         <DialogContent>
@@ -151,7 +196,9 @@ export function AssignPopover({
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setConfirmCand(null)}>{t.assign.cancel}</Button>
+          <Button onClick={() => setConfirmCand(null)}>
+            {t.assign.cancel}
+          </Button>
           <Button
             color="warning"
             variant="contained"

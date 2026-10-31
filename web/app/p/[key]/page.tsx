@@ -26,7 +26,14 @@ import { t } from "@/lib/texts";
 import { AssignPopover } from "@/components/AssignPopover";
 import type { Signal } from "@/components/Verdict";
 
-type Status = { statusId: string; name: string; icon: string | null; isStart: boolean; isFinal: boolean; position: number };
+type Status = {
+  statusId: string;
+  name: string;
+  icon: string | null;
+  isStart: boolean;
+  isFinal: boolean;
+  position: number;
+};
 type Item = {
   itemId: string;
   parentItemId?: string | null;
@@ -71,7 +78,10 @@ export default function BoardPage() {
     if (token && key) {
       fetch(`/api/members/me/last-project`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({ key: String(key) }),
       }).catch(() => {});
     }
@@ -87,7 +97,9 @@ export default function BoardPage() {
       setStatuses(project.statuses);
       // V9-S1:item 列表自带 feasSignal 冗余,不再单 feasibility 调用
       // YPJ-29:看板数据范围由后端决定(active sprint 的 items;无 active → 全量)
-      const board = await api<{ activeSprints: SprintLite[]; items: Item[] }>(`/api/projects/${key}/board`);
+      const board = await api<{ activeSprints: SprintLite[]; items: Item[] }>(
+        `/api/projects/${key}/board`,
+      );
       setActiveSprints(board.activeSprints);
       setItems(board.items);
       setSprints(await api<SprintLite[]>(`/api/projects/${key}/sprints`));
@@ -124,7 +136,10 @@ export default function BoardPage() {
   async function createItem(title: string, sprintId?: string) {
     // YPJ-56:无 active → 不带 sprintId(落 backlog,与看板全量显示自洽);单 active 由调用方带上
     try {
-      await api(`/api/projects/${key}/items`, { method: "POST", body: JSON.stringify({ title, ...(sprintId ? { sprintId } : {}) }) });
+      await api(`/api/projects/${key}/items`, {
+        method: "POST",
+        body: JSON.stringify({ title, ...(sprintId ? { sprintId } : {}) }),
+      });
       setNewTitle("");
       setSprintPickOpen(false);
       await load();
@@ -137,7 +152,10 @@ export default function BoardPage() {
   async function startSprint(sprintId: string) {
     if (!sprintId) return;
     try {
-      await api(`/api/projects/${key}/sprints/${sprintId}`, { method: "PATCH", body: JSON.stringify({ status: "active" }) });
+      await api(`/api/projects/${key}/sprints/${sprintId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: "active" }),
+      });
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : t.board.startFailed);
@@ -148,11 +166,23 @@ export default function BoardPage() {
     const item = items.find((i) => i.itemId === itemId);
     if (!item || item.status === status.name) return;
     try {
-      setItems((prev) => prev.map((i) => (i.itemId === itemId ? { ...i, status: status.name } : i)));
-      const resp = await api<{ autoAssignedSprintName?: string | null }>(`/api/items/${itemId}`, { method: "PATCH", body: JSON.stringify({ statusItemId: status.statusId }) });
+      setItems((prev) =>
+        prev.map((i) =>
+          i.itemId === itemId ? { ...i, status: status.name } : i,
+        ),
+      );
+      const resp = await api<{ autoAssignedSprintName?: string | null }>(
+        `/api/items/${itemId}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({ statusItemId: status.statusId }),
+        },
+      );
       await load();
       if (resp.autoAssignedSprintName) {
-        setSprintInfo(`已自动加入 sprint「${resp.autoAssignedSprintName}」;不想进可手动移出`);
+        setSprintInfo(
+          `已自动加入 sprint「${resp.autoAssignedSprintName}」;不想进可手动移出`,
+        );
         setTimeout(() => setSprintInfo(""), 6000);
       }
     } catch (err) {
@@ -161,13 +191,18 @@ export default function BoardPage() {
     }
   }
 
-// S7:assignee filter (purely frontend; "unassigned" = assignee is null); sprint scope is determined by the backend board endpoint (YPJ-29)
+  // S7:assignee filter (purely frontend; "unassigned" = assignee is null); sprint scope is determined by the backend board endpoint (YPJ-29)
   const filtered =
-    filter === "all" ? items
-    : filter === "unassigned" ? items.filter((i) => !i.assignee)
-    : filter === "blocked" ? items.filter((i) => i.blocked)
-    : items.filter((i) => i.assignee === filter);
-  const memberOptions = [...new Set(items.map((i) => i.assignee).filter((a): a is string => !!a))];
+    filter === "all"
+      ? items
+      : filter === "unassigned"
+        ? items.filter((i) => !i.assignee)
+        : filter === "blocked"
+          ? items.filter((i) => i.blocked)
+          : items.filter((i) => i.assignee === filter);
+  const memberOptions = [
+    ...new Set(items.map((i) => i.assignee).filter((a): a is string => !!a)),
+  ];
 
   const byStatusName = new Map<string, Item[]>();
   statuses.forEach((s) => byStatusName.set(s.name, []));
@@ -181,7 +216,11 @@ export default function BoardPage() {
     <Box sx={{ p: 3 }}>
       <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
         <Typography variant="h5">{String(key).toUpperCase()} · 看板</Typography>
-        <IconButton size="small" aria-label={t.board.refresh} onClick={() => load()}>
+        <IconButton
+          size="small"
+          aria-label={t.board.refresh}
+          onClick={() => load()}
+        >
           <RefreshIcon fontSize="small" />
         </IconButton>
         <Stack component="form" direction="row" spacing={1} onSubmit={addItem}>
@@ -208,7 +247,11 @@ export default function BoardPage() {
         </Alert>
       )}
       {sprintInfo && (
-        <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSprintInfo("")}>
+        <Alert
+          severity="success"
+          sx={{ mb: 2 }}
+          onClose={() => setSprintInfo("")}
+        >
           {sprintInfo}
         </Alert>
       )}
@@ -228,15 +271,29 @@ export default function BoardPage() {
               sx={{ width: 240 }}
               options={sprints
                 .filter((s) => s.status === "planned")
-                .map((s) => ({ value: s.sprintId, label: `${t.board.startSprint}: ${s.name}` }))}
+                .map((s) => ({
+                  value: s.sprintId,
+                  label: `${t.board.startSprint}: ${s.name}`,
+                }))}
             />
           )}
         </Stack>
       )}
 
       {/* S7:assignee 过滤 chips;sprint 范围由后端 board 端点决定(YPJ-29) */}
-      <Stack direction="row" spacing={1} sx={{ mb: 2 }} flexWrap="wrap" useFlexGap>
-        <Chip label={t.filter.all} size="small" color={filter === "all" ? "primary" : "default"} onClick={() => setFilter("all")} />
+      <Stack
+        direction="row"
+        spacing={1}
+        sx={{ mb: 2 }}
+        flexWrap="wrap"
+        useFlexGap
+      >
+        <Chip
+          label={t.filter.all}
+          size="small"
+          color={filter === "all" ? "primary" : "default"}
+          onClick={() => setFilter("all")}
+        />
         <Chip
           label={t.filter.unassigned}
           size="small"
@@ -267,7 +324,11 @@ export default function BoardPage() {
           ))}
         </Stack>
       ) : (
-        <Stack direction="row" spacing={2} sx={{ overflowX: "auto", alignItems: "flex-start", pb: 2 }}>
+        <Stack
+          direction="row"
+          spacing={2}
+          sx={{ overflowX: "auto", alignItems: "flex-start", pb: 2 }}
+        >
           {statuses.map((s) => {
             const list = byStatusName.get(s.name) ?? [];
             return (
@@ -277,7 +338,9 @@ export default function BoardPage() {
                   e.preventDefault();
                   setDragOver(s.statusId);
                 }}
-                onDragLeave={() => setDragOver((cur) => (cur === s.statusId ? null : cur))}
+                onDragLeave={() =>
+                  setDragOver((cur) => (cur === s.statusId ? null : cur))
+                }
                 onDrop={(e) => {
                   e.preventDefault();
                   setDragOver(null);
@@ -289,19 +352,26 @@ export default function BoardPage() {
                   minHeight: 300,
                   p: 1,
                   borderRadius: 2,
-                  bgcolor: dragOver === s.statusId ? "action.hover" : "background.default",
+                  bgcolor:
+                    dragOver === s.statusId
+                      ? "action.hover"
+                      : "background.default",
                   border: "1px dashed",
-                  borderColor: dragOver === s.statusId ? "primary.main" : "divider",
+                  borderColor:
+                    dragOver === s.statusId ? "primary.main" : "divider",
                 }}
               >
                 <Typography variant="subtitle2" sx={{ px: 1, py: 0.5 }}>
                   {s.icon ? `${s.icon} ` : ""}
-                  {s.name}({list.length})
-                  {s.isFinal && " [终态]"}
+                  {s.name}({list.length}){s.isFinal && " [终态]"}
                 </Typography>
                 <Stack spacing={1}>
                   {list.length === 0 && (
-                    <Typography variant="caption" color="text.secondary" sx={{ px: 1 }}>
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{ px: 1 }}
+                    >
                       (空)
                     </Typography>
                   )}
@@ -309,47 +379,91 @@ export default function BoardPage() {
                     <Card
                       key={it.itemId}
                       draggable
-                      onDragStart={(e) => e.dataTransfer.setData("text/plain", it.itemId)}
+                      onDragStart={(e) =>
+                        e.dataTransfer.setData("text/plain", it.itemId)
+                      }
                       onClick={() => router.push(`/p/${key}/i/${it.itemId}`)}
                       sx={{
                         cursor: "pointer",
-                        borderLeft: "4px solid " + (it.assigneeColor ?? "#9e9e9e"),
+                        borderLeft:
+                          "4px solid " + (it.assigneeColor ?? "#9e9e9e"),
                         transition: "box-shadow .15s, border-color .15s",
-                        "&:hover": { boxShadow: 6, borderColor: "primary.main" },
+                        "&:hover": {
+                          boxShadow: 6,
+                          borderColor: "primary.main",
+                        },
                       }}
                     >
-                      <CardContent sx={{ py: 1.5, "&:last-child": { pb: 1.5 } }}>
+                      <CardContent
+                        sx={{ py: 1.5, "&:last-child": { pb: 1.5 } }}
+                      >
                         <Stack spacing={0.5}>
-                          <Stack direction="row" spacing={1} alignItems="center">
+                          <Stack
+                            direction="row"
+                            spacing={1}
+                            alignItems="center"
+                          >
                             {it.parentNumber && (
-                              <Link href={`/p/${key}/i/${it.parentItemId}`} style={{ textDecoration: "none" }}>
-                                <Typography variant="caption" color="primary" sx={{ whiteSpace: "nowrap" }}>
+                              <Link
+                                href={`/p/${key}/i/${it.parentItemId}`}
+                                style={{ textDecoration: "none" }}
+                              >
+                                <Typography
+                                  variant="caption"
+                                  color="primary"
+                                  sx={{ whiteSpace: "nowrap" }}
+                                >
                                   {it.parentNumber} ›
                                 </Typography>
                               </Link>
                             )}
-                            <Chip label={it.number} size="small" variant="outlined" />
+                            <Chip
+                              label={it.number}
+                              size="small"
+                              variant="outlined"
+                            />
                             {it.feasSignal && it.feasSignal !== "GREEN" && (
                               <Chip
                                 size="small"
                                 label={t.signal[it.feasSignal]}
-                                color={it.feasSignal === "RED" ? "error" : "warning"}
+                                color={
+                                  it.feasSignal === "RED" ? "error" : "warning"
+                                }
                               />
                             )}
                             {it.blocked && (
-                              <Chip size="small" color="error" variant="outlined" label="⛔ 被阻塞" />
+                              <Chip
+                                size="small"
+                                color="error"
+                                variant="outlined"
+                                label="⛔ 被阻塞"
+                              />
                             )}
                             {it.sprintName && (
-                              <Chip size="small" variant="outlined" label={it.sprintName} />
+                              <Chip
+                                size="small"
+                                variant="outlined"
+                                label={it.sprintName}
+                              />
                             )}
-                            <AssignPopover itemId={it.itemId} assignee={it.assignee} onChanged={load}>
+                            <AssignPopover
+                              itemId={it.itemId}
+                              assignee={it.assignee}
+                              onChanged={load}
+                            >
                               {(onClick) => (
                                 <Chip
                                   size="small"
                                   variant="outlined"
-                                  label={it.assignee ? `👤 ${it.assignee}` : t.assign.none}
+                                  label={
+                                    it.assignee
+                                      ? `👤 ${it.assignee}`
+                                      : t.assign.none
+                                  }
                                   onClick={onClick}
-                                  sx={it.assignee ? undefined : { opacity: 0.55 }}
+                                  sx={
+                                    it.assignee ? undefined : { opacity: 0.55 }
+                                  }
                                 />
                               )}
                             </AssignPopover>
@@ -358,7 +472,10 @@ export default function BoardPage() {
                             href={`/p/${key}/i/${it.itemId}`}
                             style={{ textDecoration: "none", color: "inherit" }}
                           >
-                            <Typography variant="body2" sx={{ wordBreak: "break-word" }}>
+                            <Typography
+                              variant="body2"
+                              sx={{ wordBreak: "break-word" }}
+                            >
                               {it.title}
                             </Typography>
                           </Link>
@@ -366,18 +483,34 @@ export default function BoardPage() {
                             <Typography
                               variant="caption"
                               sx={{
-                                color: it.overdue ? "error.main" : it.dueSoon ? "warning.main" : "text.secondary",
-                                fontWeight: it.overdue || it.dueSoon ? 700 : 400,
+                                color: it.overdue
+                                  ? "error.main"
+                                  : it.dueSoon
+                                    ? "warning.main"
+                                    : "text.secondary",
+                                fontWeight:
+                                  it.overdue || it.dueSoon ? 700 : 400,
                               }}
                             >
-                              {it.overdue ? "⚠ 超期 " : it.dueSoon ? "⏳ 将到期 " : "📅 "}
+                              {it.overdue
+                                ? "⚠ 超期 "
+                                : it.dueSoon
+                                  ? "⏳ 将到期 "
+                                  : "📅 "}
                               {it.dueDate}
                             </Typography>
                           )}
                           {it.requirements.length > 0 && (
-                            <Typography variant="caption" color="text.secondary">
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
                               {it.requirements
-                                .map((r) => (r.minLevel ? `${r.attribute}≥${r.minLevel}` : r.attribute))
+                                .map((r) =>
+                                  r.minLevel
+                                    ? `${r.attribute}≥${r.minLevel}`
+                                    : r.attribute,
+                                )
                                 .join(" · ")}
                             </Typography>
                           )}
@@ -397,7 +530,11 @@ export default function BoardPage() {
         <DialogContent>
           <Stack spacing={1} sx={{ mt: 1 }}>
             {activeSprints.map((sp) => (
-              <Button key={sp.sprintId} variant="outlined" onClick={() => createItem(pendingTitle, sp.sprintId)}>
+              <Button
+                key={sp.sprintId}
+                variant="outlined"
+                onClick={() => createItem(pendingTitle, sp.sprintId)}
+              >
                 {sp.name}
               </Button>
             ))}

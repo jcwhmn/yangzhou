@@ -18,7 +18,11 @@ export function resetDb() {
 }
 
 const self = fileURLToPath(import.meta.url);
-if (process.argv[1] && fs.existsSync(process.argv[1]) && fs.realpathSync(process.argv[1]) === self) {
+if (
+  process.argv[1] &&
+  fs.existsSync(process.argv[1]) &&
+  fs.realpathSync(process.argv[1]) === self
+) {
   if (process.env.CI) {
     console.log("CI:跳过清库(service 库每次全新)");
     process.exit(0);

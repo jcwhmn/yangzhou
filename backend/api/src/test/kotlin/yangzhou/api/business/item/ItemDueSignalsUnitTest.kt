@@ -7,7 +7,6 @@ import kotlin.test.assertTrue
 
 /** overdue/dueSoon 边界(时钟纪律:today 由调用方传入,可钉死;spec 0051)。 */
 class ItemDueSignalsUnitTest {
-
     private val today = LocalDate.of(2026, 10, 18)
 
     @Test

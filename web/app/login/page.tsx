@@ -1,6 +1,14 @@
 "use client";
 
-import { Box, Button, Card, CardContent, Stack, TextField, Typography } from "@mui/material";
+import {
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Stack,
+  TextField,
+  Typography,
+} from "@mui/material";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { bootstrapOrLogin, setToken } from "@/lib/api";
@@ -22,10 +30,21 @@ export default function LoginPage() {
       // V11-S1:登录后进入上次项目
       try {
         const token = localStorage.getItem("yz-token");
-        const me = await fetch("/api/members", { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json());
-        const last = Array.isArray(me) ? me.find((m: { virtual: boolean }) => !m.virtual)?.lastProjectKey : undefined;
+        const me = await fetch("/api/members", {
+          headers: { Authorization: `Bearer ${token}` },
+        }).then((r) => r.json());
+        const last = Array.isArray(me)
+          ? me.find((m: { virtual: boolean }) => !m.virtual)?.lastProjectKey
+          : undefined;
         // V13-S2(b):回放前验项目存在——悬空 key(项目被删/E2E 冲写)停留首页
-        if (last && (await fetch(`/api/projects/${last}`, { headers: { Authorization: `Bearer ${token}` } })).ok) {
+        if (
+          last &&
+          (
+            await fetch(`/api/projects/${last}`, {
+              headers: { Authorization: `Bearer ${token}` },
+            })
+          ).ok
+        ) {
           router.replace(`/p/${last}`);
           return;
         }
@@ -39,7 +58,9 @@ export default function LoginPage() {
   }
 
   return (
-    <Box sx={{ minHeight: "100vh", display: "grid", placeItems: "center", p: 2 }}>
+    <Box
+      sx={{ minHeight: "100vh", display: "grid", placeItems: "center", p: 2 }}
+    >
       <Card sx={{ maxWidth: 380, width: "100%" }}>
         <CardContent>
           <Stack spacing={2} component="form" onSubmit={submit}>
@@ -70,7 +91,11 @@ export default function LoginPage() {
             <Button type="submit" variant="contained" disabled={busy}>
               {t.login.submit}
             </Button>
-            <Typography variant="caption" color="text.secondary" textAlign="center">
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              textAlign="center"
+            >
               {t.login.hint}
             </Typography>
           </Stack>

@@ -1,6 +1,14 @@
 "use client";
 
-import { Alert, Box, Card, CardContent, Chip, Stack, Typography } from "@mui/material";
+import {
+  Alert,
+  Box,
+  Card,
+  CardContent,
+  Chip,
+  Stack,
+  Typography,
+} from "@mui/material";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -8,7 +16,12 @@ import { api } from "@/lib/api";
 import { t } from "@/lib/texts";
 import { signalColor, type Signal } from "@/components/Verdict";
 
-type Status = { statusId: string; name: string; isFinal: boolean; position: number };
+type Status = {
+  statusId: string;
+  name: string;
+  isFinal: boolean;
+  position: number;
+};
 type Item = {
   itemId: string;
   number: string;
@@ -49,7 +62,9 @@ export default function OverviewPage() {
         api<Sprint[]>(`/api/projects/${key}/sprints`),
         api<Member[]>(`/api/members`),
       ]);
-      const finalByName = new Map(proj.statuses.map((s) => [s.name, s.isFinal]));
+      const finalByName = new Map(
+        proj.statuses.map((s) => [s.name, s.isFinal]),
+      );
       setStatuses(proj.statuses);
       setItems(its);
       setMe(mems.find((m) => !m.virtual)?.displayName ?? null);
@@ -58,7 +73,9 @@ export default function OverviewPage() {
         setSprint(null);
         return;
       }
-      const sItems = await api<Item[]>(`/api/projects/${key}/sprints/${active.sprintId}/items`);
+      const sItems = await api<Item[]>(
+        `/api/projects/${key}/sprints/${active.sprintId}/items`,
+      );
       const byMember = new Map<string, { done: number; total: number }>();
       let done = 0;
       for (const it of sItems) {
@@ -92,8 +109,11 @@ export default function OverviewPage() {
     return () => clearInterval(t);
   }, [load]);
 
-  const isFinal = (s: string) => statuses.find((st) => st.name === s)?.isFinal === true;
-  const mine = items.filter((i) => i.assignee !== null && i.assignee === me && !isFinal(i.status));
+  const isFinal = (s: string) =>
+    statuses.find((st) => st.name === s)?.isFinal === true;
+  const mine = items.filter(
+    (i) => i.assignee !== null && i.assignee === me && !isFinal(i.status),
+  );
   const risks = items.filter((i) => i.overdue || i.blocked);
   const sig = { GREEN: 0, YELLOW: 0, RED: 0 } as Record<Signal, number>;
   for (const i of items) if (i.feasSignal) sig[i.feasSignal]++;
@@ -103,8 +123,18 @@ export default function OverviewPage() {
       <Typography variant="h6" sx={{ mb: 2 }}>
         {t.overview.title}
       </Typography>
-      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" }, gap: 2 }}>
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
+          gap: 2,
+        }}
+      >
         <Card>
           <CardContent>
             <Typography color="text.secondary" variant="subtitle2" gutterBottom>
@@ -113,7 +143,8 @@ export default function OverviewPage() {
             {statuses.map((s) => (
               <Typography key={s.statusId} variant="body2" sx={{ py: 0.5 }}>
                 {s.name}
-                {s.isFinal ? t.overview.finalTag : ""} · {items.filter((i) => i.status === s.name).length}
+                {s.isFinal ? t.overview.finalTag : ""} ·{" "}
+                {items.filter((i) => i.status === s.name).length}
               </Typography>
             ))}
           </CardContent>
@@ -123,9 +154,19 @@ export default function OverviewPage() {
             <Typography color="text.secondary" variant="subtitle2" gutterBottom>
               {t.overview.signalDist}
             </Typography>
-            <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1 }}>
+            <Stack
+              direction="row"
+              spacing={1}
+              sx={{ flexWrap: "wrap", gap: 1 }}
+            >
               {(Object.keys(sig) as Signal[]).map((s) => (
-                <Chip key={s} label={`${t.signal[s]} · ${sig[s]}`} color={signalColor[s]} variant="outlined" size="small" />
+                <Chip
+                  key={s}
+                  label={`${t.signal[s]} · ${sig[s]}`}
+                  color={signalColor[s]}
+                  variant="outlined"
+                  size="small"
+                />
               ))}
             </Stack>
           </CardContent>
@@ -136,9 +177,17 @@ export default function OverviewPage() {
               {t.overview.mine}
             </Typography>
             {mine.length === 0 ? (
-              <Typography variant="body2" color="text.secondary">{t.overview.noMine}</Typography>
+              <Typography variant="body2" color="text.secondary">
+                {t.overview.noMine}
+              </Typography>
             ) : (
-              mine.map((i) => <ItemRow key={i.itemId} href={`/p/${key}/i/${i.itemId}`} item={i} />)
+              mine.map((i) => (
+                <ItemRow
+                  key={i.itemId}
+                  href={`/p/${key}/i/${i.itemId}`}
+                  item={i}
+                />
+              ))
             )}
           </CardContent>
         </Card>
@@ -148,7 +197,9 @@ export default function OverviewPage() {
               {t.overview.risk}
             </Typography>
             {risks.length === 0 ? (
-              <Typography variant="body2" color="text.secondary">{t.overview.noRisk}</Typography>
+              <Typography variant="body2" color="text.secondary">
+                {t.overview.noRisk}
+              </Typography>
             ) : (
               risks.map((i) => (
                 <ItemRow
@@ -157,8 +208,20 @@ export default function OverviewPage() {
                   item={i}
                   trailing={
                     <>
-                      {i.overdue && <Chip label={t.overview.overdue} size="small" color="error" />}
-                      {i.blocked && <Chip label={t.overview.blocked} size="small" color="warning" />}
+                      {i.overdue && (
+                        <Chip
+                          label={t.overview.overdue}
+                          size="small"
+                          color="error"
+                        />
+                      )}
+                      {i.blocked && (
+                        <Chip
+                          label={t.overview.blocked}
+                          size="small"
+                          color="warning"
+                        />
+                      )}
                     </>
                   }
                 />
@@ -172,10 +235,18 @@ export default function OverviewPage() {
               {t.overview.sprint}
             </Typography>
             {!sprint ? (
-              <Typography variant="body2" color="text.secondary">{t.overview.noSprint}</Typography>
+              <Typography variant="body2" color="text.secondary">
+                {t.overview.noSprint}
+              </Typography>
             ) : (
               <>
-                <Box sx={{ display: "flex", justifyContent: "space-between", py: 0.5 }}>
+                <Box
+                  sx={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    py: 0.5,
+                  }}
+                >
                   <Typography
                     component={Link}
                     href={`/p/${key}/sprint/${sprint.sprintId}`}
@@ -189,7 +260,12 @@ export default function OverviewPage() {
                   </Typography>
                 </Box>
                 {sprint.byMember.map((m) => (
-                  <Typography key={m.name} variant="body2" color="text.secondary" sx={{ py: 0.25 }}>
+                  <Typography
+                    key={m.name}
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ py: 0.25 }}
+                  >
                     {m.name} · {m.done}/{m.total}
                   </Typography>
                 ))}
@@ -225,7 +301,16 @@ function ItemRow({
         "&:hover": { bgcolor: "grey.100" },
       }}
     >
-      <Typography variant="body2" sx={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+      <Typography
+        variant="body2"
+        sx={{
+          flex: 1,
+          minWidth: 0,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+        }}
+      >
         {item.number} {item.title}
       </Typography>
       {trailing}

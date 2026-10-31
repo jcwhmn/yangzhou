@@ -53,10 +53,14 @@ export function WorkflowEditor({
 
   const load = useCallback(async () => {
     try {
-      const project = await api<{ statuses: Status[] }>(`/api/projects/${projectKey}`);
+      const project = await api<{ statuses: Status[] }>(
+        `/api/projects/${projectKey}`,
+      );
       setStatuses(project.statuses);
       setSaved(project.statuses);
-      setTransitions(await api<Transition[]>(`/api/projects/${projectKey}/transitions`));
+      setTransitions(
+        await api<Transition[]>(`/api/projects/${projectKey}/transitions`),
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : "加载失败");
     }
@@ -73,8 +77,12 @@ export function WorkflowEditor({
         method: "PATCH",
         body: JSON.stringify(changes),
       });
-      setStatuses((prev) => prev.map((s) => (s.statusId === statusId ? updated : s)));
-      setSaved((prev) => prev.map((s) => (s.statusId === statusId ? updated : s)));
+      setStatuses((prev) =>
+        prev.map((s) => (s.statusId === statusId ? updated : s)),
+      );
+      setSaved((prev) =>
+        prev.map((s) => (s.statusId === statusId ? updated : s)),
+      );
       onChanged();
     } catch (e) {
       setError(e instanceof Error ? e.message : "更新失败");
@@ -86,10 +94,16 @@ export function WorkflowEditor({
     if (!newName.trim()) return;
     const position = newPos.trim() === "" ? null : Number(newPos);
     try {
-      const created = await api<Status>(`/api/projects/${projectKey}/statuses`, {
-        method: "POST",
-        body: JSON.stringify({ name: newName.trim(), ...(position !== null ? { position } : {}) }),
-      });
+      const created = await api<Status>(
+        `/api/projects/${projectKey}/statuses`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            name: newName.trim(),
+            ...(position !== null ? { position } : {}),
+          }),
+        },
+      );
       setStatuses((prev) => [...prev, created]);
       setSaved((prev) => [...prev, created]);
       setNewName("");
@@ -114,10 +128,12 @@ export function WorkflowEditor({
   async function saveTransitions(list: Transition[]) {
     setError("");
     try {
-      setTransitions(await api<Transition[]>(`/api/projects/${projectKey}/transitions`, {
-        method: "PUT",
-        body: JSON.stringify({ transitions: list }),
-      }));
+      setTransitions(
+        await api<Transition[]>(`/api/projects/${projectKey}/transitions`, {
+          method: "PUT",
+          body: JSON.stringify({ transitions: list }),
+        }),
+      );
       onChanged();
     } catch (e) {
       setError(e instanceof Error ? e.message : "保存失败");
@@ -129,7 +145,8 @@ export function WorkflowEditor({
       <DialogTitle>{t.wf.title}</DialogTitle>
       <DialogContent>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          列即状态。迁移表为空 = 自由迁移;配置后仅列出的 from→to 合法。改动即时保存并刷新看板。
+          列即状态。迁移表为空 = 自由迁移;配置后仅列出的 from→to
+          合法。改动即时保存并刷新看板。
         </Typography>
         {error && (
           <Typography color="error" variant="body2" sx={{ mb: 1 }}>
@@ -142,18 +159,28 @@ export function WorkflowEditor({
         </Typography>
         <Stack spacing={1}>
           {statuses.map((s) => (
-            <Stack key={s.statusId} direction="row" spacing={1} alignItems="center">
+            <Stack
+              key={s.statusId}
+              direction="row"
+              spacing={1}
+              alignItems="center"
+            >
               <TextField
                 size="small"
                 value={s.name}
                 onChange={(e) =>
                   setStatuses((prev) =>
-                    prev.map((x) => (x.statusId === s.statusId ? { ...x, name: e.target.value } : x)),
+                    prev.map((x) =>
+                      x.statusId === s.statusId
+                        ? { ...x, name: e.target.value }
+                        : x,
+                    ),
                   )
                 }
                 onBlur={(e) => {
                   const base = saved.find((x) => x.statusId === s.statusId);
-                  if (e.target.value !== (base?.name ?? "")) patch(s.statusId, { name: e.target.value });
+                  if (e.target.value !== (base?.name ?? ""))
+                    patch(s.statusId, { name: e.target.value });
                 }}
                 sx={{ width: 170 }}
               />
@@ -163,30 +190,41 @@ export function WorkflowEditor({
                 value={s.icon ?? ""}
                 onChange={(e) =>
                   setStatuses((prev) =>
-                    prev.map((x) => (x.statusId === s.statusId ? { ...x, icon: e.target.value } : x)),
+                    prev.map((x) =>
+                      x.statusId === s.statusId
+                        ? { ...x, icon: e.target.value }
+                        : x,
+                    ),
                   )
                 }
                 onBlur={(e) => {
                   const base = saved.find((x) => x.statusId === s.statusId);
-                  if (e.target.value !== (base?.icon ?? "")) patch(s.statusId, { icon: e.target.value });
+                  if (e.target.value !== (base?.icon ?? ""))
+                    patch(s.statusId, { icon: e.target.value });
                 }}
                 sx={{ width: 90 }}
               />
-<Dropdown
+              <Dropdown
                 size="small"
                 placeholder="—"
                 value={s.isStart ? "start" : ""}
                 onChange={(v) => patch(s.statusId, { isStart: v === "start" })}
                 sx={{ width: 110 }}
-                options={[{ value: "", label: "—" }, { value: "start", label: t.wf.start }]}
+                options={[
+                  { value: "", label: "—" },
+                  { value: "start", label: t.wf.start },
+                ]}
               />
-<Dropdown
+              <Dropdown
                 size="small"
                 placeholder="—"
                 value={s.isFinal ? "final" : ""}
                 onChange={(v) => patch(s.statusId, { isFinal: v === "final" })}
                 sx={{ width: 110 }}
-                options={[{ value: "", label: "—" }, { value: "final", label: t.wf.final }]}
+                options={[
+                  { value: "", label: "—" },
+                  { value: "final", label: t.wf.final },
+                ]}
               />
               <TextField
                 size="small"
@@ -195,16 +233,25 @@ export function WorkflowEditor({
                 value={s.position}
                 onChange={(e) =>
                   setStatuses((prev) =>
-                    prev.map((x) => (x.statusId === s.statusId ? { ...x, position: Number(e.target.value) } : x)),
+                    prev.map((x) =>
+                      x.statusId === s.statusId
+                        ? { ...x, position: Number(e.target.value) }
+                        : x,
+                    ),
                   )
                 }
                 onBlur={(e) => {
                   const base = saved.find((x) => x.statusId === s.statusId);
-                  if (Number(e.target.value) !== (base?.position ?? 0)) patch(s.statusId, { position: Number(e.target.value) });
+                  if (Number(e.target.value) !== (base?.position ?? 0))
+                    patch(s.statusId, { position: Number(e.target.value) });
                 }}
                 sx={{ width: 80 }}
               />
-              <IconButton size="small" onClick={() => removeStatus(s.statusId)} aria-label="delete">
+              <IconButton
+                size="small"
+                onClick={() => removeStatus(s.statusId)}
+                aria-label="delete"
+              >
                 <DeleteIcon fontSize="small" />
               </IconButton>
             </Stack>
@@ -225,7 +272,11 @@ export function WorkflowEditor({
               onChange={(e) => setNewPos(e.target.value)}
               sx={{ width: 120 }}
             />
-            <Button startIcon={<AddIcon />} onClick={addStatus} disabled={!newName.trim()}>
+            <Button
+              startIcon={<AddIcon />}
+              onClick={addStatus}
+              disabled={!newName.trim()}
+            >
               {t.wf.addStatus}
             </Button>
           </Stack>
@@ -249,16 +300,26 @@ export function WorkflowEditor({
               <Typography variant="body2" sx={{ minWidth: 60 }}>
                 {tr.to}
               </Typography>
-              <Button size="small" onClick={() => saveTransitions(transitions.filter((_, j) => j !== i))}>
+              <Button
+                size="small"
+                onClick={() =>
+                  saveTransitions(transitions.filter((_, j) => j !== i))
+                }
+              >
                 {t.wf.remove}
               </Button>
             </Stack>
           ))}
-          <AddTransitionRow statuses={statuses} onAdd={(tr) => saveTransitions([...transitions, tr])} />
+          <AddTransitionRow
+            statuses={statuses}
+            onAdd={(tr) => saveTransitions([...transitions, tr])}
+          />
         </Stack>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>{t.attrs.delete === "删除" ? "关闭" : "Close"}</Button>
+        <Button onClick={onClose}>
+          {t.attrs.delete === "删除" ? "关闭" : "Close"}
+        </Button>
       </DialogActions>
     </Dialog>
   );
@@ -276,7 +337,7 @@ function AddTransitionRow({
   const ready = from && to && from !== to;
   return (
     <Stack direction="row" spacing={1} alignItems="center">
-<Dropdown
+      <Dropdown
         size="small"
         placeholder={t.wf.from}
         ariaLabel={t.wf.from}
@@ -286,7 +347,7 @@ function AddTransitionRow({
         options={statuses.map((s) => ({ value: s.name, label: s.name }))}
       />
       <Typography variant="body2">→</Typography>
-<Dropdown
+      <Dropdown
         size="small"
         placeholder={t.wf.to}
         ariaLabel={t.wf.to}
@@ -295,7 +356,12 @@ function AddTransitionRow({
         sx={{ width: 150 }}
         options={statuses.map((s) => ({ value: s.name, label: s.name }))}
       />
-      <Button size="small" variant="outlined" disabled={!ready} onClick={() => onAdd({ from, to })}>
+      <Button
+        size="small"
+        variant="outlined"
+        disabled={!ready}
+        onClick={() => onAdd({ from, to })}
+      >
         {t.wf.addTransition}
       </Button>
     </Stack>

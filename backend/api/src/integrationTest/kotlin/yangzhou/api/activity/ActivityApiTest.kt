@@ -7,12 +7,19 @@ import kotlin.test.assertTrue
 
 /** 活动日志:每种变更路径自动留痕,一条变更一行。 */
 class ActivityApiTest : AbstractApiTest() {
-
     private fun activityKinds(itemId: String): List<String> {
-        val body = json.readTree(
-            bootstrapAndAuth().get().uri("/api/items/$itemId/activity")
-                .exchange().expectStatus().isOk().expectBody(String::class.java).returnResult().responseBody!!,
-        )
+        val body =
+            json.readTree(
+                bootstrapAndAuth()
+                    .get()
+                    .uri("/api/items/$itemId/activity")
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody(String::class.java)
+                    .returnResult()
+                    .responseBody!!,
+            )
         return body.map { it["kind"].asText() }
     }
 
@@ -33,9 +40,13 @@ class ActivityApiTest : AbstractApiTest() {
     @Test
     fun `标题与描述变更各留一行`() {
         val (authed, itemId) = seed()
-        authed.patch().uri("/api/items/$itemId")
+        authed
+            .patch()
+            .uri("/api/items/$itemId")
             .body(mapOf("title" to "新标题", "description" to "新描述"))
-            .exchange().expectStatus().isOk()
+            .exchange()
+            .expectStatus()
+            .isOk()
 
         val kinds = activityKinds(itemId)
         assertTrue("title_changed" in kinds && "description_changed" in kinds)
@@ -45,26 +56,60 @@ class ActivityApiTest : AbstractApiTest() {
     fun `状态变更留痕并记录新旧状态名`() {
         val (authed, itemId) = seed()
         // 指派"我"以满足开工须有主
-        val meId = json.readTree(
-            authed.get().uri("/api/members").exchange()
-                .expectStatus().isOk().expectBody(String::class.java).returnResult().responseBody!!,
-        ).first { !it["virtual"].asBoolean() }["memberId"].asText()
-        authed.put().uri("/api/items/$itemId/assignee")
+        val meId =
+            json
+                .readTree(
+                    authed
+                        .get()
+                        .uri("/api/members")
+                        .exchange()
+                        .expectStatus()
+                        .isOk()
+                        .expectBody(String::class.java)
+                        .returnResult()
+                        .responseBody!!,
+                ).first { !it["virtual"].asBoolean() }["memberId"]
+                .asText()
+        authed
+            .put()
+            .uri("/api/items/$itemId/assignee")
             .body(mapOf("assigneeItemId" to meId))
-            .exchange().expectStatus().isOk()
-        val project = json.readTree(
-            authed.get().uri("/api/projects/CHE").exchange()
-                .expectStatus().isOk().expectBody(String::class.java).returnResult().responseBody!!,
-        )
+            .exchange()
+            .expectStatus()
+            .isOk()
+        val project =
+            json.readTree(
+                authed
+                    .get()
+                    .uri("/api/projects/CHE")
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody(String::class.java)
+                    .returnResult()
+                    .responseBody!!,
+            )
         val dev = project["statuses"].first { it["name"].asText() == "In Progress" }["statusId"].asText()
-        authed.patch().uri("/api/items/$itemId")
+        authed
+            .patch()
+            .uri("/api/items/$itemId")
             .body(mapOf("statusItemId" to dev))
-            .exchange().expectStatus().isOk()
+            .exchange()
+            .expectStatus()
+            .isOk()
 
-        val body = json.readTree(
-            authed.get().uri("/api/items/$itemId/activity")
-                .exchange().expectStatus().isOk().expectBody(String::class.java).returnResult().responseBody!!,
-        )
+        val body =
+            json.readTree(
+                authed
+                    .get()
+                    .uri("/api/items/$itemId/activity")
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody(String::class.java)
+                    .returnResult()
+                    .responseBody!!,
+            )
         val sc = body.first { it["kind"].asText() == "status_changed" }
         assertEquals("To Do", sc["oldValue"].asText())
         assertEquals("In Progress", sc["newValue"].asText())
@@ -73,19 +118,37 @@ class ActivityApiTest : AbstractApiTest() {
     @Test
     fun `指派与取消留痕 assigned 和 unassigned`() {
         val (authed, itemId) = seed()
-        val xiaoli = json.readTree(
-            authed.post().uri("/api/members").body(mapOf("displayName" to "小李"))
-                .exchange().expectStatus().isCreated()
-                .expectBody(String::class.java).returnResult().responseBody!!,
-        )["memberId"].asText()
+        val xiaoli =
+            json
+                .readTree(
+                    authed
+                        .post()
+                        .uri("/api/members")
+                        .body(mapOf("displayName" to "小李"))
+                        .exchange()
+                        .expectStatus()
+                        .isCreated()
+                        .expectBody(String::class.java)
+                        .returnResult()
+                        .responseBody!!,
+                )["memberId"]
+                .asText()
         addPoolMember(authed, "CHE", xiaoli) // 0047:池外不可指派
 
-        authed.put().uri("/api/items/$itemId/assignee")
+        authed
+            .put()
+            .uri("/api/items/$itemId/assignee")
             .body(mapOf("assigneeItemId" to xiaoli))
-            .exchange().expectStatus().isOk()
-        authed.put().uri("/api/items/$itemId/assignee")
+            .exchange()
+            .expectStatus()
+            .isOk()
+        authed
+            .put()
+            .uri("/api/items/$itemId/assignee")
             .body(mapOf("assigneeItemId" to null))
-            .exchange().expectStatus().isOk()
+            .exchange()
+            .expectStatus()
+            .isOk()
 
         val kinds = activityKinds(itemId)
         assertTrue("assigned" in kinds && "unassigned" in kinds)
@@ -94,16 +157,32 @@ class ActivityApiTest : AbstractApiTest() {
     @Test
     fun `需求整表替换留痕 requirement_changed 带摘要`() {
         val (authed, itemId) = seed()
-        authed.put().uri("/api/items/$itemId/requirements")
-            .body(mapOf("requirements" to listOf(
-                mapOf("attribute" to "Java", "minLevel" to 4),
-            )))
-            .exchange().expectStatus().isOk()
+        authed
+            .put()
+            .uri("/api/items/$itemId/requirements")
+            .body(
+                mapOf(
+                    "requirements" to
+                        listOf(
+                            mapOf("attribute" to "Java", "minLevel" to 4),
+                        ),
+                ),
+            ).exchange()
+            .expectStatus()
+            .isOk()
 
-        val body = json.readTree(
-            authed.get().uri("/api/items/$itemId/activity")
-                .exchange().expectStatus().isOk().expectBody(String::class.java).returnResult().responseBody!!,
-        )
+        val body =
+            json.readTree(
+                authed
+                    .get()
+                    .uri("/api/items/$itemId/activity")
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody(String::class.java)
+                    .returnResult()
+                    .responseBody!!,
+            )
         val rc = body.first { it["kind"].asText() == "requirement_changed" }
         assertEquals("Java>=4", rc["newValue"].asText())
     }

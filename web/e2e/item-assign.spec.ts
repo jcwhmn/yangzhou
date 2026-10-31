@@ -1,27 +1,47 @@
 // YPJ-1/6 候选分配体验:头部入口/Popover 分色(delta=1 浅橙)/未足确认/取消指派
 import { randomUUID } from "node:crypto";
 import { expect, test } from "./support/fixtures";
-import { apiAddPoolMember, apiAssignMe, apiCall, apiCreateItem, apiCreateMember, apiMeId } from "./support/helpers";
+import {
+  apiAddPoolMember,
+  apiAssignMe,
+  apiCall,
+  apiCreateItem,
+  apiCreateMember,
+  apiMeId,
+} from "./support/helpers";
 
 /** 属性名带随机后缀:并行用例/重跑同毫秒也不撞(409) */
 const uniqueAttr = (prefix: string) => `${prefix} ${randomUUID().slice(0, 8)}`;
 
 /** 建属性(同名重复调会 409,一属性只建一次) */
 async function createAttr(name: string) {
-  await apiCall("POST", "/api/attributes", { name, kind: "skill", leveled: true });
+  await apiCall("POST", "/api/attributes", {
+    name,
+    kind: "skill",
+    leveled: true,
+  });
 }
 
 /** 给指定成员设能力等级(memberName 为空 = me) */
 async function setCap(attr: string, level: number, memberName?: string) {
   const memberId = memberName
-    ? (await apiCall<{ memberId: string; displayName: string }[]>("GET", "/api/members")).find(
-        (m) => m.displayName === memberName,
-      )!.memberId
+    ? (
+        await apiCall<{ memberId: string; displayName: string }[]>(
+          "GET",
+          "/api/members",
+        )
+      ).find((m) => m.displayName === memberName)!.memberId
     : await apiMeId();
-  await apiCall("PUT", `/api/members/${memberId}/capabilities`, { attribute: attr, level });
+  await apiCall("PUT", `/api/members/${memberId}/capabilities`, {
+    attribute: attr,
+    level,
+  });
 }
 
-test("详情页头部——未指派显示分配入口;已指派显示 chip;谁来做区块已移除", async ({ page, projectKey }) => {
+test("详情页头部——未指派显示分配入口;已指派显示 chip;谁来做区块已移除", async ({
+  page,
+  projectKey,
+}) => {
   const empty = await apiCreateItem(projectKey, "AS 无主 item");
   await page.goto(`/p/${projectKey}/i/${empty}`);
   await expect(page.getByText("分配", { exact: true })).toBeVisible(); // 头部入口(状态下拉前)
@@ -35,7 +55,10 @@ test("详情页头部——未指派显示分配入口;已指派显示 chip;谁�
   await expect(page.getByText("分配", { exact: true })).toHaveCount(0);
 });
 
-test("展开面板——按 rank 排序,分色:绿/浅橙(delta=1)/红", async ({ page, projectKey }) => {
+test("展开面板——按 rank 排序,分色:绿/浅橙(delta=1)/红", async ({
+  page,
+  projectKey,
+}) => {
   test.slow(); // 2 次能力 PUT 各触发 recomputeWorkspace(全 workspace 逐 item 重算,V9-Q2),胖测试库下远超 30s
   const attr = uniqueAttr("AS 属性");
   await apiCreateMember("小张");
@@ -44,11 +67,20 @@ test("展开面板——按 rank 排序,分色:绿/浅橙(delta=1)/红", async (
   await setCap(attr, 1, "小张"); // 差 1 级 → 勉强浅橙
   await apiCreateMember("小王"); // 无能力 → 缺门 RED
   // 0047:池=合法指派范围,虚拟成员入池才进候选
-  const members = await apiCall<{ memberId: string; displayName: string }[]>("GET", "/api/members");
-  for (const name of ["小张", "小王"]) await apiAddPoolMember(projectKey, members.find((m) => m.displayName === name)!.memberId);
+  const members = await apiCall<{ memberId: string; displayName: string }[]>(
+    "GET",
+    "/api/members",
+  );
+  for (const name of ["小张", "小王"])
+    await apiAddPoolMember(
+      projectKey,
+      members.find((m) => m.displayName === name)!.memberId,
+    );
 
   const itemId = await apiCreateItem(projectKey, "AS 分色 item");
-  await apiCall("PUT", `/api/items/${itemId}/requirements`, { requirements: [{ attribute: attr, minLevel: 2 }] });
+  await apiCall("PUT", `/api/items/${itemId}/requirements`, {
+    requirements: [{ attribute: attr, minLevel: 2 }],
+  });
   await page.goto(`/p/${projectKey}/i/${itemId}`);
   await page.getByText("分配", { exact: true }).click(); // 头部入口
 
@@ -70,16 +102,24 @@ test("详情页指派——无未足项直接执行不弹确认", async ({ page,
   await page.getByText("分配", { exact: true }).click();
   const pop = page.locator(".MuiPopover-paper");
   await expect(pop).toBeVisible();
-  await pop.locator("[data-testid=cand-row]", { hasText: "me" }).getByRole("button", { name: "指派", exact: true }).click();
+  await pop
+    .locator("[data-testid=cand-row]", { hasText: "me" })
+    .getByRole("button", { name: "指派", exact: true })
+    .click();
   await expect(page.getByText("存在未满足项")).toHaveCount(0); // 不弹确认
   await expect(page.getByText(/^👤 me/).first()).toBeVisible();
 });
 
-test("详情页指派——有未足项先确认:取消维持现状,确认后指派成功", async ({ page, projectKey }) => {
+test("详情页指派——有未足项先确认:取消维持现状,确认后指派成功", async ({
+  page,
+  projectKey,
+}) => {
   const attr = uniqueAttr("AS 属性"); // me 无该能力 → 候选为缺门(RED,未足)
   await createAttr(attr);
   const itemId = await apiCreateItem(projectKey, "AS 未足确认");
-  await apiCall("PUT", `/api/items/${itemId}/requirements`, { requirements: [{ attribute: attr, minLevel: 2 }] });
+  await apiCall("PUT", `/api/items/${itemId}/requirements`, {
+    requirements: [{ attribute: attr, minLevel: 2 }],
+  });
   await page.goto(`/p/${projectKey}/i/${itemId}`);
 
   const pop = page.locator(".MuiPopover-paper");
@@ -100,16 +140,24 @@ test("详情页指派——有未足项先确认:取消维持现状,确认后指
   await expect(page.getByText(/^👤 me/).first()).toBeVisible();
 });
 
-test("Popover 指派缺门候选——淡出警告确认后指派成功", async ({ page, projectKey }) => {
+test("Popover 指派缺门候选——淡出警告确认后指派成功", async ({
+  page,
+  projectKey,
+}) => {
   const attr = uniqueAttr("AS 属性");
   await createAttr(attr);
   await apiCreateMember("小王");
-  const wangId = (await apiCall<{ memberId: string; displayName: string }[]>("GET", "/api/members")).find(
-    (m) => m.displayName === "小王",
-  )!.memberId;
+  const wangId = (
+    await apiCall<{ memberId: string; displayName: string }[]>(
+      "GET",
+      "/api/members",
+    )
+  ).find((m) => m.displayName === "小王")!.memberId;
   await apiAddPoolMember(projectKey, wangId); // 0047:入池才可指派
   const itemId = await apiCreateItem(projectKey, "AS 缺门候选");
-  await apiCall("PUT", `/api/items/${itemId}/requirements`, { requirements: [{ attribute: attr, minLevel: 2 }] });
+  await apiCall("PUT", `/api/items/${itemId}/requirements`, {
+    requirements: [{ attribute: attr, minLevel: 2 }],
+  });
   await page.goto(`/p/${projectKey}/i/${itemId}`);
   await page.getByText("分配", { exact: true }).click();
 
@@ -124,7 +172,10 @@ test("Popover 指派缺门候选——淡出警告确认后指派成功", async 
   await expect(page.getByText(/^👤 小王/).first()).toBeVisible(); // 指派后 Popover 收起,chip 直显
 });
 
-test("看板卡片指派入口——Popover 弹出/Esc 收起/指派成功且不跳转", async ({ page, projectKey }) => {
+test("看板卡片指派入口——Popover 弹出/Esc 收起/指派成功且不跳转", async ({
+  page,
+  projectKey,
+}) => {
   await apiCreateItem(projectKey, "AP 卡片指派");
   await page.goto(`/p/${projectKey}`);
   const card = page.locator(".MuiCard-root", { hasText: "AP 卡片指派" });
@@ -137,7 +188,11 @@ test("看板卡片指派入口——Popover 弹出/Esc 收起/指派成功且不
   // 重开,指派第一个候选 → 卡片 chip 直显
   await card.getByText("未指派").click();
   await expect(pop).toBeVisible();
-  await pop.locator("[data-testid=cand-row]").first().getByRole("button", { name: "指派", exact: true }).click();
+  await pop
+    .locator("[data-testid=cand-row]")
+    .first()
+    .getByRole("button", { name: "指派", exact: true })
+    .click();
   await expect(pop).toBeHidden();
   await expect(card.getByText(/^👤 /)).toBeVisible();
 });
@@ -150,7 +205,9 @@ test("重分配——候选列表标注当前负责人", async ({ page, projectK
   await card.getByText(/^👤 /).click();
   const pop = page.locator(".MuiPopover-paper");
   await expect(pop).toBeVisible();
-  await expect(pop.locator("[data-testid=cand-row]", { hasText: "me" })).toContainText("当前");
+  await expect(
+    pop.locator("[data-testid=cand-row]", { hasText: "me" }),
+  ).toContainText("当前");
 });
 
 test("取消指派——chip × 与 Popover 内取消指派", async ({ page, projectKey }) => {
@@ -165,9 +222,15 @@ test("取消指派——chip × 与 Popover 内取消指派", async ({ page, pro
   await page.getByText("分配", { exact: true }).click();
   const pop = page.locator(".MuiPopover-paper");
   await expect(pop).toBeVisible();
-  await pop.locator("[data-testid=cand-row]", { hasText: "me" }).getByRole("button", { name: "指派", exact: true }).click();
+  await pop
+    .locator("[data-testid=cand-row]", { hasText: "me" })
+    .getByRole("button", { name: "指派", exact: true })
+    .click();
   await expect(page.getByText(/^👤 me/).first()).toBeVisible();
-  await page.getByText(/^👤 me/).first().click();
+  await page
+    .getByText(/^👤 me/)
+    .first()
+    .click();
   await expect(pop).toBeVisible();
   await pop.getByRole("button", { name: "取消指派" }).click();
   await expect(pop).toBeHidden();
