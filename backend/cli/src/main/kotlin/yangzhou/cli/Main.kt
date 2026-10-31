@@ -5,21 +5,16 @@ import java.io.FileOutputStream
 import java.io.PrintStream
 
 /** CLI 入口:yz <noun> <verb> [args] [--flags]。瘦壳——逻辑全在 API,这里只有编排与展示。 */
-
 fun main(args: Array<String>) {
     // Windows 控制台 GBK 兜底:强制 UTF-8 输出(中文判定行不乱码)
-
     System.setOut(PrintStream(FileOutputStream(FileDescriptor.out), true, "UTF-8"))
-
     System.setErr(PrintStream(FileOutputStream(FileDescriptor.err), true, "UTF-8"))
 
     if (args.isEmpty()) return usage()
-
     try {
         run(args.toList())
     } catch (e: Exception) {
         System.err.println("错误:${e.message ?: e::class.simpleName}")
-
         kotlin.system.exitProcess(1)
     }
 }
@@ -28,67 +23,38 @@ private fun usage() {
     println(
 
         """
-
         yz — yangzhou 命令行
-
         用法:yz <命令> [参数] [选项]
 
-
-
           login [-u 用户名] [-p 密码] [--server URL]      登录(默认 8080;PM 日常实例用 http://localhost:8081)
-
           attrs create <属性> [--kind skill|label|category|custom] [--leveled] [--parent <分类>]  建词表属性
-
           members add <显示名>                         建虚拟成员(无凭据,不登录)
-
           members list [--json]                        成员目录(含我与虚拟)
-
           members rm <成员名>...                       删虚拟成员(可多名字/顿号分隔;登录账号不可删)
-
           members set <成员名> <属性> [1-4]            给成员自评能力(不带数字=未评级)
-
           teams add <组名> / teams list                建组/列组(纯分组,视图过滤)
-
           attrs list [--json]                        词表列表
-
           projects create <KEY> [名称]                 建项目(自动带三态 workflow)
-
           projects delete <KEY>... [--force]           删项目(多 KEY,可直接粘贴 login 列表;默认预览,--force 物理删)
-
           projects list [--json]                       项目列表
-
           items create <KEY> <标题> [--desc 文本] [--sprint 名称|UUID] [--req 属性[>=N]]... [--json]   建 item(需求可分级)
-
           items list <KEY> [--json]                    项目 item 列表
-
           items move <ITEM_ID> <状态名>                改状态(经 workflow 校验)
-
+          items assign <KEY-N|itemId> <sprint名|UUID|backlog>   挂入/移出 sprint(backlog=移出)
           items branch <KEY-N> <分支名> [--base <基线>] [--items YPJ-B,YPJ-C]   # 从票走补挂(主票建分支)
-
+          sprints move <KEY> <名|UUID> <planned|active|completed>   改 sprint 状态
           sprints list <KEY> [--json]                       列 sprint(id/名称/状态/起止)
-
           caps set <属性> [1-4]                        自评能力(不带数字=未评级)
-
           caps rm <属性>                               移除能力
-
           caps list [--json]                           能力清单
-
           feasibility <KEY> [--item <ID>] [--json]     可行性/差距分析
-
           candidates <KEY-N|itemId> [--json]          候选建议(谁来做:排序+理由)
-
           assign <KEY-N|itemId> <成员名|--clear>      指派/取消(引擎建议,人拍板)
-
           log <KEY-N|itemId> [--json]                 按需拉取 item 分支的 GitHub 提交历史
-
           export <KEY> [--csv] [--file <路径>]          导出(JSON 全保真/CSV 扁平)
-
           import <KEY> <文件>                           导入(JSON 按扩展名或 .csv;Linear CSV 可直接灌)
 
-
-
         会话文件:${ApiClient.sessionFile().absolutePath}
-
         """.trimIndent(),
 
     )
@@ -96,13 +62,9 @@ private fun usage() {
 
 private fun run(args: List<String>) {
     val flags = mutableMapOf<String, String>()
-
     val positional = mutableListOf<String>()
-
     val reqs = mutableListOf<String>()
-
     var i = 0
-
     while (i < args.size) {
         val a = args[i]
 
@@ -112,78 +74,56 @@ private fun run(args: List<String>) {
                 reqs += args[i + 1]
                 i += 2
             }
-
             a == "--json" -> {
                 flags["json"] = ""
                 i += 1
             } // 无值旗标,可放任意位置
-
             a.startsWith("-") -> {
                 flags[a.trimStart('-')] = args.getOrNull(i + 1) ?: ""
                 i += 2
             }
-
             else -> {
                 positional += a
                 i += 1
             }
         }
     }
-
     val noun = positional.getOrNull(0)
-
     val verb = positional.getOrNull(1)
-
     val rest = positional.drop(2)
 
     val api = ApiClient.create()
-
     if (noun == "feasibility") {
         return feasibility(api, positional.getOrNull(1), flags)
     }
-
     if (noun == "members") {
         return when (verb) {
             "add" -> {
                 val displayName = rest.getOrNull(0) ?: error("缺少显示名")
-
                 val body = api.json("POST", "/api/members", mapOf("displayName" to displayName.trim()))
-
                 println("已建虚拟成员:${body["displayName"].asString()}(无凭据,不登录)")
             }
-
             "rm" -> {
                 // 与 projects delete 同规:粘贴名单(顿号/逗号)与空格分隔等价
-
                 val names = rest.flatMap { it.split('、', ',') }.map { it.trim() }.filter { it.isNotEmpty() }
                     .ifEmpty { error("缺少成员名(可多个)") }
-
                 var failed = 0
-
                 for (name in names) {
                     try {
                         val id = memberIdByDisplayName(api, name) ?: error("成员不存在:$name")
-
                         api.json("DELETE", "/api/members/$id")
-
                         println("已删除:$name")
                     } catch (e: IllegalStateException) {
                         failed++
-
                         println("失败:$name → ${e.message}")
                     }
                 }
-
                 check(failed == 0) { "$failed/${names.size} 个成员失败" }
             }
-
             "list" -> {
                 val body = api.json("GET", "/api/members")
-
                 if (flags.containsKey("json")) return printRaw(body.toString())
-
                 println("成员     性质     用户名")
-
                 body.forEach {
                     println(
                         "%-8s %-8s %s".format(
@@ -198,22 +138,15 @@ private fun run(args: List<String>) {
                     )
                 }
             }
-
             "set" -> {
                 val name = rest.getOrNull(0) ?: error("缺少成员名")
-
                 val attr = rest.getOrNull(1) ?: error("缺少属性名")
-
                 val level = rest.getOrNull(2)?.let {
                     it.toIntOrNull()?.takeIf { l -> l in 1..4 } ?: error("等级只能是 1-4 或不填(未评级)")
                 }
-
                 val memberId = memberIdByDisplayName(api, name) ?: error("成员不存在:$name")
-
                 val body = api.json("PUT", "/api/members/$memberId/capabilities", mapOf("attribute" to attr, "level" to level))
-
                 val lvl = body["level"]
-
                 println("已设置:$name · $attr = ${if (lvl.isNull) "未评级" else lvl.asInt()}")
             }
 
@@ -223,24 +156,17 @@ private fun run(args: List<String>) {
             }
         }
     }
-
     if (noun == "teams") {
         return when (verb) {
             "add" -> {
                 val name = rest.getOrNull(0) ?: error("缺少组名")
-
                 val body = api.json("POST", "/api/teams", mapOf("name" to name.trim()))
-
                 println("已建组:${body["name"].asString()}")
             }
-
             "list" -> {
                 val body = api.json("GET", "/api/teams")
-
                 if (flags.containsKey("json")) return printRaw(body.toString())
-
                 if (body.size() == 0) return println("(无分组)")
-
                 body.forEach { team ->
 
                     println("${team["name"].asString()}:${team["members"].joinToString("、") { m -> m["displayName"].asString() }.ifEmpty { "(空)" }}")
@@ -253,21 +179,14 @@ private fun run(args: List<String>) {
             }
         }
     }
-
     if (noun == "candidates" || noun == "assign") {
         val ref = positional.getOrNull(1) ?: error("缺少 <KEY-N|itemId>(如 CHE-1)")
-
         val itemId = resolveItemId(api, ref)
-
         if (noun == "candidates") {
             val body = api.json("GET", "/api/items/$itemId/candidates")
-
             if (flags.containsKey("json")) return printRaw(body.toString())
-
             if (body.size() == 0) return println("(无候选——先建成员)")
-
             println("名次  成员     性质     信号     缺门  差距")
-
             body.forEach {
                 println(
 
@@ -292,137 +211,85 @@ private fun run(args: List<String>) {
                     ),
 
                 )
-
                 it["verdicts"].forEach { v ->
-
                     val attr = v["attribute"].asString()
-
                     val line = when (v["kind"].asString()) {
                         "satisfied" -> "      ✓ 满足($attr)"
-
                         "surplus" -> "      ✓ 有余($attr)"
-
                         "gap" -> "      △ 差 ${v["delta"].asInt()} 级($attr:需≥${v["required"].asInt()},有 ${v["actual"].asInt()})"
-
                         "unrated" -> "      △ 有但未评级($attr,需≥${v["required"].asInt()})——差距未知"
-
                         else -> "      ✗ 缺能力($attr)"
                     }
-
                     println(line)
                 }
             }
-
             return
         }
-
         // assign
-
         val name = flags["clear"]?.takeIf { it.isNotEmpty() } ?: positional.getOrNull(2)
-
         val assigneeId: String? = if (name == null || name == "--") {
             null
         } else {
             val members = api.json("GET", "/api/members")
-
             var found: String? = null
-
             members.forEach { m -> if (m["displayName"].asString() == name) found = m["memberId"].asString() }
-
             found ?: error("成员不存在:$name(可用:${members.joinToString("/") { m -> m["displayName"].asString() }})")
         }
-
         val body = api.json("PUT", "/api/items/$itemId/assignee", mapOf("assigneeItemId" to assigneeId))
-
         val who = body["assignee"]
-
         println(if (who.isNull) "已取消指派:${body["number"].asString()}" else "已指派:${body["number"].asString()}" + " → " + who.asString())
-
         return
     }
-
     if (noun == "log") {
         val ref = positional.getOrNull(1) ?: error("缺少 <KEY-N|itemId>(如 CHE-1)")
-
         val itemId = resolveItemId(api, ref)
-
         val body = api.json("GET", "/api/items/$itemId/commits")
-
         if (flags.containsKey("json")) return printRaw(body.toString())
-
         if (body.size() == 0) return println("(无关联分支——先建分支或等轮询回捞)")
-
         body.forEach { block ->
-
             println("${block["repo"].asString()} · ${block["ref"].asString()}")
-
             val commits = block["commits"]
-
             if (commits.isEmpty) return@forEach println("  (无提交——分支可能已删)")
-
             commits.forEach { c ->
-
                 val author = c["author"]
-
                 val date = c["date"]
-
                 println(
 
                     "  ${c["sha"].asString().take(7)} ${c["message"].asString()}" +
-
                         (if (!author.isNull) " · ${author.asString()}" else "") +
-
                         (if (!date.isNull) " · ${date.asString().take(10)}" else ""),
 
                 )
             }
         }
-
         return
     }
-
     if (noun == "export") {
         val key = positional.getOrNull(1) ?: error("缺少项目 KEY")
-
         val csv = flags.containsKey("csv")
-
         val file = java.io.File(flags["file"] ?: "$key-items.${if (csv) "csv" else "json"}")
-
         return if (csv) yangzhou.cli.ExportImport.exportCsv(api, key, file) else yangzhou.cli.ExportImport.exportJson(api, key, file)
     }
-
     if (noun == "import") {
         val key = positional.getOrNull(1) ?: error("缺少项目 KEY")
-
         val path = positional.getOrNull(2) ?: flags["file"] ?: error("缺少文件路径")
-
         val file = java.io.File(path)
-
         return if (file.extension.equals("csv", ignoreCase = true)) {
             yangzhou.cli.ExportImport.importCsv(api, key, file)
         } else {
             yangzhou.cli.ExportImport.importJson(api, key, file)
         }
     }
-
     when ("$noun $verb") {
         "login null", "login " -> {
             val server = (flags["server"] ?: "http://localhost:8080").trimEnd('/')
-
             val user = flags["u"] ?: error("缺少 -u")
-
             val pass = flags["p"] ?: error("缺少 -p")
-
             val client = ApiClient.login(server, user, pass)
-
             println("已登录:$server")
-
             // YPJ-58 实例定位防护:回显项目 key;无 YPJ 打警告(test 实例误登当场可见)
-
             val keys = client.json("GET", "/api/projects").values().map { it["key"].asString() }
-
             println("实例项目:" + keys.joinToString("、"))
-
             if ("YPJ" !in keys) {
                 println("⚠ 该实例没有 YPJ 项目;若要操作 PM 数据,重登:yz login --server http://localhost:8081 -u <用户名> -p <密码>")
             }
@@ -430,46 +297,29 @@ private fun run(args: List<String>) {
 
         "attrs create" -> {
             val name = rest.getOrNull(0) ?: error("缺少属性名")
-
             val kind = flags["kind"] ?: "skill"
-
             val leveled = flags.containsKey("leveled") || flags["kind"] == null || flags["kind"] == "skill"
-
             // V10-S1:--category 建分类;--parent <分类名> 挂叶子
-
             val parentName = flags["parent"]
-
             var parentId: String? = null
-
             if (parentName != null) {
                 val parent = api.json("GET", "/api/attributes")
                     .firstOrNull { it["name"].asString() == parentName && it["kind"].asString() == "category" }
-
                     ?: error("分类不存在:\$parentName")
-
                 parentId = parent["attributeId"].asString()
             }
-
             val bodyMap = mutableMapOf("name" to name, "kind" to kind, "leveled" to leveled)
-
             if (parentId != null) bodyMap["parentId"] = parentId
-
             val body = api.json("POST", "/api/attributes", bodyMap)
-
             printJson(body, flags)
-
             println("属性 " + body["name"].asString() + "(" + body["kind"].asString() + (if (body["leveled"].asBoolean()) "/分级" else "") + ")已创建")
         }
 
         "attrs list" -> {
             val body = api.json("GET", "/api/attributes")
-
             if (flags.containsKey("json")) return printRaw(body.toString())
-
             if (body.size() == 0) return println("(无属性)")
-
             println("属性     类型    分级")
-
             body.forEach {
                 println("%-8s %-7s %s".format(it["name"].asString(), it["kind"].asString(), if (it["leveled"].asBoolean()) "是" else "否"))
             }
@@ -477,223 +327,170 @@ private fun run(args: List<String>) {
 
         "projects create" -> {
             val key = rest.getOrNull(0) ?: error("缺少 KEY")
-
             val body = api.json("POST", "/api/projects", mapOf<String, Any>("key" to key, "name" to (rest.getOrNull(1) ?: key)))
-
             printJson(body, flags)
-
             println("项目 ${body["key"].asString()} 已创建")
         }
 
         "projects list" -> {
             val body = api.json("GET", "/api/projects")
-
             if (flags.containsKey("json")) return printRaw(body.toString())
-
             if (body.size() == 0) return println("(无项目)")
-
             println("KEY     名称     状态数  归档")
-
             body.forEach {
                 println("%-7s %-8s %-7s %s".format(it["key"].asString(), it["name"].asString(), it["statuses"].size(), if (it["archived"].asBoolean()) "是" else "否"))
             }
         }
-
         "projects delete" -> {
             // 粘贴 login 回显列表(顿号/逗号分隔)与空格分隔等价
-
             val keys = rest.flatMap { it.split('、', ',') }.map { it.trim() }.filter { it.isNotEmpty() }.ifEmpty { error("缺少项目 KEY(可多个)") }
-
             var failed = 0
-
             for (key in keys) {
                 try {
                     if ("force" in flags) {
                         api.json("DELETE", "/api/projects/$key")
-
                         println("已删除:$key")
                     } else {
                         val p = api.json("GET", "/api/projects/$key/deletion-preview")
-
                         println(
 
                             "将物理删除项目 ${p["key"].asString()}(${p["name"].asString()}):" +
-
                                 "item ${p["itemCount"].asInt()}、sprint/release ${p["groupCount"].asInt()}、里程碑 ${p["milestoneCount"].asInt()}、" +
-
                                 "视图 ${p["viewCount"].asInt()}、状态 ${p["statusCount"].asInt()}、成员关系 ${p["memberCount"].asInt()}",
-
                         )
                     }
                 } catch (e: IllegalStateException) {
                     failed++
-
                     println("失败:$key → ${e.message}")
                 }
             }
-
             if ("force" !in flags) println("未执行;确认无误加 --force")
-
             if (failed > 0) error("$failed/${keys.size} 个项目失败")
         }
 
         "sprints list" -> {
             val key = rest.getOrNull(0) ?: error("缺少项目 KEY")
-
             val body = api.json("GET", "/api/projects/$key/sprints")
-
             if (flags.containsKey("json")) return printRaw(body.toString())
-
             if (body.size() == 0) return println("(无 sprint)")
-
             println("sprintId                            名称             状态       起止")
-
             body.forEach { s ->
-
                 val sd = if (s["startDate"].isNull || s["startDate"].isMissingNode) "—" else s["startDate"].asString()
-
                 val ed = if (s["endDate"].isNull || s["endDate"].isMissingNode) "—" else s["endDate"].asString()
-
                 println("%-36s %-16s %-10s %s ~ %s".format(s["sprintId"].asString(), s["name"].asString(), s["status"].asString(), sd, ed))
             }
         }
 
         "items create" -> {
             val key = rest.getOrNull(0) ?: error("缺少项目 KEY")
-
             val title = rest.getOrNull(1) ?: error("缺少标题")
-
             val requirements = reqs.map { raw ->
-
                 val m = Regex("^(.+?)(?:>=(\\d))?$").find(raw.trim()) ?: error("需求格式:属性 或 属性>=N,得到:$raw")
-
                 val (attr, level) = m.destructured
-
                 if (level.isEmpty()) {
                     mapOf<String, Any?>("attribute" to attr, "minLevel" to null)
                 } else {
                     mapOf<String, Any?>("attribute" to attr, "minLevel" to level.toInt())
                 }
             }
-
             val body = api.json(
-
                 "POST",
-
                 "/api/projects/$key/items",
-
                 mapOf(
-
                     "title" to title,
-
                     "description" to flags["desc"],
-
                     "sprintId" to flags["sprint"]?.let { resolveSprintId(api, key, it) },
-
                     "requirements" to requirements,
-
                 ),
-
             )
-
             printJson(body, flags)
-
             println("已创建 ${body["number"].asString()}:${body["title"].asString()}")
         }
 
         "items list" -> {
             val key = rest.getOrNull(0) ?: error("缺少项目 KEY")
-
             val body = api.json("GET", "/api/projects/$key/items")
-
             if (flags.containsKey("json")) return printRaw(body.toString())
-
             if (body.size() == 0) return println("(无 item)")
-
             println("编号    状态          标题                    需求")
-
             body.forEach { item ->
-
                 val reqsText = item["requirements"].joinToString(",") {
                     val lvl = it["minLevel"]
-
                     if (lvl.isNull) it["attribute"].asString() else "${it["attribute"].asString()}≥${lvl.asInt()}"
                 }
-
                 println("%-7s %-13s %-23s %s".format(item["number"].asString(), item["status"].asString(), item["title"].asString(), reqsText))
             }
         }
 
+        "sprints move" -> {
+            val key = rest.getOrNull(0) ?: error("缺少项目 KEY")
+            val ref = rest.getOrNull(1) ?: error("缺少 sprint 引用(名称或 UUID)")
+            val status = rest.getOrNull(2) ?: error("缺少目标状态(planned/active/completed)")
+            if (status !in setOf("planned", "active", "completed")) error("状态只能是 planned/active/completed")
+            val groupId = resolveSprintId(api, key, ref)
+            val body = api.json("PATCH", "/api/projects/$key/sprints/$groupId", mapOf("status" to status))
+            println("已迁移 sprint ${body["name"].asString()} → ${body["status"].asString()}")
+        }
+
+        "items assign" -> {
+            val itemId = resolveItemId(api, rest.getOrNull(0) ?: error("缺少 item ID(支持 YPJ-58 或 UUID)"))
+            val ref = rest.getOrNull(1) ?: error("缺少 sprint 引用(sprint 名/UUID/backlog)")
+            val sprintId: String? = if (ref.equals("backlog", ignoreCase = true)) {
+                null
+            } else {
+                val item = api.json("GET", "/api/items/$itemId")
+                resolveSprintId(api, item["number"].asString().substringBefore("-"), ref)
+            }
+            val body = api.json("PUT", "/api/items/$itemId/sprint", mapOf("sprintId" to sprintId))
+            val sprintName = body["sprintName"]?.takeUnless { it.isNull }?.asString()
+            println(if (sprintName == null) "已移出 sprint:${body["number"].asString()}" else "已指派:${body["number"].asString()} → $sprintName")
+        }
+
         "items move" -> {
             val itemId = resolveItemId(api, rest.getOrNull(0) ?: error("缺少 item ID(支持 YPJ-58 或 UUID)"))
-
             val statusName = rest.getOrNull(1) ?: error("缺少目标状态名")
-
             // 状态名 → statusId:从 item 所属项目取状态表
-
             val item = api.json("GET", "/api/items/$itemId")
-
             val project = api.json("GET", "/api/projects/${item["number"].asString().substringBefore("-")}")
-
             val statusId = project["statuses"]
                 .firstOrNull { it["name"].asString().equals(statusName, ignoreCase = true) }
-
                 ?.get("statusId")?.asString()
-
                 ?: error("项目无此状态:$statusName(可用:${project["statuses"].joinToString("/") { s -> s["name"].asString() }})")
-
             val body = api.json("PATCH", "/api/items/$itemId", mapOf("statusItemId" to statusId))
-
             println("已迁移:${body["number"].asString()} → ${body["status"].asString()}")
         }
 
         "items branch" -> {
             val itemId = resolveItemId(api, rest.getOrNull(0) ?: error("缺少 item ID(支持 YPJ-58 或 UUID)"))
-
             val name = rest.getOrNull(1) ?: error("缺少分支名,如 cwjiang/YPJ-27-yz-wrapper")
-
             var base = "main"
-
             var alsoItems: List<String> = emptyList()
-
             var ai = 2
-
             while (ai < rest.size) {
                 when (rest[ai]) {
                     "--base" -> {
                         base = rest.getOrNull(ai + 1) ?: error("--base 需要值")
                         ai += 2
                     }
-
                     "--items" -> {
                         alsoItems = (rest.getOrNull(ai + 1) ?: error("--items 需要值")).split(',', '、').map { it.trim() }.filter { it.isNotEmpty() }
                         ai += 2
                     }
-
                     else -> error("未知参数:${rest[ai]}")
                 }
             }
 
             val item = api.json("GET", "/api/items/$itemId")
-
             val projectKey = item["number"].asString().substringBefore("-")
-
             val repos = api.json("GET", "/api/projects/$projectKey/repos")
-
             val repoId = repos[0]?.get("repoId")?.asString()
-
                 ?: error("项目未挂载仓库(先在 web 或 API 挂 repo)")
-
             val body = api.json("POST", "/api/items/$itemId/branches", mapOf("repoId" to repoId, "baseBranch" to base, "name" to name))
-
             println("分支已建:${body["branch"].asString()}(${body["repo"].asString()})")
-
             for (extra in alsoItems) {
                 val extraId = resolveItemId(api, extra)
-
                 try {
                     api.json("POST", "/api/items/$extraId/git-refs", mapOf("repo" to body["repo"].asString(), "ref" to body["branch"].asString()))
-
                     println("已补挂:$extra")
                 } catch (e: Exception) {
                     println("补挂失败:$extra(${e.message})")
@@ -703,38 +500,27 @@ private fun run(args: List<String>) {
 
         "caps set" -> {
             val attr = rest.getOrNull(0) ?: error("缺少属性名")
-
             val level = rest.getOrNull(1)?.let {
                 it.toIntOrNull()?.takeIf { l -> l in 1..4 } ?: error("等级只能是 1-4 或不填(未评级)")
             }
-
             val body = api.json("PUT", "/api/capabilities", mapOf("attribute" to attr, "level" to level))
-
             val lvl = body["level"]
-
             println("已设置:$attr = ${if (lvl.isNull) "未评级" else lvl.asInt()}")
         }
 
         "caps rm" -> {
             val attr = rest.getOrNull(0) ?: error("缺少属性名")
-
             api.json("DELETE", "/api/capabilities/$attr")
-
             println("已移除:$attr")
         }
 
         "caps list" -> {
             val body = api.json("GET", "/api/capabilities")
-
             if (flags.containsKey("json")) return printRaw(body.toString())
-
             if (body.size() == 0) return println("(无能力)")
-
             println("属性     等级")
-
             body.forEach {
                 val lvl = it["level"]
-
                 println("%-8s %s".format(it["attribute"].asString(), if (lvl.isNull) "未评级" else lvl.asInt()))
             }
         }
@@ -747,103 +533,68 @@ private fun run(args: List<String>) {
 }
 
 /** 成员名 → memberId(显示名精确匹配)。 */
-
 private fun memberIdByDisplayName(api: ApiClient, name: String): String? {
     var found: String? = null
-
     api.json("GET", "/api/members").forEach { m ->
-
         if (m["displayName"].asString() == name) found = m["memberId"].asString()
     }
-
     return found
 }
 
 /** --sprint 引用:UUID 直过;否则按项目 sprint 名称精确匹配(0/多匹配报错列候选)。 */
-
 private fun resolveSprintId(api: ApiClient, key: String, ref: String): String {
     if (Regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$").matches(ref)) return ref
-
     val sprints = api.json("GET", "/api/projects/$key/sprints")
-
     val names = sprints.joinToString("/") { it["name"].asString() }
-
     val hits = sprints.filter { it["name"].asString() == ref }
-
     if (hits.size == 1) return hits[0]["sprintId"].asString()
-
     if (hits.isEmpty()) error("项目 $key 无名为「$ref」的 sprint(可用:$names)")
-
     error("sprint 名「$ref」不唯一,请用 UUID:${hits.joinToString("/") { it["sprintId"].asString() }}")
 }
 
 /** KEY-N(如 CHE-1)→ itemId;直接给 UUID 也认。 */
-
 private fun resolveItemId(api: ApiClient, ref: String): String {
     if (ref.contains('-') && !ref.contains(' ')) {
         val key = ref.substringBefore('-')
-
         runCatching {
             val items = api.json("GET", "/api/projects/$key/items")
-
             items.forEach { if (it["number"].asString() == ref) return it["itemId"].asString() }
         }
     }
-
     error("找不到 item:$ref")
 }
 
 private fun feasibility(api: ApiClient, key: String?, flags: Map<String, String>) {
     if (key == null) error("缺少项目 KEY")
-
     val itemId = flags["item"]
-
     if (itemId != null) {
         val body = api.json("GET", "/api/items/$itemId/feasibility")
-
         if (flags.containsKey("json")) return printRaw(body.toString())
-
         return printItemFeasibility(body)
     }
-
     val body = api.json("GET", "/api/projects/$key/feasibility")
-
     if (flags.containsKey("json")) return printRaw(body.toString())
-
     val signalZh = mapOf("GREEN" to "✔ 全满足", "YELLOW" to "△ 有差距", "RED" to "✗ 有缺门")
-
     println("项目 $key → ${signalZh[body["signal"].asString()]}(缺门${body["missingCount"].asInt()} · 总差距${body["totalDelta"].asInt()}级)")
-
     body["items"].forEach { printItemFeasibility(it) }
 }
 
 private fun printItemFeasibility(item: tools.jackson.databind.JsonNode) {
     val signal = when (item["signal"].asString()) {
         "GREEN" -> "[绿]"
-
         "YELLOW" -> "[黄]"
-
         else -> "[红]"
     }
-
     println("%-8s %-24s %s".format(item["number"].asString(), item["title"].asString(), signal))
-
     item["verdicts"].forEach { v ->
-
         val attr = v["attribute"].asString()
-
         val line = when (v["kind"].asString()) {
             "satisfied" -> "    ✓ 满足($attr)"
-
             "surplus" -> "    ✓ 有余($attr)"
-
             "gap" -> "    △ 差 ${v["delta"].asInt()} 级($attr:需≥${v["required"].asInt()},有 ${v["actual"].asInt()})"
-
             "unrated" -> "    △ 有但未评级($attr,需≥${v["required"].asInt()})——差距未知"
-
             else -> "    ✗ 缺能力($attr)"
         }
-
         println(line)
     }
 }
