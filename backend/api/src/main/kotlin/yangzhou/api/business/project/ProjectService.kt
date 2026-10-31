@@ -34,17 +34,10 @@ class ProjectService(
     private val projectMembers: yangzhou.persistence.repository.ProjectMemberRepository,
     private val groupTypes: yangzhou.persistence.repository.ItemGroupTypeRepository,
 ) {
+
     private val log = LoggerFactory.getLogger(ProjectService::class.java)
 
-    data class StatusDto(
-        val statusId: UUID,
-        val name: String,
-        val icon: String?,
-        val isStart: Boolean,
-        val isFinal: Boolean,
-        val position: Int,
-    )
-
+    data class StatusDto(val statusId: UUID, val name: String, val icon: String?, val isStart: Boolean, val isFinal: Boolean, val isInProgress: Boolean, val position: Int)
     data class ProjectDto(
         val projectId: UUID,
         val key: String,
@@ -55,10 +48,7 @@ class ProjectService(
     )
 
     @Transactional
-    fun create(
-        key: String,
-        name: String,
-    ): ProjectDto {
+    fun create(key: String, name: String): ProjectDto {
         if (projects.existsByKey(key)) throw ConflictException("项目 key 已存在:$key")
         val workspaceObjectId = workspaceService.required().objectId!!
         val project = projects.save(Project(workspaceObjectId = workspaceObjectId, key = key, name = name))
@@ -69,9 +59,7 @@ class ProjectService(
         // 0047+R1(spec 0081):创建者自动入池,且为项目 leader
         projectMembers.save(
             yangzhou.persistence.ProjectMember(
-                projectObjectId = project.objectId!!,
-                memberObjectId = members.current().objectId!!,
-                role = yangzhou.persistence.ProjectMember.ROLE_LEADER,
+                projectObjectId = project.objectId!!, memberObjectId = members.current().objectId!!, role = yangzhou.persistence.ProjectMember.ROLE_LEADER,
             ),
         )
         // 0056:内建 group 类型种子(sprint/release);既有项目由 V35 迁移种子
@@ -89,10 +77,9 @@ class ProjectService(
 
     fun get(key: String): ProjectDto {
         val project = projects.findByKey(key) ?: throw NotFoundException("项目不存在:$key")
-        val statusDtos =
-            statuses.findByProjectObjectIdOrderByPosition(project.objectId!!).map {
-                StatusDto(it.objectId, it.name, it.icon, it.isStart, it.isFinal, it.position)
-            }
+        val statusDtos = statuses.findByProjectObjectIdOrderByPosition(project.objectId!!).map {
+            StatusDto(it.objectId, it.name, it.icon, it.isStart, it.isFinal, it.isInProgress, it.position)
+        }
         return ProjectDto(project.objectId, project.key, project.name, project.archivedAt != null, project.feasSignal, statusDtos)
     }
 
@@ -165,18 +152,17 @@ class ProjectService(
 
         fun walk(parent: UUID?): List<GanttRow> = (byParent[parent] ?: emptyList()).sortedBy { it.number }.flatMap { item ->
             val status = statusById[item.statusObjectId]
-            val row =
-                GanttRow(
-                    itemId = item.objectId,
-                    parentItemId = item.parentObjectId,
-                    number = "${project.key}-${item.number}",
-                    title = item.title,
-                    startDate = item.startDate?.toString(),
-                    dueDate = item.dueDate?.toString(),
-                    statusName = status?.name ?: "?",
-                    overdue = item.dueDate?.let { it < today } == true && status?.isFinal != true,
-                    depth = depthOf(item),
-                )
+            val row = GanttRow(
+                itemId = item.objectId,
+                parentItemId = item.parentObjectId,
+                number = "${project.key}-${item.number}",
+                title = item.title,
+                startDate = item.startDate?.toString(),
+                dueDate = item.dueDate?.toString(),
+                statusName = status?.name ?: "?",
+                overdue = item.dueDate?.let { it < today } == true && status?.isFinal != true,
+                depth = depthOf(item),
+            )
             listOf(row) + walk(item.objectId)
         }
 
@@ -195,15 +181,10 @@ class ProjectService(
         val depth: Int,
     )
 
-    data class GanttDto(
-        val rows: List<GanttRow>,
-    )
+    data class GanttDto(val rows: List<GanttRow>)
 
     /** YPJ-40 方案 A:默认规则按语义推导(branch→首个非 start、pr_open→次个非 start(无则不种=人管)、pr_merged→首个 final、unmerged 恒不种);标准 V7 五列下与旧按名映射结果一致。 */
-    private fun seedDefaultRules(
-        projectId: UUID,
-        saved: List<Status>,
-    ) {
+    private fun seedDefaultRules(projectId: UUID, saved: List<Status>) {
         defaultRuleSeeds(saved).forEach { (event, status) ->
             workflowRules.save(ProjectWorkflowRule(projectObjectId = projectId, eventType = event.wire, statusObjectId = status.objectId))
         }
@@ -211,7 +192,7 @@ class ProjectService(
 
     private fun defaultStatuses(projectId: UUID) = listOf( // V7:5 列(评审环节天然有位置);存量项目不动
         Status(projectObjectId = projectId, name = "To Do", isStart = true, position = 0),
-        Status(projectObjectId = projectId, name = "In Progress", position = 1),
+        Status(projectObjectId = projectId, name = "In Progress", isInProgress = true, position = 1), // YPJ-120:进行态属预置模板语义,V42 只负责存量回填
         Status(projectObjectId = projectId, name = "In Review", position = 2),
         Status(projectObjectId = projectId, name = "QA", position = 3),
         Status(projectObjectId = projectId, name = "Done", isFinal = true, position = 4),

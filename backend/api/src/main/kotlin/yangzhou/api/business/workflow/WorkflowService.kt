@@ -25,72 +25,57 @@ class WorkflowService(
     private val statuses: StatusRepository,
     private val transitions: StatusTransitionRepository,
 ) {
+
     data class StatusDto(
         val statusId: UUID,
         val name: String,
         val icon: String?,
         val isStart: Boolean,
         val isFinal: Boolean,
+        val isInProgress: Boolean,
         val position: Int,
     )
 
-    data class TransitionDto(
-        val from: String,
-        val to: String,
-    )
+    data class TransitionDto(val from: String, val to: String)
 
     // ---------- Status ----------
 
     @Transactional
-    fun createStatus(
-        projectKey: String,
-        name: String,
-        icon: String?,
-        isStart: Boolean,
-        isFinal: Boolean,
-        position: Int?,
-    ): StatusDto {
+    fun createStatus(projectKey: String, name: String, icon: String?, isStart: Boolean, isFinal: Boolean, isInProgress: Boolean, position: Int?): StatusDto {
         val project = projects.findByKey(projectKey) ?: throw NotFoundException("项目不存在:$projectKey")
         leaderGuard.requireLeader(project.objectId!!)
         val projectObjectId = project.objectId!!
         val existing = statuses.findByProjectObjectIdOrderByPosition(projectObjectId)
         if (existing.any { it.name == name }) throw ConflictException("状态名已存在:$name")
-        val saved =
-            statuses.save(
-                Status(
-                    projectObjectId = projectObjectId,
-                    name = name,
-                    icon = icon,
-                    isStart = isStart,
-                    isFinal = isFinal,
-                    position = position ?: ((existing.maxOfOrNull { it.position } ?: -1) + 1),
-                ),
-            )
+        val saved = statuses.save(
+            Status(
+                projectObjectId = projectObjectId,
+                name = name,
+                icon = icon,
+                isStart = isStart,
+                isFinal = isFinal,
+                isInProgress = isInProgress,
+                position = position ?: ((existing.maxOfOrNull { it.position } ?: -1) + 1),
+            ),
+        )
         return saved.toDto()
     }
 
     @Transactional
-    fun updateStatus(
-        statusId: UUID,
-        name: String?,
-        icon: String?,
-        isStart: Boolean?,
-        isFinal: Boolean?,
-        position: Int?,
-    ): StatusDto {
+    fun updateStatus(statusId: UUID, name: String?, icon: String?, isStart: Boolean?, isFinal: Boolean?, isInProgress: Boolean?, position: Int?): StatusDto {
         val status = statuses.findByObjectId(statusId) ?: throw NotFoundException("状态不存在")
         leaderGuard.requireLeader(status.projectObjectId)
         try {
-            val updated =
-                statuses.save(
-                    status.copy(
-                        name = name ?: status.name,
-                        icon = icon ?: status.icon,
-                        isStart = isStart ?: status.isStart,
-                        isFinal = isFinal ?: status.isFinal,
-                        position = position ?: status.position,
-                    ),
-                )
+            val updated = statuses.save(
+                status.copy(
+                    name = name ?: status.name,
+                    icon = icon ?: status.icon,
+                    isStart = isStart ?: status.isStart,
+                    isFinal = isFinal ?: status.isFinal,
+                    isInProgress = isInProgress ?: status.isInProgress,
+                    position = position ?: status.position,
+                ),
+            )
             return updated.toDto()
         } catch (_: DataIntegrityViolationException) {
             throw ConflictException("状态名已存在:$name")
@@ -120,10 +105,7 @@ class WorkflowService(
     }
 
     @Transactional
-    fun replaceTransitions(
-        projectKey: String,
-        list: List<TransitionDto>,
-    ): List<TransitionDto> {
+    fun replaceTransitions(projectKey: String, list: List<TransitionDto>): List<TransitionDto> {
         val project = projects.findByKey(projectKey) ?: throw NotFoundException("项目不存在:$projectKey")
         leaderGuard.requireLeader(project.objectId!!)
         val projectObjectId = project.objectId!!
@@ -147,11 +129,7 @@ class WorkflowService(
     }
 
     /** Item 状态迁移校验:迁移表空 = 全放行;否则 from→to 必须在表内(from==to 恒放行)。 */
-    fun assertTransitionAllowed(
-        projectObjectId: UUID,
-        fromStatusObjectId: UUID,
-        toStatusObjectId: UUID,
-    ) {
+    fun assertTransitionAllowed(projectObjectId: UUID, fromStatusObjectId: UUID, toStatusObjectId: UUID) {
         if (fromStatusObjectId == toStatusObjectId) return
         val table = transitions.findByProjectObjectId(projectObjectId)
         if (table.isEmpty()) return // 自由迁移(V1 默认)
@@ -160,7 +138,7 @@ class WorkflowService(
         }
     }
 
-    private fun Status.toDto() = StatusDto(objectId, name, icon, isStart, isFinal, position)
+    private fun Status.toDto() = StatusDto(objectId, name, icon, isStart, isFinal, isInProgress, position)
 }
 
 data class CreateStatusRequest(
@@ -168,6 +146,7 @@ data class CreateStatusRequest(
     val icon: String? = null,
     val isStart: Boolean = false,
     val isFinal: Boolean = false,
+    val isInProgress: Boolean = false,
     val position: Int? = null,
 )
 
@@ -176,9 +155,8 @@ data class UpdateStatusRequest(
     val icon: String? = null,
     val isStart: Boolean? = null,
     val isFinal: Boolean? = null,
+    val isInProgress: Boolean? = null,
     val position: Int? = null,
 )
 
-data class ReplaceTransitionsRequest(
-    val transitions: List<WorkflowService.TransitionDto> = emptyList(),
-)
+data class ReplaceTransitionsRequest(val transitions: List<WorkflowService.TransitionDto> = emptyList())
