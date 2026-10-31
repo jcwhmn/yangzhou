@@ -392,6 +392,7 @@ export const t = {
   view: {
     name: "视图",
     defaultView: "默认视图",
+    backlog: "backlog",
     save: "保存",
     saveAs: "另存为",
     delete: "删除视图",
