@@ -2,6 +2,7 @@
 
 import {
   Box,
+  LinearProgress,
   Button,
   Chip,
   Dialog,
@@ -12,6 +13,7 @@ import {
   Table,
   TableBody,
   TableCell,
+  TablePagination,
   TableContainer,
   TableHead,
   TableRow,
@@ -58,6 +60,14 @@ const EMPTY_FILTERS: Filters = { status: "", assignee: "", priority: "" };
 
 type SortKey = { field: string; dir: "asc" | "desc" };
 
+const PAGE_SIZES = [20, 50, 100];
+
+function readPageSize(): number {
+  if (typeof window === "undefined") return PAGE_SIZES[0];
+  const n = Number(localStorage.getItem("yz-table-page-size"));
+  return PAGE_SIZES.includes(n) ? n : PAGE_SIZES[0];
+}
+
 const DEFAULT_SORTS: SortKey[] = [{ field: "number", dir: "asc" }];
 
 /** V10-S4 表格视图;YPJ-47 视图配置(spec 0045):筛选(客户端)+ 视图保存/切换 + 列配置 Popover(YPJ-28 合并)。 */
@@ -66,6 +76,8 @@ export default function TableViewPage() {
   const [items, setItems] = useState<Item[] | null>(null);
   const [statuses, setStatuses] = useState<Status[]>([]);
   const [sorts, setSorts] = useState<SortKey[]>(DEFAULT_SORTS);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(readPageSize);
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [error, setError] = useState("");
 
@@ -134,6 +146,7 @@ export default function TableViewPage() {
 
   function setFilter(f: Partial<Filters>) {
     setFilters((prev) => ({ ...prev, ...f }));
+    setPage(0);
     setDirty(true);
   }
 
@@ -268,6 +281,7 @@ export default function TableViewPage() {
   }
   // 单击循环 升→降→移除;移除后空回默认;Shift+点击追加次级键(YPJ-124)
   function toggleSort(field: string, shift: boolean) {
+    setPage(0);
     setSorts((prev) => {
       const idx = prev.findIndex((k) => k.field === field);
       if (idx === -1)
@@ -301,6 +315,16 @@ export default function TableViewPage() {
       }
       return 0;
     });
+
+  // 分页切片;页码越界(筛选后行数变少)兜底(YPJ-125)
+  const safePage = Math.min(
+    page,
+    Math.max(0, Math.ceil(sorted.length / rowsPerPage) - 1),
+  );
+  const paged = sorted.slice(
+    safePage * rowsPerPage,
+    (safePage + 1) * rowsPerPage,
+  );
 
   const selectedName =
     views.find((v) => v.viewId === selectedView)?.name ?? t.view.defaultView;
@@ -431,142 +455,162 @@ export default function TableViewPage() {
         )}
       </Stack>
 
+      {items === null && !error && <LinearProgress />}
       {error && <Typography color="error">{error}</Typography>}
       {items !== null && items.length === 0 && (
         <Typography color="text.secondary">暂无 item。</Typography>
       )}
       {items !== null && items.length > 0 && (
-        <TableContainer>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                {visibleCols.map((c) => {
-                  const idx = sorts.findIndex((k) => k.field === c.id);
-                  return (
-                    <TableCell
-                      key={c.id}
-                      sortDirection={idx >= 0 ? sorts[idx].dir : false}
-                    >
-                      <TableSortLabel
-                        active={idx >= 0}
-                        direction={idx >= 0 ? sorts[idx].dir : "asc"}
-                        onClick={(e) => toggleSort(c.id, e.shiftKey)}
-                        sx={{
-                          // MUI 默认非激活列 hover 才见箭头,可发现性差;常显(半透明,激活实色)
-                          ".MuiTableSortLabel-icon": { opacity: 0.3 },
-                          "&:hover .MuiTableSortLabel-icon": { opacity: 0.6 },
-                          "&.Mui-active .MuiTableSortLabel-icon": {
-                            opacity: 1,
-                          },
-                        }}
+        <>
+          <TableContainer sx={{ maxHeight: "calc(100vh - 280px)" }}>
+            <Table size="small" stickyHeader>
+              <TableHead>
+                <TableRow>
+                  {visibleCols.map((c) => {
+                    const idx = sorts.findIndex((k) => k.field === c.id);
+                    return (
+                      <TableCell
+                        key={c.id}
+                        sortDirection={idx >= 0 ? sorts[idx].dir : false}
                       >
-                        {c.label}
-                        {sorts.length > 1 && idx >= 0 && (
-                          <Typography
-                            component="span"
-                            variant="caption"
-                            sx={{ ml: 0.5, opacity: 0.6 }}
-                          >
-                            {idx + 1}
-                          </Typography>
-                        )}
-                      </TableSortLabel>
-                    </TableCell>
-                  );
-                })}
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {sorted.map((it) => (
-                <TableRow key={it.itemId} hover>
-                  {visibleCols.map((c) => (
-                    <TableCell key={c.id}>
-                      {c.id === "number" ? (
-                        <Link href={`/p/${key}/i/${it.itemId}?from=table`}>
-                          <Typography
-                            variant="body2"
-                            sx={{ whiteSpace: "nowrap" }}
-                          >
-                            {(it.parentNumber ? it.parentNumber + " › " : "") +
-                              it.number}
-                          </Typography>
-                        </Link>
-                      ) : c.id === "title" ? (
-                        <Link href={`/p/${key}/i/${it.itemId}?from=table`}>
-                          <Typography variant="body2">{it.title}</Typography>
-                        </Link>
-                      ) : c.id === "status" ? (
-                        it.status
-                      ) : c.id === "priority" ? (
-                        (it.priority ?? "")
-                      ) : c.id === "assignee" ? (
-                        <AssignPopover
-                          itemId={it.itemId}
-                          assignee={it.assignee}
-                          onChanged={load}
-                        >
-                          {(onClick) => (
-                            <Chip
-                              size="small"
-                              variant="outlined"
-                              label={
-                                it.assignee
-                                  ? `👤 ${it.assignee}`
-                                  : t.assign.none
-                              }
-                              onClick={onClick}
-                              sx={it.assignee ? undefined : { opacity: 0.55 }}
-                            />
-                          )}
-                        </AssignPopover>
-                      ) : c.id === "startDate" ? (
-                        (it.startDate ?? "")
-                      ) : c.id === "dueDate" ? (
-                        <span
-                          style={{
-                            color: it.overdue
-                              ? "red"
-                              : it.dueSoon
-                                ? "orange"
-                                : "inherit",
+                        <TableSortLabel
+                          active={idx >= 0}
+                          direction={idx >= 0 ? sorts[idx].dir : "asc"}
+                          onClick={(e) => toggleSort(c.id, e.shiftKey)}
+                          sx={{
+                            // MUI 默认非激活列 hover 才见箭头,可发现性差;常显(半透明,激活实色)
+                            ".MuiTableSortLabel-icon": { opacity: 0.3 },
+                            "&:hover .MuiTableSortLabel-icon": { opacity: 0.6 },
+                            "&.Mui-active .MuiTableSortLabel-icon": {
+                              opacity: 1,
+                            },
                           }}
                         >
-                          {it.dueDate ?? ""}
-                        </span>
-                      ) : c.id === "overdue" ? (
-                        it.overdue ? (
-                          "是"
-                        ) : (
-                          "否"
-                        )
-                      ) : c.id === "feasSignal" ? (
-                        it.feasSignal ? (
-                          t.signal[it.feasSignal]
-                        ) : (
-                          ""
-                        )
-                      ) : c.id === "sprint" ? (
-                        (it.sprintName ?? (
-                          <Typography variant="body2" sx={{ opacity: 0.5 }}>
-                            {t.view.backlog}
-                          </Typography>
-                        ))
-                      ) : c.id === "blocked" ? (
-                        it.blocked ? (
-                          "⛔"
-                        ) : (
-                          ""
-                        )
-                      ) : (
-                        ""
-                      )}
-                    </TableCell>
-                  ))}
+                          {c.label}
+                          {sorts.length > 1 && idx >= 0 && (
+                            <Typography
+                              component="span"
+                              variant="caption"
+                              sx={{ ml: 0.5, opacity: 0.6 }}
+                            >
+                              {idx + 1}
+                            </Typography>
+                          )}
+                        </TableSortLabel>
+                      </TableCell>
+                    );
+                  })}
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
+              </TableHead>
+              <TableBody>
+                {paged.map((it) => (
+                  <TableRow key={it.itemId} hover>
+                    {visibleCols.map((c) => (
+                      <TableCell key={c.id}>
+                        {c.id === "number" ? (
+                          <Link href={`/p/${key}/i/${it.itemId}?from=table`}>
+                            <Typography
+                              variant="body2"
+                              sx={{ whiteSpace: "nowrap" }}
+                            >
+                              {(it.parentNumber
+                                ? it.parentNumber + " › "
+                                : "") + it.number}
+                            </Typography>
+                          </Link>
+                        ) : c.id === "title" ? (
+                          <Link href={`/p/${key}/i/${it.itemId}?from=table`}>
+                            <Typography variant="body2">{it.title}</Typography>
+                          </Link>
+                        ) : c.id === "status" ? (
+                          it.status
+                        ) : c.id === "priority" ? (
+                          (it.priority ?? "")
+                        ) : c.id === "assignee" ? (
+                          <AssignPopover
+                            itemId={it.itemId}
+                            assignee={it.assignee}
+                            onChanged={load}
+                          >
+                            {(onClick) => (
+                              <Chip
+                                size="small"
+                                variant="outlined"
+                                label={
+                                  it.assignee
+                                    ? `👤 ${it.assignee}`
+                                    : t.assign.none
+                                }
+                                onClick={onClick}
+                                sx={it.assignee ? undefined : { opacity: 0.55 }}
+                              />
+                            )}
+                          </AssignPopover>
+                        ) : c.id === "startDate" ? (
+                          (it.startDate ?? "")
+                        ) : c.id === "dueDate" ? (
+                          <span
+                            style={{
+                              color: it.overdue
+                                ? "red"
+                                : it.dueSoon
+                                  ? "orange"
+                                  : "inherit",
+                            }}
+                          >
+                            {it.dueDate ?? ""}
+                          </span>
+                        ) : c.id === "overdue" ? (
+                          it.overdue ? (
+                            "是"
+                          ) : (
+                            "否"
+                          )
+                        ) : c.id === "feasSignal" ? (
+                          it.feasSignal ? (
+                            t.signal[it.feasSignal]
+                          ) : (
+                            ""
+                          )
+                        ) : c.id === "sprint" ? (
+                          (it.sprintName ?? (
+                            <Typography variant="body2" sx={{ opacity: 0.5 }}>
+                              {t.view.backlog}
+                            </Typography>
+                          ))
+                        ) : c.id === "blocked" ? (
+                          it.blocked ? (
+                            "⛔"
+                          ) : (
+                            ""
+                          )
+                        ) : (
+                          ""
+                        )}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+          <TablePagination
+            rowsPerPageOptions={PAGE_SIZES}
+            count={sorted.length}
+            page={safePage}
+            onPageChange={(_, p) => setPage(p)}
+            rowsPerPage={rowsPerPage}
+            onRowsPerPageChange={(e) => {
+              setRowsPerPage(Number(e.target.value));
+              setPage(0);
+              localStorage.setItem("yz-table-page-size", e.target.value);
+            }}
+            labelRowsPerPage={t.view.perPage}
+            labelDisplayedRows={({ from, to, count }) =>
+              `${from}-${to} / ${count}`
+            }
+          />
+        </>
       )}
 
       {/* 命名 Dialog(save 首存 / saveAs 另存共用) */}

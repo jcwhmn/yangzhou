@@ -89,3 +89,26 @@ test("列头排序:单击循环 升/降/取消,Shift 追加次级键", async ({
   await page.getByRole("columnheader", { name: /标题/ }).click();
   await expect.poll(trailOf).toEqual([1, 2, 3, 4]);
 });
+
+test("分页:21 条默认每页 20 两页,翻页/改页大小生效", async ({
+  page,
+  projectKey,
+}) => {
+  // 默认页大小 20:21 条 → 两页(20+1)
+  for (let i = 1; i <= 21; i++)
+    await createItemResilient(projectKey, `TB ${i}`);
+
+  await page.goto(`/p/${projectKey}/table`);
+  await expect(page.getByRole("row").nth(1)).toBeVisible();
+  await expect(page.locator("tbody tr")).toHaveCount(20);
+  await expect(page.getByText("1-20 / 21")).toBeVisible();
+
+  await page.getByRole("button", { name: /next page/i }).click();
+  await expect(page.locator("tbody tr")).toHaveCount(1);
+  await expect(page.getByText("21-21 / 21")).toBeVisible();
+
+  // 改每页 50 → 单页 21 行
+  await page.getByRole("combobox", { name: "每页" }).click();
+  await page.getByRole("option", { name: "50", exact: true }).click();
+  await expect(page.locator("tbody tr")).toHaveCount(21);
+});
