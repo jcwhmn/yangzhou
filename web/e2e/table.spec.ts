@@ -46,3 +46,46 @@ test("表格显示:编号数字序、状态列非空、sprint 列 backlog 标识
   // 未挂 sprint 的行显示弱化 backlog 标识(10 行全显)
   await expect(page.getByText("backlog", { exact: true })).toHaveCount(10);
 });
+
+test("列头排序:单击循环 升/降/取消,Shift 追加次级键", async ({
+  page,
+  projectKey,
+}) => {
+  // 建序 C/A/D/B(number 1..4):标题升序时行序应为 number [2,4,1,3]
+  for (const t of ["TB C", "TB A", "TB D", "TB B"])
+    await createItemResilient(projectKey, t);
+
+  await page.goto(`/p/${projectKey}/table`);
+  await expect(page.getByRole("row").nth(1)).toBeVisible();
+
+  const trailOf = async () => {
+    const nums = await page
+      .locator("tbody tr td:first-child")
+      .allTextContents();
+    return nums.map((s) => Number(s.trim().split("-").pop()));
+  };
+
+  // 单击标题:升序
+  await page.getByRole("columnheader", { name: /标题/ }).click();
+  await expect.poll(trailOf).toEqual([2, 4, 1, 3]);
+
+  // 再点:降序
+  await page.getByRole("columnheader", { name: /标题/ }).click();
+  await expect.poll(trailOf).toEqual([3, 1, 4, 2]);
+
+  // Shift+点截止:追加次级键(全 null 恒最后,不破坏标题序);列头显示多栏序号 1/2
+  await page
+    .getByRole("columnheader", { name: /截止/ })
+    .click({ modifiers: ["Shift"] });
+  await expect.poll(trailOf).toEqual([3, 1, 4, 2]);
+  await expect(page.getByRole("columnheader", { name: /标题/ })).toContainText(
+    "1",
+  );
+  await expect(page.getByRole("columnheader", { name: /截止/ })).toContainText(
+    "2",
+  );
+
+  // 第三点:移除标题键,仅剩截止(全 null)→ 回默认编号序
+  await page.getByRole("columnheader", { name: /标题/ }).click();
+  await expect.poll(trailOf).toEqual([1, 2, 3, 4]);
+});

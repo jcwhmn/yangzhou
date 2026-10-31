@@ -15,6 +15,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TableSortLabel,
   TextField,
   Typography,
 } from "@mui/material";
@@ -55,12 +56,16 @@ type Filters = { status: string; assignee: string; priority: string };
 
 const EMPTY_FILTERS: Filters = { status: "", assignee: "", priority: "" };
 
+type SortKey = { field: string; dir: "asc" | "desc" };
+
+const DEFAULT_SORTS: SortKey[] = [{ field: "number", dir: "asc" }];
+
 /** V10-S4 表格视图;YPJ-47 视图配置(spec 0045):筛选(客户端)+ 视图保存/切换 + 列配置 Popover(YPJ-28 合并)。 */
 export default function TableViewPage() {
   const { key } = useParams<{ key: string }>();
   const [items, setItems] = useState<Item[] | null>(null);
   const [statuses, setStatuses] = useState<Status[]>([]);
-  const [sort, setSort] = useState("number");
+  const [sorts, setSorts] = useState<SortKey[]>(DEFAULT_SORTS);
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [error, setError] = useState("");
 
@@ -216,9 +221,68 @@ export default function TableViewPage() {
     ),
   ];
 
-  // number 是"KEY-N"串,按尾数字自然排序(还原后端 int 序;YPJ-123)
-  const byNumber = (a: Item, b: Item) =>
-    a.number.localeCompare(b.number, undefined, { numeric: true });
+  // 多栏排序:sorts 顺序即优先级;null 恒排最后,不随方向翻转(YPJ-124)
+  type Val = string | number | boolean;
+  const getters: Record<string, (i: Item) => Val | null> = {
+    number: (i) => i.number,
+    title: (i) => i.title,
+    priority: (i) => i.priority,
+    status: (i) => i.status,
+    assignee: (i) => i.assignee,
+    startDate: (i) => i.startDate,
+    dueDate: (i) => i.dueDate,
+    overdue: (i) => i.overdue,
+    feasSignal: (i) => i.feasSignal,
+    blocked: (i) => i.blocked,
+    sprint: (i) => i.sprintName,
+  };
+  const valueRank: Record<string, Record<string, number>> = {
+    priority: { P0: 0, P1: 1, P2: 2, P3: 3 },
+    feasSignal: { GREEN: 0, YELLOW: 1, RED: 2 },
+  };
+  function compareField(
+    field: string,
+    a: Item,
+    b: Item,
+    desc: boolean,
+  ): number {
+    const av = getters[field](a);
+    const bv = getters[field](b);
+    if (av == null || bv == null) {
+      if (av == null && bv == null) return 0;
+      return av == null ? 1 : -1;
+    }
+    const rank = valueRank[field];
+    let r: number;
+    if (rank) {
+      r = (rank[String(av)] ?? 9) - (rank[String(bv)] ?? 9);
+    } else if (typeof av === "boolean" && typeof bv === "boolean") {
+      r = Number(av) - Number(bv);
+    } else if (field === "number") {
+      // number 是"KEY-N"串,按尾数字自然排序(还原后端 int 序;YPJ-123)
+      r = String(av).localeCompare(String(bv), undefined, { numeric: true });
+    } else {
+      r = String(av).localeCompare(String(bv));
+    }
+    return desc ? -r : r;
+  }
+  // 单击循环 升→降→移除;移除后空回默认;Shift+点击追加次级键(YPJ-124)
+  function toggleSort(field: string, shift: boolean) {
+    setSorts((prev) => {
+      const idx = prev.findIndex((k) => k.field === field);
+      if (idx === -1)
+        return shift
+          ? [...prev, { field, dir: "asc" }]
+          : [{ field, dir: "asc" }];
+      const { dir } = prev[idx];
+      const rest = prev.filter((_, i) => i !== idx);
+      if (dir === "asc") {
+        const flipped: SortKey = { field, dir: "desc" };
+        return shift ? [...rest, flipped] : [flipped];
+      }
+      return rest.length > 0 ? rest : DEFAULT_SORTS;
+    });
+  }
 
   const sorted = [...(items ?? [])]
     .filter(
@@ -231,13 +295,11 @@ export default function TableViewPage() {
         (!filters.priority || it.priority === filters.priority),
     )
     .sort((a, b) => {
-      if (sort === "priority") {
-        const rank = (p: string | null) => (p ? 4 - Number(p.slice(1)) : 9);
-        return rank(a.priority) - rank(b.priority) || byNumber(a, b);
+      for (const { field, dir } of sorts) {
+        const r = compareField(field, a, b, dir === "desc");
+        if (r !== 0) return r;
       }
-      if (sort === "status")
-        return a.status.localeCompare(b.status) || byNumber(a, b);
-      return byNumber(a, b);
+      return 0;
     });
 
   const selectedName =
@@ -254,18 +316,6 @@ export default function TableViewPage() {
         useFlexGap
       >
         <Typography variant="h5">{`${String(key)} · 表格`}</Typography>
-        <Dropdown
-          ariaLabel="排序"
-          size="small"
-          value={sort}
-          onChange={(v) => setSort(v)}
-          sx={{ width: 130 }}
-          options={[
-            { value: "number", label: "按编号" },
-            { value: "priority", label: "按优先级" },
-            { value: "status", label: "按状态" },
-          ]}
-        />
         <Box sx={{ flex: 1 }} />
         {/* 视图控件(YPJ-47) */}
         <Dropdown
@@ -390,9 +440,32 @@ export default function TableViewPage() {
           <Table size="small">
             <TableHead>
               <TableRow>
-                {visibleCols.map((c) => (
-                  <TableCell key={c.id}>{c.label}</TableCell>
-                ))}
+                {visibleCols.map((c) => {
+                  const idx = sorts.findIndex((k) => k.field === c.id);
+                  return (
+                    <TableCell
+                      key={c.id}
+                      sortDirection={idx >= 0 ? sorts[idx].dir : false}
+                    >
+                      <TableSortLabel
+                        active={idx >= 0}
+                        direction={idx >= 0 ? sorts[idx].dir : "asc"}
+                        onClick={(e) => toggleSort(c.id, e.shiftKey)}
+                      >
+                        {c.label}
+                        {sorts.length > 1 && idx >= 0 && (
+                          <Typography
+                            component="span"
+                            variant="caption"
+                            sx={{ ml: 0.5, opacity: 0.6 }}
+                          >
+                            {idx + 1}
+                          </Typography>
+                        )}
+                      </TableSortLabel>
+                    </TableCell>
+                  );
+                })}
               </TableRow>
             </TableHead>
             <TableBody>
