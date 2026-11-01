@@ -128,24 +128,12 @@ function readPageSize(): number {
 
 const DEFAULT_SORTS: SortKey[] = [{ field: "number", dir: "asc" }];
 
-/** YPJ-126 表内搜索:不区分大小写子串匹配可见字段(不含 description,YPJ-122)。 */
-function matches(it: Item, q: string): boolean {
-  if (!q) return true;
-  const s = q.toLowerCase();
-  return (
-    it.number.toLowerCase().includes(s) ||
-    (it.parentNumber ?? "").toLowerCase().includes(s) ||
-    it.title.toLowerCase().includes(s) ||
-    (it.assignee ?? "").toLowerCase().includes(s) ||
-    (it.sprintName ?? "").toLowerCase().includes(s) ||
-    (it.attributes ?? []).some((a) => (a.value ?? "").toLowerCase().includes(s))
-  );
-}
-
-/** V10-S4 表格视图;YPJ-47 视图配置(spec 0045):筛选(客户端)+ 视图保存/切换 + 列配置 Popover(YPJ-28 合并)。 */
+/** V10-S4 表格视图;YPJ-47 视图配置(spec 0045):筛选/搜索/排序/分页后端化(YPJ-130)+ 视图保存/切换 + 列配置 Popover(YPJ-28 合并)。 */
 export default function TableViewPage() {
   const { key } = useParams<{ key: string }>();
   const [items, setItems] = useState<Item[] | null>(null);
+  const [total, setTotal] = useState(0);
+  const [pool, setPool] = useState<string[]>([]);
   const [statuses, setStatuses] = useState<Status[]>([]);
   const [sorts, setSorts] = useState<SortKey[]>(() => readSorts(key));
   const [page, setPage] = useState(0);
@@ -202,6 +190,7 @@ export default function TableViewPage() {
     setLoaded(false);
     setFatal(false);
     setDirty(false);
+    setPage(0);
   }, [key]);
 
   // 仅默认视图写 localStorage;选中视图时写会把默认视图存档冲掉(YPJ-131 实测)
@@ -243,16 +232,16 @@ export default function TableViewPage() {
     setError("");
     setFatal(false);
     try {
-      const [its, sts, vs] = await Promise.all([
-        api<Item[]>(`/api/projects/${key}/items`),
+      const [sts, vs, ms] = await Promise.all([
         api<{ statuses: Status[] }>(`/api/projects/${key}`).then(
           (p) => p.statuses,
         ),
         api<ViewDto[]>(`/api/projects/${key}/views`),
+        api<{ displayName: string }[]>(`/api/projects/${key}/members`),
       ]);
-      setItems(its);
       setStatuses(sts);
       setViews(vs);
+      setPool(ms.map((m) => m.displayName));
       setLoaded(true);
 
       // 记住上次选中的视图,重进自动应用(YPJ-131 手测反馈)
@@ -274,6 +263,37 @@ export default function TableViewPage() {
   useEffect(() => {
     load().catch((e) => setError(e instanceof Error ? e.message : "加载失败"));
   }, [load]);
+
+  // YPJ-130:筛选/排序/搜索/翻页任一变更 → 防抖拉当页(250ms 合并连续变更)
+  const fetchItems = useCallback(async () => {
+    const params = new URLSearchParams({
+      page: String(page),
+      size: String(rowsPerPage),
+      sort: sorts.map((s) => `${s.field}:${s.dir}`).join(","),
+    });
+    if (query.trim()) params.set("query", query);
+    if (filters.status) params.set("status", filters.status);
+    if (filters.assignee) params.set("assignee", filters.assignee);
+    if (filters.priority) params.set("priority", filters.priority);
+    try {
+      const res = await api<{ items: Item[]; total: number }>(
+        `/api/projects/${key}/items/page?${params.toString()}`,
+      );
+      setItems(res.items);
+      setTotal(res.total);
+    } catch (e) {
+      // items 页失败 = 表格无数据,等同死页面锁(YPJ-131 原则延伸,spec 0093)
+      setLoaded(false);
+      setFatal(true);
+      setError(e instanceof Error ? e.message : "加载失败");
+    }
+  }, [key, page, rowsPerPage, sorts, query, filters]);
+
+  useEffect(() => {
+    if (!loaded) return;
+    const t = setTimeout(() => void fetchItems(), 250);
+    return () => clearTimeout(t);
+  }, [fetchItems, loaded]);
 
   function toggleCol(c: string) {
     setCols((prev) => ({
@@ -312,6 +332,7 @@ export default function TableViewPage() {
     setColOrder(normalizeOrder(v.colOrder));
     setSorts(v.sort ?? DEFAULT_SORTS);
     setQuery(v.query ?? "");
+    setPage(0);
     setDirty(false);
   }
 
@@ -395,59 +416,8 @@ export default function TableViewPage() {
         !(nameOpen === "save" && v.viewId === selectedView),
     );
 
-  const assignees = [
-    ...new Set(
-      (items ?? [])
-        .map((i) => i.assignee)
-        .filter((a): a is string => a != null),
-    ),
-  ];
+  const assignees = [...pool].sort((a, b) => a.localeCompare(b));
 
-  // 多栏排序:sorts 顺序即优先级;null 恒排最后,不随方向翻转(YPJ-124)
-  type Val = string | number | boolean;
-  const getters: Record<string, (i: Item) => Val | null> = {
-    number: (i) => i.number,
-    title: (i) => i.title,
-    priority: (i) => i.priority,
-    status: (i) => i.status,
-    assignee: (i) => i.assignee,
-    startDate: (i) => i.startDate,
-    dueDate: (i) => i.dueDate,
-    overdue: (i) => i.overdue,
-    feasSignal: (i) => i.feasSignal,
-    blocked: (i) => i.blocked,
-    sprint: (i) => i.sprintName,
-  };
-  const valueRank: Record<string, Record<string, number>> = {
-    priority: { P0: 0, P1: 1, P2: 2, P3: 3 },
-    feasSignal: { GREEN: 0, YELLOW: 1, RED: 2 },
-  };
-  function compareField(
-    field: string,
-    a: Item,
-    b: Item,
-    desc: boolean,
-  ): number {
-    const av = getters[field](a);
-    const bv = getters[field](b);
-    if (av == null || bv == null) {
-      if (av == null && bv == null) return 0;
-      return av == null ? 1 : -1;
-    }
-    const rank = valueRank[field];
-    let r: number;
-    if (rank) {
-      r = (rank[String(av)] ?? 9) - (rank[String(bv)] ?? 9);
-    } else if (typeof av === "boolean" && typeof bv === "boolean") {
-      r = Number(av) - Number(bv);
-    } else if (field === "number") {
-      // number 是"KEY-N"串,按尾数字自然排序(还原后端 int 序;YPJ-123)
-      r = String(av).localeCompare(String(bv), undefined, { numeric: true });
-    } else {
-      r = String(av).localeCompare(String(bv));
-    }
-    return desc ? -r : r;
-  }
   // 单击循环 升→降→移除;移除后空回默认;Shift+点击追加次级键(YPJ-124)
   // 多列排序:普通点击=追加/翻向/移除;Shift+点击=仅按此列(替换)(YPJ-131 用户拍板)
   function toggleSort(field: string, replace: boolean) {
@@ -468,34 +438,8 @@ export default function TableViewPage() {
     });
   }
 
-  const sorted = [...(items ?? [])]
-    .filter(
-      (it) =>
-        matches(it, query) &&
-        (!filters.status || it.status === filters.status) &&
-        (!filters.assignee ||
-          (filters.assignee === "__none__"
-            ? it.assignee == null
-            : it.assignee === filters.assignee)) &&
-        (!filters.priority || it.priority === filters.priority),
-    )
-    .sort((a, b) => {
-      for (const { field, dir } of sorts) {
-        const r = compareField(field, a, b, dir === "desc");
-        if (r !== 0) return r;
-      }
-      return 0;
-    });
-
-  // 分页切片;页码越界(筛选后行数变少)兜底(YPJ-125)
-  const safePage = Math.min(
-    page,
-    Math.max(0, Math.ceil(sorted.length / rowsPerPage) - 1),
-  );
-  const paged = sorted.slice(
-    safePage * rowsPerPage,
-    (safePage + 1) * rowsPerPage,
-  );
+  // YPJ-130:筛选/搜索/排序/分页全部后端承担;前端只渲染当页行
+  const rows = items ?? [];
 
   const selectedName =
     views.find((v) => v.viewId === selectedView)?.name ?? t.view.defaultView;
@@ -722,7 +666,7 @@ export default function TableViewPage() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {paged.map((it) => (
+                {rows.map((it) => (
                   <TableRow key={it.itemId} hover>
                     {visibleCols.map((c) => (
                       <TableCell key={c.id}>
@@ -815,8 +759,8 @@ export default function TableViewPage() {
           </TableContainer>
           <TablePagination
             rowsPerPageOptions={PAGE_SIZES}
-            count={sorted.length}
-            page={safePage}
+            count={total}
+            page={page}
             onPageChange={(_, p) => setPage(p)}
             rowsPerPage={rowsPerPage}
             onRowsPerPageChange={(e) => {

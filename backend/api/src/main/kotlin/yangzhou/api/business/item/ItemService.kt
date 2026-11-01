@@ -209,6 +209,78 @@ class ItemService(
         }
     }
 
+    // YPJ-130(spec 0093):表格后端分页主链。契约真值表见 spec §1:
+    // sort 非法字段/方向 400 fail-fast(拍板②);size 白名单;页码越末页 → 空 items + 真实 total。
+    fun pagedList(
+        projectKey: String,
+        page: Int,
+        size: Int,
+        query: String?,
+        status: String?,
+        assignee: String?,
+        priority: String?,
+        sort: String?,
+    ): ItemPageResponse {
+        if (page < 0) throw BadRequestException("page 不能为负")
+        if (size !in ITEM_PAGE_SIZES) throw BadRequestException("size 仅支持 ${ITEM_PAGE_SIZES.sorted().joinToString("/")}")
+        val slots = parseItemSort(sort)
+        val project = projects.findByKey(projectKey) ?: throw NotFoundException("项目不存在:$projectKey")
+        val projectObjectId = project.objectId!!
+        val like = query?.takeIf { it.isNotBlank() }?.let { "%${escapeLike(it)}%" } ?: ""
+        val today = LocalDate.now(clock)
+        val blockedIds =
+            dependencyService.blockedItemObjectIds(projectObjectId).ifEmpty { setOf(UUID(0, 0)) }
+        val items =
+            itemRepo.findPage(
+                projectObjectId,
+                status.orEmpty(),
+                assignee.orEmpty(),
+                priority.orEmpty(),
+                like,
+                today,
+                blockedIds,
+                slots[0].first,
+                slots[0].second,
+                slots[1].first,
+                slots[1].second,
+                slots[2].first,
+                slots[2].second,
+                size,
+                page * size,
+            )
+        val total = itemRepo.countPage(projectObjectId, status.orEmpty(), assignee.orEmpty(), priority.orEmpty(), like)
+        // 只 enrich 当页(不再全量):parentNumber 只查当页父行;attributes 同理
+        val ctx = buildCtx(project, items)
+        val parentRows =
+            items.mapNotNull { it.parentObjectId }.takeIf { it.isNotEmpty() }?.let(itemRepo::findAllByObjectIdIn).orEmpty()
+        val numberById = parentRows.associate { it.objectId to "${project.key}-${it.number}" }
+        val attrsByItem = itemAttributes.findByItemObjectIdIn(items.mapNotNull { it.objectId }).groupBy { it.itemObjectId }
+        val attrNames =
+            definitions.findAllByObjectIdIn(attrsByItem.values.flatten().map { it.attributeDefinitionObjectId }).associate {
+                it.objectId!! to
+                    it.name
+            }
+        val dtos =
+            items.map {
+                ctx.toDto(it).copy(
+                    parentNumber = it.parentObjectId?.let(numberById::get),
+                    attributes =
+                    attrsByItem[it.objectId].orEmpty().map { a ->
+                        ItemAttributeDto(attrNames[a.attributeDefinitionObjectId] ?: "?", a.value)
+                    },
+                )
+            }
+        return ItemPageResponse(dtos, total, page, size)
+    }
+
+    /** YPJ-130:表格后端分页 envelope。 */
+    data class ItemPageResponse(
+        val items: List<ItemDto>,
+        val total: Long,
+        val page: Int,
+        val size: Int,
+    )
+
     fun get(itemId: UUID): ItemDto {
         val item = itemRepo.findByObjectId(itemId) ?: throw NotFoundException("item 不存在")
         val project = projectOf(item.projectObjectId)
@@ -732,3 +804,44 @@ internal fun isDueSoon(
     due: LocalDate?,
     today: LocalDate,
 ): Boolean = due != null && due >= today && due < today.plusDays(3)
+
+/** YPJ-130(spec 0093):表格分页参数——白名单镜像前端列定义/页大小。 */
+internal val ITEM_PAGE_SIZES = setOf(20, 50, 100)
+
+internal val ITEM_SORT_FIELDS =
+    setOf(
+        "number",
+        "title",
+        "type",
+        "status",
+        "assignee",
+        "priority",
+        "startDate",
+        "dueDate",
+        "feasSignal",
+        "sprint",
+        "createdAt",
+        "overdue",
+        "blocked",
+    )
+
+/** 排序串解析:恒返 3 槽(空串哨兵=无操作);非法字段/方向 400 fail-fast(拍板②);超 3 键忽略多余(骨架槽位上限,前端不可达路径,spec 记录)。 */
+internal fun parseItemSort(sort: String?): List<Pair<String, String>> {
+    val raw = sort?.takeIf { it.isNotBlank() } ?: return listOf("number" to "asc", "" to "", "" to "")
+    val keys =
+        raw
+            .split(",")
+            .map { seg ->
+                val parts = seg.trim().split(":")
+                if (parts.size != 2) throw BadRequestException("sort 段格式应为 field:dir:$seg")
+                val (field, dir) = parts
+                if (field !in ITEM_SORT_FIELDS) throw BadRequestException("非法排序字段:$field")
+                if (dir != "asc" && dir != "desc") throw BadRequestException("非法排序方向:$dir")
+                field to dir
+            }
+    val taken = keys.take(3).ifEmpty { listOf("number" to "asc") }
+    return taken + List(3 - taken.size) { "" to "" }
+}
+
+/** ILIKE 通配符转义:对齐前端 String.includes 字面子串语义。 */
+internal fun escapeLike(q: String): String = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")

@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 import yangzhou.api.business.sprint.SprintService
@@ -43,6 +44,19 @@ class ItemController(
     fun list(
         @PathVariable key: String,
     ): List<ItemService.ItemDto> = service.list(key)
+
+    /** YPJ-130(spec 0093):表格后端分页——契约真值表见 spec §1;校验在 service(BadRequestException → 400)。 */
+    @GetMapping("/projects/{key}/items/page")
+    fun page(
+        @PathVariable key: String,
+        @RequestParam(defaultValue = "0") page: Int,
+        @RequestParam(defaultValue = "20") size: Int,
+        @RequestParam(required = false) query: String?,
+        @RequestParam(required = false) status: String?,
+        @RequestParam(required = false) assignee: String?,
+        @RequestParam(required = false) priority: String?,
+        @RequestParam(required = false) sort: String?,
+    ): ItemService.ItemPageResponse = service.pagedList(key, page, size, query, status, assignee, priority, sort)
 
     @GetMapping("/items/{itemId}")
     fun get(

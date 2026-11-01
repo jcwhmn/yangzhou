@@ -271,6 +271,14 @@ Content-Type: application/json
 GET {{host}}/api/projects/{{pkey}}/items
 Authorization: Bearer {{token}}
 
+### item 分页(YPJ-130:后端分页;sort 白名单见 spec 0093,非法字段 400)
+GET {{host}}/api/projects/{{pkey}}/items/page?page=0&size=20&sort=title:asc
+Authorization: Bearer {{token}}
+
+### item 分页:搜索+状态筛选组合(query 子串;status/assignee/priority 精确,__none__=未指派)
+GET {{host}}/api/projects/{{pkey}}/items/page?query=前端&status={{statusFrom}}&sort=number:asc
+Authorization: Bearer {{token}}
+
 ### item 详情
 GET {{host}}/api/items/{{itemId}}
 Authorization: Bearer {{token}}
@@ -889,6 +897,18 @@ DELETE {{host}}/api/projects/{{pkey}}/views/{{viewId}}
 Authorization: Bearer {{token}}
 
 # 负例区:以下请求「红色 = 预期」,演示约束生效,不要当 bug
+
+### [预期 400] 分页排序字段不在白名单(YPJ-130)
+GET {{host}}/api/projects/{{pkey}}/items/page?sort=hacker:asc
+Authorization: Bearer {{token}}
+
+### [预期 400] 分页 size 不在白名单(20/50/100)
+GET {{host}}/api/projects/{{pkey}}/items/page?size=15
+Authorization: Bearer {{token}}
+
+### [预期 400] 分页 page 为负
+GET {{host}}/api/projects/{{pkey}}/items/page?page=-1
+Authorization: Bearer {{token}}
 ### ============================================================
 
 ### [预期 400] 起止不成对(只有 startedAt)

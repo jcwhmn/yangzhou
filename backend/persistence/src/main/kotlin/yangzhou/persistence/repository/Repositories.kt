@@ -223,6 +223,173 @@ interface ItemRepository : CrudRepository<Item, Long> {
     fun existsByParentObjectId(parentObjectId: UUID): Boolean
 
     fun findByObjectIdIn(objectIds: Collection<UUID>): List<Item>
+
+    /** YPJ-130(spec 0093):表格后端分页——服务端过滤/搜索/排序 + LIMIT/OFFSET。
+     * 探针实证(ItemsPageQueryProbeTest):Spring Data JDBC 对 @Query 忽略 Sort/Pageable,
+     * 故排序用静态骨架:白名单 13 字段 × 2 向 × 3 槽位全枚举;槽位空串恒不命中即无操作;
+     * NULLS LAST 双向(null 排最后,镜像前端比较器);blockedIds 空集合由调用方换哨兵 id 防 IN ()。 */
+    @Query(
+        """SELECT i.*
+            FROM item i
+            JOIN project p ON p.object_id = i.project_object_id
+            LEFT JOIN status s ON s.object_id = i.status_object_id
+            LEFT JOIN member m ON m.object_id = i.assignee_object_id
+            LEFT JOIN item i2 ON i2.object_id = i.parent_object_id
+            LEFT JOIN LATERAL (
+                SELECT g.name FROM item_group_member igm
+                JOIN item_group g ON g.object_id = igm.group_object_id
+                WHERE igm.item_object_id = i.object_id AND g.type = 'sprint' AND g.status <> 'completed'
+                ORDER BY g.created_at DESC LIMIT 1
+            ) sp ON TRUE
+            WHERE i.project_object_id = :projectObjectId AND i.deleted_at IS NULL
+            AND (:statusName = '' OR s.name = :statusName)
+            AND (:assigneeFilter = '' OR (:assigneeFilter = '__none__' AND i.assignee_object_id IS NULL)
+                 OR m.display_name = :assigneeFilter)
+            AND (:priority = '' OR i.priority = :priority)
+            AND (:like = ''
+                OR CAST(i.number AS TEXT) ILIKE :like
+                OR i.title ILIKE :like
+                OR m.display_name ILIKE :like
+                OR (p.key || '-' || CAST(i.number AS TEXT)) ILIKE :like
+                OR (p.key || '-' || CAST(i2.number AS TEXT)) ILIKE :like
+                OR sp.name ILIKE :like
+                OR EXISTS (SELECT 1 FROM item_attribute ia
+                    WHERE ia.item_object_id = i.object_id AND ia.value ILIKE :like))
+            ORDER BY CASE WHEN :k1 = 'number' AND :d1 = 'asc' THEN i.number END ASC NULLS LAST,
+            CASE WHEN :k1 = 'number' AND :d1 = 'desc' THEN i.number END DESC NULLS LAST,
+            CASE WHEN :k1 = 'title' AND :d1 = 'asc' THEN i.title END ASC NULLS LAST,
+            CASE WHEN :k1 = 'title' AND :d1 = 'desc' THEN i.title END DESC NULLS LAST,
+            CASE WHEN :k1 = 'type' AND :d1 = 'asc' THEN i.type END ASC NULLS LAST,
+            CASE WHEN :k1 = 'type' AND :d1 = 'desc' THEN i.type END DESC NULLS LAST,
+            CASE WHEN :k1 = 'status' AND :d1 = 'asc' THEN s.name END ASC NULLS LAST,
+            CASE WHEN :k1 = 'status' AND :d1 = 'desc' THEN s.name END DESC NULLS LAST,
+            CASE WHEN :k1 = 'assignee' AND :d1 = 'asc' THEN m.display_name END ASC NULLS LAST,
+            CASE WHEN :k1 = 'assignee' AND :d1 = 'desc' THEN m.display_name END DESC NULLS LAST,
+            CASE WHEN :k1 = 'priority' AND :d1 = 'asc' THEN i.priority END ASC NULLS LAST,
+            CASE WHEN :k1 = 'priority' AND :d1 = 'desc' THEN i.priority END DESC NULLS LAST,
+            CASE WHEN :k1 = 'startDate' AND :d1 = 'asc' THEN i.start_date END ASC NULLS LAST,
+            CASE WHEN :k1 = 'startDate' AND :d1 = 'desc' THEN i.start_date END DESC NULLS LAST,
+            CASE WHEN :k1 = 'dueDate' AND :d1 = 'asc' THEN i.due_date END ASC NULLS LAST,
+            CASE WHEN :k1 = 'dueDate' AND :d1 = 'desc' THEN i.due_date END DESC NULLS LAST,
+            CASE WHEN :k1 = 'feasSignal' AND :d1 = 'asc' THEN i.feas_signal END ASC NULLS LAST,
+            CASE WHEN :k1 = 'feasSignal' AND :d1 = 'desc' THEN i.feas_signal END DESC NULLS LAST,
+            CASE WHEN :k1 = 'sprint' AND :d1 = 'asc' THEN sp.name END ASC NULLS LAST,
+            CASE WHEN :k1 = 'sprint' AND :d1 = 'desc' THEN sp.name END DESC NULLS LAST,
+            CASE WHEN :k1 = 'createdAt' AND :d1 = 'asc' THEN i.created_at END ASC NULLS LAST,
+            CASE WHEN :k1 = 'createdAt' AND :d1 = 'desc' THEN i.created_at END DESC NULLS LAST,
+            CASE WHEN :k1 = 'overdue' AND :d1 = 'asc' THEN (i.due_date IS NOT NULL AND i.due_date < :today AND s.is_final = FALSE) END ASC NULLS LAST,
+            CASE WHEN :k1 = 'overdue' AND :d1 = 'desc' THEN (i.due_date IS NOT NULL AND i.due_date < :today AND s.is_final = FALSE) END DESC NULLS LAST,
+            CASE WHEN :k1 = 'blocked' AND :d1 = 'asc' THEN (i.object_id IN (:blockedIds)) END ASC NULLS LAST,
+            CASE WHEN :k1 = 'blocked' AND :d1 = 'desc' THEN (i.object_id IN (:blockedIds)) END DESC NULLS LAST,
+            CASE WHEN :k2 = 'number' AND :d2 = 'asc' THEN i.number END ASC NULLS LAST,
+            CASE WHEN :k2 = 'number' AND :d2 = 'desc' THEN i.number END DESC NULLS LAST,
+            CASE WHEN :k2 = 'title' AND :d2 = 'asc' THEN i.title END ASC NULLS LAST,
+            CASE WHEN :k2 = 'title' AND :d2 = 'desc' THEN i.title END DESC NULLS LAST,
+            CASE WHEN :k2 = 'type' AND :d2 = 'asc' THEN i.type END ASC NULLS LAST,
+            CASE WHEN :k2 = 'type' AND :d2 = 'desc' THEN i.type END DESC NULLS LAST,
+            CASE WHEN :k2 = 'status' AND :d2 = 'asc' THEN s.name END ASC NULLS LAST,
+            CASE WHEN :k2 = 'status' AND :d2 = 'desc' THEN s.name END DESC NULLS LAST,
+            CASE WHEN :k2 = 'assignee' AND :d2 = 'asc' THEN m.display_name END ASC NULLS LAST,
+            CASE WHEN :k2 = 'assignee' AND :d2 = 'desc' THEN m.display_name END DESC NULLS LAST,
+            CASE WHEN :k2 = 'priority' AND :d2 = 'asc' THEN i.priority END ASC NULLS LAST,
+            CASE WHEN :k2 = 'priority' AND :d2 = 'desc' THEN i.priority END DESC NULLS LAST,
+            CASE WHEN :k2 = 'startDate' AND :d2 = 'asc' THEN i.start_date END ASC NULLS LAST,
+            CASE WHEN :k2 = 'startDate' AND :d2 = 'desc' THEN i.start_date END DESC NULLS LAST,
+            CASE WHEN :k2 = 'dueDate' AND :d2 = 'asc' THEN i.due_date END ASC NULLS LAST,
+            CASE WHEN :k2 = 'dueDate' AND :d2 = 'desc' THEN i.due_date END DESC NULLS LAST,
+            CASE WHEN :k2 = 'feasSignal' AND :d2 = 'asc' THEN i.feas_signal END ASC NULLS LAST,
+            CASE WHEN :k2 = 'feasSignal' AND :d2 = 'desc' THEN i.feas_signal END DESC NULLS LAST,
+            CASE WHEN :k2 = 'sprint' AND :d2 = 'asc' THEN sp.name END ASC NULLS LAST,
+            CASE WHEN :k2 = 'sprint' AND :d2 = 'desc' THEN sp.name END DESC NULLS LAST,
+            CASE WHEN :k2 = 'createdAt' AND :d2 = 'asc' THEN i.created_at END ASC NULLS LAST,
+            CASE WHEN :k2 = 'createdAt' AND :d2 = 'desc' THEN i.created_at END DESC NULLS LAST,
+            CASE WHEN :k2 = 'overdue' AND :d2 = 'asc' THEN (i.due_date IS NOT NULL AND i.due_date < :today AND s.is_final = FALSE) END ASC NULLS LAST,
+            CASE WHEN :k2 = 'overdue' AND :d2 = 'desc' THEN (i.due_date IS NOT NULL AND i.due_date < :today AND s.is_final = FALSE) END DESC NULLS LAST,
+            CASE WHEN :k2 = 'blocked' AND :d2 = 'asc' THEN (i.object_id IN (:blockedIds)) END ASC NULLS LAST,
+            CASE WHEN :k2 = 'blocked' AND :d2 = 'desc' THEN (i.object_id IN (:blockedIds)) END DESC NULLS LAST,
+            CASE WHEN :k3 = 'number' AND :d3 = 'asc' THEN i.number END ASC NULLS LAST,
+            CASE WHEN :k3 = 'number' AND :d3 = 'desc' THEN i.number END DESC NULLS LAST,
+            CASE WHEN :k3 = 'title' AND :d3 = 'asc' THEN i.title END ASC NULLS LAST,
+            CASE WHEN :k3 = 'title' AND :d3 = 'desc' THEN i.title END DESC NULLS LAST,
+            CASE WHEN :k3 = 'type' AND :d3 = 'asc' THEN i.type END ASC NULLS LAST,
+            CASE WHEN :k3 = 'type' AND :d3 = 'desc' THEN i.type END DESC NULLS LAST,
+            CASE WHEN :k3 = 'status' AND :d3 = 'asc' THEN s.name END ASC NULLS LAST,
+            CASE WHEN :k3 = 'status' AND :d3 = 'desc' THEN s.name END DESC NULLS LAST,
+            CASE WHEN :k3 = 'assignee' AND :d3 = 'asc' THEN m.display_name END ASC NULLS LAST,
+            CASE WHEN :k3 = 'assignee' AND :d3 = 'desc' THEN m.display_name END DESC NULLS LAST,
+            CASE WHEN :k3 = 'priority' AND :d3 = 'asc' THEN i.priority END ASC NULLS LAST,
+            CASE WHEN :k3 = 'priority' AND :d3 = 'desc' THEN i.priority END DESC NULLS LAST,
+            CASE WHEN :k3 = 'startDate' AND :d3 = 'asc' THEN i.start_date END ASC NULLS LAST,
+            CASE WHEN :k3 = 'startDate' AND :d3 = 'desc' THEN i.start_date END DESC NULLS LAST,
+            CASE WHEN :k3 = 'dueDate' AND :d3 = 'asc' THEN i.due_date END ASC NULLS LAST,
+            CASE WHEN :k3 = 'dueDate' AND :d3 = 'desc' THEN i.due_date END DESC NULLS LAST,
+            CASE WHEN :k3 = 'feasSignal' AND :d3 = 'asc' THEN i.feas_signal END ASC NULLS LAST,
+            CASE WHEN :k3 = 'feasSignal' AND :d3 = 'desc' THEN i.feas_signal END DESC NULLS LAST,
+            CASE WHEN :k3 = 'sprint' AND :d3 = 'asc' THEN sp.name END ASC NULLS LAST,
+            CASE WHEN :k3 = 'sprint' AND :d3 = 'desc' THEN sp.name END DESC NULLS LAST,
+            CASE WHEN :k3 = 'createdAt' AND :d3 = 'asc' THEN i.created_at END ASC NULLS LAST,
+            CASE WHEN :k3 = 'createdAt' AND :d3 = 'desc' THEN i.created_at END DESC NULLS LAST,
+            CASE WHEN :k3 = 'overdue' AND :d3 = 'asc' THEN (i.due_date IS NOT NULL AND i.due_date < :today AND s.is_final = FALSE) END ASC NULLS LAST,
+            CASE WHEN :k3 = 'overdue' AND :d3 = 'desc' THEN (i.due_date IS NOT NULL AND i.due_date < :today AND s.is_final = FALSE) END DESC NULLS LAST,
+            CASE WHEN :k3 = 'blocked' AND :d3 = 'asc' THEN (i.object_id IN (:blockedIds)) END ASC NULLS LAST,
+            CASE WHEN :k3 = 'blocked' AND :d3 = 'desc' THEN (i.object_id IN (:blockedIds)) END DESC NULLS LAST
+            LIMIT :limit OFFSET :offset
+        """,
+    )
+    fun findPage(
+        projectObjectId: UUID,
+        statusName: String,
+        assigneeFilter: String,
+        priority: String,
+        like: String,
+        today: LocalDate,
+        blockedIds: Collection<UUID>,
+        k1: String,
+        d1: String,
+        k2: String,
+        d2: String,
+        k3: String,
+        d3: String,
+        limit: Int,
+        offset: Int,
+    ): List<Item>
+
+    /** YPJ-130(spec 0093):分页总数——与 findPage 同 WHERE(含同套过滤哨兵),无排序。 */
+    @Query(
+        """SELECT COUNT(*)
+            FROM item i
+            JOIN project p ON p.object_id = i.project_object_id
+            LEFT JOIN status s ON s.object_id = i.status_object_id
+            LEFT JOIN member m ON m.object_id = i.assignee_object_id
+            LEFT JOIN item i2 ON i2.object_id = i.parent_object_id
+            LEFT JOIN LATERAL (
+                SELECT g.name FROM item_group_member igm
+                JOIN item_group g ON g.object_id = igm.group_object_id
+                WHERE igm.item_object_id = i.object_id AND g.type = 'sprint' AND g.status <> 'completed'
+            ) sp ON TRUE
+            WHERE i.project_object_id = :projectObjectId AND i.deleted_at IS NULL
+            AND (:statusName = '' OR s.name = :statusName)
+            AND (:assigneeFilter = '' OR (:assigneeFilter = '__none__' AND i.assignee_object_id IS NULL)
+                 OR m.display_name = :assigneeFilter)
+            AND (:priority = '' OR i.priority = :priority)
+            AND (:like = ''
+                OR CAST(i.number AS TEXT) ILIKE :like
+                OR i.title ILIKE :like
+                OR m.display_name ILIKE :like
+                OR (p.key || '-' || CAST(i.number AS TEXT)) ILIKE :like
+                OR (p.key || '-' || CAST(i2.number AS TEXT)) ILIKE :like
+                OR sp.name ILIKE :like
+                OR EXISTS (SELECT 1 FROM item_attribute ia
+                    WHERE ia.item_object_id = i.object_id AND ia.value ILIKE :like))
+        """,
+    )
+    fun countPage(
+        projectObjectId: UUID,
+        statusName: String,
+        assigneeFilter: String,
+        priority: String,
+        like: String,
+    ): Long
 }
 
 interface ProjectRepoRepository : CrudRepository<ProjectRepo, Long> {

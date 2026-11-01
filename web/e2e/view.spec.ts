@@ -190,7 +190,7 @@ test("表格视图——列顺序:面板调序、随视图保存/恢复、恢复
 // → 保存/另存/列配置锁定,错误常驻 + 重试;重试成功后一切恢复
 test("加载失败锁定操作,重试恢复", async ({ page, projectKey }) => {
   await apiCreateItem(projectKey, "VW 死页面 item");
-  await page.route("**/api/projects/*/items*", (r) => r.abort());
+  await page.route("**/api/projects/*/items**", (r) => r.abort()); // items** 匹配 /items 与 /items/page(YPJ-130 数据源)
   await page.goto(`/p/${projectKey}/table`);
   const save = page.getByRole("button", { name: "保存", exact: true });
   await expect(save).toBeDisabled();
@@ -198,7 +198,7 @@ test("加载失败锁定操作,重试恢复", async ({ page, projectKey }) => {
   await expect(page.getByRole("button", { name: /列配置/ })).toBeDisabled();
   await expect(page.getByRole("button", { name: "重试" })).toBeVisible();
 
-  await page.unroute("**/api/projects/*/items*");
+  await page.unroute("**/api/projects/*/items**");
   await page.getByRole("button", { name: "重试" }).click();
   await expect(save).toBeEnabled();
   await expect(page.getByText("VW 死页面 item")).toBeVisible();
