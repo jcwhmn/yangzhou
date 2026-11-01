@@ -50,7 +50,7 @@ docs/      adr/ · spec/ · architecture/(puml 类图) · requirement/(PRD) · p
 2. 实现带测试,跑全相关验证
 3. PR:`gh pr create --base main --title "YPJ-{N}: ..."`;开出后 `yz items move YPJ-{N} "In Review"`
 4. **停**,等用户审阅合并
-5. 合并后同回合完成:`git checkout main && git pull --ff-only` → 删远程分支(`gh pr merge --squash --delete-branch` 或 `git push origin --delete <branch>`;GITHub 栏已支持删后经 PR 回溯,YPJ-69)→ **YPJ 移 Done**(`yz items move YPJ-{N} "Done"`,非可选)→ 扫父 item:子票全 Done 则父票 Done,否则 In Progress。PR 已合而 item 停在 In Progress = 流程破损态。
+5. 合并后同回合完成:`git checkout main && git pull --ff-only` → 删远程分支(`git push origin --delete <branch>`;**本地分支永久保留不删**,2026-11-01 定,过程考古走 `git log <本地分支>`;`gh pr merge --delete-branch` 连本地一起删,**禁用**;GitHub 侧 refs/pull/N/head 仍可回溯,YPJ-69)→ **YPJ 移 Done**(`yz items move YPJ-{N} "Done"`,非可选)→ 扫父 item:子票全 Done 则父票 Done,否则 In Progress。PR 已合而 item 停在 In Progress = 流程破损态。
 
 ## Kotlin 风格
 
@@ -98,9 +98,9 @@ docs/      adr/ · spec/ · architecture/(puml 类图) · requirement/(PRD) · p
 - JDK 25(LTS)。后端在 `backend/`:`gradle build`(单元测试,不含集成)/ `gradle integrationTest`(集成,需 Docker)/ `gradle :domain:run`(引擎 Demo,输出与 prototype S1–S7 可比对)。
 - `./gradlew` 同效;首次需下载发行包,国内网络慢属已知,用本地 gradle 即可。
 - CI(GitHub Actions):`backend.yml` 跑 `gradle test`(纯单元,免 Docker;spec 0014);`nightly.yml` 每日全量兜底(含集成,红了必修);`e2e.yml` web/backend 变更起 bootRun + Playwright 整跑 E2E
-- 本机开发库:`yangzhou`/`yangzhou_dev`/`yangzhou_test`(外部共享 postgres,已建)。**三 profile 常驻容器化**(YPJ-118,spec 0087):`script/app-infra.ps1 <build|up|down|status> <prod|dev|test>`——prod=web3000+api8080 / dev=web3001+api8081 / test=api8082(仅 api,E2E 用);镜像 2 个(api/web),build 先宿主 `bootJar` 再 docker build。rustfs 起停仍 `script/dev-infra.ps1`。调试改码走 IDE/gradle bootRun,但 test profile 须 `--server.port=8082` 且 test 容器已停(8080/8081 归容器)。
+- 本机开发库:`yangzhou`/`yangzhou_dev`/`yangzhou_test`(外部共享 postgres,已建)。**三 profile 常驻容器化**(YPJ-118,spec 0087):`script/app-infra.ps1 <build|rebuild|up|down|status> <prod|dev|test>`——prod=web3000+api8080 / dev=web3001+api8081 / test=api8082(仅 api,E2E 用);镜像 2 个(api/web),build 先宿主 `bootJar` 再 docker build。rustfs 起停仍 `script/dev-infra.ps1`。调试改码走 IDE/gradle bootRun,但 test profile 须 `--server.port=8082` 且 test 容器已停(8080/8081 归容器)。
 - **不要猜前端或后端是否已运行,需要运行环境的,告知需要的运行环境,命令,从我这里确认**。
-- **三 profile 与端口格局**(2026-10-30 重排,YPJ-118 容器化):**3000(web)+8080 = prod / PM 日常**(default profile,库 `yangzhou`,dogfood 项目 YPJ,真实数据);**3001(web)+8081 = dev**(dev profile,库 `yangzhou_dev`,scratch 可丢弃,空库首启用 `POST /api/auth/bootstrap` 引导);**8082 = test**(test profile,库 `yangzhou_test`,E2E 用,globalSetup 会清库;无前端,E2E 前端由 Playwright 拉起)。常驻起停 `script/app-infra.ps1 <build|up|down|status> <prod|dev|test>`;CLI `yz` 的 session(`~/.yangzhou/session.json`)指向谁就写谁的库——动 PM 数据前确认 server 指向 prod(api 8080)。
+- **三 profile 与端口格局**(2026-10-30 重排,YPJ-118 容器化):**3000(web)+8080 = prod / PM 日常**(default profile,库 `yangzhou`,dogfood 项目 YPJ,真实数据);**3001(web)+8081 = dev**(dev profile,库 `yangzhou_dev`,scratch 可丢弃,空库首启用 `POST /api/auth/bootstrap` 引导);**8082 = test**(test profile,库 `yangzhou_test`,E2E 用,globalSetup 会清库;无前端,E2E 前端由 Playwright 拉起)。常驻起停 `script/app-infra.ps1 <build|rebuild|up|down|status> <prod|dev|test>`;CLI `yz` 的 session(`~/.yangzhou/session.json`)指向谁就写谁的库——动 PM 数据前确认 server 指向 prod(api 8080)。
 - PM 实例部署形态(已拍板):本机常驻即可;Postgres 备份手工期(`pg_dump`),自动化另票。
 - **⚠ 前端命令必须在 `web/` 目录下执行**:`cd /d/code/yangzhou/web && npx next build` / `npm run dev` / `npx playwright test` 等。agent 的 shell CWD 每次重置到 repo 根,漏 cd 会在错误目录跑命令导致 `.next` 污染或路径找不到。
 
@@ -119,3 +119,12 @@ main 干线开发;原型留 `prototype/*` 分支;每张票 = 一个 YPJ item(dog
 - **spec 文件是版本必须项**:开工前立 `docs/spec/00NN`(增量节,概要设计),完工后补 As-built;无 spec 不开工(2026-10-08 定,V16 系补录见 0013)。Linear 已冻结只读(历史存档),不再开新票。
 - **每票实现前三件套**(2026-10-09 立):spec 增量节含 ①需求(写细,含范围/非目标)②详细设计(代码级修改计划:改哪些文件、怎么改、否决的备选)③手工测试用例(供用户 build/debug 阶段执行);用户过目后才编码。
 - **编码完成后停**:功能代码+测试代码写完即停,等用户 build/debug,通过后再 PR。
+- **过程档案(2026-11-01 立,YPJ-131 复盘)**:每个验证绿点就地 commit(消息带票号+绿点说明),不攒「一票一提交」;PR squash 不变——main 干线干净、本地分支留全程细粒度历史;handoff 换届将 `CURRENT.md` 挪 `.scratch/handoff/archive/YYYY-MM-DD-YPJ-N.md`,不覆盖。
+- **诊断交付七规(2026-11-01 立,YPJ-131 复盘,P0+P1,违反=流程事故)**:
+  1. 验收 = **用户主路径**测试绿,不是实现路径绿;测试先按用户实际操作路径写。
+  2. 用户报 N 个症状,交付前逐条标注「已解释/已修复/仍开放」,禁止打包「都修好了」。
+  3. 归因必须实锤(查库/直调 API);未实锤的归因标「假设」,禁入「勿走回头路」与 handoff 结论。
+  4. 每个结论先设计反证探针——明确「什么证据能推翻它」,证实与证伪都做。
+  5. UI 双路径/状态相关行为(保存/另存、点击语义)必须写「状态×动作→行为」真值表进 spec;结果级描述不算设计完成。
+  6. 品味型交互(两可设计如点击语义)动工前摆两方案给用户拍板或给可点原型,agent 不代选。
+  7. 交用户复验前,agent 先做最小数据探针(查库/直调确认写入已发生);「测试绿」≠「数据落了」。

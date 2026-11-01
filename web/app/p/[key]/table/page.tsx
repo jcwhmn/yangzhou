@@ -56,12 +56,65 @@ type ViewDto = {
   name: string;
   filters: Record<string, string | null>;
   columns: Record<string, boolean>;
+  colOrder?: string[] | null;
   sort?: { field: string; dir: "asc" | "desc" }[] | null;
   query?: string | null;
 };
 type Filters = { status: string; assignee: string; priority: string };
 
 const EMPTY_FILTERS: Filters = { status: "", assignee: "", priority: "" };
+
+// 列定义真相源(spec 0091 §6):编号恒显钉首位、不入顺序数组,其余按此默认顺序
+type ColumnDef = { id: string; label: string; visible: boolean };
+const COLUMN_DEFS: ColumnDef[] = [
+  { id: "number", label: "编号", visible: true },
+  { id: "title", label: "标题", visible: true },
+  { id: "priority", label: "优先级", visible: false },
+  { id: "status", label: "状态", visible: true },
+  { id: "assignee", label: "负责人", visible: true },
+  { id: "startDate", label: "开始", visible: true },
+  { id: "dueDate", label: "截止", visible: true },
+  { id: "overdue", label: "超期", visible: true },
+  { id: "feasSignal", label: "可行性", visible: true },
+  { id: "blocked", label: "阻塞", visible: false },
+  { id: "sprint", label: "Sprint", visible: true },
+];
+const MOVABLE_IDS = COLUMN_DEFS.slice(1).map((c) => c.id);
+const DEFAULT_COL_ORDER = MOVABLE_IDS;
+
+function normalizeOrder(saved?: string[] | null): string[] {
+  const known = new Set(MOVABLE_IDS);
+  const ordered = (saved ?? []).filter((id) => known.has(id));
+  const rest = MOVABLE_IDS.filter((id) => !ordered.includes(id));
+  return [...ordered, ...rest]; // 存档剔除未知 id,新增列按默认顺序补尾
+}
+
+function readSorts(k: string): SortKey[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(`yz-table-sorts:${k}`) ?? "null");
+    return Array.isArray(v) && v.length > 0 ? v : DEFAULT_SORTS;
+  } catch {
+    return DEFAULT_SORTS;
+  }
+}
+
+function readQuery(k: string): string {
+  try {
+    const v = JSON.parse(localStorage.getItem(`yz-table-query:${k}`) ?? "null");
+    return typeof v === "string" ? v : "";
+  } catch {
+    return "";
+  }
+}
+
+function readSelectedView(k: string): string | null {
+  try {
+    const v = JSON.parse(localStorage.getItem(`yz-table-view:${k}`) ?? "null");
+    return typeof v === "string" ? v : null;
+  } catch {
+    return null;
+  }
+}
 
 type SortKey = { field: string; dir: "asc" | "desc" };
 
@@ -94,11 +147,11 @@ export default function TableViewPage() {
   const { key } = useParams<{ key: string }>();
   const [items, setItems] = useState<Item[] | null>(null);
   const [statuses, setStatuses] = useState<Status[]>([]);
-  const [sorts, setSorts] = useState<SortKey[]>(DEFAULT_SORTS);
+  const [sorts, setSorts] = useState<SortKey[]>(() => readSorts(key));
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(readPageSize);
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(() => readQuery(key));
   const [error, setError] = useState("");
 
   // 列可见性:默认视图走 localStorage(按项目 key 区分,YPJ-32);选中视图时以视图数据为准
@@ -115,41 +168,105 @@ export default function TableViewPage() {
     readCols(key),
   );
 
+  function readOrder(k: string): string[] {
+    try {
+      return normalizeOrder(
+        JSON.parse(localStorage.getItem(`yz-table-colorder:${k}`) ?? "[]"),
+      );
+    } catch {
+      return DEFAULT_COL_ORDER;
+    }
+  }
+
+  const [colOrder, setColOrder] = useState<string[]>(() => readOrder(key));
+
   // 视图状态
   const [views, setViews] = useState<ViewDto[]>([]);
-  const [selectedView, setSelectedView] = useState<string | null>(null);
+  const [selectedView, setSelectedView] = useState<string | null>(() =>
+    readSelectedView(key),
+  );
   const [dirty, setDirty] = useState(false);
   const [nameOpen, setNameOpen] = useState<null | "save" | "saveAs">(null);
   const [viewName, setViewName] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [fatal, setFatal] = useState(false);
 
   useEffect(() => {
     setCols(readCols(key));
+    setColOrder(readOrder(key));
     setFilters(EMPTY_FILTERS);
-    setQuery("");
-    setSorts(DEFAULT_SORTS);
-    setSelectedView(null);
+    setQuery(readQuery(key));
+    setSorts(readSorts(key));
+    setSelectedView(readSelectedView(key));
+    setLoaded(false);
+    setFatal(false);
     setDirty(false);
   }, [key]);
 
+  // 仅默认视图写 localStorage;选中视图时写会把默认视图存档冲掉(YPJ-131 实测)
   useEffect(() => {
-    localStorage.setItem(`yz-table-cols:${key}`, JSON.stringify(cols));
-  }, [cols, key]);
+    if (selectedView === null) {
+      localStorage.setItem(`yz-table-cols:${key}`, JSON.stringify(cols));
+    }
+  }, [cols, key, selectedView]);
+
+  useEffect(() => {
+    if (selectedView === null) {
+      localStorage.setItem(
+        `yz-table-colorder:${key}`,
+        JSON.stringify(colOrder),
+      );
+    }
+  }, [colOrder, key, selectedView]);
+
+  useEffect(() => {
+    if (selectedView === null) {
+      localStorage.setItem(`yz-table-sorts:${key}`, JSON.stringify(sorts));
+      localStorage.setItem(`yz-table-query:${key}`, JSON.stringify(query));
+    }
+  }, [sorts, query, key, selectedView]);
+
+  // 记住上次选中的视图,重进自动应用(YPJ-131 手测反馈)
+  useEffect(() => {
+    localStorage.setItem(`yz-table-view:${key}`, JSON.stringify(selectedView));
+  }, [selectedView, key]);
+
+  // 错误条 6s 自动消失;命名对话框开着时保持(YPJ-131 手测反馈:409 信息一直不消失)
+  useEffect(() => {
+    if (!error || nameOpen !== null || fatal) return;
+    const timer = setTimeout(() => setError(""), 6000);
+    return () => clearTimeout(timer);
+  }, [error, nameOpen, fatal]);
 
   const load = useCallback(async () => {
+    setError("");
+    setFatal(false);
     try {
       const [its, sts, vs] = await Promise.all([
         api<Item[]>(`/api/projects/${key}/items`),
         api<{ statuses: Status[] }>(`/api/projects/${key}`).then(
           (p) => p.statuses,
         ),
-        api<ViewDto[]>(`/api/projects/${key}/views`).catch(
-          () => [] as ViewDto[],
-        ),
+        api<ViewDto[]>(`/api/projects/${key}/views`),
       ]);
       setItems(its);
       setStatuses(sts);
       setViews(vs);
+      setLoaded(true);
+
+      // 记住上次选中的视图,重进自动应用(YPJ-131 手测反馈)
+      const remembered = readSelectedView(key);
+      const target = remembered
+        ? vs.find((v) => v.viewId === remembered)
+        : undefined;
+      if (target) applyView(target);
+      else setSelectedView(null);
     } catch (e) {
+      // 加载失败=死页面:锁操作+常驻错误+重试(YPJ-131 复验:token 过期 401 后
+      // views=[] 令同名预检失效,默认视图下保存误走 POST 撞同名 409)
+      setLoaded(false);
+      setFatal(true);
       setError(e instanceof Error ? e.message : "加载失败");
     }
   }, [key]);
@@ -163,6 +280,18 @@ export default function TableViewPage() {
       ...prev,
       [c]: !(prev[c] ?? columns.find((x) => x.id === c)?.visible ?? true),
     }));
+    setDirty(true);
+  }
+
+  function moveCol(id: string, dir: "up" | "down") {
+    setColOrder((prev) => {
+      const i = prev.indexOf(id);
+      const j = dir === "up" ? i - 1 : i + 1;
+      if (i < 0 || j < 0 || j >= prev.length) return prev;
+      const next = [...prev];
+      [next[i], next[j]] = [next[j], next[i]];
+      return next;
+    });
     setDirty(true);
   }
 
@@ -180,12 +309,16 @@ export default function TableViewPage() {
       priority: v.filters.priority ?? "",
     });
     setCols({ ...v.columns });
+    setColOrder(normalizeOrder(v.colOrder));
     setSorts(v.sort ?? DEFAULT_SORTS);
     setQuery(v.query ?? "");
     setDirty(false);
   }
 
   async function saveCurrent(name: string) {
+    // 防连点:双击会 POST 两次,第二次 409 同名(YPJ-131 手测反馈)
+    if (saving) return;
+    setSaving(true);
     const body = {
       name,
       filters: {
@@ -194,11 +327,14 @@ export default function TableViewPage() {
         priority: filters.priority || null,
       },
       columns: cols,
+      colOrder,
       sort: sorts,
       query: query,
     };
     try {
-      if (selectedView && nameOpen === "save") {
+      // 选中视图的工具栏直存=PATCH(不弹框,nameOpen=null);另存=POST 建副本。
+      // 旧条件 nameOpen === "save" 永假 → 直存误走 POST 撞同名 409,顺序/排序不落库(YPJ-127 起遗留,复验实锤)
+      if (selectedView && nameOpen !== "saveAs") {
         await api(`/api/projects/${key}/views/${selectedView}`, {
           method: "PATCH",
           body: JSON.stringify(body),
@@ -215,6 +351,8 @@ export default function TableViewPage() {
       setNameOpen(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "保存失败");
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -228,31 +366,34 @@ export default function TableViewPage() {
       setSelectedView(null);
       setFilters(EMPTY_FILTERS);
       setCols(readCols(key));
-      setSorts(DEFAULT_SORTS);
-      setQuery("");
+      setColOrder(readOrder(key));
+      setSorts(readSorts(key));
+      setQuery(readQuery(key));
+      setError("");
       setDirty(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "删除失败");
     }
   }
 
-  const columns: { id: string; label: string; visible: boolean }[] = [
-    { id: "number", label: "编号", visible: true }, // 恒显
-    { id: "title", label: "标题", visible: true }, // 恒显
-    { id: "priority", label: "优先级", visible: cols.priority ?? false },
-    { id: "status", label: "状态", visible: cols.status ?? true },
-    { id: "assignee", label: "负责人", visible: cols.assignee ?? true },
-    { id: "startDate", label: "开始", visible: cols.startDate ?? true },
-    { id: "dueDate", label: "截止", visible: cols.dueDate ?? true },
-    { id: "overdue", label: "超期", visible: cols.overdue ?? true },
-    { id: "feasSignal", label: "可行性", visible: cols.feasSignal ?? true },
-    { id: "blocked", label: "阻塞", visible: cols.blocked ?? false },
-    { id: "sprint", label: "Sprint", visible: cols.sprint ?? true },
-  ];
+  const columns: ColumnDef[] = COLUMN_DEFS.map((c) => ({
+    ...c,
+    visible: c.id === "number" || c.id === "title" || (cols[c.id] ?? c.visible),
+  }));
 
-  const visibleCols = columns.filter(
-    (c) => c.id === "number" || c.id === "title" || (cols[c.id] ?? c.visible),
-  );
+  const visibleCols = ["number", ...colOrder]
+    .map((id) => columns.find((c) => c.id === id))
+    .filter((c): c is ColumnDef => c !== undefined && c.visible);
+
+  // 另存/首存同名预检:后端 409 前置拦截(YPJ-131 手测反馈)
+  const nameConflict =
+    nameOpen !== null &&
+    viewName.trim().length > 0 &&
+    views.some(
+      (v) =>
+        v.name === viewName.trim() &&
+        !(nameOpen === "save" && v.viewId === selectedView),
+    );
 
   const assignees = [
     ...new Set(
@@ -308,20 +449,20 @@ export default function TableViewPage() {
     return desc ? -r : r;
   }
   // 单击循环 升→降→移除;移除后空回默认;Shift+点击追加次级键(YPJ-124)
-  function toggleSort(field: string, shift: boolean) {
+  // 多列排序:普通点击=追加/翻向/移除;Shift+点击=仅按此列(替换)(YPJ-131 用户拍板)
+  function toggleSort(field: string, replace: boolean) {
     setPage(0);
     setDirty(true);
     setSorts((prev) => {
       const idx = prev.findIndex((k) => k.field === field);
       if (idx === -1)
-        return shift
-          ? [...prev, { field, dir: "asc" }]
-          : [{ field, dir: "asc" }];
+        return replace
+          ? [{ field, dir: "asc" }]
+          : [...prev, { field, dir: "asc" }];
       const { dir } = prev[idx];
       const rest = prev.filter((_, i) => i !== idx);
       if (dir === "asc") {
-        const flipped: SortKey = { field, dir: "desc" };
-        return shift ? [...rest, flipped] : [flipped];
+        return [...rest, { field, dir: "desc" }];
       }
       return rest.length > 0 ? rest : DEFAULT_SORTS;
     });
@@ -383,8 +524,10 @@ export default function TableViewPage() {
               setSelectedView(null);
               setFilters(EMPTY_FILTERS);
               setCols(readCols(key));
-              setSorts(DEFAULT_SORTS);
-              setQuery("");
+              setColOrder(readOrder(key));
+              setSorts(readSorts(key));
+              setQuery(readQuery(key));
+              setError("");
               setDirty(false);
             }
           }}
@@ -397,6 +540,7 @@ export default function TableViewPage() {
         <Button
           size="small"
           variant={dirty ? "contained" : "outlined"}
+          disabled={!loaded}
           onClick={() => {
             if (selectedView) void saveCurrent(selectedName);
             else {
@@ -414,11 +558,17 @@ export default function TableViewPage() {
             setViewName("");
             setNameOpen("saveAs");
           }}
+          disabled={!loaded}
         >
           {t.view.saveAs}
         </Button>
         {selectedView && (
-          <Button size="small" color="error" onClick={() => void deleteView()}>
+          <Button
+            size="small"
+            color="error"
+            disabled={!loaded}
+            onClick={() => void deleteView()}
+          >
             {t.view.delete}
           </Button>
         )}
@@ -491,13 +641,19 @@ export default function TableViewPage() {
           }))}
         />
         <ColumnConfigPopover
-          columns={columns.filter((c) => c.id !== "number" && c.id !== "title")}
+          disabled={!loaded}
+          columns={colOrder.flatMap((id) => {
+            const c = columns.find((x) => x.id === id);
+            return c ? [{ ...c, locked: id === "title" }] : [];
+          })}
           visible={(id) =>
             cols[id] ?? columns.find((c) => c.id === id)?.visible ?? true
           }
           onToggle={toggleCol}
+          onMove={moveCol}
           onReset={() => {
             setCols({});
+            setColOrder(DEFAULT_COL_ORDER);
             setDirty(true);
           }}
         />
@@ -509,7 +665,16 @@ export default function TableViewPage() {
       </Stack>
 
       {items === null && !error && <LinearProgress />}
-      {error && <Typography color="error">{error}</Typography>}
+      {error && (
+        <Stack direction="row" spacing={1} alignItems="center">
+          <Typography color="error">{error}</Typography>
+          {fatal && (
+            <Button size="small" variant="outlined" onClick={() => void load()}>
+              {t.view.retry}
+            </Button>
+          )}
+        </Stack>
+      )}
       {items !== null && items.length === 0 && (
         <Typography color="text.secondary">暂无 item。</Typography>
       )}
@@ -528,6 +693,7 @@ export default function TableViewPage() {
                       >
                         <TableSortLabel
                           active={idx >= 0}
+                          title={t.view.sortHint}
                           direction={idx >= 0 ? sorts[idx].dir : "asc"}
                           onClick={(e) => toggleSort(c.id, e.shiftKey)}
                           sx={{
@@ -672,12 +838,19 @@ export default function TableViewPage() {
           {nameOpen === "saveAs" ? t.view.saveAs : t.view.save}
         </DialogTitle>
         <DialogContent>
+          {nameOpen !== null && error && (
+            <Typography color="error" variant="body2">
+              {error}
+            </Typography>
+          )}
           <TextField
             autoFocus
             fullWidth
             size="small"
             label={t.view.viewName}
             value={viewName}
+            error={nameConflict}
+            helperText={nameConflict ? t.view.nameConflict : undefined}
             onChange={(e) => setViewName(e.target.value)}
             sx={{ mt: 1 }}
           />
@@ -686,7 +859,7 @@ export default function TableViewPage() {
           <Button onClick={() => setNameOpen(null)}>{t.assign.cancel}</Button>
           <Button
             variant="contained"
-            disabled={!viewName.trim()}
+            disabled={!viewName.trim() || nameConflict || saving}
             onClick={() => void saveCurrent(viewName.trim())}
           >
             {t.view.save}

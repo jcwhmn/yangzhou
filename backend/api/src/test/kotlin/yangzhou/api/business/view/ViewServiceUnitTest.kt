@@ -213,4 +213,63 @@ class ViewServiceUnitTest {
             }
         }
     }
+
+    @Nested
+    inner class ColOrder {
+        private val orderJson = """["title","priority","status"]"""
+
+        private fun mine() = ProjectView(
+            id = 10L,
+            objectId = UUID(0, 10),
+            projectObjectId = UUID(0, 1),
+            creatorObjectId = UUID(0, 5),
+            name = "mine",
+            filters = "{}",
+            columns = "{}",
+            colOrder = orderJson,
+        )
+
+        private fun stubCreate() {
+            every { views.existsByProjectObjectIdAndCreatorObjectIdAndName(UUID(0, 1), UUID(0, 5), "mine") } returns false
+            every { views.save(any()) } answers { firstArg<ProjectView>().copy(id = 10L, objectId = UUID(0, 10)) }
+        }
+
+        @Test
+        fun createPassThroughColOrder() {
+            stubCreate()
+            val dto = service.create("CHE", ViewService.CreateViewRequest("mine", colOrder = mapper.readTree(orderJson)))
+            assertEquals(3, dto.colOrder!!.size()) // 透传回读
+            verify { views.save(withArg<ProjectView> { assertEquals(orderJson, it.colOrder) }) }
+        }
+
+        @Test
+        fun createWithoutColOrderStoresNull() {
+            stubCreate()
+            assertEquals(null, service.create("CHE", ViewService.CreateViewRequest("mine")).colOrder)
+        }
+
+        @Test
+        fun patchOnlyColOrderKeepsSortQuery() {
+            val view = mine()
+            every { views.findByObjectIdAndCreatorObjectId(view.objectId, UUID(0, 5)) } returns view
+            every { views.save(any()) } answers { firstArg<ProjectView>() }
+            val dto = service.update("CHE", view.objectId, ViewService.UpdateViewRequest(colOrder = mapper.readTree("[]")))
+            assertEquals(0, dto.colOrder!!.size()) // 仅改 colOrder
+            assertEquals(null, dto.sort) // 不传不改
+            assertEquals(null, dto.query)
+        }
+
+        @Test
+        fun oversizedColOrderRejected() {
+            val view = mine()
+            every { views.findByObjectIdAndCreatorObjectId(view.objectId, UUID(0, 5)) } returns view
+            assertFailsWith<BadRequestException> {
+                service.update(
+                    "CHE",
+                    view.objectId,
+                    ViewService.UpdateViewRequest(colOrder = mapper.readTree("""["${"x".repeat(5000)}"]""")),
+                )
+            }
+        }
+    }
 }

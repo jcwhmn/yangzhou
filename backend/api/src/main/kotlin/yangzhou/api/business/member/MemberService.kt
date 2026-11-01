@@ -1,5 +1,6 @@
 package yangzhou.api.business.member
 
+import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import yangzhou.api.business.workspace.WorkspaceService
@@ -52,9 +53,15 @@ class MemberService(
         return palette[members.findAll().count() % palette.size]
     }
 
-    /** 登录成员 = 唯一有凭据者(虚拟成员出现后,findAll().first() 不再可靠)。 */
-    fun current(): Member = members.findAll().firstOrNull { it.passwordHash != null }
-        ?: throw NotFoundException("尚未初始化,请先 bootstrap")
+    /** 当前登录成员 = JWT subject(= member objectId;JwtAuthFilter 验签后写入 SecurityContext)。
+     *  不得回退「第一个有密码的账号」:多登录账号时 findAll 堆序漂移会串号(YPJ-131 复验实测,
+     *  me 行被 last-project 更新挪页后,views/能力/收藏等按 dev2 解析 → 视图空集/记忆失效)。 */
+    fun current(): Member {
+        val sub = SecurityContextHolder.getContext().authentication?.principal?.toString()
+        val id = sub?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+            ?: throw NotFoundException("未认证")
+        return members.findByObjectId(id) ?: throw NotFoundException("成员不存在")
+    }
 
     fun list(): List<MemberResponse> = members
         .findByWorkspaceObjectId(workspaceService.required().objectId!!)

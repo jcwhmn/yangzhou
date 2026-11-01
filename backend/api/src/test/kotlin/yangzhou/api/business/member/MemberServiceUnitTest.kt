@@ -4,8 +4,11 @@ import io.mockk.clearMocks
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
+import org.springframework.security.core.context.SecurityContextHolder
 import yangzhou.api.business.workspace.WorkspaceService
 import yangzhou.api.error.BadRequestException
 import yangzhou.api.error.ConflictException
@@ -94,17 +97,35 @@ class MemberServiceUnitTest {
         every { members.findByObjectId(virtual.objectId) } returns virtual
     }
 
+    @AfterEach
+    fun clearSecurityContext() {
+        SecurityContextHolder.clearContext()
+    }
+
     @Nested
     inner class Current {
         @Test
-        fun onlyCredentialedMemberCounts() {
-            every { members.findAll() } returns listOf(virtual, member(id = 1L, name = "me", passwordHash = "h"))
+        fun resolvesByJwtSubjectNotFirstCredentialed() {
+            // 第二个有密码账号(dev2)排在 findAll 首位也必须按 token 身份取 me
+            // (YPJ-131 复验:me 行被 last-project 更新挪页 → 堆序漂移 → 视图/收藏串号)
+            SecurityContextHolder.getContext().authentication =
+                UsernamePasswordAuthenticationToken(UUID(0, 1).toString(), null, emptyList())
+            every { members.findAll() } returns
+                listOf(member(id = 2L, name = "dev2", passwordHash = "h"), member(id = 1L, name = "me", passwordHash = "h"))
+            every { members.findByObjectId(UUID(0, 1)) } returns member(id = 1L, name = "me", passwordHash = "h")
             assertEquals("me", service.current().displayName)
         }
 
         @Test
-        fun notBootstrappedRejected() {
-            every { members.findAll() } returns listOf(virtual)
+        fun unknownSubjectRejected() {
+            SecurityContextHolder.getContext().authentication =
+                UsernamePasswordAuthenticationToken(UUID(0, 99).toString(), null, emptyList())
+            every { members.findByObjectId(UUID(0, 99)) } returns null
+            assertFailsWith<NotFoundException> { service.current() }
+        }
+
+        @Test
+        fun notAuthenticatedRejected() {
             assertFailsWith<NotFoundException> { service.current() }
         }
     }
