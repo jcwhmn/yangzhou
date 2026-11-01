@@ -172,4 +172,34 @@ class ViewsApiTest : AbstractApiTest() {
         assertEquals("", patch("/api/projects/VW5/views/$viewId", mapOf("query" to "")).second!!["query"].asText())
         assertEquals("number", patch("/api/projects/VW5/views/$viewId", mapOf<String, String>()).second!!["sort"][0]["field"].asText())
     }
+
+    @Test
+    fun `视图 colOrder 透传与 PATCH 语义`() {
+        authed = bootstrapAndAuth()
+        createProject(authed, "VW6")
+        val (code, created) =
+            post(
+                "/api/projects/VW6/views",
+                mapOf(
+                    "name" to "带列序视图",
+                    "colOrder" to listOf("title", "status", "priority"),
+                ),
+            )
+        assertEquals(201, code)
+        val viewId = created!!["viewId"].asText()
+        assertEquals(3, created["colOrder"].size()) // 透传回读
+        assertEquals("title", created["colOrder"][0].asText())
+        // PATCH 仅改 colOrder
+        val (pcode, patched) =
+            patch("/api/projects/VW6/views/$viewId", mapOf("colOrder" to listOf("status")))
+        assertEquals(200, pcode)
+        assertEquals(1, patched!!["colOrder"].size())
+        assertTrue(patched["sort"].isNull || patched["sort"].isMissingNode) // sort 本就没存
+        // 不传 = 不改
+        val (ncode, _) = patch("/api/projects/VW6/views/$viewId", mapOf("name" to "带列序视图 v2"))
+        assertEquals(200, ncode)
+        val after = get("/api/projects/VW6/views")[0]
+        assertEquals(viewId, after["viewId"].asText())
+        assertEquals(1, after["colOrder"].size())
+    }
 }

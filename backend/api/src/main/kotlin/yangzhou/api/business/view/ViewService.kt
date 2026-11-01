@@ -29,6 +29,7 @@ class ViewService(
         val columns: JsonNode,
         val sort: JsonNode? = null,
         val query: String? = null,
+        val colOrder: JsonNode? = null,
     )
 
     data class CreateViewRequest(
@@ -37,6 +38,7 @@ class ViewService(
         val columns: JsonNode? = null,
         val sort: JsonNode? = null,
         val query: String? = null,
+        val colOrder: JsonNode? = null,
     )
 
     data class UpdateViewRequest(
@@ -45,6 +47,7 @@ class ViewService(
         val columns: JsonNode? = null,
         val sort: JsonNode? = null,
         val query: String? = null,
+        val colOrder: JsonNode? = null,
     )
 
     @Transactional(readOnly = true)
@@ -76,6 +79,7 @@ class ViewService(
                     columns = columns.toString(),
                     sort = rawJson(request.sort, "sort"),
                     query = cappedQuery(request.query),
+                    colOrder = rawJson(request.colOrder, "colOrder"),
                 ),
             )
         return toDto(saved)
@@ -104,6 +108,7 @@ class ViewService(
         request.columns?.let { cur = cur.copy(columns = validated(it, "columns").toString()) }
         request.sort?.let { cur = cur.copy(sort = rawJson(it, "sort")) }
         request.query?.let { cur = cur.copy(query = cappedQuery(it)) }
+        request.colOrder?.let { cur = cur.copy(colOrder = rawJson(it, "colOrder")) }
         cur = cur.copy(updatedAt = Instant.now())
         return toDto(views.save(cur))
     }
@@ -162,5 +167,6 @@ class ViewService(
         mapper.readTree(v.columns),
         v.sort?.let { mapper.readTree(it) },
         v.query,
+        v.colOrder?.let { mapper.readTree(it) },
     )
 }

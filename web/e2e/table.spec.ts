@@ -47,7 +47,7 @@ test("表格显示:编号数字序、状态列非空、sprint 列 backlog 标识
   await expect(page.getByText("backlog", { exact: true })).toHaveCount(10);
 });
 
-test("列头排序:单击循环 升/降/取消,Shift 追加次级键", async ({
+test("列头排序:单击追加多列(循环 升/降/移除),Shift 仅此列", async ({
   page,
   projectKey,
 }) => {
@@ -65,19 +65,15 @@ test("列头排序:单击循环 升/降/取消,Shift 追加次级键", async ({
     return nums.map((s) => Number(s.trim().split("-").pop()));
   };
 
-  // 单击标题:升序
-  await page.getByRole("columnheader", { name: /标题/ }).click();
+  // Shift+标题:仅按此列升序(替换)
+  await page
+    .getByRole("columnheader", { name: /标题/ })
+    .click({ modifiers: ["Shift"] });
   await expect.poll(trailOf).toEqual([2, 4, 1, 3]);
 
-  // 再点:降序
-  await page.getByRole("columnheader", { name: /标题/ }).click();
-  await expect.poll(trailOf).toEqual([3, 1, 4, 2]);
-
-  // Shift+点截止:追加次级键(全 null 恒最后,不破坏标题序);列头显示多栏序号 1/2
-  await page
-    .getByRole("columnheader", { name: /截止/ })
-    .click({ modifiers: ["Shift"] });
-  await expect.poll(trailOf).toEqual([3, 1, 4, 2]);
+  // 单击截止:追加次级键(全 null 恒最后,不破坏标题序);列头显示多栏序号 1/2
+  await page.getByRole("columnheader", { name: /截止/ }).click();
+  await expect.poll(trailOf).toEqual([2, 4, 1, 3]);
   await expect(page.getByRole("columnheader", { name: /标题/ })).toContainText(
     "1",
   );
@@ -85,15 +81,24 @@ test("列头排序:单击循环 升/降/取消,Shift 追加次级键", async ({
     "2",
   );
 
-  // 第三点:移除标题键,仅剩截止(全 null)→ 回默认编号序
+  // 再点截止:降序(标题仍居首)
+  await page.getByRole("columnheader", { name: /截止/ }).click();
+  await expect.poll(trailOf).toEqual([2, 4, 1, 3]);
+
+  // 三点截止:移除 → 仅剩标题升序
+  await page.getByRole("columnheader", { name: /截止/ }).click();
+  await expect.poll(trailOf).toEqual([2, 4, 1, 3]);
+
+  // 点标题:翻降序
+  await page.getByRole("columnheader", { name: /标题/ }).click();
+  await expect.poll(trailOf).toEqual([3, 1, 4, 2]);
+
+  // 再点标题:移除 → 回默认编号序
   await page.getByRole("columnheader", { name: /标题/ }).click();
   await expect.poll(trailOf).toEqual([1, 2, 3, 4]);
 });
 
-test("分页:21 条默认每页 20 两页,翻页/改页大小生效", async ({
-  page,
-  projectKey,
-}) => {
+test("分页页 20 两页,翻页/改页大小生效", async ({ page, projectKey }) => {
   // 默认页大小 20:21 条 → 两页(20+1)
   for (let i = 1; i <= 21; i++)
     await createItemResilient(projectKey, `TB ${i}`);

@@ -81,6 +81,8 @@
 
 ### 需求
 
+> ⚠ **2026-11-01 语义反转(YPJ-131 复验拍板)**:本节两条点击语义已被 §6「追加(手测反馈)」取代——现行语义为**普通点击=追加/翻向/移除(多列),Shift+点击=仅按此列(替换)**。以下原始描述仅存档,勿按其实现或测试。
+
 - 每个可见列的表头可点击:单击循环 **升序 → 降序 → 取消**;取消后若排序键空则回默认(`number` 升序)
 - **Shift + 点击**:将该列**追加**为最低优先级排序键(已在该键则按单击循环处理)
 - 多栏时表头显示优先级序号(1、2、…)+ 方向箭头(MUI TableSortLabel 自带)
@@ -239,6 +241,61 @@
 2. 调序存「我的视图」→ 切默认 → 切回:顺序恢复;另存新视图互不影响
 3. 「恢复默认」→ 可见性+顺序回默认;编号恒首位(面板无编号行,表头 number 恒第一)
 4. PATCH 语义:仅调列可见性再保存 → colOrder 不丢
+
+### As-built(2026-11-01)
+
+- 实现与设计一致:V44(`col_order TEXT NULL`)→ 实体/DTO/Request → `rawJson` 透传;单测 ColOrder 组 4 例 + 集成 `视图 colOrder 透传与 PATCH 语义`
+- **补充设计(e2e 实测发现)**:列可见性/列顺序的 localStorage 写入加 `selectedView === null` 守卫——原实现在选中视图时也写,把默认视图存档冲掉(切换视图后默认视图配置被覆写为该视图的)。此问题 cols 可见性 127 就存在,本票一并修;切默认分支补 `setColOrder(readOrder(key))`
+- 验证:`gradle test`/`build`/`integrationTest` 全绿;e2e 全量 61 passed(新用例:调序→存视图→切默认→切回→恢复默认,含 reload localStorage 断言)
+- entities.puml 同步(ProjectView 补 sort/query/colOrder;127 欠账一并补)
+
+#### 追加(2026-11-01 手测反馈,用户拍板)
+
+- **记忆上次视图**:重进 table 页自动选中并应用上次视图(localStorage `yz-table-view:<key>`,load 后校验存在性,视图已删则回落默认)
+- **默认视图 sorts/query 改持久**:修改 §5「未选视图时 sorts/query 为会话态」规则——现随 cols/colOrder 一致走 localStorage(`yz-table-sorts/query:<key>`,仅 selectedView===null 时写);切默认 = 恢复默认视图自己的持久态(filters 仍会话重置)
+- e2e 主链用例同步新语义(重进自动应用、切默认搜索保留)
+- **排序交互语义反转(用户拍板)**:YPJ-124 原语义为「普通点击=替换单列,Shift=追加次级」——多列能力在但不可发现;现改为「普通点击=追加/翻向/移除(多列),Shift+点击=仅按此列」,列头 title 提示文案外置(sortHint);table.spec 排序用例重写
+
+
+#### 追加(2026-11-01 复验,死页面诊断)
+
+用户复验报「回到 table 列表空/只剩默认视图、test 视图下保存报同名 409」。经 dev api 访问日志 + dev 库核对定位:**触发器是 JWT 24h 过期**(昨日签发 token 于当日 07:2x 失效,用户 07:23:15 重登),401 打断 load 后页面留下**死状态**(items=null、views=[]),再经浏览器后退/恢复回到表格:下拉只剩默认视图、列表空,但保存/列配置仍可点——views=[] 令同名预检(nameConflict)失效,默认视图态下保存误走 POST 撞同名 409。服务端无恙(4 视图完好,默认存档守卫未被破坏)。修复:
+
+- **load 失败 = 死页面统一处理**:views 子请求的吞错 catch 移除,任何一项失败整个 load 走 fatal → 禁用 保存/另存/删除/列配置(`loaded` 门禁),同名预检盲区不再可达
+- **错误分级**:6s 自动消失仅限瞬时错误;load 类错误常驻 + 「重试」按钮(原 6s 自动消失恰好擦掉了唯一线索)
+- **重试** = 重新 load(),成功后 loaded/fatal 复位,记忆视图/列表正常恢复;load 开头清 error/fatal
+- key effect 重置 loaded/fatal,防跨项目残留
+- e2e `view.spec.ts` 新增用例:route.abort 拦断 items → 锁四入口+重试可见 → unroute+重试 → 恢复(全量 62 passed)
+- 备查:token 过期静默踢回登录页本身是既定行为(api.ts 401 → /login),本票不改;死页面锁操作是纵深防御
+
+#### 追加(2026-11-01 复验二次:真根因 = current() 身份解析漂移)——⚠ 语义修正,置顶标注
+
+上节「死页面」只是表层,真根因在后端身份解析:**`MemberService.current()` 返回「表里第一个有密码的账号」,无视 JWT subject**。dev2(2026-10-30 建号,真人登录)加入后,`findAll()` 堆序随行更新(last-project PUT 挪页)在 me/dev2 间漂移:轮到 dev2 时,views 按其解析 → `GET /views` 200 但**空集**、记忆视图 id 解析失败落回默认、同名预检对 me 的视图"失明"(POST "test" 误建撞 409)——此前「只剩默认视图」「列表又空了」疑团全部同源。token 过期(07:23 重登)只是叠加触发器。
+
+- **证据链**:me 合法 token 直调 8081 → `[]`;同刻库里 4 视图 creator=me;`list`/`create` 同走 `requireContext`,409(create 命中 me 的行)与 [] (list 按 dev2)分属不同身份解析时刻;JwtAuthFilter 本就把 subject(member objectId)写入 SecurityContext,current() 却从不读它
+- **修复**:`current()` = SecurityContext principal(JWT sub)→ `findByObjectId`;未知 subject / 无上下文 → 404。绝不回退「第一个有密码的账号」
+- **波及面**:current() 全部调用点(能力、评论作者、收藏、feasibility、item 创建者/活动记录者、视图)统一回归「按登录身份」——与 JwtAuthFilter 既有设计对齐,非破坏;产品面当前仅 bootstrap 单真人可登录,既有行为不变,多真人登录后各自严格隔离
+- **单测改写 3 例**(MemberServiceUnitTest.Current):按 subject 解析(dev2 排首位也取 token 对应者)/未知 subject 404/无上下文 404;@AfterEach 清 SecurityContext
+- **集成测试不新增**:REST 无法创建第二个登录账号(bootstrap 一次性),双真人身份语义暂不可达,由单测覆盖
+- **验证**:`gradle test` + `integrationTest` 全绿;test 容器重建后 e2e 全量 62 passed;dev 重建后 me-token 直调 `/views` 返回 4 视图;同刻用前端锁操作+重试死页面修复(上节)作纵深防御,两层互补
+
+#### 追加(2026-11-01 复验三次:直存误走 POST = YPJ-127 遗留 PATCH 死分支)
+
+- **现象**:rebuild + 硬刷新后,选中视图移列 → 工具栏直存,列顺序不落库(dev 库 4 视图 col_order 全默认序、rebuild 后零写入、updated_at 不动)
+- **真根因(前端,YPJ-127 起遗留)**:工具栏「保存」在选中视图时直调 `saveCurrent(selectedName)` 不弹框 → `nameOpen=null` → `saveCurrent` 内条件 `selectedView && nameOpen === "save"` 永假 → 落入 else **POST /views** 撞同名 409,PATCH 分支是不可达死代码。此前「sort 保存后丢失」同根:视图内修改从未 PATCH 成功过(test2/test3 的多列排序系建视图时随 POST 落库)
+- **放大器**:错误条 6s 自动消失,409 报错易被无视
+- **e2e 盲区**:既有用例只覆盖对话框保存/另存路径,从未测「选中视图 → 工具栏直存」
+- **修复**:`saveCurrent` 条件改 `selectedView && nameOpen !== "saveAs"`(选中视图直存=PATCH;另存=POST 建副本;命名首存=POST);新增 e2e 回归用例(view.spec.ts 末:首存视图 → 视图内移列 → 直存 → 刷新记忆恢复)
+- **验证**:e2e 全量 63 passed(含新用例);后端零改动(PATCH 契约本就正确)
+
+- **交互契约(状态 × 动作 → 行为,此前只散落在代码里)**:
+
+| 场景 | 入口 | 行为 |
+|---|---|---|
+| 默认视图(未选视图) | 工具栏「保存」 | 弹命名框 → POST 新建 |
+| 已选中视图 | 工具栏「保存」 | 直存 PATCH 该视图,不弹框 |
+| 任意 | 「另存为」 | 弹命名框 → POST 新副本(同名前端预检禁用保存) |
+| 连点 | saving 标志 | 保存期间忽略后续点击 |
 
 ---
 

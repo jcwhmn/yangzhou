@@ -1,10 +1,10 @@
 ﻿# YPJ-118(spec 0087):yangzhou 应用容器一键 build/up/down/status
-# 用法: .\script\app-infra.ps1 <build|up|down|status> <prod|dev|test>
+# 用法: .\script\app-infra.ps1 <build|rebuild|up|down|status> <prod|dev|test>
 # 前置:postgres/rustfs 外部实例已起(F:/code/docker-compose/postgresql 与 script/dev-infra.ps1)
 # 端口格局:prod=3000+8080 / dev=3001+8081 / test=8082(仅 api)
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet("build", "up", "down", "status")]
+    [ValidateSet("build", "rebuild", "up", "down", "status")]
     [string]$Action,
 
     [Parameter(Mandatory = $true)]
@@ -37,6 +37,13 @@ function Assert-PortsFree {
 }
 
 function Compose { docker compose -f $composeFile @args; if ($LASTEXITCODE -ne 0) { throw "docker compose $args 失败(exit $LASTEXITCODE)" } }
+
+# rebuild = build + up 一条命令(YPJ-131 手测反馈)
+if ($Action -eq "rebuild") {
+    & $PSCommandPath build $Env
+    & $PSCommandPath up $Env
+    exit $LASTEXITCODE
+}
 
 switch ($Action) {
     "build" {

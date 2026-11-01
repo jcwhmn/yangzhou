@@ -131,6 +131,9 @@ class ProjectView {
   name: String
   filters: String
   columns: String
+  sort: String
+  query: String
+  colOrder: String
 }
 class TeamMember
 
