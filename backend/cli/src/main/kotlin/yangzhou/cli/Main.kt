@@ -40,8 +40,10 @@ private fun usage() {
           items create <KEY> <标题> [--desc 文本] [--sprint 名称|UUID] [--req 属性[>=N]]... [--json]   建 item(需求可分级)
           items list <KEY> [--json]                    项目 item 列表
           items move <ITEM_ID> <状态名>                改状态(经 workflow 校验)
+          items comment <KEY-N|itemId> <文本...>        给 item 加评论
           items assign <KEY-N|itemId> <sprint名|UUID|backlog>   挂入/移出 sprint(backlog=移出)
           items branch <KEY-N> <分支名> [--base <基线>] [--items YPJ-B,YPJ-C]   # 从票走补挂(主票建分支)
+          sprints create <KEY> <名称>                   建 sprint(planned 起步)
           sprints move <KEY> <名|UUID> <planned|active|completed>   改 sprint 状态
           sprints list <KEY> [--json]                       列 sprint(id/名称/状态/起止)
           caps set <属性> [1-4]                        自评能力(不带数字=未评级)
@@ -420,6 +422,24 @@ private fun run(args: List<String>) {
                 }
                 println("%-7s %-13s %-23s %s".format(item["number"].asString(), item["status"].asString(), item["title"].asString(), reqsText))
             }
+        }
+
+        "items comment" -> {
+            val ref = rest.getOrNull(0) ?: error("缺少 item ID(支持 YPJ-58 或 UUID)")
+            val text = rest.drop(1).joinToString(" ").trim()
+            if (text.isEmpty()) error("缺少评论文本")
+            val itemId = resolveItemId(api, ref)
+            api.json("POST", "/api/items/$itemId/comments", mapOf("body" to text))
+            val preview = if (text.length > 24) text.take(24) + "…" else text
+            println("已评论 $ref:$preview")
+        }
+
+        "sprints create" -> {
+            val key = rest.getOrNull(0) ?: error("缺少项目 KEY")
+            val name = rest.drop(1).joinToString(" ").trim()
+            if (name.isEmpty()) error("缺少 sprint 名称")
+            val body = api.json("POST", "/api/projects/$key/sprints", mapOf("name" to name))
+            println("已建 sprint:${body["name"].asString()}(${body["status"].asString()})")
         }
 
         "sprints move" -> {
