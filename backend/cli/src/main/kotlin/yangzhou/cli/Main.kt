@@ -41,6 +41,8 @@ private fun usage() {
           items list <KEY> [--json]                    项目 item 列表
           items move <ITEM_ID> <状态名>                改状态(经 workflow 校验)
           items comment <KEY-N|itemId> <文本...>        给 item 加评论
+          items show <KEY-N|itemId> [--json]            单票详情
+          items comments <KEY-N|itemId>                 列 item 评论
           items assign <KEY-N|itemId> <sprint名|UUID|backlog>   挂入/移出 sprint(backlog=移出)
           items branch <KEY-N> <分支名> [--base <基线>] [--items YPJ-B,YPJ-C]   # 从票走补挂(主票建分支)
           sprints create <KEY> <名称>                   建 sprint(planned 起步)
@@ -421,6 +423,36 @@ private fun run(args: List<String>) {
                     if (lvl.isNull) it["attribute"].asString() else "${it["attribute"].asString()}≥${lvl.asInt()}"
                 }
                 println("%-7s %-13s %-23s %s".format(item["number"].asString(), item["status"].asString(), item["title"].asString(), reqsText))
+            }
+        }
+
+        "items show" -> {
+            val itemId = resolveItemId(api, rest.getOrNull(0) ?: error("缺少 item ID(支持 YPJ-58 或 UUID)"))
+            val body = api.json("GET", "/api/items/$itemId")
+            if (flags.containsKey("json")) return printRaw(body.toString())
+            fun v(name: String): String = body[name]?.takeUnless { it.isNull }?.asString() ?: ""
+            println("${body["number"].asString()}  ${body["title"].asString()}")
+            println("状态:${body["status"].asString()} | 类型:${v("type")} | 指派:${v("assignee").ifEmpty { "未指派" }} | sprint:${v("sprintName").ifEmpty { "-" }}")
+            println("priority:${v("priority").ifEmpty { "-" }} | 起止:${v("startDate").ifEmpty { "-" }} ~ ${v("dueDate").ifEmpty { "-" }} | feasSignal:${v("feasSignal").ifEmpty { "-" }} | overdue:${body["overdue"].asBoolean()} | blocked:${body["blocked"].asBoolean()}")
+            println("createdAt:${v("createdAt")} | externalRef:${v("externalRef").ifEmpty { "-" }} | parent:${v("parentNumber").ifEmpty { "-" }}")
+            val reqs = body["requirements"].joinToString(", ") {
+                val lvl = it["minLevel"]
+                if (lvl.isNull) it["attribute"].asString() else "${it["attribute"].asString()}≥${lvl.asInt()}"
+            }
+            println("需求:${reqs.ifEmpty { "-" }}")
+            val attrs = body["attributes"].joinToString(", ") { "${it["attribute"].asString()}=${it["value"].asString()}" }
+            println("属性:${attrs.ifEmpty { "-" }}")
+            val desc = v("description")
+            if (desc.isNotEmpty()) println("--- 描述 ---\n$desc")
+        }
+
+        "items comments" -> {
+            val itemId = resolveItemId(api, rest.getOrNull(0) ?: error("缺少 item ID(支持 YPJ-58 或 UUID)"))
+            val list = api.json("GET", "/api/items/$itemId/comments")
+            if (list.size() == 0) return println("(无评论)")
+            list.forEach { c ->
+                val t = c["createdAt"].asString().replace("T", " ").take(16)
+                println("[$t] ${c["author"].asString()}: ${c["body"].asString()}")
             }
         }
 

@@ -34,7 +34,7 @@ class SmokeTest {
         // usage 完整性锚点:主干命令集;新命令合并时同步追加(YPJ-115: sprints move / items assign)
         for (anchor in listOf(
             "login", "attrs create", "members add", "teams add", "projects create", "projects delete",
-            "items create", "items list", "items move", "items comment", "items branch", "sprints create", "sprints list",
+            "items create", "items list", "items show", "items comments", "items move", "items comment", "items branch", "sprints create", "sprints list",
             "caps set", "caps rm", "caps list", "feasibility", "candidates", "assign", "log", "export", "import",
         )) {
             assertTrue(out.contains(anchor), "usage 缺:$anchor")
@@ -60,6 +60,13 @@ class SmokeTest {
         val (code, out) = run("items", "comment", "YPJ-133")
         assertTrue(code != 0, "缺评论文本应非 0 退出")
         assertTrue(out.contains("缺少评论文本"), "应报缺少评论文本(参数校验先于网络)")
+    }
+
+    @Test
+    fun `items show without id fails before network`() {
+        val (code, out) = run("items", "show")
+        assertTrue(code != 0, "缺 item ID 应非 0 退出")
+        assertTrue(out.contains("缺少 item ID"), "应报缺少 item ID(参数校验先于网络)")
     }
 
     @Test
