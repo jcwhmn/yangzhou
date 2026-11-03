@@ -81,16 +81,45 @@ class GroupWorkflowServiceUnitTest {
                 row("active", StatusType.ACTIVE, """[{"function":"complete","target":"completed"},{"function":"backward","target":"planned"}]"""),
                 row("completed", StatusType.FINAL),
             )
+        // 三个状态行全部先 stub(目标行查询需要真行,relaxed 子 mock 会在意图校验处炸)
         every { groupStatuses.findByGroupTypeIdAndName(1L, "planned") } returns row("planned", StatusType.START, """[{"function":"start","target":"active"}]""")
+        every { groupStatuses.findByGroupTypeIdAndName(1L, "active") } returns row("active", StatusType.ACTIVE, """[{"function":"complete","target":"completed"},{"function":"backward","target":"planned"}]""")
+        every { groupStatuses.findByGroupTypeIdAndName(1L, "completed") } returns row("completed", StatusType.FINAL)
         assertEquals("active", service.applyAction(sprintType, "planned", "start"))
         assertFailsWith<yangzhou.api.error.ConflictException> { service.applyAction(sprintType, "planned", "complete") }
 
-        val active = row("active", StatusType.ACTIVE, """[{"function":"complete","target":"completed"},{"function":"backward","target":"planned"}]""")
-        every { groupStatuses.findByGroupTypeIdAndName(1L, "active") } returns active
         assertEquals("completed", service.applyAction(sprintType, "active", "complete"))
 
-        val completed = row("completed", StatusType.FINAL)
-        every { groupStatuses.findByGroupTypeIdAndName(1L, "completed") } returns completed
         assertFailsWith<yangzhou.api.error.ConflictException> { service.applyAction(sprintType, "completed", "start") } // 终态护栏
+    }
+
+    @Test
+    fun actionRegistryValidatesIntent() {
+        // spec 0097 §3.6:已知函数意图校验;未知函数数据驱动放行
+        every { groupStatuses.findByGroupTypeIdOrderByPosition(1L) } returns
+            listOf(
+                row("planned", StatusType.START),
+                row("active", StatusType.ACTIVE),
+                row("completed", StatusType.FINAL),
+            )
+        // complete 出边指向非 FINAL → 409(意图违例)
+        val bad = row("active", StatusType.ACTIVE, """[{"function":"complete","target":"active"}]""")
+        every { groupStatuses.findByGroupTypeIdAndName(1L, "active") } returns bad
+        assertFailsWith<yangzhou.api.error.ConflictException> { service.applyAction(sprintType, "active", "complete") }
+
+        // 预留 reopen:FINAL→ACTIVE 合法
+        val done = row("completed", StatusType.FINAL, """[{"function":"reopen","target":"active"}]""")
+        every { groupStatuses.findByGroupTypeIdAndName(1L, "completed") } returns done
+        assertEquals("active", service.applyAction(sprintType, "completed", "reopen"))
+
+        // 预留 reopen 从非 FINAL 触发 → 409(source 意图违例)
+        val activeGood = row("active", StatusType.ACTIVE, """[{"function":"reopen","target":"completed"}]""")
+        every { groupStatuses.findByGroupTypeIdAndName(1L, "active") } returns activeGood
+        assertFailsWith<yangzhou.api.error.ConflictException> { service.applyAction(sprintType, "active", "reopen") }
+
+        // 未知函数(postpone):出边存在即迁移,注册表不拦
+        val postpone = row("planned", StatusType.START, """[{"function":"postpone","target":"active"}]""")
+        every { groupStatuses.findByGroupTypeIdAndName(1L, "planned") } returns postpone
+        assertEquals("active", service.applyAction(sprintType, "planned", "postpone"))
     }
 }

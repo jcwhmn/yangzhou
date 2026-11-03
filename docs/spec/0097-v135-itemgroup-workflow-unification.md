@@ -138,6 +138,31 @@ create table group_status (
 - CONTEXT.md/DOMAIN.md:ItemGroup 词条改写(动作=workflow 配置);领域规则 3 措辞核对(自由迁移仍成立)。
 - 用户设计文档 case 2 勾选完成后回写 status 注记。
 
+### 3.6 组动作函数注册表(YPJ-141,S4 增量,2026-11-04)
+
+**需求**:S2 的动作端点只是「按出边 function 标签找边迁移」,函数名无语义(任意标签均可)。需要给动作函数真实语义:已知函数带意图校验,未知函数数据驱动放行;内置模板与 prod 行为不变,新增函数可预留或服务其它 workflow(release/自定义/未来)。
+
+**详细设计**:
+
+- `GroupWorkflowService.kt` 新增 `enum class GroupActionFn(sourceType: StatusType? = null, targetType: StatusType? = null)`,函数名小写对应出边标签:
+
+| function | 语义 | 校验 | 现状 |
+|---|---|---|---|
+| `start` | 开始(进入执行态) | target = ACTIVE | sprint 模板在用 |
+| `complete` | 完成(进入终态) | target = FINAL | sprint/release 模板在用 |
+| `backward` | 后退一步 | 无(按边) | sprint 模板在用 |
+| `switch` | 通用切换 | 无(按边) | 自定义三态循环在用 |
+| `forward` | 前进一步 | 无(按边) | **预留** |
+| `reopen` | 终态复活 | source = FINAL ∧ target = ACTIVE | **预留** |
+| `cancel` | 弃置(进终态) | target = FINAL | **预留** |
+
+- `applyAction` 顺序:出边查找(无匹配 → 409「当前状态无此动作」,不变)→ **意图校验**(已知函数违反 source/target statusType → 409)→ 目标存在校验(不变)。校验在边之后,存量负例报错文案不变。
+- **未知函数(不在注册表)不拦**:workflow 出边即真相,数据驱动;预留给自定义/未来 workflow(如 postpone)。这是「函数名白名单」与「动作端点唯一变更路径」两回事——前者不做,后者 S2 已保证。
+- **否决的备选**:(a) 严格白名单拒未知函数——与数据驱动出边设计冲突,自定义 workflow 会被卡;(b) 动作携带副作用(如 complete 清成员)——与裁决 2「历史不可变」冲突,FINAL statusType 语义已覆盖,不需要;(c) seedFor 种子加 cancelled 状态——prod 无需求,模板不动(零迁移)。
+- 契约义务:REST 形状不变(同端点同参数,仅 409 语义增强),api.http 不动;内置模板合法(start→ACTIVE/complete→FINAL),存量负例全兼容。
+
+**手工测试用例**:无 prod 可见变化;dev(3001)验证 sprint 开始/完成/409 照旧即可。预留函数触发需自定 workflow(无编辑入口),由单测覆盖。
+
 ## 同类依附结构检查(transitions JSON 化原则的推广面)
 
 | 结构 | 判定 | 处理 |
