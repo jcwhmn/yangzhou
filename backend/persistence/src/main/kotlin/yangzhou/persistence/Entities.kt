@@ -426,6 +426,22 @@ data class Requirement(
     var updatedByObjectId: UUID? = null,
 )
 
+/** YPJ-139(spec 0097 S2):组类型的状态机定义;ItemGroupType 即 workflow 宿主(类型 1→1),组实例只存 currentStatus。 */
+@Table("group_status")
+data class GroupStatus(
+    @Id val id: Long? = null,
+    val objectId: UUID = UUID.randomUUID(),
+    val groupTypeId: Long,
+    val name: String,
+    val statusType: StatusType = StatusType.ACTIVE,
+    val transitions: String = "[]", // 出边 JSON [{"function","target"}]
+    val position: Int = 0,
+    @CreatedDate
+    var createdAt: Instant = Instant.now(),
+    @LastModifiedDate
+    var updatedAt: Instant = Instant.now(),
+)
+
 @Table("item_group")
 data class ItemGroup(
     @Id val id: Long? = null,

@@ -12,14 +12,12 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
-import yangzhou.api.business.sprint.SprintService
 import java.util.UUID
 
 @RestController
 @RequestMapping("/api")
 class ItemController(
     private val service: ItemService,
-    private val sprintService: SprintService,
     private val releaseService: yangzhou.api.business.release.ReleaseService,
 ) {
     @PostMapping("/projects/{key}/items")
@@ -72,13 +70,6 @@ class ItemController(
         @PathVariable itemId: UUID,
         @RequestBody request: AssigneeRequest,
     ): ItemService.ItemDto = service.assign(itemId, request.assigneeItemId)
-
-    /** 指派/移出当前 sprint(值=指派,null=移出;spec 0010 裁决 2)。 */
-    @PutMapping("/items/{itemId}/sprint")
-    fun assignSprint(
-        @PathVariable itemId: UUID,
-        @RequestBody request: SprintService.AssignSprintRequest,
-    ): ItemService.ItemDto = sprintService.assignItem(itemId, request.sprintId)
 
     /** 拉入/移出 release(值=指派,null=移出;spec 0012)。 */
     @PutMapping("/items/{itemId}/release")

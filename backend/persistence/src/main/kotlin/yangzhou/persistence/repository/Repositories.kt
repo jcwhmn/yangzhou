@@ -15,6 +15,7 @@ import yangzhou.persistence.ItemActivity
 import yangzhou.persistence.ItemAttribute
 import yangzhou.persistence.ItemDependency
 import yangzhou.persistence.ItemGitRef
+import yangzhou.persistence.GroupStatus
 import yangzhou.persistence.ItemGroup
 import yangzhou.persistence.ItemGroupMember
 import yangzhou.persistence.ItemGroupMemberHistory
@@ -369,6 +370,16 @@ interface ItemGroupRepository : CrudRepository<ItemGroup, Long> {
         projectObjectId: UUID,
         objectId: UUID,
     ): ItemGroup?
+}
+
+interface GroupStatusRepository : CrudRepository<GroupStatus, Long> {
+    fun findByGroupTypeIdOrderByPosition(groupTypeId: Long): List<GroupStatus>
+
+    fun findByGroupTypeIdAndName(groupTypeId: Long, name: String): GroupStatus?
+
+    fun findByGroupTypeIdAndObjectId(groupTypeId: Long, objectId: UUID): GroupStatus?
+
+    fun deleteByGroupTypeId(groupTypeId: Long)
 }
 
 interface ItemGroupTypeRepository : CrudRepository<ItemGroupType, Long> {

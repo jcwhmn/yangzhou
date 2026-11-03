@@ -2,7 +2,7 @@ package yangzhou.api.business.dashboard
 
 import org.springframework.stereotype.Service
 import yangzhou.api.business.milestone.MilestoneService
-import yangzhou.api.business.sprint.SprintService
+import yangzhou.api.business.itemgroup.ItemGroupService
 import yangzhou.api.business.standup.StandupDto
 import yangzhou.api.business.standup.StandupService
 import yangzhou.persistence.repository.ProjectRepository
@@ -36,7 +36,7 @@ data class DashboardDto(
 class DashboardService(
     private val projects: ProjectRepository,
     private val standupService: StandupService,
-    private val sprintService: SprintService,
+    private val groups: ItemGroupService,
     private val milestoneService: MilestoneService,
 ) {
     fun dashboard(): DashboardDto {
@@ -48,10 +48,10 @@ class DashboardService(
                     LiveGroupDto(
                         projectKey = p.key,
                         sprints =
-                        sprintService
-                            .list(p.key)
+                        groups
+                            .listGroups(p.key, "sprint")
                             .filter { it.status == "active" }
-                            .map { LiveSprintDto(it.sprintId, it.name, it.endDate) },
+                            .map { LiveSprintDto(it.groupId, it.name, it.endDate) },
                         milestones =
                         milestoneService
                             .list(p.key)

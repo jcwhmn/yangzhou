@@ -374,14 +374,14 @@ private fun run(args: List<String>) {
 
         "sprints list" -> {
             val key = rest.getOrNull(0) ?: error("缺少项目 KEY")
-            val body = api.json("GET", "/api/projects/$key/sprints")
+            val body = api.json("GET", "/api/projects/$key/groups?type=sprint")
             if (flags.containsKey("json")) return printRaw(body.toString())
             if (body.size() == 0) return println("(无 sprint)")
             println("sprintId                            名称             状态       起止")
             body.forEach { s ->
                 val sd = if (s["startDate"].isNull || s["startDate"].isMissingNode) "—" else s["startDate"].asString()
                 val ed = if (s["endDate"].isNull || s["endDate"].isMissingNode) "—" else s["endDate"].asString()
-                println("%-36s %-16s %-10s %s ~ %s".format(s["sprintId"].asString(), s["name"].asString(), s["status"].asString(), sd, ed))
+                println("%-36s %-16s %-10s %s ~ %s".format(s["groupId"].asString(), s["name"].asString(), s["status"].asString(), sd, ed))
             }
         }
 
@@ -470,7 +470,7 @@ private fun run(args: List<String>) {
             val key = rest.getOrNull(0) ?: error("缺少项目 KEY")
             val name = rest.drop(1).joinToString(" ").trim()
             if (name.isEmpty()) error("缺少 sprint 名称")
-            val body = api.json("POST", "/api/projects/$key/sprints", mapOf("name" to name))
+            val body = api.json("POST", "/api/projects/$key/groups", mapOf("typeKey" to "sprint", "name" to name))
             println("已建 sprint:${body["name"].asString()}(${body["status"].asString()})")
         }
 
@@ -480,7 +480,14 @@ private fun run(args: List<String>) {
             val status = rest.getOrNull(2) ?: error("缺少目标状态(planned/active/completed)")
             if (status !in setOf("planned", "active", "completed")) error("状态只能是 planned/active/completed")
             val groupId = resolveSprintId(api, key, ref)
-            val body = api.json("PATCH", "/api/projects/$key/sprints/$groupId", mapOf("status" to status))
+            // spec 0097 S2:状态变更走动作端点(planned→active=start,→completed=complete,active→planned=backward)
+            val function = when (status) {
+                "planned" -> "backward"
+                "active" -> "start"
+                "completed" -> "complete"
+                else -> error("目标状态只能是 planned/active/completed")
+            }
+            val body = api.json("POST", "/api/projects/$key/groups/$groupId/actions/$function", mapOf<String, Any?>())
             println("已迁移 sprint ${body["name"].asString()} → ${body["status"].asString()}")
         }
 
@@ -493,7 +500,7 @@ private fun run(args: List<String>) {
                 val item = api.json("GET", "/api/items/$itemId")
                 resolveSprintId(api, item["number"].asString().substringBefore("-"), ref)
             }
-            val body = api.json("PUT", "/api/items/$itemId/sprint", mapOf("sprintId" to sprintId))
+            val body = api.json("PUT", "/api/items/$itemId/group-membership", mapOf("groupId" to sprintId, "groupType" to "sprint"))
             val sprintName = body["sprintName"]?.takeUnless { it.isNull }?.asString()
             println(if (sprintName == null) "已移出 sprint:${body["number"].asString()}" else "已指派:${body["number"].asString()} → $sprintName")
         }
@@ -596,12 +603,12 @@ private fun memberIdByDisplayName(api: ApiClient, name: String): String? {
 /** --sprint 引用:UUID 直过;否则按项目 sprint 名称精确匹配(0/多匹配报错列候选)。 */
 private fun resolveSprintId(api: ApiClient, key: String, ref: String): String {
     if (Regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$").matches(ref)) return ref
-    val sprints = api.json("GET", "/api/projects/$key/sprints")
+    val sprints = api.json("GET", "/api/projects/$key/groups?type=sprint")
     val names = sprints.joinToString("/") { it["name"].asString() }
     val hits = sprints.filter { it["name"].asString() == ref }
-    if (hits.size == 1) return hits[0]["sprintId"].asString()
+    if (hits.size == 1) return hits[0]["groupId"].asString()
     if (hits.isEmpty()) error("项目 $key 无名为「$ref」的 sprint(可用:$names)")
-    error("sprint 名「$ref」不唯一,请用 UUID:${hits.joinToString("/") { it["sprintId"].asString() }}")
+    error("sprint 名「$ref」不唯一,请用 UUID:${hits.joinToString("/") { it["groupId"].asString() }}")
 }
 
 /** KEY-N(如 CHE-1)→ itemId;直接给 UUID 也认。 */

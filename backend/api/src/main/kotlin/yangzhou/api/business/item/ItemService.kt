@@ -169,6 +169,7 @@ class ItemService(
         if (sprintId != null) { // YPJ-56:创建时初始归属,校验同 assignItem(sprint 归属该项目;completed 拒);同事务,负例下 item 不落库
             val sprint =
                 groups.findByProjectObjectIdAndObjectId(projectObjectId, sprintId)
+                    ?.takeIf { it.type == "sprint" } // spec 0097 泄漏 2 收口:只认 sprint 组(404 语义不变)
                     ?: throw NotFoundException("sprint 不存在")
             if (sprint.status == "completed") throw ConflictException("sprint 已完成,不能指派")
             memberships.save(ItemGroupMember(groupObjectId = sprint.objectId!!, itemObjectId = itemId))

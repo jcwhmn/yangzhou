@@ -421,8 +421,8 @@ class ItemsApiTest : AbstractApiTest() {
     ): JsonNode = json.readTree(
         authed
             .post()
-            .uri("/api/projects/$key/sprints")
-            .body(mapOf("name" to name, "startDate" to "2026-10-01", "endDate" to "2026-10-15"))
+            .uri("/api/projects/$key/groups")
+            .body(mapOf("typeKey" to "sprint", "name" to name, "startDate" to "2026-10-01", "endDate" to "2026-10-15"))
             .exchange()
             .expectBody(String::class.java)
             .returnResult()
@@ -435,10 +435,11 @@ class ItemsApiTest : AbstractApiTest() {
         sprintId: String,
         status: String,
     ) {
+        // spec 0097 S2:状态变更走动作端点(planned→active=start,→completed=complete)
+        val function = if (status == "active") "start" else "complete"
         authed
-            .patch()
-            .uri("/api/projects/$key/sprints/$sprintId")
-            .body(mapOf("status" to status))
+            .post()
+            .uri("/api/projects/$key/groups/$sprintId/actions/$function")
             .exchange()
             .expectBody(String::class.java)
             .returnResult()
@@ -476,7 +477,7 @@ class ItemsApiTest : AbstractApiTest() {
         val authed = bootstrapAndAuth()
         createProject(authed, "KBO")
         val s = createSprint56(authed, "KBO", "S1")
-        val sid = s["sprintId"].asText()
+        val sid = s["groupId"].asText()
         setSprintStatus56(authed, "KBO", sid, "active")
         val r = createWithSprint56(authed, "KBO", "t1", sid)
         assertEquals(201, r.status.value(), r.responseBody)
@@ -485,7 +486,7 @@ class ItemsApiTest : AbstractApiTest() {
             json.readTree(
                 authed
                     .get()
-                    .uri("/api/projects/KBO/sprints/$sid/items")
+                    .uri("/api/projects/KBO/groups/$sid/items")
                     .exchange()
                     .expectBody(String::class.java)
                     .returnResult()
@@ -530,7 +531,7 @@ class ItemsApiTest : AbstractApiTest() {
         val authed = bootstrapAndAuth()
         createProject(authed, "KBC")
         val s = createSprint56(authed, "KBC", "S1")
-        val sid = s["sprintId"].asText()
+        val sid = s["groupId"].asText()
         setSprintStatus56(authed, "KBC", sid, "active")
         setSprintStatus56(authed, "KBC", sid, "completed")
         val before = countItems56(authed, "KBC")
@@ -546,7 +547,7 @@ class ItemsApiTest : AbstractApiTest() {
         createProject(authed, "KDE")
         val s = createSprint56(authed, "KDE", "Other")
         val before = countItems56(authed, "KBD")
-        val r = createWithSprint56(authed, "KBD", "t4", s["sprintId"].asText())
+        val r = createWithSprint56(authed, "KBD", "t4", s["groupId"].asText())
         assertEquals(404, r.status.value(), r.responseBody)
         assertEquals(before, countItems56(authed, "KBD"))
     }
