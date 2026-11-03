@@ -955,7 +955,7 @@ Content-Type: application/json
 }
 
 ### [预期 409] 删除非空 Sprint(成员关系即历史,先空才能删)
-DELETE {{host}}/api/projects/{{pkey}}/sprints/{{sprintId}}
+DELETE {{host}}/api/projects/{{pkey}}/groups/{{sprintId}}
 Authorization: Bearer {{token}}
 
 ### [预期 409] 开第二个 in_progress Milestone(0..1 current,先完成或取消)
@@ -1012,26 +1012,26 @@ GET {{host}}/api/projects/{{pkey}}/metrics/reopen-rate?from=2026-12-31T00:00:00Z
 Authorization: Bearer {{token}}
 
 ### 建 sprint 供负例(YPJ-56;handler 存 completedSprintId)
-POST {{host}}/api/projects/{{pkey}}/sprints
+POST {{host}}/api/projects/{{pkey}}/groups
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
+  "typeKey": "sprint",
   "name": "负例用 sprint"
 }
 
 > {%
-    client.global.set("completedSprintId", response.body.sprintId);
+    client.global.set("completedSprintId", response.body.groupId);
  %}
 
-### 上一条 sprint 置 completed(YPJ-56 负例前置)
-PATCH {{host}}/api/projects/{{pkey}}/sprints/{{completedSprintId}}
+### 上一条 sprint 置 completed(YPJ-56 负例前置;动作端点:start→complete 两步)
+POST {{host}}/api/projects/{{pkey}}/groups/{{completedSprintId}}/actions/start
 Authorization: Bearer {{token}}
-Content-Type: application/json
 
-{
-  "status": "completed"
-}
+### 上一条 sprint 置 completed(续)
+POST {{host}}/api/projects/{{pkey}}/groups/{{completedSprintId}}/actions/complete
+Authorization: Bearer {{token}}
 
 ### [预期 409] 建 item 带 completed sprint(item 不落库,YPJ-56)
 POST {{host}}/api/projects/{{pkey}}/items
@@ -1040,7 +1040,8 @@ Content-Type: application/json
 
 {
   "title": "负例:直入已完成 sprint",
-  "sprintId": "{{completedSprintId}}"
+  "groupId": "{{completedSprintId}}",
+  "groupType": "sprint"
 }
 
 ### [预期 404] 建 item 带未知 sprint(item 不落库,YPJ-56)
