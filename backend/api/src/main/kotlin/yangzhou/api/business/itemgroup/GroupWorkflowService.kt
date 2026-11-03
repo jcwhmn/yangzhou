@@ -33,24 +33,23 @@ class GroupWorkflowService(
 
     // ---------- 种子模板(createType / ProjectService.create 复用) ----------
 
-    private fun template(typeKey: String): List<Triple<String, StatusType, List<Edge>>> =
-        when (typeKey) {
-            "sprint" -> listOf(
-                Triple("planned", StatusType.START, listOf(Edge("start", "active"))),
-                Triple("active", StatusType.ACTIVE, listOf(Edge("complete", "completed"), Edge("backward", "planned"))),
-                Triple("completed", StatusType.FINAL, emptyList()), // 终态无出边 = 护栏
+    private fun template(typeKey: String): List<Triple<String, StatusType, List<Edge>>> = when (typeKey) {
+        "sprint" -> listOf(
+            Triple("planned", StatusType.START, listOf(Edge("start", "active"))),
+            Triple("active", StatusType.ACTIVE, listOf(Edge("complete", "completed"), Edge("backward", "planned"))),
+            Triple("completed", StatusType.FINAL, emptyList()), // 终态无出边 = 护栏
+        )
+        "release" -> listOf(
+            Triple("planned", StatusType.START, listOf(Edge("complete", "released"))),
+            Triple("released", StatusType.FINAL, emptyList()),
+        )
+        else -> // 自定义默认三态循环 switch(每态单出边无歧义;循环可达任意态,与 0056「可任意推进」语义等效)
+            listOf(
+                Triple("planned", StatusType.START, listOf(Edge("switch", "active"))),
+                Triple("active", StatusType.ACTIVE, listOf(Edge("switch", "completed"))),
+                Triple("completed", StatusType.FINAL, listOf(Edge("switch", "planned"))),
             )
-            "release" -> listOf(
-                Triple("planned", StatusType.START, listOf(Edge("complete", "released"))),
-                Triple("released", StatusType.FINAL, emptyList()),
-            )
-            else -> // 自定义默认三态循环 switch(每态单出边无歧义;循环可达任意态,与 0056「可任意推进」语义等效)
-                listOf(
-                    Triple("planned", StatusType.START, listOf(Edge("switch", "active"))),
-                    Triple("active", StatusType.ACTIVE, listOf(Edge("switch", "completed"))),
-                    Triple("completed", StatusType.FINAL, listOf(Edge("switch", "planned"))),
-                )
-        }
+    }
 
     /** 类型落库后种默认状态机(幂等:先清后种)。 */
     @Transactional
@@ -71,20 +70,16 @@ class GroupWorkflowService(
 
     // ---------- 读取 ----------
 
-    fun workflow(type: ItemGroupType): List<GroupStatusDto> =
-        groupStatuses.findByGroupTypeIdOrderByPosition(type.id!!).map { it.toDto() }
+    fun workflow(type: ItemGroupType): List<GroupStatusDto> = groupStatuses.findByGroupTypeIdOrderByPosition(type.id!!).map { it.toDto() }
 
     /** 组初始状态 = 该类型 workflow 的 START 态名(如 sprint=planned)。 */
-    fun startStatusName(type: ItemGroupType): String =
-        groupStatuses.findByGroupTypeIdOrderByPosition(type.id!!).firstOrNull { it.statusType == StatusType.START }?.name
-            ?: error("类型 ${type.typeKey} 缺 START 状态")
+    fun startStatusName(type: ItemGroupType): String = groupStatuses.findByGroupTypeIdOrderByPosition(type.id!!).firstOrNull { it.statusType == StatusType.START }?.name
+        ?: error("类型 ${type.typeKey} 缺 START 状态")
 
     /** FINAL 态名集(如 sprint={completed}, release={released})——membership「历史不可变」判定用。 */
-    fun finalStatusNames(type: ItemGroupType): Set<String> =
-        groupStatuses.findByGroupTypeIdOrderByPosition(type.id!!).filter { it.statusType == StatusType.FINAL }.map { it.name }.toSet()
+    fun finalStatusNames(type: ItemGroupType): Set<String> = groupStatuses.findByGroupTypeIdOrderByPosition(type.id!!).filter { it.statusType == StatusType.FINAL }.map { it.name }.toSet()
 
-    fun statusNames(type: ItemGroupType): Set<String> =
-        groupStatuses.findByGroupTypeIdOrderByPosition(type.id!!).map { it.name }.toSet()
+    fun statusNames(type: ItemGroupType): Set<String> = groupStatuses.findByGroupTypeIdOrderByPosition(type.id!!).map { it.name }.toSet()
 
     // ---------- 动作(白名单) ----------
 
@@ -100,14 +95,13 @@ class GroupWorkflowService(
         return edge.target
     }
 
-    private fun parseTransitions(status: GroupStatus): List<Edge> =
-        try {
-            mapper.readTree(status.transitions).map { node ->
-                Edge(node["function"]?.asString() ?: "switch", node["target"]?.asString() ?: "")
-            }.filter { it.target.isNotEmpty() }
-        } catch (_: Exception) {
-            emptyList()
-        }
+    private fun parseTransitions(status: GroupStatus): List<Edge> = try {
+        mapper.readTree(status.transitions).map { node ->
+            Edge(node["function"]?.asString() ?: "switch", node["target"]?.asString() ?: "")
+        }.filter { it.target.isNotEmpty() }
+    } catch (_: Exception) {
+        emptyList()
+    }
 
     private fun GroupStatus.toDto() = GroupStatusDto(name, statusType, parseTransitions(this).map { GroupTransitionDto(it.function, it.target) })
 }

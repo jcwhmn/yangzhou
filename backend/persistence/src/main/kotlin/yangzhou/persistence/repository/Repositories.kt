@@ -10,12 +10,12 @@ import yangzhou.persistence.Capability
 import yangzhou.persistence.ChecklistItem
 import yangzhou.persistence.Comment
 import yangzhou.persistence.Favorite
+import yangzhou.persistence.GroupStatus
 import yangzhou.persistence.Item
 import yangzhou.persistence.ItemActivity
 import yangzhou.persistence.ItemAttribute
 import yangzhou.persistence.ItemDependency
 import yangzhou.persistence.ItemGitRef
-import yangzhou.persistence.GroupStatus
 import yangzhou.persistence.ItemGroup
 import yangzhou.persistence.ItemGroupMember
 import yangzhou.persistence.ItemGroupMemberHistory

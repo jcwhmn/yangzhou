@@ -32,7 +32,10 @@ class GroupWorkflowServiceUnitTest {
     fun seedWritesEdgesAsJson() {
         val saved = mutableListOf<GroupStatus>()
         every { groupStatuses.deleteByGroupTypeId(any()) } returns Unit
-        every { groupStatuses.save(any()) } answers { saved.add(firstArg()); firstArg() }
+        every { groupStatuses.save(any()) } answers {
+            saved.add(firstArg())
+            firstArg()
+        }
         service.seedFor(sprintType)
         assertEquals(3, saved.size)
         assertEquals("planned", saved[0].name)
@@ -47,7 +50,10 @@ class GroupWorkflowServiceUnitTest {
     fun seedCustomTypeAllConnectedSwitch() {
         val saved = mutableListOf<GroupStatus>()
         every { groupStatuses.deleteByGroupTypeId(any()) } returns Unit
-        every { groupStatuses.save(any()) } answers { saved.add(firstArg()); firstArg() }
+        every { groupStatuses.save(any()) } answers {
+            saved.add(firstArg())
+            firstArg()
+        }
         val phase = ItemGroupType(id = 2L, objectId = UUID(0, 3), projectObjectId = UUID(0, 9), typeKey = "phase", name = "阶段")
         service.seedFor(phase)
         assertEquals(3, saved.size)

@@ -9,12 +9,10 @@ import org.junit.jupiter.api.Nested
 import yangzhou.api.error.BadRequestException
 import yangzhou.api.error.ConflictException
 import yangzhou.api.error.NotFoundException
-import yangzhou.persistence.GroupStatus
 import yangzhou.persistence.ItemGroup
 import yangzhou.persistence.ItemGroupMember
 import yangzhou.persistence.ItemGroupType
 import yangzhou.persistence.Project
-import yangzhou.persistence.StatusType
 import yangzhou.persistence.repository.ItemGroupMemberHistoryRepository
 import yangzhou.persistence.repository.ItemGroupMemberRepository
 import yangzhou.persistence.repository.ItemGroupRepository

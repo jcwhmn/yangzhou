@@ -249,17 +249,17 @@ class ItemGroupService(
             g.copy(
                 name = name ?: g.name,
                 startDate =
-                    when {
-                        request.startDate == null -> g.startDate
-                        request.startDate.isEmpty() -> null
-                        else -> parseDate(request.startDate, "startDate")
-                    },
+                when {
+                    request.startDate == null -> g.startDate
+                    request.startDate.isEmpty() -> null
+                    else -> parseDate(request.startDate, "startDate")
+                },
                 endDate =
-                    when {
-                        request.endDate == null -> g.endDate
-                        request.endDate.isEmpty() -> null
-                        else -> parseDate(request.endDate, "endDate")
-                    },
+                when {
+                    request.endDate == null -> g.endDate
+                    request.endDate.isEmpty() -> null
+                    else -> parseDate(request.endDate, "endDate")
+                },
                 updatedAt = Instant.now(),
             )
         return groups.save(updated).toDto()
