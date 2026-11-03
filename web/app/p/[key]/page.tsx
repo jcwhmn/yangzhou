@@ -30,8 +30,7 @@ type Status = {
   statusId: string;
   name: string;
   icon: string | null;
-  isStart: boolean;
-  isFinal: boolean;
+  statusType: string;
   position: number;
 };
 type Item = {
@@ -363,7 +362,7 @@ export default function BoardPage() {
               >
                 <Typography variant="subtitle2" sx={{ px: 1, py: 0.5 }}>
                   {s.icon ? `${s.icon} ` : ""}
-                  {s.name}({list.length}){s.isFinal && " [终态]"}
+                  {s.name}({list.length}){s.statusType === "FINAL" && " [终态]"}
                 </Typography>
                 <Stack spacing={1}>
                   {list.length === 0 && (

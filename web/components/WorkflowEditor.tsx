@@ -22,14 +22,27 @@ type Status = {
   statusId: string;
   name: string;
   icon: string | null;
-  isStart: boolean;
-  isFinal: boolean;
+  statusType: string;
   position: number;
 };
-type Transition = { from: string; to: string };
+type Transition = { from: string; to: string; function: string };
+
+const FN_OPTIONS = ["start", "complete", "switch", "forward", "backward", "cancel"];
+
+function fnLabel(fn: string): string {
+  switch (fn) {
+    case "start": return t.wf.fnStart;
+    case "complete": return t.wf.fnComplete;
+    case "switch": return t.wf.fnSwitch;
+    case "forward": return t.wf.fnForward;
+    case "backward": return t.wf.fnBackward;
+    case "cancel": return t.wf.fnCancel;
+    default: return fn;
+  }
+}
 
 /**
- * Workflow 编辑面板(V4-S1):列增删改(名称/图标/isStart/isFinal/position)+ 迁移表整表替换。
+ * Workflow 编辑面板(V4-S1):列增删改(名称/图标/statusType/position)+ 迁移表整表替换(spec 0097:出边内嵌,带动作函数)。
  * 数据驱动 workflow 的管理入口——列是行,迁移表空 = 自由迁移(DOMAIN.md 领域规则 3)。
  * 每次成功变更即回调 onChanged → 看板即时刷新。
  */
@@ -206,24 +219,13 @@ export function WorkflowEditor({
               />
               <Dropdown
                 size="small"
-                placeholder="—"
-                value={s.isStart ? "start" : ""}
-                onChange={(v) => patch(s.statusId, { isStart: v === "start" })}
+                value={s.statusType}
+                onChange={(v) => patch(s.statusId, { statusType: v })}
                 sx={{ width: 110 }}
                 options={[
-                  { value: "", label: "—" },
-                  { value: "start", label: t.wf.start },
-                ]}
-              />
-              <Dropdown
-                size="small"
-                placeholder="—"
-                value={s.isFinal ? "final" : ""}
-                onChange={(v) => patch(s.statusId, { isFinal: v === "final" })}
-                sx={{ width: 110 }}
-                options={[
-                  { value: "", label: "—" },
-                  { value: "final", label: t.wf.final },
+                  { value: "START", label: t.wf.start },
+                  { value: "ACTIVE", label: t.wf.active },
+                  { value: "FINAL", label: t.wf.final },
                 ]}
               />
               <TextField
@@ -300,6 +302,9 @@ export function WorkflowEditor({
               <Typography variant="body2" sx={{ minWidth: 60 }}>
                 {tr.to}
               </Typography>
+              <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                [{fnLabel(tr.function)}]
+              </Typography>
               <Button
                 size="small"
                 onClick={() =>
@@ -334,6 +339,7 @@ function AddTransitionRow({
 }) {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [fn, setFn] = useState("switch");
   const ready = from && to && from !== to;
   return (
     <Stack direction="row" spacing={1} alignItems="center">
@@ -356,11 +362,19 @@ function AddTransitionRow({
         sx={{ width: 150 }}
         options={statuses.map((s) => ({ value: s.name, label: s.name }))}
       />
+      <Dropdown
+        size="small"
+        ariaLabel={t.wf.statusType}
+        value={fn}
+        onChange={(v) => setFn(v)}
+        sx={{ width: 110 }}
+        options={FN_OPTIONS.map((f) => ({ value: f, label: fnLabel(f) }))}
+      />
       <Button
         size="small"
         variant="outlined"
         disabled={!ready}
-        onClick={() => onAdd({ from, to })}
+        onClick={() => onAdd({ from, to, function: fn })}
       >
         {t.wf.addTransition}
       </Button>

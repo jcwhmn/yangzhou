@@ -50,7 +50,7 @@ import { DateInput } from "@/components/DateInput";
 type Status = {
   statusId: string;
   name: string;
-  isFinal: boolean;
+  statusType: string;
   position: number;
 };
 

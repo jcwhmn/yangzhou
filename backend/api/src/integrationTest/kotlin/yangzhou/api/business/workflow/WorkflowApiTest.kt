@@ -3,7 +3,6 @@ package yangzhou.api.business.workflow
 import yangzhou.api.AbstractApiTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 class WorkflowApiTest : AbstractApiTest() {
     @Test

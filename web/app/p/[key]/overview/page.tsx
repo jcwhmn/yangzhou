@@ -19,7 +19,7 @@ import { signalColor, type Signal } from "@/components/Verdict";
 type Status = {
   statusId: string;
   name: string;
-  isFinal: boolean;
+  statusType: string;
   position: number;
 };
 type Item = {
@@ -63,7 +63,7 @@ export default function OverviewPage() {
         api<Member[]>(`/api/members`),
       ]);
       const finalByName = new Map(
-        proj.statuses.map((s) => [s.name, s.isFinal]),
+        proj.statuses.map((s) => [s.name, s.statusType === "FINAL"]),
       );
       setStatuses(proj.statuses);
       setItems(its);
@@ -110,7 +110,7 @@ export default function OverviewPage() {
   }, [load]);
 
   const isFinal = (s: string) =>
-    statuses.find((st) => st.name === s)?.isFinal === true;
+    statuses.find((st) => st.name === s)?.statusType === "FINAL";
   const mine = items.filter(
     (i) => i.assignee !== null && i.assignee === me && !isFinal(i.status),
   );
@@ -143,7 +143,7 @@ export default function OverviewPage() {
             {statuses.map((s) => (
               <Typography key={s.statusId} variant="body2" sx={{ py: 0.5 }}>
                 {s.name}
-                {s.isFinal ? t.overview.finalTag : ""} ·{" "}
+                {s.statusType === "FINAL" ? t.overview.finalTag : ""} ·{" "}
                 {items.filter((i) => i.status === s.name).length}
               </Typography>
             ))}

@@ -33,8 +33,7 @@ type AssigneeCount = {
 type Workload = {
   byStatus: {
     name: string;
-    isStart: boolean;
-    isFinal: boolean;
+    statusType: string;
     count: number;
   }[];
   byAssignee: AssigneeCount[];
@@ -59,7 +58,7 @@ type FlowTimes = {
   };
 };
 type Cfd = {
-  statuses: { statusId: string; name: string; isFinal: boolean }[];
+  statuses: { statusId: string; name: string; statusType: string }[];
   series: { date: string; counts: Record<string, number> }[];
 };
 type Aging = {
@@ -190,7 +189,7 @@ export default function FlowPage() {
 
   const wipSeries = useMemo(() => {
     const statuses = (data.workload?.byStatus ?? [])
-      .filter((s) => !s.isStart && !s.isFinal)
+      .filter((s) => s.statusType !== "START" && s.statusType !== "FINAL")
       .map((s) => s.name);
     const rows = data.workload?.byAssignee ?? [];
     return {

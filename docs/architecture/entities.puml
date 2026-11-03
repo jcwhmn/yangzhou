@@ -29,9 +29,8 @@ class ProjectMember
 class Status {
   name: String
   icon: String?
-  isStart: Boolean
-  isFinal: Boolean
-  isInProgress: Boolean
+  statusType ∈ {START, FINAL, ACTIVE}
+  transitions: JSON [{function,target}]
   position: Int
 }
 class ItemStatusHistory {
@@ -39,7 +38,6 @@ class ItemStatusHistory {
   to: UUID
   source: String
 }
-class StatusTransition
 class ProjectRepo {
   repo: String
 }

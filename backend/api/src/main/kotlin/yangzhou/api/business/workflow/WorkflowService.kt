@@ -151,15 +151,14 @@ class WorkflowService(
     }
 
     /** status.transitions JSON → (function, target 名) 对;坏 JSON/空数组返回空(全放行)。 */
-    private fun parseTransitions(status: Status): List<Pair<String, String>> =
-        try {
-            mapper.readTree(status.transitions).map { node ->
-                val obj = node
-                (obj["function"]?.asString() ?: "switch") to (obj["target"]?.asString() ?: "")
-            }.filter { it.second.isNotEmpty() }
-        } catch (_: Exception) {
-            emptyList()
-        }
+    private fun parseTransitions(status: Status): List<Pair<String, String>> = try {
+        mapper.readTree(status.transitions).map { node ->
+            val obj = node
+            (obj["function"]?.asString() ?: "switch") to (obj["target"]?.asString() ?: "")
+        }.filter { it.second.isNotEmpty() }
+    } catch (_: Exception) {
+        emptyList()
+    }
 
     private fun Status.toDto() = StatusDto(
         objectId,

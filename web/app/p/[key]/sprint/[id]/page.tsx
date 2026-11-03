@@ -54,7 +54,7 @@ type Item = {
 type Status = {
   statusId: string;
   name: string;
-  isFinal: boolean;
+  statusType: string;
   position: number;
 };
 type Candidate = {
@@ -523,7 +523,7 @@ export default function SprintPage() {
               <Typography>
                 {confirmFlow === "start"
                   ? `项目已有进行中的 Sprint「${allSprints.find((s) => s.status === "active" && s.sprintId !== id)?.name ?? ""}」,允许同时存在多个进行中。仍要开始本 Sprint?`
-                  : `未完成的 ${(items ?? []).filter((it) => !statuses.find((st) => st.name === it.status)?.isFinal).length} 个 item 将回到 Backlog 供重新规划;已完成 item 保留在本页历史。`}
+                  : `未完成的 ${(items ?? []).filter((it) => !((statuses.find((st) => st.name === it.status)?.statusType === "FINAL"))).length} 个 item 将回到 Backlog 供重新规划;已完成 item 保留在本页历史。`}
               </Typography>
             </DialogContent>
             <DialogActions>
