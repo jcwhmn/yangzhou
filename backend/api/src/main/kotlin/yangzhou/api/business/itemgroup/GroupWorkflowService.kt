@@ -10,9 +10,30 @@ import yangzhou.persistence.StatusType
 import yangzhou.persistence.repository.GroupStatusRepository
 import yangzhou.persistence.repository.ItemGroupTypeRepository
 
+/** spec 0097 §3.6(YPJ-141):组动作函数注册表——function 名 → 意图校验(source/target statusType)。
+ *  已知函数违反意图 → 409;未注册函数不拦(数据驱动:出边即真相,预留给自定义/未来 workflow)。 */
+enum class GroupActionFn(
+    val sourceType: StatusType? = null,
+    val targetType: StatusType? = null,
+) {
+    START(targetType = StatusType.ACTIVE),
+    COMPLETE(targetType = StatusType.FINAL),
+    BACKWARD,
+    SWITCH,
+    FORWARD,
+    REOPEN(sourceType = StatusType.FINAL, targetType = StatusType.ACTIVE),
+    CANCEL(targetType = StatusType.FINAL),
+    ;
+
+    companion object {
+        private val byName = entries.associateBy { it.name.lowercase() }
+        fun of(function: String): GroupActionFn? = byName[function]
+    }
+}
+
 /**
  * GroupWorkflow(spec 0097 S2):ItemGroupType 即 workflow 宿主(类型 1→1),group_status 行即其内容。
- * 出边内嵌 group_status.transitions JSON(依附 status,不独立建表);组状态变更 = 动作白名单触发。
+ * 出边内嵌 group_status.transitions JSON(依附 status,不独立建表);组状态变更 = 动作端点唯一路径触发(函数语义见 GroupActionFn)。
  */
 @Service
 class GroupWorkflowService(
@@ -79,11 +100,9 @@ class GroupWorkflowService(
     /** FINAL 态名集(如 sprint={completed}, release={released})——membership「历史不可变」判定用。 */
     fun finalStatusNames(type: ItemGroupType): Set<String> = groupStatuses.findByGroupTypeIdOrderByPosition(type.id!!).filter { it.statusType == StatusType.FINAL }.map { it.name }.toSet()
 
-    fun statusNames(type: ItemGroupType): Set<String> = groupStatuses.findByGroupTypeIdOrderByPosition(type.id!!).map { it.name }.toSet()
-
     // ---------- 动作(白名单) ----------
 
-    /** 当前状态出边含此 function → 返回目标状态名;否则 409「当前状态无此动作」。 */
+    /** 当前状态出边含此 function → 意图校验(§3.6 注册表)后返回目标状态名;无匹配出边 → 409。 */
     @Transactional
     fun applyAction(type: ItemGroupType, currentStatus: String, function: String): String {
         val current =
@@ -91,8 +110,17 @@ class GroupWorkflowService(
                 ?: error("组状态不在类型 workflow 内:$currentStatus")
         val edge = parseTransitions(current).firstOrNull { it.function == function }
             ?: throw ConflictException("当前状态无此动作:$function")
-        if (edge.target !in statusNames(type)) error("出边目标不在类型 workflow 内:${edge.target}")
-        return edge.target
+        val target = groupStatuses.findByGroupTypeIdAndName(type.id!!, edge.target)
+            ?: error("出边目标不在类型 workflow 内:${edge.target}")
+        GroupActionFn.of(function)?.let { action ->
+            if (action.sourceType != null && current.statusType != action.sourceType) {
+                throw ConflictException("动作 $function 仅允许从 ${action.sourceType} 态触发")
+            }
+            if (action.targetType != null && target.statusType != action.targetType) {
+                throw ConflictException("动作 $function 的出边目标必须是 ${action.targetType} 态")
+            }
+        }
+        return target.name
     }
 
     private fun parseTransitions(status: GroupStatus): List<Edge> = try {
