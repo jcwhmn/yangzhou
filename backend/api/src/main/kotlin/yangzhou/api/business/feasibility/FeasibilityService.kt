@@ -117,6 +117,7 @@ class FeasibilityService(
 
     /** 重算项目:全部 item 冗余 + 聚合到 project(RED>YELLOW>GREEN;无 item = null)。 */
     fun recomputeProjectSignal(projectObjectId: UUID): String? {
+        projects.lockByObjectId(projectObjectId) // YPJ-128 统一锁序:入口先拿 project 行锁(对已持锁事务 no-op;spec 0096)
         val projectItems = itemRepo.findByProjectObjectIdAndDeletedAtIsNullOrderByNumber(projectObjectId)
         var worst: String? = null
         for (it in projectItems) {

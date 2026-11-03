@@ -140,6 +140,9 @@ interface CapabilityRepository : CrudRepository<Capability, Long> {
 }
 
 interface ProjectRepository : CrudRepository<Project, Long> {
+    // YPJ-128:写事务统一锁序——FOR UPDATE 拿 project 行锁,消 project/item 反序环(spec 0096)
+    @Query("select object_id from project where object_id = :id for update")
+    fun lockByObjectId(id: UUID): UUID?
     fun findByKey(key: String): Project?
 
     fun findByObjectId(objectId: UUID): Project?

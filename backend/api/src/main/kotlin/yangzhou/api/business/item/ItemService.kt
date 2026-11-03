@@ -117,6 +117,7 @@ class ItemService(
         if (type !in setOf("task", "bug", "goal", "story")) throw BadRequestException("type 非法:$type")
         val projectObjectId = project.objectId!!
 
+        // YPJ-128:nextNumber 的 UPDATE project 即本事务第一把锁——锁序统一 project→item(spec 0096)
         val number = numbering.nextNumber(projectObjectId) // 原子取号,行锁防并发重号
 
         val status =
@@ -361,6 +362,7 @@ class ItemService(
     ): ItemDto {
         val item = itemRepo.findByObjectId(itemId) ?: throw NotFoundException("item 不存在")
         val project = projectOf(item.projectObjectId)
+        projects.lockByObjectId(item.projectObjectId) // YPJ-128 统一锁序:第一把锁必须是 project 行(spec 0096)
         val rowId = item.objectId!!
         requirementRepo.deleteByItemObjectId(rowId)
         resolveRequirements(project.workspaceObjectId, requirements).forEach { (defId, minLevel) ->
@@ -445,6 +447,7 @@ class ItemService(
     @Transactional
     fun delete(itemId: UUID) {
         val item = itemRepo.findByObjectId(itemId) ?: throw NotFoundException("item 不存在")
+        projects.lockByObjectId(item.projectObjectId) // YPJ-128 统一锁序:第一把锁必须是 project 行(spec 0096)
         softDeleteSubtree(item.id!!, clock.instant()) // 触碰即迁移:原裸 Instant.now() 历史债(spec 0049)
         feasibilityService.recomputeProjectSignal(item.projectObjectId) // V9-S1
     }
@@ -523,6 +526,7 @@ class ItemService(
     fun purge(itemId: UUID) {
         val item = itemRepo.findByObjectId(itemId) ?: throw NotFoundException("item 不存在")
         if (item.deletedAt == null) throw ConflictException("该 item 不在回收站")
+        projects.lockByObjectId(item.projectObjectId) // YPJ-128 统一锁序:第一把锁必须是 project 行(spec 0096)
         purgeSubtree(item.id!!)
         feasibilityService.recomputeProjectSignal(item.projectObjectId)
     }
