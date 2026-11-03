@@ -175,36 +175,6 @@ export default function ProjectLayout({
 
   const itemSx = { py: 0.5 };
 
-  // V14 Epic 段:顶层 type='goal' 的 item;rollup = 自身+子孙 feasSignal 取最差(红>黄>绿,DOMAIN 聚合规则)
-  const epics = items.filter((i) => i.type === "goal" && !i.parentItemId);
-  const childrenOf = new Map<string, NavItem[]>();
-  for (const i of items) {
-    if (!i.parentItemId) continue;
-    const list = childrenOf.get(i.parentItemId) ?? [];
-    list.push(i);
-    childrenOf.set(i.parentItemId, list);
-  }
-  const sigRank: Record<Signal, number> = { RED: 0, YELLOW: 1, GREEN: 2 };
-  const worstSignal = (id: string, seen = new Set<string>()): Signal | null => {
-    if (seen.has(id)) return null; // 树环兕底
-    seen.add(id);
-    const self = items.find((i) => i.itemId === id);
-    const signals: Signal[] = [];
-    if (self?.feasSignal) signals.push(self.feasSignal);
-    for (const c of childrenOf.get(id) ?? []) {
-      const s = worstSignal(c.itemId, seen);
-      if (s) signals.push(s);
-    }
-    return signals.length
-      ? signals.reduce((a, b) => (sigRank[a] <= sigRank[b] ? a : b))
-      : null;
-  };
-  const dotColor: Record<Signal, string> = {
-    GREEN: "success.main",
-    YELLOW: "warning.main",
-    RED: "error.main",
-  };
-
   async function exportXlsx(projectKey: string) {
     const token = localStorage.getItem("yz-token");
     const res = await fetch(
@@ -395,59 +365,6 @@ export default function ProjectLayout({
               />
             </ListItemButton>
           ))}
-          <Divider sx={{ my: 1 }} />
-          <ListSubheader disableSticky sx={{ bgcolor: "transparent" }}>
-            {t.projectNav.epics}
-          </ListSubheader>
-          {epics.length === 0 && (
-            <ListItemButton disabled sx={{ py: 0.25 }}>
-              <ListItemText
-                primary={t.projectNav.noEpics}
-                primaryTypographyProps={{
-                  variant: "caption",
-                  color: "text.secondary",
-                }}
-              />
-            </ListItemButton>
-          )}
-          {epics.map((e) => {
-            const sig = worstSignal(e.itemId);
-            return (
-              <ListItemButton
-                key={e.itemId}
-                component={Link}
-                href={`/p/${key}/i/${e.itemId}`}
-                sx={itemSx}
-              >
-                <Box
-                  component="span"
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 1,
-                    minWidth: 0,
-                  }}
-                >
-                  <Box
-                    component="span"
-                    aria-label={sig ? t.signal[sig] : undefined}
-                    sx={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: "50%",
-                      flexShrink: 0,
-                      bgcolor: sig ? dotColor[sig] : "transparent",
-                      border: sig ? "none" : "1px solid",
-                      borderColor: "grey.300",
-                    }}
-                  />
-                  <Typography variant="body2" noWrap>
-                    {e.title}
-                  </Typography>
-                </Box>
-              </ListItemButton>
-            );
-          })}
           <Divider sx={{ my: 1 }} />
           <ListSubheader
             disableSticky

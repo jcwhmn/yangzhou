@@ -35,7 +35,7 @@ test("Release 全链路——段显示/对话框建与补建/发布/拉入/非�
   await expect(page.getByText("R1.9 (0)")).toBeVisible();
 
   // 管理对话框:新建 R3.0
-  await openReleaseManager(page);
+  await openReleaseManager();
   const dialog = page.getByRole("dialog");
   await dialog.getByLabel("名称").fill("R3.0");
   await fillDate(dialog, "目标发布日", "2027-03-01");
@@ -68,7 +68,7 @@ test("Release 全链路——段显示/对话框建与补建/发布/拉入/非�
   // 侧边栏计数 (1);对话框非空删除 409;移出后删 204
   await page.goto(`/p/${projectKey}`);
   await expect(page.getByText("R3.0 (1)")).toBeVisible();
-  await openReleaseManager(page);
+  await openReleaseManager();
   const r3 = page
     .getByRole("dialog")
     .getByTestId("release-row")
@@ -82,7 +82,7 @@ test("Release 全链路——段显示/对话框建与补建/发布/拉入/非�
   await page.goto(`/p/${projectKey}/i/${itemId}`);
   await page.getByRole("button", { name: "清除 Release" }).click(); // Dropdown 清空走 ×(spec 0018)
   await page.goto(`/p/${projectKey}`);
-  await openReleaseManager(page);
+  await openReleaseManager();
   const r3again = page
     .getByRole("dialog")
     .getByTestId("release-row")

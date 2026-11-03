@@ -237,6 +237,8 @@ export const t = {
     empty: "暂无类型。",
     failed: "操作失败",
     close: "关闭",
+    workflow: "Workflow",
+    wfEmpty: "(无状态)",
   },
   gh: {
     patTitle: "GitHub PAT(workspace 级)",
@@ -453,6 +455,10 @@ export const t = {
     unassigned: "未指派",
     count: "item 数",
   },
+  sprintPage: {
+    startBtn: "▶ 开始 Sprint",
+    completeBtn: "✓ 完成 Sprint",
+  },
   projectNav: {
     overview: "Overview",
     flow: "Flow",
@@ -461,9 +467,7 @@ export const t = {
     table: "表格",
     sprints: "Sprint",
     backlog: "Backlog",
-    epics: "Epic",
     milestones: "Milestone",
-    noEpics: "暂无 Epic(item 类型 goal)",
     noMilestones: "暂无 Milestone",
     releases: "Release",
     noReleases: "暂无 Release",
