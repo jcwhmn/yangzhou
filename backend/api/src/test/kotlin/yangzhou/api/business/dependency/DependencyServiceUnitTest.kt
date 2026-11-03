@@ -56,7 +56,7 @@ class DependencyServiceUnitTest {
     ) = Status(
         projectObjectId = projA,
         name = name,
-        isFinal = final,
+        statusType = if (final) yangzhou.persistence.StatusType.FINAL else yangzhou.persistence.StatusType.ACTIVE,
         position = position,
     )
 

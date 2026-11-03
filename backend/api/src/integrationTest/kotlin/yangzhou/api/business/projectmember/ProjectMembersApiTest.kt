@@ -190,7 +190,7 @@ class ProjectMembersApiTest : AbstractApiTest() {
                         .returnResult()
                         .responseBody!!,
                 )["statuses"]
-                .last { it["isFinal"].asBoolean() }["statusId"]
+                .last { it["statusType"].asText() == "FINAL" }["statusId"]
                 .asText()
         authed
             .patch()

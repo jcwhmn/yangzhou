@@ -272,8 +272,8 @@ class MetricsService(
                 StatusCountDto(
                     s.statusObjectId,
                     s.name,
-                    s.isStart,
-                    s.isFinal,
+                    s.statusType == "START",
+                    s.statusType == "FINAL",
                     countByStatusId[s.statusObjectId] ?: 0,
                 )
             }
@@ -285,8 +285,7 @@ class MetricsService(
                     val wipByStatus =
                         its
                             .filter {
-                                !statusByObjectId.getValue(it.statusObjectId).isStart &&
-                                    !statusByObjectId.getValue(it.statusObjectId).isFinal
+                                statusByObjectId.getValue(it.statusObjectId).statusType == "ACTIVE"
                             }.groupingBy { statusByObjectId.getValue(it.statusObjectId).name }
                             .eachCount()
                     if (oid == null) {
@@ -301,8 +300,8 @@ class MetricsService(
                 .eachCount()
                 .map { TypeCountDto(it.key, it.value) }
                 .sortedBy { it.type }
-        val backlogSize = statuses.filter { it.isStart }.sumOf { countByStatusId[it.statusObjectId] ?: 0 }
-        val done = statuses.filter { it.isFinal }.sumOf { countByStatusId[it.statusObjectId] ?: 0 }
+        val backlogSize = statuses.filter { it.statusType == "START" }.sumOf { countByStatusId[it.statusObjectId] ?: 0 }
+        val done = statuses.filter { it.statusType == "FINAL" }.sumOf { countByStatusId[it.statusObjectId] ?: 0 }
         return WorkloadResponse(
             mapOf("workload" to D_BACKLOG),
             backlogSize,
@@ -348,8 +347,8 @@ class MetricsService(
         requireProject(key)
         val (from, to) = window(fromS, toS)
         val statuses = repo.statuses(key)
-        val finalIds = statuses.filter { it.isFinal }.map { it.statusObjectId }.toSet()
-        val startIds = statuses.filter { it.isStart }.map { it.statusObjectId }.toSet()
+        val finalIds = statuses.filter { it.statusType == "FINAL" }.map { it.statusObjectId }.toSet()
+        val startIds = statuses.filter { it.statusType == "START" }.map { it.statusObjectId }.toSet()
         val byItem = repo.history(key).groupBy { it.itemObjectId }
         val flows =
             repo
@@ -407,7 +406,7 @@ class MetricsService(
         }
         return CfdResponse(
             definitions = mapOf("cfd" to D_CFD),
-            statuses = statuses.map { CfdStatusDto(it.statusObjectId, it.name, it.isFinal) },
+            statuses = statuses.map { CfdStatusDto(it.statusObjectId, it.name, it.statusType == "FINAL") },
             series = series,
         )
     }
@@ -423,7 +422,7 @@ class MetricsService(
             items
                 .mapNotNull { item ->
                     val s = statusByObjectId[item.statusObjectId] ?: return@mapNotNull null
-                    if (s.isStart || s.isFinal) return@mapNotNull null
+                    if (s.statusType == "START" || s.statusType == "FINAL") return@mapNotNull null
                     val enteredAt = byItem[item.itemObjectId]?.maxOf { it.createdAt } ?: item.createdAt
                     AgingItemDto(
                         item.itemObjectId,
@@ -438,8 +437,8 @@ class MetricsService(
         val countByStatusId = items.groupingBy { statusByObjectId.getValue(it.statusObjectId).statusObjectId }.eachCount()
         val queueWidth =
             statuses
-                .filter { !it.isFinal }
-                .map { s -> StatusCountDto(s.statusObjectId, s.name, s.isStart, s.isFinal, countByStatusId[s.statusObjectId] ?: 0) }
+                .filter { it.statusType != "FINAL" }
+                .map { s -> StatusCountDto(s.statusObjectId, s.name, s.statusType == "START", s.statusType == "FINAL", countByStatusId[s.statusObjectId] ?: 0) }
         return AgingResponse(mapOf("aging" to D_AGING), aging, queueWidth)
     }
 
@@ -537,7 +536,7 @@ class MetricsService(
         requireProject(key)
         val (from, to) = window(fromS, toS)
         val statuses = repo.statuses(key)
-        val finalIds = statuses.filter { it.isFinal }.map { it.statusObjectId }.toSet()
+        val finalIds = statuses.filter { it.statusType == "FINAL" }.map { it.statusObjectId }.toSet()
         val byItem = repo.history(key).groupBy { it.itemObjectId }
         var completed = 0
         var reopened = 0
@@ -634,7 +633,7 @@ class MetricsService(
         val finalIds =
             repo
                 .statuses(key)
-                .filter { it.isFinal }
+                .filter { it.statusType == "FINAL" }
                 .map { it.statusObjectId }
                 .toSet()
         val items = repo.items(key).filter { itemObjectIdFilter == null || it.itemObjectId in itemObjectIdFilter }

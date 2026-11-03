@@ -76,9 +76,9 @@ class GithubSyncServiceUnitTest {
     private val todoOid = UUID.randomUUID()
     private val doingOid = UUID.randomUUID()
     private val doneOid = UUID.randomUUID()
-    private val todo = Status(id = 1L, projectObjectId = UUID(0, 100), name = "To Do", position = 0, isStart = true, objectId = todoOid)
+    private val todo = Status(id = 1L, projectObjectId = UUID(0, 100), name = "To Do", position = 0, statusType = yangzhou.persistence.StatusType.START, objectId = todoOid)
     private val doing = Status(id = 2L, projectObjectId = UUID(0, 100), name = "In Progress", position = 1, objectId = doingOid)
-    private val done = Status(id = 3L, projectObjectId = UUID(0, 100), name = "Done", position = 2, isFinal = true, objectId = doneOid)
+    private val done = Status(id = 3L, projectObjectId = UUID(0, 100), name = "Done", position = 2, statusType = yangzhou.persistence.StatusType.FINAL, objectId = doneOid)
 
     @BeforeEach
     fun setup() {

@@ -3,7 +3,6 @@ package yangzhou.api.business.workflow
 import yangzhou.api.AbstractApiTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 class WorkflowApiTest : AbstractApiTest() {
     @Test
@@ -16,7 +15,7 @@ class WorkflowApiTest : AbstractApiTest() {
                 authed
                     .post()
                     .uri("/api/projects/CHE/statuses")
-                    .body(mapOf("name" to "Code Review", "icon" to "🔍", "isFinal" to false))
+                    .body(mapOf("name" to "Code Review", "icon" to "🔍", "statusType" to "ACTIVE"))
                     .exchange()
                     .expectStatus()
                     .isCreated()
@@ -34,7 +33,7 @@ class WorkflowApiTest : AbstractApiTest() {
                 authed
                     .patch()
                     .uri("/api/statuses/$statusId")
-                    .body(mapOf("name" to "Review", "isFinal" to true))
+                    .body(mapOf("name" to "Review", "statusType" to "FINAL"))
                     .exchange()
                     .expectStatus()
                     .isOk()
@@ -43,7 +42,7 @@ class WorkflowApiTest : AbstractApiTest() {
                     .responseBody!!,
             )
         assertEquals("Review", updated["name"].asText())
-        assertTrue(updated["isFinal"].asBoolean())
+        assertEquals("FINAL", updated["statusType"].asText())
 
         // 删除未被 item 引用的状态
         authed
@@ -215,43 +214,20 @@ class WorkflowApiTest : AbstractApiTest() {
                     .responseBody!!,
             )["statuses"]
         // 默认:To Do 是起点
-        assertEquals(true, statuses[0]["isStart"].asBoolean())
+        assertEquals("START", statuses[0]["statusType"].asText())
 
         // 加第二个起点(position 更小)→ 新 item 落它
         authed
             .post()
             .uri("/api/projects/CHE/statuses")
-            .body(mapOf("name" to "Backlog", "isStart" to true, "position" to -1))
+            .body(mapOf("name" to "Backlog", "statusType" to "START", "position" to -1))
             .exchange()
             .expectStatus()
             .isCreated()
         val item = createItem(authed, "CHE", "x")
         assertEquals("Backlog", item["status"].asText())
 
-        // 全部取消起点 → 回退首列(position 最小 = Backlog)
-        val all =
-            json.readTree(
-                authed
-                    .get()
-                    .uri("/api/projects/CHE")
-                    .exchange()
-                    .expectStatus()
-                    .isOk()
-                    .expectBody(String::class.java)
-                    .returnResult()
-                    .responseBody!!,
-            )["statuses"]
-        all.forEach { st ->
-            authed
-                .patch()
-                .uri("/api/statuses/${st["statusId"].asText()}")
-                .body(mapOf("isStart" to false))
-                .exchange()
-                .expectStatus()
-                .isOk()
-        }
-        val item2 = createItem(authed, "CHE", "y")
-        assertEquals("Backlog", item2["status"].asText()) // position -1 < 0
+        // spec 0097:工作流必须保留 START,「无起点回退首列」成为防御分支,黑盒不可达(护栏 409)
     }
 
     @Test

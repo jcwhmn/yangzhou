@@ -30,7 +30,6 @@ import yangzhou.persistence.ProjectView
 import yangzhou.persistence.ProjectWorkflowRule
 import yangzhou.persistence.Requirement
 import yangzhou.persistence.Status
-import yangzhou.persistence.StatusTransition
 import yangzhou.persistence.Team
 import yangzhou.persistence.TeamMember
 import yangzhou.persistence.TimeEntry
@@ -189,12 +188,6 @@ interface StatusRepository : CrudRepository<Status, Long> {
     fun findByObjectId(objectId: UUID): Status?
 
     fun deleteByObjectId(objectId: UUID)
-}
-
-interface StatusTransitionRepository : CrudRepository<StatusTransition, Long> {
-    fun findByProjectObjectId(projectObjectId: UUID): List<StatusTransition>
-
-    fun deleteByProjectObjectId(projectObjectId: UUID)
 }
 
 interface ItemRepository : CrudRepository<Item, Long> {
@@ -450,7 +443,7 @@ interface MilestoneRepository : CrudRepository<Milestone, Long> {
 interface MetricsRepository : Repository<Status, Long> {
     @Query(
         """SELECT s.object_id AS status_object_id, s.name,
-            s.is_final, s.is_start, s.position
+            s.status_type, s.position
             FROM status s JOIN project p ON p.object_id = s.project_object_id
             WHERE p.key = :key ORDER BY s.position""",
     )
@@ -507,8 +500,7 @@ interface MetricsRepository : Repository<Status, Long> {
 data class MetricsStatusRow(
     val statusObjectId: UUID,
     val name: String,
-    val isFinal: Boolean,
-    val isStart: Boolean,
+    val statusType: String,
     val position: Int,
 )
 

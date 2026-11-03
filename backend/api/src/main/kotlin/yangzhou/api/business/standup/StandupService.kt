@@ -66,7 +66,7 @@ class StandupService(
                     )
                 val iid = item.objectId!!
                 if (iid in movedYesterday) done.add(dto)
-                if (!status.isFinal) {
+                if (status.statusType != yangzhou.persistence.StatusType.FINAL) {
                     today.add(dto)
                     if (iid in blockedIds) blocked.add(dto)
                 }

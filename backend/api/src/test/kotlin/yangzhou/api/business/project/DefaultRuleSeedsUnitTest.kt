@@ -12,19 +12,18 @@ class DefaultRuleSeedsUnitTest {
     private fun col(
         name: String,
         position: Int,
-        isStart: Boolean = false,
-        isFinal: Boolean = false,
-    ) = Status(projectObjectId = UUID(0, 0), name = name, position = position, isStart = isStart, isFinal = isFinal)
+        statusType: yangzhou.persistence.StatusType = yangzhou.persistence.StatusType.ACTIVE,
+    ) = Status(projectObjectId = UUID(0, 0), name = name, position = position, statusType = statusType)
 
     @Test
     fun `标准 V7 五列 - 与旧按名映射一致`() {
         val saved =
             listOf(
-                col("To Do", 0, isStart = true),
+                col("To Do", 0, statusType = yangzhou.persistence.StatusType.START),
                 col("In Progress", 1),
                 col("In Review", 2),
                 col("QA", 3),
-                col("Done", 4, isFinal = true),
+                col("Done", 4, statusType = yangzhou.persistence.StatusType.FINAL),
             )
         val seeds = ProjectService.defaultRuleSeeds(saved)
         assertEquals(
@@ -39,10 +38,10 @@ class DefaultRuleSeedsUnitTest {
     fun `非标四列 - 按顺序推导`() {
         val saved =
             listOf(
-                col("To Do", 0, isStart = true),
+                col("To Do", 0, statusType = yangzhou.persistence.StatusType.START),
                 col("Doing", 1),
                 col("Review", 2),
-                col("Done", 3, isFinal = true),
+                col("Done", 3, statusType = yangzhou.persistence.StatusType.FINAL),
             )
         val seeds = ProjectService.defaultRuleSeeds(saved)
         assertEquals(listOf("branch_created", "pr_opened", "pr_merged"), seeds.map { it.first.wire })
@@ -51,7 +50,7 @@ class DefaultRuleSeedsUnitTest {
 
     @Test
     fun `极简三列 - pr_open 落到次个非 start(final 不豁免)`() {
-        val saved = listOf(col("To Do", 0, isStart = true), col("Doing", 1), col("Done", 2, isFinal = true))
+        val saved = listOf(col("To Do", 0, statusType = yangzhou.persistence.StatusType.START), col("Doing", 1), col("Done", 2, statusType = yangzhou.persistence.StatusType.FINAL))
         val seeds = ProjectService.defaultRuleSeeds(saved)
         assertEquals(listOf("branch_created", "pr_opened", "pr_merged"), seeds.map { it.first.wire })
         assertEquals(listOf("Doing", "Done", "Done"), seeds.map { it.second.name })
@@ -59,14 +58,14 @@ class DefaultRuleSeedsUnitTest {
 
     @Test
     fun `无 final 列 - pr_merged 不种`() {
-        val saved = listOf(col("To Do", 0, isStart = true), col("Doing", 1))
+        val saved = listOf(col("To Do", 0, statusType = yangzhou.persistence.StatusType.START), col("Doing", 1))
         val seeds = ProjectService.defaultRuleSeeds(saved)
         assertEquals(listOf("branch_created" to "Doing"), seeds.map { it.first.wire to it.second.name })
     }
 
     @Test
     fun `单列 start 非 final - 全不种`() {
-        val saved = listOf(col("Archive", 0, isStart = true))
+        val saved = listOf(col("Archive", 0, statusType = yangzhou.persistence.StatusType.START))
         assertTrue(ProjectService.defaultRuleSeeds(saved).isEmpty())
     }
 }

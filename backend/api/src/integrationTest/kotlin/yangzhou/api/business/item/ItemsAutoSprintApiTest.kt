@@ -6,7 +6,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/** YPJ-120(spec 0089):开始动作自动入当前 sprint——服务端黑盒;status isInProgress 契约。 */
+/** YPJ-120(spec 0089):开始动作自动入当前 sprint——服务端黑盒;status statusType 契约。 */
 class ItemsAutoSprintApiTest : AbstractApiTest() {
 
     private fun setup(): Pair<RestTestClient, String> {
@@ -111,28 +111,28 @@ class ItemsAutoSprintApiTest : AbstractApiTest() {
     }
 
     @Test
-    fun `workflow 契约回显 isInProgress 且预置回填`() {
+    fun `workflow 契约回显 statusType 且预置回填`() {
         val authed = bootstrapAndAuth()
         createProject(authed, "CHE")
         val byName = projectStatuses(authed).associate { it["name"].asText() to it }
-        assertEquals(true, byName.getValue("In Progress")["isInProgress"].asBoolean(), "预置 In Progress 应回填 true")
-        assertEquals(false, byName.getValue("To Do")["isInProgress"].asBoolean())
-        assertEquals(false, byName.getValue("Done")["isInProgress"].asBoolean())
+        assertEquals("ACTIVE", byName.getValue("In Progress")["statusType"].asText(), "预置 In Progress 应为 ACTIVE")
+        assertEquals("START", byName.getValue("To Do")["statusType"].asText())
+        assertEquals("FINAL", byName.getValue("Done")["statusType"].asText())
 
         // CRUD:自定义状态创建/更新回显
         val created = json.readTree(
             authed.post().uri("/api/projects/CHE/statuses")
-                .body(mapOf("name" to "自定义中", "isInProgress" to true))
+                .body(mapOf("name" to "自定义中", "statusType" to "ACTIVE"))
                 .exchange().expectStatus().isCreated()
                 .expectBody(String::class.java).returnResult().responseBody!!,
         )
-        assertEquals(true, created["isInProgress"].asBoolean())
+        assertEquals("ACTIVE", created["statusType"].asText())
         val updated = json.readTree(
             authed.patch().uri("/api/statuses/${created["statusId"].asText()}")
-                .body(mapOf("isInProgress" to false))
+                .body(mapOf("statusType" to "FINAL"))
                 .exchange().expectStatus().isOk()
                 .expectBody(String::class.java).returnResult().responseBody!!,
         )
-        assertEquals(false, updated["isInProgress"].asBoolean())
+        assertEquals("FINAL", updated["statusType"].asText())
     }
 }

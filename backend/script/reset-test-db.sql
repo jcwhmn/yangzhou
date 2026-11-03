@@ -4,7 +4,7 @@
 TRUNCATE
   workspace, member, team, team_member, attribute_definition, capability,
   project, project_member, project_repo, project_workflow_rule,
-  status, status_transition, item, item_activity, item_dependency, item_git_ref,
+  status, item, item_activity, item_dependency, item_git_ref,
   item_group, item_group_member, checklist_item, comment, favorite,
   milestone, notification, requirement, time_entry
 RESTART IDENTITY CASCADE;

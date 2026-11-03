@@ -351,7 +351,7 @@ Content-Type: application/json
   "position": 3
 }
 
-### 迁移规则列表(无行 = 自由迁移)
+### 迁移规则列表(状态出边内嵌;出边空数组 = 自由迁移)
 GET {{host}}/api/projects/{{pkey}}/transitions
 Authorization: Bearer {{token}}
 
@@ -362,7 +362,7 @@ Content-Type: application/json
 
 {
   "transitions": [
-    { "from": "{{statusFrom}}", "to": "{{statusTo}}" }
+    { "from": "{{statusFrom}}", "to": "{{statusTo}}", "function": "switch" }
   ]
 }
 
@@ -1311,25 +1311,25 @@ Content-Type: application/json
 ### ============ 19. Workflow 状态进行态(YPJ-120;spec 0089) ============
 ### ============================================================
 
-### 建自定义状态(isInProgress=true;handler 存变量 stCustom)
+### 建自定义状态(statusType=ACTIVE;handler 存变量 stCustom)
 POST {{host}}/api/projects/{{pkey}}/statuses
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
-{ "name": "自定义中-{{suffix}}", "isInProgress": true }
+{ "name": "自定义中-{{suffix}}", "statusType": "ACTIVE" }
 
 > {% 
 client.global.set("stCustom", response.body.statusId);
 %}
 
-### PATCH 状态进行态(回显 isInProgress)
+### PATCH 状态类型(回显 statusType)
 PATCH {{host}}/api/statuses/{{stCustom}}
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
-{ "isInProgress": false }
+{ "statusType": "ACTIVE" }
 
-### 项目详情回显:statuses[].isInProgress(预置 In Progress=true,存量库由 V42 回填)
+### 项目详情回显:statuses[].statusType(预置 To Do=START / In Progress=ACTIVE / Done=FINAL,V45 对存量回填)
 GET {{host}}/api/projects/{{pkey}}
 Authorization: Bearer {{token}}
 
@@ -1339,3 +1339,9 @@ Authorization: Bearer {{token}}
 Content-Type: application/json
 
 { "statusItemId": "{{statusTo}}" }
+
+### 负例:删掉唯一 START(护栏——工作流至少保留一个 START 与 FINAL)
+### PATCH {{host}}/api/statuses/<toDoStatusId> {"statusType": "ACTIVE"} → 409
+
+### 负例:未知动作函数(迁移配置引用不在预定义集的 function)
+### PUT {{host}}/api/projects/{{pkey}}/transitions {"transitions":[{"from":"...","to":"...","function":"explode"}]} → 400

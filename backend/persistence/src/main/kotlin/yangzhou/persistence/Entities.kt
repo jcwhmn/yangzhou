@@ -205,6 +205,13 @@ data class ProjectMember(
     }
 }
 
+/** YPJ-138(spec 0097 S1):每状态恰属一类(START 起点 / FINAL 终态 / ACTIVE 进行)。 */
+enum class StatusType {
+    START,
+    FINAL,
+    ACTIVE,
+}
+
 @Table("status")
 data class Status(
     @Id val id: Long? = null,
@@ -212,28 +219,10 @@ data class Status(
     val projectObjectId: UUID,
     val name: String,
     val icon: String? = null,
-    val isFinal: Boolean = false,
-    val isStart: Boolean = false,
-    val isInProgress: Boolean = false,
+    val statusType: StatusType = StatusType.ACTIVE,
+    val transitions: String = "[]", // YPJ-138(spec 0097 S1):出边 JSON 内嵌 [{"function","target"}],空数组 = 自由迁移
     val wipLimit: Int? = null,
     val position: Int = 0,
-    @CreatedDate
-    var createdAt: Instant = Instant.now(),
-    @LastModifiedDate
-    var updatedAt: Instant = Instant.now(),
-    @CreatedBy
-    var createdByObjectId: UUID? = null,
-    @LastModifiedBy
-    var updatedByObjectId: UUID? = null,
-)
-
-@Table("status_transition")
-data class StatusTransition(
-    @Id val id: Long? = null,
-    val objectId: UUID = UUID.randomUUID(),
-    val projectObjectId: UUID,
-    val fromStatusObjectId: UUID,
-    val toStatusObjectId: UUID,
     @CreatedDate
     var createdAt: Instant = Instant.now(),
     @LastModifiedDate

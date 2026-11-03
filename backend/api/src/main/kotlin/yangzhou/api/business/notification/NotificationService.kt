@@ -138,7 +138,7 @@ class NotificationService(
             val sts = statusCache.getOrPut(item.projectObjectId) { statuses.findByProjectObjectIdOrderByPosition(item.projectObjectId) }
             val current = sts.firstOrNull { it.objectId == item.statusObjectId }
             val action =
-                if (current != null && !current.isFinal) {
+                if (current != null && current.statusType != yangzhou.persistence.StatusType.FINAL) {
                     sts
                         .filter { it.position > current.position }
                         .minByOrNull { it.position }

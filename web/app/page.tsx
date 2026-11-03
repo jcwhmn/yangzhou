@@ -30,7 +30,7 @@ type ProjectDto = {
   statuses: {
     statusId: string;
     name: string;
-    isFinal: boolean;
+    statusType: string;
     position: number;
   }[];
 };
