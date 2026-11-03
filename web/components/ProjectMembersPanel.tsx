@@ -56,7 +56,9 @@ export function ProjectMembersPanel({
       setAll(a);
       // V11-S5 成员色点:🟢 有非终态 assignee item / ⚪ 无(按 displayName 聚合,workspace 内唯一)
       const finalNames = new Set(
-        proj.statuses.filter((s) => s.statusType === "FINAL").map((s) => s.name),
+        proj.statuses
+          .filter((s) => s.statusType === "FINAL")
+          .map((s) => s.name),
       );
       setBusy(
         new Set(

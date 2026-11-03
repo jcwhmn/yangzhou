@@ -27,17 +27,31 @@ type Status = {
 };
 type Transition = { from: string; to: string; function: string };
 
-const FN_OPTIONS = ["start", "complete", "switch", "forward", "backward", "cancel"];
+const FN_OPTIONS = [
+  "start",
+  "complete",
+  "switch",
+  "forward",
+  "backward",
+  "cancel",
+];
 
 function fnLabel(fn: string): string {
   switch (fn) {
-    case "start": return t.wf.fnStart;
-    case "complete": return t.wf.fnComplete;
-    case "switch": return t.wf.fnSwitch;
-    case "forward": return t.wf.fnForward;
-    case "backward": return t.wf.fnBackward;
-    case "cancel": return t.wf.fnCancel;
-    default: return fn;
+    case "start":
+      return t.wf.fnStart;
+    case "complete":
+      return t.wf.fnComplete;
+    case "switch":
+      return t.wf.fnSwitch;
+    case "forward":
+      return t.wf.fnForward;
+    case "backward":
+      return t.wf.fnBackward;
+    case "cancel":
+      return t.wf.fnCancel;
+    default:
+      return fn;
   }
 }
 
