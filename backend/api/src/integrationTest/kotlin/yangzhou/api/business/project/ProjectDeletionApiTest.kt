@@ -68,8 +68,8 @@ class ProjectDeletionApiTest : AbstractApiTest() {
         createProject(authed, "GON")
         authed
             .post()
-            .uri("/api/projects/GON/sprints")
-            .body(mapOf<String, String?>("name" to "S1"))
+            .uri("/api/projects/GON/groups")
+            .body(mapOf<String, String?>("typeKey" to "sprint", "name" to "S1"))
             .exchange()
             .expectStatus()
             .isCreated()

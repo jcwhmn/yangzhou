@@ -14,6 +14,7 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { t } from "@/lib/texts";
+import { listSprints } from "@/lib/sprints";
 import { signalColor, type Signal } from "@/components/Verdict";
 
 type Status = {
@@ -59,7 +60,7 @@ export default function OverviewPage() {
       const [proj, its, sps, mems] = await Promise.all([
         api<{ statuses: Status[] }>(`/api/projects/${key}`),
         api<Item[]>(`/api/projects/${key}/items`),
-        api<Sprint[]>(`/api/projects/${key}/sprints`),
+        listSprints(key),
         api<Member[]>(`/api/members`),
       ]);
       const finalByName = new Map(
@@ -74,7 +75,7 @@ export default function OverviewPage() {
         return;
       }
       const sItems = await api<Item[]>(
-        `/api/projects/${key}/sprints/${active.sprintId}/items`,
+        `/api/projects/${key}/groups/${active.sprintId}/items`,
       );
       const byMember = new Map<string, { done: number; total: number }>();
       let done = 0;

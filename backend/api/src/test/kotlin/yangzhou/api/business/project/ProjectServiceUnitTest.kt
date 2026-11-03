@@ -26,7 +26,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
-/** YPJ-87 单测补齐:ProjectService(建项种子/组装/删除)。规则种子细节见 DefaultRuleSeedsUnitTest,不重复。 */
+/** YPJ-87 单测补齐:ProjectService(建项种子/组装/删除, groupWorkflow)。规则种子细节见 DefaultRuleSeedsUnitTest,不重复。 */
 class ProjectServiceUnitTest {
     private val projects = mockk<ProjectRepository>(relaxed = true)
     private val statuses = mockk<StatusRepository>(relaxed = true)
@@ -37,6 +37,7 @@ class ProjectServiceUnitTest {
     private val members = mockk<MemberService>(relaxed = true)
     private val projectMembers = mockk<ProjectMemberRepository>(relaxed = true)
     private val groupTypes = mockk<ItemGroupTypeRepository>(relaxed = true)
+    private val groupWorkflow = mockk<yangzhou.api.business.itemgroup.GroupWorkflowService>(relaxed = true)
     private val leaderGuard = mockk<yangzhou.api.guard.LeaderGuard>(relaxed = true)
     private val service =
         ProjectService(
@@ -50,6 +51,7 @@ class ProjectServiceUnitTest {
             members,
             projectMembers,
             groupTypes,
+            groupWorkflow,
         )
 
     private val wsId = UUID(0, 9)

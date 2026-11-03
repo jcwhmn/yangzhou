@@ -4,8 +4,8 @@ import io.mockk.clearMocks
 import io.mockk.every
 import io.mockk.mockk
 import org.junit.jupiter.api.BeforeEach
+import yangzhou.api.business.itemgroup.ItemGroupService
 import yangzhou.api.business.milestone.MilestoneService
-import yangzhou.api.business.sprint.SprintService
 import yangzhou.api.business.standup.StandupDto
 import yangzhou.api.business.standup.StandupService
 import yangzhou.persistence.Project
@@ -19,9 +19,9 @@ import kotlin.test.assertTrue
 class DashboardServiceUnitTest {
     private val projects = mockk<ProjectRepository>(relaxed = true)
     private val standupService = mockk<StandupService>(relaxed = true)
-    private val sprintService = mockk<SprintService>(relaxed = true)
+    private val groups = mockk<ItemGroupService>(relaxed = true)
     private val milestoneService = mockk<MilestoneService>(relaxed = true)
-    private val service = DashboardService(projects, standupService, sprintService, milestoneService)
+    private val service = DashboardService(projects, standupService, groups, milestoneService)
 
     private val live = Project(id = 1L, objectId = UUID(0, 1), workspaceObjectId = UUID(0, 9), key = "CHE", name = "CHE")
     private val archived =
@@ -36,20 +36,20 @@ class DashboardServiceUnitTest {
 
     @BeforeEach
     fun setup() {
-        clearMocks(projects, standupService, sprintService, milestoneService)
+        clearMocks(projects, standupService, groups, milestoneService)
         every { projects.findAll() } returns listOf(live, archived)
         every { standupService.standup(null) } returns StandupDto(UUID.randomUUID(), "me", emptyList(), emptyList(), emptyList())
     }
 
     @Test
     fun activeSprintMakesProjectLive() {
-        every { sprintService.list("CHE") } returns
+        every { groups.listGroups("CHE", "sprint") } returns
             listOf(
-                SprintService.SprintDto(UUID.randomUUID(), "V24", "active", null, null),
-                SprintService.SprintDto(UUID.randomUUID(), "V23", "completed", null, null),
+                ItemGroupService.GroupDto(UUID.randomUUID(), "sprint", "V24", "active", null, null),
+                ItemGroupService.GroupDto(UUID.randomUUID(), "sprint", "V23", "completed", null, null),
             )
         every { milestoneService.list("CHE") } returns emptyList()
-        every { sprintService.list("OLD") } returns emptyList()
+        every { groups.listGroups("OLD", "sprint") } returns emptyList()
         every { milestoneService.list("OLD") } returns emptyList()
         val dto = service.dashboard()
         assertEquals(listOf("CHE"), dto.live.map { it.projectKey })
@@ -58,7 +58,7 @@ class DashboardServiceUnitTest {
 
     @Test
     fun inProgressMilestoneAloneMakesProjectLive() {
-        every { sprintService.list(any()) } returns emptyList()
+        every { groups.listGroups(any(), "sprint") } returns emptyList()
         every { milestoneService.list("CHE") } returns
             listOf(
                 MilestoneService.MilestoneDto(UUID.randomUUID(), "M1", "in_progress", "2026-11-01"),
@@ -72,7 +72,7 @@ class DashboardServiceUnitTest {
 
     @Test
     fun idleProjectsDropped() {
-        every { sprintService.list(any()) } returns emptyList()
+        every { groups.listGroups(any(), "sprint") } returns emptyList()
         every { milestoneService.list(any()) } returns emptyList()
         assertTrue(service.dashboard().live.isEmpty())
     }

@@ -51,10 +51,15 @@ test("Overview 五区块——状态分布/信号/我的/风险/Sprint @smoke", 
   });
 
   const sprintId = await apiCreateSprint(projectKey, "OV Sprint");
-  await apiCall("PATCH", `/api/projects/${projectKey}/sprints/${sprintId}`, {
-    status: "active",
+  await apiCall(
+    "POST",
+    `/api/projects/${projectKey}/groups/${sprintId}/actions/start`,
+    {},
+  );
+  await apiCall("PUT", `/api/items/${mine}/group-membership`, {
+    groupId: sprintId,
+    groupType: "sprint",
   });
-  await apiCall("PUT", `/api/items/${mine}/sprint`, { sprintId });
 
   // 侧边栏入口 + 选中态
   await page.goto(`/p/${projectKey}`);

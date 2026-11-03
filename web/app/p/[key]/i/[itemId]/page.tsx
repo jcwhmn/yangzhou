@@ -35,6 +35,7 @@ import { api } from "@/lib/api";
 import { resolveBack } from "@/lib/back";
 
 import { t } from "@/lib/texts";
+import { listSprints, assignSprint } from "@/lib/sprints";
 
 import {
   SignalChip,
@@ -413,14 +414,11 @@ export default function ItemDetailPage() {
 
       // sprints 并入首屏:选项一次性到位,避免下拉打开后 children 变化把 MUI 菜单关掉
 
-      api<SprintLite[]>(`/api/projects/${key}/sprints`)
+      listSprints(key)
         .catch(
           () =>
             new Promise<SprintLite[]>((res) =>
-              setTimeout(
-                () => res(api<SprintLite[]>(`/api/projects/${key}/sprints`)),
-                1000,
-              ),
+              setTimeout(() => res(listSprints(key)), 1000),
             ),
         ) // CI 冷 JVM 偶发连接重置(status -1),延迟重试,否则静默成空选项
 
@@ -596,13 +594,10 @@ export default function ItemDetailPage() {
 
   // V12-S3:指派/移出当前 sprint(值 = 指派,null = 移出;completed sprint 不在选项中)
 
-  async function assignSprint(sprintId: string | null) {
+  async function applySprint(sprintId: string | null) {
     try {
-      const it = await api<Item>(`/api/items/${itemId}/sprint`, {
-        method: "PUT",
-
-        body: JSON.stringify({ sprintId }),
-      });
+      await assignSprint(key, itemId, sprintId);
+      const it = await api<Item>(`/api/items/${itemId}`);
 
       setItem(it);
     } catch (e) {
@@ -992,7 +987,7 @@ export default function ItemDetailPage() {
 
                 value={item.sprintId ?? ""}
 
-                onChange={(v) => assignSprint(v || null)}
+                onChange={(v) => applySprint(v || null)}
 
                 sx={{ width: 170 }}
 

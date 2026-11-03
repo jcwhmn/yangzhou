@@ -187,7 +187,10 @@ test("YPJ-29 无 active sprint 显示全部+提示条;开始 sprint 后收窄", 
   const inSprint = await apiCreateItem(projectKey, "Sprint内 item");
   await apiCreateItem(projectKey, "Sprint外 item");
   const sprintId = await apiCreateSprint(projectKey, "E2E Board Sprint");
-  await apiCall("PUT", `/api/items/${inSprint}/sprint`, { sprintId });
+  await apiCall("PUT", `/api/items/${inSprint}/group-membership`, {
+    groupId: sprintId,
+    groupType: "sprint",
+  });
 
   await page.goto(`/p/${projectKey}`);
   await expect(page.getByText("当前无进行中 sprint")).toBeVisible();
@@ -197,7 +200,8 @@ test("YPJ-29 无 active sprint 显示全部+提示条;开始 sprint 后收窄", 
   // 开始 sprint(看板内一键激活)→ 范围收窄,提示条消失
   await page.getByRole("combobox", { name: "开始 sprint" }).click();
   const resp = page.waitForResponse(
-    (r) => r.url().includes("/sprints/") && r.request().method() === "PATCH",
+    (r) =>
+      r.url().includes("/actions/start") && r.request().method() === "POST",
   );
   await page.getByRole("option", { name: "E2E Board Sprint" }).click();
   await resp;

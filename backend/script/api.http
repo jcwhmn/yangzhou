@@ -398,19 +398,20 @@ Authorization: Bearer {{token}}
 # 语义:同一 item 至多属于一个 planned/active sprint(替换式写入);
 # 完成 sprint 的成员关系是历史,不可变;组不进匹配输入。
 
-### 建 Sprint(handler 存变量 sprintId;日期可选,格式 yyyy-MM-dd)
-POST {{host}}/api/projects/{{pkey}}/sprints
+### 建 Sprint(统一组端点;handler 存变量 sprintId;日期可选,格式 yyyy-MM-dd)
+POST {{host}}/api/projects/{{pkey}}/groups
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
+  "typeKey": "sprint",
   "name": "Sprint 42",
   "startDate": "2026-10-01",
   "endDate": "2026-10-15"
 }
 
 > {%
-    client.global.set("sprintId", response.body.sprintId);
+    client.global.set("sprintId", response.body.groupId);
  %}
 
 ### 建 item 直入 Sprint(YPJ-56:创建请求带 sprintId,同事务归入;handler 存 itemIdSprint)
@@ -420,23 +421,24 @@ Content-Type: application/json
 
 {
   "title": "建票直入 sprint",
-  "sprintId": "{{sprintId}}"
+  "groupId": "{{sprintId}}",
+  "groupType": "sprint"
 }
 
 > {%
     client.global.set("itemIdSprint", response.body.itemId);
  %}
 
-### Sprint 列表
-GET {{host}}/api/projects/{{pkey}}/sprints
+### Sprint 列表(统一 /groups?type=sprint)
+GET {{host}}/api/projects/{{pkey}}/groups?type=sprint
 Authorization: Bearer {{token}}
 
-### Sprint 详情
-GET {{host}}/api/projects/{{pkey}}/sprints/{{sprintId}}
+### 组详情
+GET {{host}}/api/projects/{{pkey}}/groups/{{sprintId}}
 Authorization: Bearer {{token}}
 
-### 改 Sprint(状态 planned → active;日期传空串 = 清除)
-PATCH {{host}}/api/projects/{{pkey}}/sprints/{{sprintId}}
+### 开始 Sprint(动作端点:planned→active;PATCH 不再管 status)
+POST {{host}}/api/projects/{{pkey}}/groups/{{sprintId}}/actions/start
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
@@ -444,17 +446,18 @@ Content-Type: application/json
   "status": "active"
 }
 
-### 指派 item 到 Sprint
-PUT {{host}}/api/items/{{itemId}}/sprint
+### 指派 item 到 Sprint(按类型替换归属)
+PUT {{host}}/api/items/{{itemId}}/group-membership
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-  "sprintId": "{{sprintId}}"
+  "groupId": "{{sprintId}}",
+  "groupType": "sprint"
 }
 
-### Sprint 内 items(完成后仍含历史行)
-GET {{host}}/api/projects/{{pkey}}/sprints/{{sprintId}}/items
+### 组内 items(完成后仍含历史行)
+GET {{host}}/api/projects/{{pkey}}/groups/{{sprintId}}/items
 Authorization: Bearer {{token}}
 
 ### backlog 派生桶(非终态且未进任何 planned/active sprint;此刻不含已指派的 item)
@@ -572,26 +575,28 @@ Content-Type: application/json
 DELETE {{host}}/api/projects/{{pkey}}/milestones/{{milestoneId}}
 Authorization: Bearer {{token}}
 
-### 移出 item 的 Sprint(null = 移出,item 回 backlog)
-PUT {{host}}/api/items/{{itemId}}/sprint
+### 移出 item 的 Sprint(groupId=null + groupType = 移出,item 回 backlog)
+PUT {{host}}/api/items/{{itemId}}/group-membership
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-  "sprintId": null
+  "groupId": null,
+  "groupType": "sprint"
 }
 
 ### 再指派(完成后留历史行,负例区要用)
-PUT {{host}}/api/items/{{itemId}}/sprint
+PUT {{host}}/api/items/{{itemId}}/group-membership
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-  "sprintId": "{{sprintId}}"
+  "groupId": "{{sprintId}}",
+  "groupType": "sprint"
 }
 
-### 完成 Sprint
-PATCH {{host}}/api/projects/{{pkey}}/sprints/{{sprintId}}
+### 完成 Sprint(动作端点:active→completed;终态无出边,再动 409)
+POST {{host}}/api/projects/{{pkey}}/groups/{{sprintId}}/actions/complete
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
@@ -945,11 +950,12 @@ Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-  "sprintId": "{{sprintId}}"
+  "groupId": "{{sprintId}}",
+  "groupType": "sprint"
 }
 
 ### [预期 409] 删除非空 Sprint(成员关系即历史,先空才能删)
-DELETE {{host}}/api/projects/{{pkey}}/sprints/{{sprintId}}
+DELETE {{host}}/api/projects/{{pkey}}/groups/{{sprintId}}
 Authorization: Bearer {{token}}
 
 ### [预期 409] 开第二个 in_progress Milestone(0..1 current,先完成或取消)
@@ -1006,26 +1012,26 @@ GET {{host}}/api/projects/{{pkey}}/metrics/reopen-rate?from=2026-12-31T00:00:00Z
 Authorization: Bearer {{token}}
 
 ### 建 sprint 供负例(YPJ-56;handler 存 completedSprintId)
-POST {{host}}/api/projects/{{pkey}}/sprints
+POST {{host}}/api/projects/{{pkey}}/groups
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
+  "typeKey": "sprint",
   "name": "负例用 sprint"
 }
 
 > {%
-    client.global.set("completedSprintId", response.body.sprintId);
+    client.global.set("completedSprintId", response.body.groupId);
  %}
 
-### 上一条 sprint 置 completed(YPJ-56 负例前置)
-PATCH {{host}}/api/projects/{{pkey}}/sprints/{{completedSprintId}}
+### 上一条 sprint 置 completed(YPJ-56 负例前置;动作端点:start→complete 两步)
+POST {{host}}/api/projects/{{pkey}}/groups/{{completedSprintId}}/actions/start
 Authorization: Bearer {{token}}
-Content-Type: application/json
 
-{
-  "status": "completed"
-}
+### 上一条 sprint 置 completed(续)
+POST {{host}}/api/projects/{{pkey}}/groups/{{completedSprintId}}/actions/complete
+Authorization: Bearer {{token}}
 
 ### [预期 409] 建 item 带 completed sprint(item 不落库,YPJ-56)
 POST {{host}}/api/projects/{{pkey}}/items
@@ -1034,7 +1040,8 @@ Content-Type: application/json
 
 {
   "title": "负例:直入已完成 sprint",
-  "sprintId": "{{completedSprintId}}"
+  "groupId": "{{completedSprintId}}",
+  "groupType": "sprint"
 }
 
 ### [预期 404] 建 item 带未知 sprint(item 不落库,YPJ-56)
@@ -1345,3 +1352,9 @@ Content-Type: application/json
 
 ### 负例:未知动作函数(迁移配置引用不在预定义集的 function)
 ### PUT {{host}}/api/projects/{{pkey}}/transitions {"transitions":[{"from":"...","to":"...","function":"explode"}]} → 400
+
+### 负例:组动作白名单——planned 无 backward / 终态无任何动作 → 409「当前状态无此动作」
+### POST {{host}}/api/projects/{{pkey}}/groups/{{sprintId}}/actions/backward → 409
+
+### 跨类型归属正交:item 挂 sprint 后再挂 release,两者共存(响应 sprintId 与 releaseId 同时非空)
+### PUT {{host}}/api/items/{{itemId}}/group-membership {"groupId": "{{releaseId}}", "groupType": "release"}

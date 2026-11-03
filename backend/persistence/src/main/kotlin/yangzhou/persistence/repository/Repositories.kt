@@ -10,6 +10,7 @@ import yangzhou.persistence.Capability
 import yangzhou.persistence.ChecklistItem
 import yangzhou.persistence.Comment
 import yangzhou.persistence.Favorite
+import yangzhou.persistence.GroupStatus
 import yangzhou.persistence.Item
 import yangzhou.persistence.ItemActivity
 import yangzhou.persistence.ItemAttribute
@@ -369,6 +370,16 @@ interface ItemGroupRepository : CrudRepository<ItemGroup, Long> {
         projectObjectId: UUID,
         objectId: UUID,
     ): ItemGroup?
+}
+
+interface GroupStatusRepository : CrudRepository<GroupStatus, Long> {
+    fun findByGroupTypeIdOrderByPosition(groupTypeId: Long): List<GroupStatus>
+
+    fun findByGroupTypeIdAndName(groupTypeId: Long, name: String): GroupStatus?
+
+    fun findByGroupTypeIdAndObjectId(groupTypeId: Long, objectId: UUID): GroupStatus?
+
+    fun deleteByGroupTypeId(groupTypeId: Long)
 }
 
 interface ItemGroupTypeRepository : CrudRepository<ItemGroupType, Long> {

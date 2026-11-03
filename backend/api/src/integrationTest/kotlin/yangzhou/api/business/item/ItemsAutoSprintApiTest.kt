@@ -16,17 +16,16 @@ class ItemsAutoSprintApiTest : AbstractApiTest() {
         return authed to itemId
     }
 
-    private fun createSprint(authed: RestTestClient, name: String): String = authed.post().uri("/api/projects/CHE/sprints")
-        .body(mapOf("name" to name))
+    private fun createSprint(authed: RestTestClient, name: String): String = authed.post().uri("/api/projects/CHE/groups")
+        .body(mapOf("typeKey" to "sprint", "name" to name))
         .exchange()
         .expectStatus().isCreated()
         .expectBody(String::class.java).returnResult().responseBody!!
-        .let { json.readTree(it) }["sprintId"].asText()
+        .let { json.readTree(it) }["groupId"].asText()
 
     /** POST 建出的 sprint 默认 planned;激活是用户动作(sprints move active)。 */
     private fun activateSprint(authed: RestTestClient, sprintId: String) {
-        authed.patch().uri("/api/projects/CHE/sprints/$sprintId")
-            .body(mapOf("status" to "active"))
+        authed.post().uri("/api/projects/CHE/groups/$sprintId/actions/start")
             .exchange().expectStatus().isOk()
     }
 
@@ -80,8 +79,8 @@ class ItemsAutoSprintApiTest : AbstractApiTest() {
         val (authed, itemId) = setup()
         val keep = createSprint(authed, "keep")
         assignToMe(authed, itemId)
-        authed.put().uri("/api/items/$itemId/sprint")
-            .body(mapOf("sprintId" to keep))
+        authed.put().uri("/api/items/$itemId/group-membership")
+            .body(mapOf("groupId" to keep, "groupType" to "sprint"))
             .exchange().expectStatus().isOk()
 
         val resp = patchStatus(authed, itemId, statusId(authed, "In Progress"))

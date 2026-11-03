@@ -87,6 +87,12 @@ class ChecklistItem {
   position: Int
 }
 class ItemDependency
+class GroupStatus {
+  name: String
+  statusType ∈ {START, FINAL, ACTIVE}
+  transitions: JSON [{function,target}]
+  position: Int
+}
 class ItemGroup {
   type: String
   name: String

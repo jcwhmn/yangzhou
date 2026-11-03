@@ -34,6 +34,7 @@ class ProjectService(
     private val members: yangzhou.api.business.member.MemberService,
     private val projectMembers: yangzhou.persistence.repository.ProjectMemberRepository,
     private val groupTypes: yangzhou.persistence.repository.ItemGroupTypeRepository,
+    private val groupWorkflow: yangzhou.api.business.itemgroup.GroupWorkflowService,
 ) {
 
     private val log = LoggerFactory.getLogger(ProjectService::class.java)
@@ -65,7 +66,8 @@ class ProjectService(
         )
         // 0056:内建 group 类型种子(sprint/release);既有项目由 V35 迁移种子
         listOf("sprint" to "Sprint", "release" to "Release").forEach { (k, n) ->
-            groupTypes.save(yangzhou.persistence.ItemGroupType(projectObjectId = project.objectId!!, typeKey = k, name = n, builtin = true))
+            val t = groupTypes.save(yangzhou.persistence.ItemGroupType(projectObjectId = project.objectId!!, typeKey = k, name = n, builtin = true))
+            groupWorkflow.seedFor(t) // spec 0097 S2:类型落库同步种默认状态机
         }
         return get(key)
     }

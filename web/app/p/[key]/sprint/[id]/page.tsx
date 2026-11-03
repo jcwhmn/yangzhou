@@ -30,6 +30,12 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { t } from "@/lib/texts";
+import {
+  listSprints,
+  getSprint,
+  sprintAction,
+  assignSprint,
+} from "@/lib/sprints";
 import { AssignPopover } from "@/components/AssignPopover";
 import { SignalChip, type Signal } from "@/components/Verdict";
 
@@ -99,10 +105,10 @@ export default function SprintPage() {
 
   useEffect(() => {
     Promise.all([
-      api<Sprint>(`/api/projects/${key}/sprints/${id}`),
-      api<Item[]>(`/api/projects/${key}/sprints/${id}/items`),
+      getSprint(key, id),
+      api<Item[]>(`/api/projects/${key}/groups/${id}/items`),
       api<{ statuses: Status[] }>(`/api/projects/${key}`),
-      api<Sprint[]>(`/api/projects/${key}/sprints`),
+      listSprints(key),
     ])
       .then(([s, its, p, all]) => {
         setSprint(s);
@@ -119,10 +125,12 @@ export default function SprintPage() {
   async function changeStatus(status: string) {
     if (!sprint) return;
     try {
-      const s = await api<Sprint>(`/api/projects/${key}/sprints/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ status }),
-      });
+      // spec 0097 S2:状态变更走动作白名单(active=start / completed=complete)
+      const s = await sprintAction(
+        key,
+        id,
+        status === "completed" ? "complete" : "start",
+      );
       setSprint(s);
       // YPJ-74:通知 sidebar 重拉 sprints(状态/排序即时同步)
       window.dispatchEvent(new Event("sprints-changed"));
@@ -195,13 +203,10 @@ export default function SprintPage() {
       for (const c of candidates) {
         const now = selected.has(c.itemId);
         if (prev.has(c.itemId) === now) continue;
-        await api(`/api/items/${c.itemId}/sprint`, {
-          method: "PUT",
-          body: JSON.stringify({ sprintId: now ? id : null }),
-        });
+        await assignSprint(key, c.itemId, now ? id : null);
       }
       setAddOpen(false);
-      setItems(await api<Item[]>(`/api/projects/${key}/sprints/${id}/items`));
+      setItems(await api<Item[]>(`/api/projects/${key}/groups/${id}/items`));
     } catch (e) {
       setError(e instanceof Error ? e.message : "更新失败");
     } finally {

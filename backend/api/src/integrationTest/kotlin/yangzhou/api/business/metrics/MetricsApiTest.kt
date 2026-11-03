@@ -39,14 +39,14 @@ class MetricsApiTest : AbstractApiTest() {
         meId = get("/api/members")[0]["memberId"].asText()
         s1 =
             post(
-                "/api/projects/MTR/sprints",
-                mapOf("name" to "S1", "startDate" to "2026-10-01", "endDate" to "2026-10-14"),
-            )["sprintId"].asText()
+                "/api/projects/MTR/groups",
+                mapOf("typeKey" to "sprint", "name" to "S1", "startDate" to "2026-10-01", "endDate" to "2026-10-14"),
+            )["groupId"].asText()
         s2 =
             post(
-                "/api/projects/MTR/sprints",
-                mapOf("name" to "S2", "startDate" to "2026-10-15", "endDate" to "2026-10-28"),
-            )["sprintId"].asText()
+                "/api/projects/MTR/groups",
+                mapOf("typeKey" to "sprint", "name" to "S2", "startDate" to "2026-10-15", "endDate" to "2026-10-28"),
+            )["groupId"].asText()
     }
 
     private fun newItem(
@@ -60,7 +60,7 @@ class MetricsApiTest : AbstractApiTest() {
     ): String {
         val itemId = createItem(authed, "MTR", title)["itemId"].asText()
         if (assignee) put("/api/items/$itemId/assignee", mapOf("assigneeItemId" to meId))
-        if (sprintId != null) put("/api/items/$itemId/sprint", mapOf("sprintId" to sprintId))
+        if (sprintId != null) put("/api/items/$itemId/group-membership", mapOf("groupId" to sprintId, "groupType" to "sprint"))
         val iid = jdbc.queryForObject("select object_id from item where object_id = ?::uuid", java.util.UUID::class.java, itemId)
         jdbc.update("update item set created_at = ?::timestamptz where object_id = ?", createdAt, iid)
         jdbc.update(
@@ -433,13 +433,13 @@ class MetricsApiTest : AbstractApiTest() {
             Int::class.java,
             iid,
         )
-        put("/api/items/$id/sprint", mapOf("sprintId" to s1))
+        put("/api/items/$id/group-membership", mapOf("groupId" to s1, "groupType" to "sprint"))
         assertEquals(1, rows(false))
         assertEquals(1, rows(true)) // 加入:S1 在册
-        put("/api/items/$id/sprint", mapOf("sprintId" to s2))
+        put("/api/items/$id/group-membership", mapOf("groupId" to s2, "groupType" to "sprint"))
         assertEquals(2, rows(false))
         assertEquals(1, rows(true)) // 换组:旧 closed,S2 在册
-        put("/api/items/$id/sprint", mapOf("sprintId" to null))
+        put("/api/items/$id/group-membership", mapOf("groupId" to null, "groupType" to "sprint"))
         assertEquals(2, rows(false))
         assertEquals(0, rows(true)) // 移出:全 closed
         val rel = post("/api/projects/MTR/releases", mapOf("name" to "R1"))["releaseId"].asText()
@@ -479,7 +479,7 @@ class MetricsApiTest : AbstractApiTest() {
         assertEquals(1, r["adds"].asInt())
         assertEquals(1, r["removes"].asInt())
         assertEquals(0, r["net"].asInt())
-        val s3 = post("/api/projects/MTR/sprints", mapOf("name" to "S3"))["sprintId"].asText()
+        val s3 = post("/api/projects/MTR/groups", mapOf("typeKey" to "sprint", "name" to "S3"))["groupId"].asText()
         authed
             .get()
             .uri("/api/projects/MTR/metrics/scope-change?groupId=$s3")

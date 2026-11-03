@@ -23,6 +23,7 @@ import { usePathname, useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api, API_BASE } from "@/lib/api";
 import { t } from "@/lib/texts";
+import { listSprints, createSprint as createSprintApi } from "@/lib/sprints";
 import {
   MilestoneManager,
   type Milestone,
@@ -85,14 +86,11 @@ export default function ProjectLayout({
 
   const loadSprints = () => {
     // CI 冷 JVM 偶发连接重置(status -1):失败隔 1s 重试一次
-    api<Sprint[]>(`/api/projects/${key}/sprints`)
+    listSprints(key)
       .catch(
         () =>
           new Promise<Sprint[]>((res) =>
-            setTimeout(
-              () => res(api<Sprint[]>(`/api/projects/${key}/sprints`)),
-              1000,
-            ),
+            setTimeout(() => res(listSprints(key)), 1000),
           ),
       )
       .then(setSprints)
@@ -152,13 +150,10 @@ export default function ProjectLayout({
 
   async function createSprint() {
     try {
-      await api(`/api/projects/${key}/sprints`, {
-        method: "POST",
-        body: JSON.stringify({
-          name,
-          startDate: startDate || null,
-          endDate: endDate || null,
-        }),
+      await createSprintApi(key, {
+        name,
+        startDate: startDate || null,
+        endDate: endDate || null,
       });
       setCreateOpen(false);
       setName("");
