@@ -22,6 +22,7 @@ import { ChartsReferenceLine } from "@mui/x-charts/ChartsReferenceLine";
 import { ScatterChart } from "@mui/x-charts/ScatterChart";
 import { api } from "@/lib/api";
 import { t } from "@/lib/texts";
+import { listSprints } from "@/lib/sprints";
 
 // YPJ-46 项目级 Flow 页(spec 0044):五图一表 + velocity/burnup,数据全来自只读 metrics 端点。
 type AssigneeCount = {
@@ -157,7 +158,7 @@ export default function FlowPage() {
           api<Cfd>(`/api/projects/${key}/metrics/cfd?from=${from}&to=${to}`),
           api<Aging>(`/api/projects/${key}/metrics/aging`),
           api<Velocity>(`/api/projects/${key}/metrics/velocity`),
-          api<Sprint[]>(`/api/projects/${key}/sprints`),
+          listSprints(key),
         ]);
       const active = (sprints ?? []).find((s) => s.status === "active");
       const burnup =

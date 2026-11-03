@@ -45,21 +45,27 @@ test("Sprint 详情 burndown——active sprint 出现剩余/理想线图例", a
 }) => {
   // burndown 端点要求起止日期:直建带日期 sprint(helper 建的是无日期)
   const sprintId = (
-    await apiCall<{ sprintId: string }>(
+    await apiCall<{ groupId: string }>(
       "POST",
-      `/api/projects/${projectKey}/sprints`,
+      `/api/projects/${projectKey}/groups`,
       {
+        typeKey: "sprint",
         name: "FL Sprint",
         startDate: new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10),
         endDate: new Date(Date.now() + 7 * 864e5).toISOString().slice(0, 10),
       },
     )
-  ).sprintId;
+  ).groupId;
   const item = await apiCreateItem(projectKey, "FL Sprint item");
-  await apiCall("PUT", `/api/items/${item}/sprint`, { sprintId });
-  await apiCall("PATCH", `/api/projects/${projectKey}/sprints/${sprintId}`, {
-    status: "active",
+  await apiCall("PUT", `/api/items/${item}/group-membership`, {
+    groupId: sprintId,
+    groupType: "sprint",
   });
+  await apiCall(
+    "POST",
+    `/api/projects/${projectKey}/groups/${sprintId}/actions/start`,
+    {},
+  );
 
   await page.goto(`/p/${projectKey}/sprint/${sprintId}`);
   await expect(page.getByText("剩余")).toBeVisible();

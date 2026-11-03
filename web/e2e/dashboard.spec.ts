@@ -8,19 +8,20 @@ test("驾驶舱聚合——我的 items、活跃 sprint、进行中 milestone @s
 }) => {
   const itemId = await apiCreateItem(projectKey, "驾驶舱聚合任务");
   await apiAssignMe(itemId);
-  const sprint = await apiCall<{ sprintId: string }>(
+  const sprint = await apiCall<{ groupId: string }>(
     "POST",
-    `/api/projects/${projectKey}/sprints`,
+    `/api/projects/${projectKey}/groups`,
     {
+      typeKey: "sprint",
       name: `驾驶舱冲刺 ${projectKey}`,
       startDate: null,
       endDate: null,
     },
   );
   await apiCall(
-    "PATCH",
-    `/api/projects/${projectKey}/sprints/${sprint.sprintId}`,
-    { status: "active" },
+    "POST",
+    `/api/projects/${projectKey}/groups/${sprint.groupId}/actions/start`,
+    {},
   );
   const ms = await apiCall<{ milestoneId: string }>(
     "POST",

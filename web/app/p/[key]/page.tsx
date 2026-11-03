@@ -23,6 +23,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { t } from "@/lib/texts";
+import { listSprints, sprintAction } from "@/lib/sprints";
 import { AssignPopover } from "@/components/AssignPopover";
 import type { Signal } from "@/components/Verdict";
 
@@ -96,12 +97,12 @@ export default function BoardPage() {
       setStatuses(project.statuses);
       // V9-S1:item 列表自带 feasSignal 冗余,不再单 feasibility 调用
       // YPJ-29:看板数据范围由后端决定(active sprint 的 items;无 active → 全量)
-      const board = await api<{ activeSprints: SprintLite[]; items: Item[] }>(
+      const board = await api<{ activeGroups: SprintLite[]; items: Item[] }>(
         `/api/projects/${key}/board`,
       );
-      setActiveSprints(board.activeSprints);
+      setActiveSprints(board.activeGroups ?? []);
       setItems(board.items);
-      setSprints(await api<SprintLite[]>(`/api/projects/${key}/sprints`));
+      setSprints(await listSprints(key));
     } catch (e) {
       setError(e instanceof Error ? e.message : "加载失败");
     } finally {
@@ -151,10 +152,7 @@ export default function BoardPage() {
   async function startSprint(sprintId: string) {
     if (!sprintId) return;
     try {
-      await api(`/api/projects/${key}/sprints/${sprintId}`, {
-        method: "PATCH",
-        body: JSON.stringify({ status: "active" }),
-      });
+      await sprintAction(key, sprintId, "start");
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : t.board.startFailed);

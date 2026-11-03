@@ -127,16 +127,21 @@ export async function apiCreateSprint(
   key: string,
   name: string,
 ): Promise<string> {
-  const res = await fetch(`${config.apiURL}/api/projects/${key}/sprints`, {
+  const res = await fetch(`${config.apiURL}/api/projects/${key}/groups`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${await apiToken()}`,
     },
-    body: JSON.stringify({ name, startDate: null, endDate: null }),
+    body: JSON.stringify({
+      typeKey: "sprint",
+      name,
+      startDate: null,
+      endDate: null,
+    }),
   });
   if (!res.ok) await assertOk(res, "创建 sprint");
-  return ((await res.json()) as { sprintId: string }).sprintId;
+  return ((await res.json()) as { groupId: string }).groupId;
 }
 
 /** 0047:池=合法指派范围;虚拟成员入池后才可指派/进候选 */
