@@ -136,15 +136,16 @@ create table group_status_transition (
 - CONTEXT.md/DOMAIN.md:ItemGroup 词条改写(动作=workflow 配置);领域规则 3 措辞核对(自由迁移仍成立)。
 - 用户设计文档 case 2 勾选完成后回写 status 注记。
 
-## 四、切片拆分与工作量评估
+## 四、切片拆分与工作量评估(已立票:YPJ-138/139/140,均挂 YPJ-137 下)
 
-| 切片 | 内容 | 规模 | 验证绿 |
-|---|---|---|---|
-| **S1 Workflow 统一模型(item 侧)** | V44 + WorkflowService/Controller 契约改造 + ItemService 判定适配 + web WorkflowEditor + 测试 | 后端 ~7 文件 + web ~2 + 测试 ~5 | `gradle build`+`integrationTest` 绿;workflow/看板 e2e 回归 |
-| **S2 GroupWorkflow + 统一服务** | V45 + itemgroup 包新建 + 删 sprint/grouptype 包 + ItemService 收口 + CLI + 测试改造 | 后端 ~12 文件 + CLI ~2 + 测试 ~9 | 后端双绿 + api.http 全绿 + smoke |
-| **S3 Web 全量** | 侧栏/sprint 页/详情/设置页/WorkflowEditor 收尾 + e2e 适配 | web ~10 + e2e ~5 | tsc 干净 + e2e 全量绿 |
+| 切片 | 票 | 内容 | 规模 | 验证绿 |
+|---|---|---|---|---|
+| **S1 Workflow 统一模型(item 侧)** | YPJ-138 | V44 + WorkflowService/Controller 契约改造 + **ItemService 全部 item 侧判定与泄漏 3/4 收口**(原 S1/S2 交点整块划入) + web WorkflowEditor + 测试 | 后端 ~7 文件 + web ~2 + 测试 ~5 | `gradle build`+`integrationTest` 绿;workflow/看板 e2e 回归 |
+| **S2 GroupWorkflow + 统一服务** | YPJ-139 | V45 + itemgroup 包新建 + 删 sprint/grouptype 包 + **泄漏 1/2 收口(统一归属端点)+ CLI** + 测试改造;不碰 ItemService | 后端 ~12 文件 + CLI ~2 + 测试 ~9 | 后端双绿 + api.http 全绿 + smoke |
+| **S3 Web 全量** | YPJ-140 | 侧栏/sprint 页/详情/设置页/WorkflowEditor 收尾 + e2e 适配 | web ~10 + e2e ~5 | tsc 干净 + e2e 全量绿 |
 
-- 总量 ~45 文件、预估 **3~3.5 个会话**,每片独立 PR 独立验证绿(S2 依赖 S1 的 V44 已合;S3 依赖 S2)。
+- **独立性**:S1 与 S2 代码零交集(交点 = ItemService 判定,整块归 S1),可并行开发;S3 硬依赖 S1+S2 契约。合并顺序 **S1 → S2 → S3**(V44 编号须先于 V45 落库)。
+- 总量 ~45 文件、预估 **3~3.5 个会话**,每片独立 PR 独立验证绿。
 - 单片不可再拆的理由:S1 的契约破坏(三布尔→枚举)无法半commit;S2 的删包与建包同事务性;S3 的侧栏与动作渲染共享数据源。
 - 测试改造大户:SprintApiTest/SprintBoardApiTest → ItemGroupApiTest;ItemsAutoSprintApiTest 适配;GroupTypeServiceUnitTest 14 例迁移。
 
