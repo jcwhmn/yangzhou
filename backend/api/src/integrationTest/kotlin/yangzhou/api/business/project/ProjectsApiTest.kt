@@ -14,7 +14,7 @@ class ProjectsApiTest : AbstractApiTest() {
         assertEquals("CHE", project["key"].asText())
         val names = project["statuses"].map { it["name"].asText() }
         assertEquals(listOf("To Do", "In Progress", "In Review", "QA", "Done"), names)
-        assertTrue(project["statuses"][4]["isFinal"].asBoolean())
+        assertTrue(project["statuses"][4]["statusType"].asText() == "FINAL")
     }
 
     @Test

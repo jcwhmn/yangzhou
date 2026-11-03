@@ -102,11 +102,11 @@ class ProjectServiceUnitTest {
 
         @Test
         fun statusDtosMapped() {
-            val s = Status(id = 1L, objectId = UUID(0, 1), projectObjectId = UUID(0, 1), name = "Done", isFinal = true, position = 4)
+            val s = Status(id = 1L, objectId = UUID(0, 1), projectObjectId = UUID(0, 1), name = "Done", statusType = yangzhou.persistence.StatusType.FINAL, position = 4)
             every { statuses.findByProjectObjectIdOrderByPosition(UUID(0, 1)) } returns listOf(s)
             val dto = service.get("CHE")
             assertEquals(1, dto.statuses.size)
-            assertEquals(true, dto.statuses[0].isFinal)
+            assertEquals(yangzhou.persistence.StatusType.FINAL, dto.statuses[0].statusType)
             assertEquals("Done", dto.statuses[0].name)
         }
 
@@ -147,6 +147,6 @@ class ProjectServiceUnitTest {
         Status(projectObjectId = projectObjectId, name = "In Progress", position = 1),
         Status(projectObjectId = projectObjectId, name = "In Review", position = 2),
         Status(projectObjectId = projectObjectId, name = "QA", position = 3),
-        Status(projectObjectId = projectObjectId, name = "Done", isFinal = true, position = 4),
+        Status(projectObjectId = projectObjectId, name = "Done", statusType = yangzhou.persistence.StatusType.FINAL, position = 4),
     )
 }

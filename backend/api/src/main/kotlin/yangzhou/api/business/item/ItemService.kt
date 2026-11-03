@@ -7,6 +7,7 @@ import yangzhou.api.error.BadRequestException
 import yangzhou.api.error.ConflictException
 import yangzhou.api.error.NotFoundException
 import yangzhou.persistence.Item
+import yangzhou.persistence.StatusType
 import yangzhou.persistence.ItemActivity
 import yangzhou.persistence.ItemGroupMember
 import yangzhou.persistence.ItemStatusHistory
@@ -128,7 +129,7 @@ class ItemService(
                 else ->
                     statuses
                         .findByProjectObjectIdOrderByPosition(projectObjectId)
-                        .let { list -> list.filter { it.isStart }.minByOrNull { it.position } ?: list.firstOrNull() }
+                        .let { list -> list.filter { it.statusType == StatusType.START }.minByOrNull { it.position } ?: list.firstOrNull() }
                         ?: throw ConflictException("项目无状态")
             }
 
@@ -257,7 +258,7 @@ class ItemService(
                 workflow.assertTransitionAllowed(projectObjectId, oldStatus.objectId!!, status.objectId!!)
             }
             // 开工须有主:离开起点状态前必须已指派(V4-S3)
-            if (current.assigneeObjectId == null && oldStatus?.isStart == true && !status.isStart) {
+            if (current.assigneeObjectId == null && oldStatus?.statusType == StatusType.START && status.statusType != StatusType.START) {
                 throw ConflictException("开工前请先指派负责人")
             }
             // WIP 限制:目标列已有 item 数 >= 上限 → 409(V5-W1)
@@ -282,17 +283,18 @@ class ItemService(
             notificationService.notifyStatusChange(current, actorId, oldStatus?.name, status.name)
             // YPJ-120(spec 0089):开始动作自动入当前 sprint——离开 start 态、目标为进行态、且无 sprint 时,
             // 挂到最早创建的 active sprint(与 board activeSprints[0] 同序);无 active/已有 sprint 静默跳过。
-            if (oldStatus?.isStart == true && !status.isStart && status.isInProgress) {
+            if (oldStatus?.statusType == StatusType.START && status.statusType == StatusType.ACTIVE) {
                 val rows = memberships.findByItemObjectIdIn(listOf(current.objectId!!))
                 val rowGroups = if (rows.isEmpty()) {
                     emptyMap()
                 } else {
                     groups.findAllByObjectIdIn(rows.map { it.groupObjectId }.toSet()).associateBy { it.objectId!! }
                 }
-                val hasLive = rows.any { rowGroups[it.groupObjectId]?.status != "completed" }
+                // spec 0097 泄漏 4 收口:只认 sprint 归属为 live(release/自定义组不再抑制自动挂载)
+                val hasLive = rows.any { rowGroups[it.groupObjectId]?.let { g -> g.status != "completed" && g.type == "sprint" } == true }
                 if (!hasLive) {
                     val first = groups.findByProjectObjectIdOrderByCreatedAt(projectObjectId)
-                        .firstOrNull { it.status == "active" }
+                        .firstOrNull { it.type == "sprint" && it.status == "active" } // spec 0097 泄漏 3 收口:自动挂载只挂 sprint
                     if (first != null) { // 同 create 初始归属模式(YPJ-56):save + 留痕,同事务
                         memberships.save(ItemGroupMember(groupObjectId = first.objectId!!, itemObjectId = current.objectId!!))
                         memberHistory.recordAdd(first.objectId!!, current.objectId!!, clock.instant())
@@ -630,7 +632,7 @@ class ItemService(
         val currentSprint: Map<UUID, yangzhou.persistence.ItemGroup>,
         val currentRelease: Map<UUID, yangzhou.persistence.ItemGroup>,
     ) {
-        val finalIds: Set<UUID> = statusById.filterValues { it.isFinal }.keys
+        val finalIds: Set<UUID> = statusById.filterValues { it.statusType == StatusType.FINAL }.keys
         private val statusNames = statusById.mapValues { it.value.name }
         private val memberNames = memberMap.mapValues { it.value.displayName }
 
@@ -643,7 +645,7 @@ class ItemService(
             status = statusNames[item.statusObjectId]?.let { if (item.deletedAt != null) "[已删除] $it" else it } ?: "?",
             startDate = item.startDate?.toString(),
             dueDate = item.dueDate?.toString(),
-            overdue = isOverdue(item.dueDate, LocalDate.now(clock), statusById[item.statusObjectId]?.isFinal == true),
+            overdue = isOverdue(item.dueDate, LocalDate.now(clock), statusById[item.statusObjectId]?.statusType == StatusType.FINAL),
             feasSignal = item.feasSignal,
             priority = item.priority,
             blocked = item.objectId in blockedIds,

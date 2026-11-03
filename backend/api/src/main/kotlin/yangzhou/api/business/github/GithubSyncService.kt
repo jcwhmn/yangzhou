@@ -163,7 +163,7 @@ class GithubSyncService(
             statuses
                 .findByProjectObjectIdOrderByPosition(projectObjectId)
                 .firstOrNull { it.objectId == item.statusObjectId }
-        if (current?.isFinal == true) return
+        if (current?.statusType == yangzhou.persistence.StatusType.FINAL) return
         if (current != null && target.position <= current.position) return
         val limit = target.wipLimit
         if (limit != null &&

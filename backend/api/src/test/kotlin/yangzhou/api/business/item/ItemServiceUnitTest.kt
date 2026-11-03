@@ -139,9 +139,9 @@ class ItemServiceUnitTest {
 
     private val project = Project(id = 1, objectId = projectObjectId, workspaceObjectId = workspaceObjectId, key = "CHE", name = "CHE 项目")
 
-    private val startStatus = Status(id = 100, projectObjectId = projectObjectId, name = "To Do", isStart = true)
+    private val startStatus = Status(id = 100, projectObjectId = projectObjectId, name = "To Do", statusType = yangzhou.persistence.StatusType.START)
 
-    private val doneStatus = Status(id = 200, projectObjectId = projectObjectId, name = "Done", isFinal = true, position = 9)
+    private val doneStatus = Status(id = 200, projectObjectId = projectObjectId, name = "Done", statusType = yangzhou.persistence.StatusType.FINAL, position = 9)
 
     private val me =
         Member(

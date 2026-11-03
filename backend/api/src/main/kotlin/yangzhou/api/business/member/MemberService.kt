@@ -96,7 +96,7 @@ class MemberService(
         val activeItems =
             items
                 .findByAssigneeObjectIdAndDeletedAtIsNull(member.objectId)
-                .filter { item -> statuses.findByObjectId(item.statusObjectId)?.isFinal != true }
+                .filter { item -> statuses.findByObjectId(item.statusObjectId)?.statusType != yangzhou.persistence.StatusType.FINAL }
         if (activeItems.isNotEmpty()) {
             throw ConflictException("该成员仍有进行中 item(${activeItems.size} 个),请先改派或完成")
         }

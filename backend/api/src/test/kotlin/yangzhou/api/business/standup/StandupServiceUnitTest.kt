@@ -38,7 +38,7 @@ class StandupServiceUnitTest {
         Member(id = 5L, objectId = UUID(0, 5), workspaceObjectId = UUID(0, 9), username = null, passwordHash = "h", displayName = "me")
     private val project = Project(id = 1L, objectId = UUID(0, 1), workspaceObjectId = UUID(0, 9), key = "CHE", name = "CHE")
     private val open = Status(id = 1L, objectId = UUID(0, 1), projectObjectId = UUID(0, 1), name = "In Progress", position = 1)
-    private val done = Status(id = 2L, objectId = UUID(0, 2), projectObjectId = UUID(0, 1), name = "Done", isFinal = true, position = 2)
+    private val done = Status(id = 2L, objectId = UUID(0, 2), projectObjectId = UUID(0, 1), name = "Done", statusType = yangzhou.persistence.StatusType.FINAL, position = 2)
 
     private fun item(
         id: Long,

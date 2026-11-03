@@ -13,6 +13,7 @@ import yangzhou.api.guard.LeaderGuard
 import yangzhou.persistence.Project
 import yangzhou.persistence.ProjectWorkflowRule
 import yangzhou.persistence.Status
+import yangzhou.persistence.StatusType
 import yangzhou.persistence.repository.ProjectDeletionRepository
 import yangzhou.persistence.repository.ProjectRepository
 import yangzhou.persistence.repository.ProjectWorkflowRuleRepository
@@ -37,7 +38,7 @@ class ProjectService(
 
     private val log = LoggerFactory.getLogger(ProjectService::class.java)
 
-    data class StatusDto(val statusId: UUID, val name: String, val icon: String?, val isStart: Boolean, val isFinal: Boolean, val isInProgress: Boolean, val position: Int)
+    data class StatusDto(val statusId: UUID, val name: String, val icon: String?, val statusType: StatusType, val position: Int)
     data class ProjectDto(
         val projectId: UUID,
         val key: String,
@@ -78,7 +79,7 @@ class ProjectService(
     fun get(key: String): ProjectDto {
         val project = projects.findByKey(key) ?: throw NotFoundException("项目不存在:$key")
         val statusDtos = statuses.findByProjectObjectIdOrderByPosition(project.objectId!!).map {
-            StatusDto(it.objectId, it.name, it.icon, it.isStart, it.isFinal, it.isInProgress, it.position)
+            StatusDto(it.objectId, it.name, it.icon, it.statusType, it.position)
         }
         return ProjectDto(project.objectId, project.key, project.name, project.archivedAt != null, project.feasSignal, statusDtos)
     }
@@ -160,7 +161,7 @@ class ProjectService(
                 startDate = item.startDate?.toString(),
                 dueDate = item.dueDate?.toString(),
                 statusName = status?.name ?: "?",
-                overdue = item.dueDate?.let { it < today } == true && status?.isFinal != true,
+                overdue = item.dueDate?.let { it < today } == true && status?.statusType != StatusType.FINAL,
                 depth = depthOf(item),
             )
             listOf(row) + walk(item.objectId)
@@ -191,20 +192,20 @@ class ProjectService(
     }
 
     private fun defaultStatuses(projectId: UUID) = listOf( // V7:5 列(评审环节天然有位置);存量项目不动
-        Status(projectObjectId = projectId, name = "To Do", isStart = true, position = 0),
-        Status(projectObjectId = projectId, name = "In Progress", isInProgress = true, position = 1), // YPJ-120:进行态属预置模板语义,V42 只负责存量回填
+        Status(projectObjectId = projectId, name = "To Do", statusType = StatusType.START, position = 0),
+        Status(projectObjectId = projectId, name = "In Progress", statusType = StatusType.ACTIVE, position = 1), // YPJ-120→spec 0097:进行态 = ACTIVE 类
         Status(projectObjectId = projectId, name = "In Review", position = 2),
         Status(projectObjectId = projectId, name = "QA", position = 3),
-        Status(projectObjectId = projectId, name = "Done", isFinal = true, position = 4),
+        Status(projectObjectId = projectId, name = "Done", statusType = StatusType.FINAL, position = 4),
     )
 
     companion object {
         /** YPJ-40 方案 A 的推导核心(纯函数,单测直测):branch→首个非 start、pr_open→次个非 start(无则不种=人管)、pr_merged→首个 final;缺失即不种,非标 workflow 开箱有定义。 */
         fun defaultRuleSeeds(statuses: List<Status>): List<Pair<VcsEvent, Status>> = buildList {
-            val nonStart = statuses.filter { !it.isStart }
+            val nonStart = statuses.filter { it.statusType != StatusType.START }
             nonStart.firstOrNull()?.let { add(VcsEvent.BRANCH_CREATED to it) }
             nonStart.getOrNull(1)?.let { add(VcsEvent.PR_OPENED to it) }
-            statuses.firstOrNull { it.isFinal }?.let { add(VcsEvent.PR_MERGED to it) }
+            statuses.firstOrNull { it.statusType == StatusType.FINAL }?.let { add(VcsEvent.PR_MERGED to it) }
         }
     }
 }

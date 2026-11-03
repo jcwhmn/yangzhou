@@ -179,7 +179,7 @@ class NotificationServiceUnitTest {
             val open = Status(id = 1L, objectId = UUID(0, 1), projectObjectId = projectObjectId, name = "To Do", position = 0)
             val mid = Status(id = 2L, objectId = UUID(0, 2), projectObjectId = projectObjectId, name = "In Progress", position = 1)
             val final =
-                Status(id = 3L, objectId = UUID(0, 3), projectObjectId = projectObjectId, name = "Done", isFinal = true, position = 2)
+                Status(id = 3L, objectId = UUID(0, 3), projectObjectId = projectObjectId, name = "Done", statusType = yangzhou.persistence.StatusType.FINAL, position = 2)
             every { notifications.findByRecipientMemberObjectId(creatorObjectId) } returns (1..60).map { notif(it.toLong()) }
             every { items.findAllByObjectIdIn(any()) } returns listOf(item)
             every { members.findAllByObjectIdIn(any()) } returns listOf(assignee)
@@ -196,7 +196,7 @@ class NotificationServiceUnitTest {
         @Test
         fun finalStatusHasNoAction() {
             val final =
-                Status(id = 3L, objectId = UUID(0, 3), projectObjectId = projectObjectId, name = "Done", isFinal = true, position = 2)
+                Status(id = 3L, objectId = UUID(0, 3), projectObjectId = projectObjectId, name = "Done", statusType = yangzhou.persistence.StatusType.FINAL, position = 2)
             item.statusObjectId.let { }
             val doneItem = item.copy(statusObjectId = final.objectId)
             every { notifications.findByRecipientMemberObjectId(creatorObjectId) } returns listOf(notif(1L))

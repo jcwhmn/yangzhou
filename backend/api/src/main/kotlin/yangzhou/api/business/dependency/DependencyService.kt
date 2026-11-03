@@ -52,7 +52,7 @@ class DependencyService(
                     number = target?.let { "${project?.key}-${it.number}" } ?: "?",
                     title = target?.title ?: "",
                     statusName = status?.name ?: "?",
-                    final = status?.isFinal == true,
+                    final = status?.statusType == yangzhou.persistence.StatusType.FINAL,
                 )
             }
         return DependencyListDto(deps, blocked = deps.any { !it.final })
@@ -83,7 +83,7 @@ class DependencyService(
             number = "${project?.key}-${target.number}",
             title = target.title,
             statusName = status?.name ?: "?",
-            final = status?.isFinal == true,
+            final = status?.statusType == yangzhou.persistence.StatusType.FINAL,
         )
     }
 
@@ -100,7 +100,7 @@ class DependencyService(
         val finalByObjectId =
             statuses
                 .findByProjectObjectIdOrderByPosition(projectObjectId)
-                .associate { it.objectId to it.isFinal }
+                .associate { it.objectId to (it.statusType == yangzhou.persistence.StatusType.FINAL) }
         return dependencies
             .findByItemObjectIdIn(projectItems.mapNotNull { it.objectId })
             .filter { row ->
