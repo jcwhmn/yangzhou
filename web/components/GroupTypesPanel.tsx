@@ -24,6 +24,44 @@ import { api } from "@/lib/api";
 import { t } from "@/lib/texts";
 
 type GroupType = { typeKey: string; name: string; builtin: boolean };
+// spec 0097 S3:类型 workflow 只读形状(同 GroupWorkflowService.GroupStatusDto)
+type WfStatus = {
+  name: string;
+  statusType: string;
+  transitions: { function: string; target: string }[];
+};
+
+function wfTypeLabel(statusType: string): string {
+  switch (statusType) {
+    case "START":
+      return t.wf.start;
+    case "FINAL":
+      return t.wf.final;
+    case "ACTIVE":
+      return t.wf.active;
+    default:
+      return statusType;
+  }
+}
+
+function wfFnLabel(fn: string): string {
+  switch (fn) {
+    case "start":
+      return t.wf.fnStart;
+    case "complete":
+      return t.wf.fnComplete;
+    case "switch":
+      return t.wf.fnSwitch;
+    case "forward":
+      return t.wf.fnForward;
+    case "backward":
+      return t.wf.fnBackward;
+    case "cancel":
+      return t.wf.fnCancel;
+    default:
+      return fn;
+  }
+}
 
 export function GroupTypesPanel({
   projectKey,
@@ -35,13 +73,28 @@ export function GroupTypesPanel({
   onClose: () => void;
 }) {
   const [types, setTypes] = useState<GroupType[]>([]);
+  const [workflows, setWorkflows] = useState<
+    Record<string, WfStatus[] | undefined>
+  >({});
   const [typeKey, setTypeKey] = useState("");
   const [name, setName] = useState("");
   const [error, setError] = useState("");
 
   const load = () => {
     api<GroupType[]>(`/api/projects/${projectKey}/group-types`)
-      .then(setTypes)
+      .then(async (ts) => {
+        setTypes(ts);
+        // spec 0097 S3:workflow 只读展示,每类型一拉;失败不阻断类型管理(该类型不显示块)
+        const entries = await Promise.all(
+          ts.map(async (g) => {
+            const wf = await api<WfStatus[]>(
+              `/api/projects/${projectKey}/group-types/${g.typeKey}/workflow`,
+            ).catch(() => undefined);
+            return [g.typeKey, wf] as const;
+          }),
+        );
+        setWorkflows(Object.fromEntries(entries));
+      })
       .catch(() => setTypes([]));
   };
 
@@ -83,7 +136,7 @@ export function GroupTypesPanel({
   }
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle>{t.groupTypes.title}</DialogTitle>
       <DialogContent>
         <Typography variant="caption" color="text.secondary">
@@ -91,31 +144,57 @@ export function GroupTypesPanel({
         </Typography>
         <List dense>
           {types.map((g) => (
-            <Box
-              key={g.typeKey}
-              component="li"
-              sx={{ display: "flex", alignItems: "center" }}
-            >
-              <ListItemText
-                primary={g.name}
-                secondary={g.typeKey}
-                sx={{ flex: 1 }}
-              />
-              {g.builtin && (
-                <Chip
-                  size="small"
-                  label={t.groupTypes.builtin}
-                  sx={{ mr: 1 }}
+            <Box key={g.typeKey} component="li">
+              <Box sx={{ display: "flex", alignItems: "center" }}>
+                <ListItemText
+                  primary={g.name}
+                  secondary={g.typeKey}
+                  sx={{ flex: 1 }}
                 />
-              )}
-              {!g.builtin && (
-                <IconButton
-                  size="small"
-                  aria-label={t.groupTypes.deleteBtn}
-                  onClick={() => remove(g.typeKey)}
-                >
-                  <DeleteOutlineIcon fontSize="small" />
-                </IconButton>
+                {g.builtin && (
+                  <Chip
+                    size="small"
+                    label={t.groupTypes.builtin}
+                    sx={{ mr: 1 }}
+                  />
+                )}
+                {!g.builtin && (
+                  <IconButton
+                    size="small"
+                    aria-label={t.groupTypes.deleteBtn}
+                    onClick={() => remove(g.typeKey)}
+                  >
+                    <DeleteOutlineIcon fontSize="small" />
+                  </IconButton>
+                )}
+              </Box>
+              {/* spec 0097 S3:workflow 只读展示(状态 · statusType · 出边动作 → 目标) */}
+              {workflows[g.typeKey] !== undefined && (
+                <Box sx={{ pl: 2, pb: 1 }}>
+                  {workflows[g.typeKey]!.length === 0 ? (
+                    <Typography variant="caption" color="text.secondary">
+                      {t.groupTypes.wfEmpty}
+                    </Typography>
+                  ) : (
+                    workflows[g.typeKey]!.map((st) => (
+                      <Typography
+                        key={st.name}
+                        variant="caption"
+                        component="div"
+                        color="text.secondary"
+                      >
+                        {st.name} · {wfTypeLabel(st.statusType)}
+                        {st.transitions.length > 0 &&
+                          ` · ${st.transitions
+                            .map(
+                              (tr) =>
+                                `${wfFnLabel(tr.function)} → ${tr.target}`,
+                            )
+                            .join("、")}`}
+                      </Typography>
+                    ))
+                  )}
+                </Box>
               )}
             </Box>
           ))}

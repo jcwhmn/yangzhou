@@ -63,6 +63,12 @@ type Status = {
   statusType: string;
   position: number;
 };
+// spec 0097 S3:类型 workflow(GET /group-types/{typeKey}/workflow),按钮按出边渲染
+type TypeWorkflow = {
+  name: string;
+  statusType: string;
+  transitions: { function: string; target: string }[];
+};
 type Candidate = {
   itemId: string;
   number: string;
@@ -90,6 +96,7 @@ export default function SprintPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [allSprints, setAllSprints] = useState<Sprint[]>([]);
+  const [wf, setWf] = useState<TypeWorkflow[]>([]);
   const [confirmFlow, setConfirmFlow] = useState<null | "start" | "complete">(
     null,
   );
@@ -109,12 +116,14 @@ export default function SprintPage() {
       api<Item[]>(`/api/projects/${key}/groups/${id}/items`),
       api<{ statuses: Status[] }>(`/api/projects/${key}`),
       listSprints(key),
+      api<TypeWorkflow[]>(`/api/projects/${key}/group-types/sprint/workflow`),
     ])
-      .then(([s, its, p, all]) => {
+      .then(([s, its, p, all, w]) => {
         setSprint(s);
         setItems(its);
         setStatuses(p.statuses);
         setAllSprints(all);
+        setWf(w);
       })
       .catch((e) => {
         if (e instanceof ApiError && e.status === 404) setGone(true);
@@ -155,6 +164,19 @@ export default function SprintPage() {
   async function doComplete() {
     await changeStatus("completed");
     setConfirmFlow(null);
+  }
+
+  // spec 0097 S3:按钮 = 当前状态出边(backward 仅 CLI/API 可及,UI 现状一致)
+  function actionLabel(fn: string): string {
+    return fn === "start"
+      ? t.sprintPage.startBtn
+      : fn === "complete"
+        ? t.sprintPage.completeBtn
+        : fn;
+  }
+  function actionClick(fn: string) {
+    if (fn === "start") return startSprint();
+    if (fn === "complete") return completeSprint();
   }
 
   useEffect(() => {
@@ -294,20 +316,19 @@ export default function SprintPage() {
               alignItems="center"
               sx={{ ml: "auto" }}
             >
-              {sprint.status === "planned" && (
-                <Button size="small" variant="contained" onClick={startSprint}>
-                  ▶ 开始 Sprint
-                </Button>
-              )}
-              {sprint.status === "active" && (
-                <Button
-                  size="small"
-                  variant="contained"
-                  onClick={completeSprint}
-                >
-                  ✓ 完成 Sprint
-                </Button>
-              )}
+              {wf
+                .find((s) => s.name === sprint.status)
+                ?.transitions.filter((tr) => tr.function !== "backward")
+                .map((tr) => (
+                  <Button
+                    key={tr.function}
+                    size="small"
+                    variant="contained"
+                    onClick={() => actionClick(tr.function)}
+                  >
+                    {actionLabel(tr.function)}
+                  </Button>
+                ))}
             </Stack>
             {sprint.status !== "completed" && (
               <Button size="small" variant="outlined" onClick={openAdd}>
