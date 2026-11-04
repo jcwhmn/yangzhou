@@ -97,6 +97,7 @@ class ItemService(
         val createdAt: String? = null,
         val sprintId: UUID? = null,
         val sprintName: String? = null,
+        val onBoard: Boolean = false,
         val autoAssignedSprintName: String? = null, // YPJ-120 仅 PATCH 触发自动挂载时非空
         val releaseId: UUID? = null,
         val releaseName: String? = null,
@@ -188,7 +189,7 @@ class ItemService(
         val visible =
             if (backlogOnly) {
                 projectItems.filter {
-                    it.statusObjectId !in ctx.finalIds && it.objectId !in ctx.currentSprint
+                    it.statusObjectId !in ctx.finalIds && it.objectId !in ctx.currentSprint && !it.onBoard
                 }
             } else {
                 projectItems
@@ -656,6 +657,7 @@ class ItemService(
             createdAt = item.createdAt.toString(),
             sprintId = currentSprint[item.objectId]?.objectId,
             sprintName = currentSprint[item.objectId]?.name,
+            onBoard = item.onBoard,
             releaseId = currentRelease[item.objectId]?.objectId,
             releaseName = currentRelease[item.objectId]?.name,
             externalRef = item.externalRef,

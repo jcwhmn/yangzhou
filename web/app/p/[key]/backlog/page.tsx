@@ -71,6 +71,7 @@ export default function BacklogPage() {
     "优先级",
     "状态",
     "负责人",
+    "拉入",
     "开始",
     "截止",
     "可行性",
@@ -155,6 +156,26 @@ export default function BacklogPage() {
                         />
                       )}
                     </AssignPopover>
+                  </TableCell>
+                  <TableCell>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      onClick={() =>
+                        api(`/api/items/${it.itemId}/board-membership`, {
+                          method: "PUT",
+                          body: JSON.stringify({ onBoard: true }),
+                        })
+                          .then(() =>
+                            api<Item[]>(`/api/projects/${key}/backlog`)
+                              .then(setItems)
+                              .catch(() => {}),
+                          )
+                          .catch(() => {})
+                      }
+                    >
+                      {t.board.pullItem}
+                    </Button>
                   </TableCell>
                   <TableCell>{it.startDate ?? "—"}</TableCell>
                   <TableCell>

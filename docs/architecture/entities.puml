@@ -67,6 +67,7 @@ class Item {
   type: String
   startDate: LocalDate?
   dueDate: LocalDate?
+  on_board: Boolean
   children: List<Item>
 }
 class Notification {

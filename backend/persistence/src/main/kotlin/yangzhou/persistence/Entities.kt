@@ -250,6 +250,7 @@ data class Item(
     val dueDate: LocalDate? = null,
     val feasSignal: String? = null,
     val priority: String? = null,
+    val onBoard: Boolean = false,
     val deletedAt: Instant? = null,
     @CreatedDate
     var createdAt: Instant = Instant.now(),
