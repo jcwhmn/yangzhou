@@ -24,8 +24,12 @@ test("看板页拉入对话框——多选拉入", async ({ page, projectKey }) 
   await apiCreateItem(projectKey, "BM 对话框 item");
   await page.goto(`/p/${projectKey}/board`);
   await page.getByRole("button", { name: "拉入看板" }).click();
-  await page.getByRole("button", { name: /BM 对话框 item/ }).click();
-  await page.getByRole("button", { name: "拉入", exact: true }).click();
+  // sprint 同款对话框(List+Checkbox):勾选候选行
+  await page
+    .locator("li", { hasText: "BM 对话框 item" })
+    .getByRole("checkbox")
+    .click();
+  await page.getByRole("button", { name: "完成" }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeHidden(); // MUI 淡出期吞点击,先等关
   await expect(page.getByText("BM 对话框 item")).toBeVisible();

@@ -18,6 +18,15 @@ import {
 } from "@mui/material";
 import { Dropdown } from "@/components/Dropdown";
 import RefreshIcon from "@mui/icons-material/Refresh";
+import UndoOutlined from "@mui/icons-material/UndoOutlined";
+import {
+  Checkbox,
+  List,
+  ListItem,
+  ListItemText,
+  DialogActions,
+  Tooltip,
+} from "@mui/material";
 import Link from "next/link";
 import { usePathname, useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -505,15 +514,19 @@ export default function BoardPage() {
                               )}
                             </AssignPopover>
                             {!finalNames.has(it.status) && (
-                              <Chip
-                                size="small"
-                                variant="outlined"
-                                label={t.board.remove}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setBoardItem(it.itemId, false).then(load);
-                                }}
-                              />
+                              <Tooltip title={t.board.remove}>
+                                <IconButton
+                                  size="small"
+                                  aria-label={t.board.remove}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setBoardItem(it.itemId, false).then(load);
+                                  }}
+                                  sx={{ alignSelf: "center", mr: -0.5 }}
+                                >
+                                  <UndoOutlined fontSize="inherit" />
+                                </IconButton>
+                              </Tooltip>
                             )}
                           </Stack>
                           <Link
@@ -589,47 +602,57 @@ export default function BoardPage() {
           </Stack>
         </DialogContent>
       </Dialog>
-      <Dialog open={pullOpen} onClose={() => setPullOpen(false)}>
+      <Dialog
+        open={pullOpen}
+        onClose={() => setPullOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
         <DialogTitle>{t.board.pullTitle}</DialogTitle>
-        <DialogContent>
-          <Stack spacing={1} sx={{ mt: 1 }}>
-            {(backlogItems ?? []).length === 0 && (
-              <Typography color="text.secondary">
-                {t.board.pullEmpty}
-              </Typography>
-            )}
+        <DialogContent dividers sx={{ maxHeight: 480 }}>
+          <List dense disablePadding>
             {[...(backlogItems ?? [])]
               .sort(
                 (a, b) =>
                   Number(a.status === "To Do") - Number(b.status === "To Do"),
               )
               .map((it) => (
-                <Button
-                  key={it.itemId}
-                  variant={picked.has(it.itemId) ? "contained" : "outlined"}
-                  onClick={() =>
-                    setPicked((prev) => {
-                      const next = new Set(prev);
-                      if (next.has(it.itemId)) next.delete(it.itemId);
-                      else next.add(it.itemId);
-                      return next;
-                    })
-                  }
-                >
-                  {it.number} {it.title} · {it.status}
-                </Button>
+                <ListItem key={it.itemId} dense disableGutters>
+                  <Checkbox
+                    size="small"
+                    checked={picked.has(it.itemId)}
+                    onChange={() =>
+                      setPicked((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(it.itemId)) next.delete(it.itemId);
+                        else next.add(it.itemId);
+                        return next;
+                      })
+                    }
+                  />
+                  <ListItemText
+                    primary={`${it.number} · ${it.title}`}
+                    secondary={it.status}
+                  />
+                </ListItem>
               ))}
-            {(backlogItems ?? []).length > 0 && (
-              <Button
-                variant="contained"
-                disabled={picked.size === 0}
-                onClick={confirmPull}
-              >
-                {t.board.pullConfirm}
-              </Button>
+            {(backlogItems ?? []).length === 0 && (
+              <Typography variant="caption" color="text.secondary">
+                {t.board.pullEmpty}
+              </Typography>
             )}
-          </Stack>
+          </List>
         </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPullOpen(false)}>取消</Button>
+          <Button
+            variant="contained"
+            onClick={confirmPull}
+            disabled={picked.size === 0}
+          >
+            {t.board.pullConfirm}
+          </Button>
+        </DialogActions>
       </Dialog>
     </Box>
   );
