@@ -122,4 +122,11 @@ class ItemGroupController(
         @PathVariable itemId: UUID,
         @RequestBody request: ItemGroupService.MembershipRequest,
     ): ItemService.ItemDto = service.replaceMembership(itemId, request)
+
+    /** 看板拉入/退回(spec 0099):{onBoard}。拉入同时挂最早 active sprint;退回同时移出非 completed sprint 成员行。 */
+    @PutMapping("/items/{itemId}/board-membership")
+    fun boardMembership(
+        @PathVariable itemId: UUID,
+        @RequestBody request: ItemGroupService.BoardMembershipRequest,
+    ): ItemService.ItemDto = service.boardMembership(itemId, request)
 }

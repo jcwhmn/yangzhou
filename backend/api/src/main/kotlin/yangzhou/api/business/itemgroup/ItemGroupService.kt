@@ -333,7 +333,7 @@ class ItemGroupService(
         val rows = active.flatMap { memberships.findByGroupObjectId(it.objectId!!) }
         if (rows.isEmpty()) return BoardDto(activeDto, emptyList())
         val objectIds = itemRepo.findAllByObjectIdIn(rows.map { it.itemObjectId }.toSet()).map { it.objectId }.toSet()
-        return BoardDto(activeDto, itemService.list(key).filter { it.itemId in objectIds })
+        return BoardDto(activeDto, itemService.list(key).filter { it.itemId in objectIds || it.onBoard })
     }
 
     /**
@@ -341,6 +341,9 @@ class ItemGroupService(
      * groupId=null + groupType = 移出;目标组 FINAL 态 409(历史不可变,同 sprint 现状 completed 拒)。
      */
     @Transactional
+    /** spec 0099:看板拉入/退回请求。 */
+    data class BoardMembershipRequest(val onBoard: Boolean)
+
     fun replaceMembership(
         itemObjectId: UUID,
         request: MembershipRequest,
@@ -384,6 +387,31 @@ class ItemGroupService(
         if (target != null) {
             memberships.save(ItemGroupMember(groupObjectId = target.objectId!!, itemObjectId = item.objectId!!))
             memberHistory.recordAdd(target.objectId!!, item.objectId!!, clock.instant())
+        }
+        return itemService.get(itemObjectId)
+    }
+
+    /** spec 0099:看板拉入/退回。拉入 = 置标记 + 同时挂最早 active sprint(若有,幂等);退回 = 清标记 + 移出全部非 completed sprint 成员行(复用归属移出,历史不可变)。 */
+    @Transactional
+    fun boardMembership(
+        itemObjectId: UUID,
+        request: BoardMembershipRequest,
+    ): ItemService.ItemDto {
+        val item = itemRepo.findByObjectId(itemObjectId) ?: throw NotFoundException("item 不存在")
+        itemRepo.save(item.copy(onBoard = request.onBoard))
+        if (request.onBoard) {
+            val active =
+                groups.findByProjectObjectIdOrderByCreatedAt(item.projectObjectId)
+                    .firstOrNull { it.type == "sprint" && it.status == "active" }
+            if (active != null) {
+                val rows = memberships.findByItemObjectIdIn(listOf(item.objectId!!))
+                if (rows.none { it.groupObjectId == active.objectId }) {
+                    memberships.save(ItemGroupMember(groupObjectId = active.objectId!!, itemObjectId = item.objectId!!))
+                    memberHistory.recordAdd(active.objectId!!, item.objectId!!, clock.instant())
+                }
+            }
+        } else {
+            replaceMembership(itemObjectId, MembershipRequest(groupId = null, groupType = "sprint"))
         }
         return itemService.get(itemObjectId)
     }

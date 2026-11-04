@@ -456,6 +456,15 @@ Content-Type: application/json
   "groupType": "sprint"
 }
 
+### 看板拉入/退回(spec 0099:on_board 标记;拉入同时挂最早 active sprint,退回同时移出非 completed 成员行)
+PUT {{host}}/api/items/{{itemId}}/board-membership
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "onBoard": true
+}
+
 ### 组内 items(完成后仍含历史行)
 GET {{host}}/api/projects/{{pkey}}/groups/{{sprintId}}/items
 Authorization: Bearer {{token}}
