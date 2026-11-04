@@ -53,10 +53,19 @@ test("日期与超期标识——详情设置日期,看板红标,甘特可见", 
 }) => {
   // 另造一个无日期 item:甘特「未排期」桶 length>0 才渲染,只有带日期 item 时桶不出现
   await apiCreateItem(projectKey, "E2E 未排期 item");
-  await page.goto(`/p/${projectKey}`);
-  await page.getByPlaceholder("新建 item").fill("E2E 超期 item");
-  await page.getByRole("button", { name: "新建 ITEM" }).click();
-  await page.getByText("E2E 超期 item").first().click();
+  // 超期 item 放进 active sprint:看板卡才有红标(无 active 时根页落 Backlog,方案A)
+  const itemId = await apiCreateItem(projectKey, "E2E 超期 item");
+  const sprintId = await apiCreateSprint(projectKey, "E2E Date Sprint");
+  await apiCall("PUT", `/api/items/${itemId}/group-membership`, {
+    groupId: sprintId,
+    groupType: "sprint",
+  });
+  await apiCall(
+    "POST",
+    `/api/projects/${projectKey}/groups/${sprintId}/actions/start`,
+    {},
+  );
+  await page.goto(`/p/${projectKey}/i/${itemId}`);
   await fillDate(page, "开始日期", "2020-01-01");
   await fillDate(page, "截止日期", "2020-01-15");
   const saveResp = page.waitForResponse(
@@ -65,7 +74,7 @@ test("日期与超期标识——详情设置日期,看板红标,甘特可见", 
   await page.getByRole("button", { name: "保存" }).click();
   await saveResp; // 等 PATCH 落库再导航,否则请求被打断
   await expectDate(page, "开始日期", "2020-01-01");
-  // 看板红标
+  // 看板红标(active sprint → 根页 = 看板)
   await page.goto(`/p/${projectKey}`);
   await expect(page.getByText("⚠ 超期 2020-01-15")).toBeVisible();
   // 甘特:行可见 + 未排期组存在
@@ -148,7 +157,7 @@ test("回收站——删除后可恢复", async ({ page, projectKey }) => {
   // 详情删除(原生 confirm 自动接受)
   page.once("dialog", (d) => d.accept());
   await page.getByRole("button", { name: "删除", exact: true }).click();
-  await expect(page).toHaveURL(new RegExp(`/p/${projectKey}$`));
+  await expect(page).toHaveURL(new RegExp(`/p/${projectKey}/backlog$`));
   // 回收站列出 → 恢复 → 看板重现
   await page.goto("/recycle-bin");
   await page.getByText("E2E 回收站 item").waitFor({ timeout: 10000 });
@@ -158,6 +167,18 @@ test("回收站——删除后可恢复", async ({ page, projectKey }) => {
 });
 
 test("看板刷新按钮可用", async ({ page, projectKey }) => {
+  // 看板仅在有 active sprint 时承载(方案A):API 造板
+  const itemId = await apiCreateItem(projectKey, "E2E 刷新 item");
+  const sprintId = await apiCreateSprint(projectKey, "E2E 刷新 Sprint");
+  await apiCall("PUT", `/api/items/${itemId}/group-membership`, {
+    groupId: sprintId,
+    groupType: "sprint",
+  });
+  await apiCall(
+    "POST",
+    `/api/projects/${projectKey}/groups/${sprintId}/actions/start`,
+    {},
+  );
   await page.goto(`/p/${projectKey}`);
   await page.getByRole("button", { name: "刷新" }).click();
   await expect(
@@ -180,7 +201,7 @@ test("V13-S4 详情切状态 409——错误浮出且状态不变", async ({
   );
 });
 
-test("YPJ-29 无 active sprint 显示全部+提示条;开始 sprint 后收窄", async ({
+test("board——无 active 落 Backlog(方案A);开始 sprint 后收窄", async ({
   page,
   projectKey,
 }) => {
@@ -192,20 +213,19 @@ test("YPJ-29 无 active sprint 显示全部+提示条;开始 sprint 后收窄", 
     groupType: "sprint",
   });
 
+  // 无 active:根页重定向 Backlog(工作集);planned 成员不在工作集
   await page.goto(`/p/${projectKey}`);
-  await expect(page.getByText("当前无进行中 sprint")).toBeVisible();
-  await expect(page.getByText("Sprint内 item")).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`/p/${projectKey}/backlog$`));
   await expect(page.getByText("Sprint外 item")).toBeVisible();
+  await expect(page.getByText("Sprint内 item")).toHaveCount(0);
 
-  // 开始 sprint(看板内一键激活)→ 范围收窄,提示条消失
-  await page.getByRole("combobox", { name: "开始 sprint" }).click();
-  const resp = page.waitForResponse(
-    (r) =>
-      r.url().includes("/actions/start") && r.request().method() === "POST",
+  // API 开始 sprint → 根页 = 看板,收窄为成员
+  await apiCall(
+    "POST",
+    `/api/projects/${projectKey}/groups/${sprintId}/actions/start`,
+    {},
   );
-  await page.getByRole("option", { name: "E2E Board Sprint" }).click();
-  await resp;
-  await expect(page.getByText("当前无进行中 sprint")).toBeHidden();
+  await page.goto(`/p/${projectKey}`);
   await expect(page.getByText("Sprint内 item")).toBeVisible();
   await expect(page.getByText("Sprint外 item")).toBeHidden();
 });

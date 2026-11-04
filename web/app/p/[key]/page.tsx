@@ -114,6 +114,12 @@ export default function BoardPage() {
     load();
   }, [load]);
 
+  // spec 0098 方案A:无 active sprint → 根页落 Backlog(工作集);看板仅在有 active sprint 时承载
+  useEffect(() => {
+    if (!loading && activeSprints.length === 0)
+      router.replace(`/p/${key}/backlog`);
+  }, [loading, activeSprints, key, router]);
+
   // 项目级面板(工作流/成员)改动 → 刷新本页数据(面板已上移至 layout,YPJ-13)
   useEffect(() => {
     const h = () => load();

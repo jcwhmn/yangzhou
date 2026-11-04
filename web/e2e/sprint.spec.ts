@@ -35,7 +35,11 @@ test("V12-S3 Sprint 全链路——建/指派/开始/完成/backlog/历史 @smok
   await expect(page.getByText("E2E 冒烟 item")).toHaveCount(0);
 
   // 详情清除 → 回 backlog
-  await page.goto(`/p/${projectKey}`);
+  // 方案A:planned 成员不在 backlog,经侧栏 sprint 链接进入(原根页降级路径已重定向)
+  await page
+    .getByRole("link", { name: /Sprint 42/ })
+    .first()
+    .click();
   await page.getByText("E2E 冒烟 item").first().click();
   await page.getByRole("button", { name: "清除 Sprint" }).click(); // Dropdown 无边框方案:清空走 ×(spec 0018)
   await expect(
