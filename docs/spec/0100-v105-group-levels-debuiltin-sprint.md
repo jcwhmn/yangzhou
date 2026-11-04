@@ -1,0 +1,131 @@
+# spec 0100 — YPJ-105 分组类型去内置:「加 level」自底向上的组层级模型
+
+> 母票 YPJ-105(In Progress,V27)。决议链:spec 0098 后续票决议(2026-11-05 用户拍板)→ 0099 非目标(「level-1 组映射=将来加 level 票」)→ 本 spec。
+> 交付:ADR-0008(`docs/adr/0008-group-type-levels.md`)+ 大票拆分(§四)。
+
+## ⚠ 架构破坏 / 契约变更(置顶,显要标注)
+
+1. **推翻 PRD §28.1 评审裁剪**:「§26.1 组可配层级 → 不做(v1 一层)」废止——`item_group_type` 引入 `level` 列,类型集合从「种子 + 追加」变为「用户自底向上配置的层级」。
+2. **新项目行为变更**:`ProjectService.create` 不再种子 sprint 类型(仍种子 release,builtin 暂留)。新项目默认无 Sprint 段,加 level 后才有组结构——backlog/看板落 0098/0099 无组语义(已实现,自动生效)。
+3. **V12 立场废止**:「v1 唯一实例化类型 = Sprint」(spec 0010 / CONTEXT 词汇表 ItemGroup 词条)由「类型即数据,结构语义挂 level-1」取代;词条随实现更新。
+4. **契约扩展(兼容)**:`GroupTypeDto` + `level`/`timed`;`GET /groups` 新增 `level` 查询参数(现有 `type` 参数保留)。无删除性契约变更。
+
+## 一、需求
+
+### 范围
+
+- **类型管理去内置 sprint**:类型不再有内置 sprint;用户按「加 level」自底向上配置(最接近 item 的层先配):name + workflow(模板可选)+ **可选时间盒**(`timed`)。
+- **level-1 接管 sprint 的结构语义**:backlog 排除、开始 item 自动挂载、看板拉入挂组、board 谓词、dashboard/metrics 数据源——代码中 `type == "sprint"` 判定全部改为 `type.level == 1`。
+- **存量迁移**:已配置 sprint 的项目 level-1 即 sprint(行为不变);未配置的项目无 level-1(NGX 无组语义已就绪)。
+- **时间盒**:类型级 `timed` 开关;sprint 迁移后 `timed=true`;UI 仅对 timed 类型给起止日期;月历/velocity 只吃 timed 的 level-1 组。
+- **release 保持内置**(0098 决议:milestone/release 暂定内置,将来 = time frame 类型语义);`level = NULL`(交付轴,不占嵌套层级)。
+
+### 非目标
+
+- 组嵌套(父链/树查询/嵌套展示)= YPJ-110/111/112 本体,本 spec 只落 level 地基(§四建议重排)。
+- milestone/release 开/关开关、侧栏数据驱动显隐(「Sprint +」段头、段按实例显隐)= 后续独立票(0098 决议,中小)。
+- release/milestone 去内置(将来票);displayName/icon 字段(决议中带「?」,不做,要时加列)。
+- 看板列语义、拖拽排序。
+
+## 二、现状实锚(2026-11-06,main=bd59281)
+
+- **表**:`item_group_type`(V35:`project_id`+`type_key` 唯一,`name`,`builtin`;**无 level/timed**);`group_status`(V46:`group_type_id` 外挂,transitions JSON 内嵌——workflow 已类型驱动);`item_group`(V27:`type varchar(20) default 'sprint'`,`status`,`start_date`/`end_date` 可空——时间盒数据已在,只缺类型级开关)。
+- **后端 `"sprint"` 字面量 7 文件**(逐处语义):
+  | 文件 | 语义 | 归类 |
+  |---|---|---|
+  | `ProjectService`(:68) | 建项目种 `("sprint"→"Sprint","release"→"Release")` | 种子(去 sprint) |
+  | `ItemGroupService`(:85 `builtinKeys`;:130 `membershipIsHistory`;:327/:405 active sprint;:414 退回 replaceMembership) | 删除守卫/最早 active 挂组/退回清理 | 结构语义 → level-1 |
+  | `ItemService`(:173,:296-299,:616) | 组归属读、hasLive、开始自动挂载 | 结构语义 → level-1 |
+  | `GroupWorkflowService`(:58) | `"sprint" -> statuses 模板` | 种子模板(去 sprint 名化) |
+  | `DashboardService`(:52)、`MetricsService`(:572) | 图表/月历数据源 `listGroups(key,"sprint")` | 展示 → level-1(+timed) |
+  | `Entities.kt`(:451 `type default "sprint"`) | 列默认值 | 去默认 |
+- **web `sprint` 字面量 14 文件**:侧栏 `layout.tsx`、`backlog`/`flow`/`overview`/`page`(根)/`home`、`sprint/[id]`、`table`、item 详情、`AssignPopover`、`GroupTypesPanel`、`back.ts`、`sprints.ts`(:33 `type=sprint`)、`texts.ts`。
+- **CLI**:`yz sprints create/move/list`、`items assign` 内部映射新端点(0097 S2 语义),仍按 `type_key='sprint'` 寻型。
+
+## 三、详细设计
+
+### 3.1 ADR-0008 裁决(YPJ-105 待决致命问题)
+
+「开始/完成 sprint 按钮归谁」:**采 (d) 变体,层级化落地**——
+
+- **结构语义挂层级**:恰一个 level-1 类型/项目;backlog 排除、自动挂载、看板挂组、图表源 = level-1 组。硬编码 `type=='sprint'` 全部按此改。
+- **业务语义挂类型**:workflow(已有,group_status 按 type 种)+ 时间盒(新,`timed`)按类型配置;「开始/完成」按钮 = type workflow 出边动作(0097 S3 已做),不再问「归谁」。
+- 否决:(a) 全组同权(Epic/Release 语义不符);(b) 最近组启发式(嵌套后破);(c) 逐组定制(护栏难保);纯 (d) 原样(生命周期挂 type 名,不解决结构语义归属)。
+
+### 3.2 数据模型(V48 迁移)
+
+```sql
+alter table item_group_type add column level int;                 -- NULL=非嵌套类型(release)
+alter table item_group_type add column timed boolean not null default false;
+update item_group_type set level = 1, timed = true, builtin = false
+    where type_key = 'sprint';                                    -- 存量:保留语义,去内置标
+create unique index uk_item_group_type_project_level1
+    on item_group_type(project_id) where level = 1;               -- 不变量①:至多一个 level-1
+```
+
+- 无新表 → cleanDatabase 清单不动;`entities.puml` 同步 `ItemGroupType.level/timed`。
+- `item_group.type` 列保留(= type_key 引用,不改名);`Entities.kt` 去掉 `default "sprint"`。
+
+### 3.3 后端(按文件)
+
+- **ItemGroupService**:
+  - `GroupTypeDto(typeKey, name, builtin)` → `+ level: Int? + timed: Boolean`
+  - `createType`:level 自动分配——无 level-1 → 1(「最接近 item 的层先配」);有 → `max(level)+1`;并发撞 uk 索引 → 409(不变量①);`timed` 请求可选,默认 false
+  - 新增 `level1TypeKey(project): String?`(types 小表内存解析,替代散落的 `"sprint"` 字面量;唯一口径)
+  - `builtinKeys`/`membershipIsHistory`:改为 `builtin || hasGroups`(非空不可删;类型语义守卫脱离名单)
+  - boardMembership 拉入挂组(:405)、退回清理(:414)、board 两侧谓词(:327):`"sprint"` → level-1 解析
+  - workflow 种子模板(`GroupWorkflowService`:58):`"sprint" ->` 改名 `timedLevel1 模板`(planned/active/completed + start/complete/backward,内容不变),新类型按 `timed` 选模板:timed→时间盒模板,否则三态全连通 switch(现自定义语义)
+- **ProjectService**(:68):种子表删 sprint 行,保留 release(builtin,level=NULL,timed=false)
+- **ItemService**(:173/:296-299/:616):归属读/hasLive/自动挂载判定 → level-1;backlog 谓词(0098 单点)同步
+- **DashboardService/MetricsService**:`listGroups(key,"sprint")` → level-1;metrics 月历/velocity 再叠 `timed` 过滤
+- **CLI**(`sprints create/move/list`、`items assign`):寻型改 level-1;项目无 level-1 → 明确报错「项目未配置 level-1 组类型(Web 类型管理加 level)」;命令面不变
+
+### 3.4 Web
+
+- **侧栏 `layout.tsx`**:Sprints 段数据源 `GET /groups?type=sprint` → `?level=1`(段名/显隐逻辑不动,数据驱动显隐=侧栏票)
+- **`GroupTypesPanel`**:建类型 = 加 level 动线:name + 模板选择(timed 时间盒模板 / 自由三态)+ `timed` 开关;level 展示只读;删类型按钮走新守卫
+- **`sprints.ts`**:`type=sprint` 查询换 level;`sprint/[id]` 页路由名保留(level-1 组详情,动作渲染 0097 已做,零改动)
+- `flow`/`overview`/`home`/`table`/`AssignPopover`/item 详情:sprint 数据源统一走 level-1(多数是 `sprints.ts`/`back.ts` 单点改动)
+- `texts.ts` 文案外置;建项目断言(e2e projects.spec「无 Sprint 段」)
+
+### 3.5 契约与文档义务
+
+- `api.http`:group-types 区块补 level/timed 与负例(第二个 level-1 → 409;删有组类型 → 409)
+- `entities.puml`(3.2);CONTEXT 词汇表补「Group Level」词条(**命名冲突显式声明**:Group level = 组嵌套层级,≠ Attribute level 1–4);DOMAIN.md ItemGroup 行更新
+- YPJ-110/111/112(多层嵌套):level 列即其「固定层级」地基;建议三票挂到 YPJ-105 下重排为本 spec 后续切片(用户拍板,见 §四)
+
+### 3.6 不变量(护栏,实现须断言)
+
+1. 每项目至多一个 level-1 类型(partial unique index + createType 校验)
+2. board ∩ backlog = ∅(0098,不变,回归)
+3. completed 组 = 终态:出边空(V46 已有)+ 成员行历史不可变(退回/换组只动非 completed 行,0099 已有)
+4. 自动挂载/拉入只挂 **active** level-1(取最早创建,YPJ-120 语义)
+5. timed 类型组 `start_date <= end_date`(现校验保持);非 timed 组日期不展示不参与月历
+
+### 3.7 测试(编码前先读 `.agents/skills/backend-testing/SKILL.md`)
+
+- 集成:①新项目无类型 → backlog 全集/board 补集/自动挂载不发生 ②加 level-1(timed)→ 全链语义与 sprint 时代等价 ③存量迁移项目(V48 后)sprint 行为回归 ④第二个 level-1 → 409 ⑤timed=false 的 level-1 不进月历 ⑥CLI 无 level-1 报错
+- e2e:新项目加 level 全链(backlog→拉入→开始→看板/月历)+ NGX 无组回归 + 存量 YPJ sprint 回归
+
+## 四、切片拆分与工作量评估(垂直切片,各自可独立合并验证绿)
+
+| 切片 | 内容 | 量 | 独立绿判据 |
+|---|---|---|---|
+| **A 数据模型** | V48 + Entities + GroupTypeDto/CRUD level/timed + 守卫改 + puml | S(≈0.5d) | `gradle build`+`integrationTest` 绿;行为零变化(存量 sprint 的 typeKey 未变) |
+| **B 后端语义切换** | §3.3 全部(7 文件)+ CLI + api.http + 集成测试改造 | M(≈1d) | build+integrationTest 绿;api.http 全过;存量项目行为不变、新项目无 sprint 生效 |
+| **C Web + e2e** | §3.4 全部 + e2e 三线 | M(≈1–1.5d) | tsc 干净 + playwright 全量绿;停,等用户手工验收 |
+
+- 依赖:仅 A→B→C 单向;每片合并后 main 均可用(A 合并=纯加列,B 合并=存量项目无感)。
+- **建议**(待用户拍板):YPJ-110/111/112(多层嵌套)与本 spec 的关系——level 地基本票落,嵌套树/展示是独立后续;三票改挂 YPJ-105 下并改写描述(去重防两套实现),或保持独立由本 spec 引用。
+
+## 五、手工测试用例(用户 build/debug 阶段,合并后 rebuild dev)
+
+1. **新项目**:侧栏无 Sprint 段;类型管理加「Iteration」(timed,时间盒模板)→ 建 iteration → backlog 拉 item → 开始 → 自动挂 iteration;看板/月历正常
+2. **存量 YPJ**:sprint 段/拉入退回/rollover/月历全部不回归(V48 后 sprint=level-1)
+3. **NGX 无组实验**:无 level-1 → backlog=全部非终态、看板=补集+拉入,与现状一致
+4. **release 项目**:Release 段与 release 流程不受影响(builtin 保留)
+5. **负例**:建第二个 level-1 → 409;删有组的类型 → 409;`yz sprints create` 在无 level-1 项目报错引导
+
+## Out of Scope
+
+- 组嵌套树(YPJ-110/111/112)、侧栏数据驱动显隐票、milestone/release 开关票、release/milestone 去内置、displayName/icon、看板列语义、Calendar/Roadmap ViewType
