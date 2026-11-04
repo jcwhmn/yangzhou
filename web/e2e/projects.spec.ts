@@ -2,7 +2,7 @@
 import { expect } from "./support/fixtures";
 import { test } from "./support/fixtures";
 
-test("建项目表单——创建并落 Backlog(方案A 工作集) @smoke", async ({
+test("建项目表单——创建并进入看板(根页=看板) @smoke", async ({
   page,
   projectKey,
 }) => {
@@ -12,10 +12,10 @@ test("建项目表单——创建并落 Backlog(方案A 工作集) @smoke", asyn
   await page.getByRole("button", { name: "创建项目" }).click();
   await expect(page.getByText(`${projectKey}P`, { exact: true })).toBeVisible();
   await page.goto(`/p/${projectKey}P`);
-  // 方案A:新项目无 active sprint → 根页重定向 Backlog(工作集);五列看板仅在有 active sprint 时承载
-  await expect(page).toHaveURL(new RegExp(`/p/${projectKey}P/backlog$`));
-  await expect(page.getByPlaceholder("新建 item")).toBeVisible();
-  await expect(page.getByText("暂无未规划 item。")).toBeVisible();
+  // YPJ-146:撤方案A 重定向——根页 = 看板(无 active 时显示补集提示 + 拉入入口)
+  await expect(page).toHaveURL(new RegExp(`/p/${projectKey}P$`));
+  await expect(page.getByText("当前无进行中 sprint")).toBeVisible();
+  await expect(page.getByRole("button", { name: "拉入看板" })).toBeVisible();
 });
 
 test("V11-S3 项目列表搜索/排序/显示已归档", async ({ page, projectKey }) => {

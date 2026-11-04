@@ -83,3 +83,12 @@ if (active.isEmpty()) {
 - **backlog 谓词**未来可能变(通常全 To Do + 极少数其它状态);现谓词单点在 ItemService.list
 - **分组类型去内置(新票,大)**:类型管理不应有内置 sprint;流程 = 「加 level」自底向上(最接近 item 的层先配):name/displayName?/icon?/workflow + **可选起止日期(时间盒,已拍板要加)**;level-1 接管 sprint 结构语义(backlog 排除/开始 item 自动挂载/看板,代码由 type=='sprint' 改按层级);存量项目:已配置 sprint 的保留,否则迁移;release 同理用「数据中配置需要」保语义一致
 - **milestone/release 暂定内置**(将来语义 = time frame 类型);项目设置加打开/关闭开关,关 → 侧栏段消失(与侧栏显隐同票,中小)
+
+
+## 修订二(2026-11-05 晚,YPJ-146):撤根页重定向
+
+用户实测反馈:「每次都会进入 backlog,要再点一次看板才会进入看板,哪怕 item detail 点返回看板也是进 backlog」。拍板:根页 = 看板(不再重定向);backlog 走侧栏;`/board` 路由保留(与根页同组件)。
+
+- 真值表「根页」列作废:`/p/{key}` 恒渲染看板(无 active = 补集视图 + 拉入入口)
+- board ∩ backlog = ∅ 不变量不变(0098 核心);看板拉入/退回(0099)不变
+- e2e 适配:board.spec 冒烟/日期/依赖/回收站的 item 交互移到 backlog 页;YPJ-29 用例改断言根页=看板;projects.spec 建项目断言看板;sprint.spec 三处 To Do item 交互移到 backlog

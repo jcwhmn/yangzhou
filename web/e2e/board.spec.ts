@@ -14,7 +14,7 @@ test("建 item → 详情 → 评论 → 指派 → 状态 QA → 活动日志 @
   page,
   projectKey,
 }) => {
-  await page.goto(`/p/${projectKey}`);
+  await page.goto(`/p/${projectKey}/backlog`);
   await page.getByPlaceholder("新建 item").fill("E2E 冒烟 item");
   await page.getByRole("button", { name: "新建 ITEM" }).click();
   await page.getByText("E2E 冒烟 item").first().click();
@@ -75,7 +75,7 @@ test("日期与超期标识——详情设置日期,看板红标,甘特可见", 
   await saveResp; // 等 PATCH 落库再导航,否则请求被打断
   await expectDate(page, "开始日期", "2020-01-01");
   // 看板红标(active sprint → 根页 = 看板)
-  await page.goto(`/p/${projectKey}`);
+  await page.goto(`/p/${projectKey}`); // 红标在板卡上(item ∈ active sprint)
   await expect(page.getByText("⚠ 超期 2020-01-15")).toBeVisible();
   // 甘特:行可见 + 未排期组存在
   await page.goto(`/p/${projectKey}/gantt`);
@@ -137,7 +137,7 @@ test("V10 priority 设置与表格视图", async ({ page, projectKey }) => {
 test("V10 依赖——blocked 标识", async ({ page, projectKey }) => {
   await apiCreateItem(projectKey, "E2E 依赖 item");
   await apiCreateItem(projectKey, "E2E 被卡 item");
-  await page.goto(`/p/${projectKey}`);
+  await page.goto(`/p/${projectKey}/backlog`);
   // 打开被卡 item 详情,在「依赖+清单」页签内把依赖 item 设为它的前置(YPJ-11 恢复页签)
   await page.getByText("E2E 被卡 item").first().click();
   await page.getByRole("tab", { name: "依赖+清单" }).click();
@@ -150,19 +150,19 @@ test("V10 依赖——blocked 标识", async ({ page, projectKey }) => {
 });
 
 test("回收站——删除后可恢复", async ({ page, projectKey }) => {
-  await page.goto(`/p/${projectKey}`);
+  await page.goto(`/p/${projectKey}/backlog`);
   await page.getByPlaceholder("新建 item").fill("E2E 回收站 item");
   await page.getByRole("button", { name: "新建 ITEM" }).click();
   await page.getByText("E2E 回收站 item").first().click();
   // 详情删除(原生 confirm 自动接受)
   page.once("dialog", (d) => d.accept());
   await page.getByRole("button", { name: "删除", exact: true }).click();
-  await expect(page).toHaveURL(new RegExp(`/p/${projectKey}/backlog$`));
+  await expect(page).toHaveURL(new RegExp(`/p/${projectKey}/backlog$`)); // 从哪来回哪去(back.href)
   // 回收站列出 → 恢复 → 看板重现
   await page.goto("/recycle-bin");
   await page.getByText("E2E 回收站 item").waitFor({ timeout: 10000 });
   await page.getByRole("button", { name: "恢复" }).first().click();
-  await page.goto(`/p/${projectKey}`);
+  await page.goto(`/p/${projectKey}/backlog`);
   await page.getByText("E2E 回收站 item").first().waitFor({ timeout: 10000 });
 });
 
@@ -201,7 +201,7 @@ test("V13-S4 详情切状态 409——错误浮出且状态不变", async ({
   );
 });
 
-test("board——无 active 落 Backlog(方案A);开始 sprint 后收窄", async ({
+test("board——根页=看板(无 active 显示补集);开始 sprint 后收窄", async ({
   page,
   projectKey,
 }) => {
@@ -213,11 +213,11 @@ test("board——无 active 落 Backlog(方案A);开始 sprint 后收窄", async
     groupType: "sprint",
   });
 
-  // 无 active:根页重定向 Backlog(工作集);planned 成员不在工作集
+  // 无 active:根页 = 看板(不重定向,YPJ-146),显示 backlog 补集(终态 ∪ planned 成员)
   await page.goto(`/p/${projectKey}`);
-  await expect(page).toHaveURL(new RegExp(`/p/${projectKey}/backlog$`));
-  await expect(page.getByText("Sprint外 item")).toBeVisible();
-  await expect(page.getByText("Sprint内 item")).toHaveCount(0);
+  await expect(page).toHaveURL(new RegExp(`/p/${projectKey}$`));
+  await expect(page.getByText("Sprint内 item")).toBeVisible();
+  await expect(page.getByText("Sprint外 item")).toHaveCount(0);
 
   // API 开始 sprint → 根页 = 看板,收窄为成员
   await apiCall(
