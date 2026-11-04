@@ -551,7 +551,12 @@ function MiniCalendar({
   onPick: (iso: string) => void;
 }) {
   const init = parseIso(initialIso);
-  const [ym, setYm] = useState({ y: Number(init.yyyy), m: Number(init.mm) });
+  // 空值(无日期 item)以今天为基准初始化——否则 Number("") = 0,月历渲染公元 0 年,选中返回非 4 位年份串被 parseIso 丢弃(YPJ-145)
+  const [ym, setYm] = useState(() => {
+    if (init.yyyy) return { y: Number(init.yyyy), m: Number(init.mm) };
+    const t = todaySegs();
+    return { y: Number(t.yyyy), m: Number(t.mm) };
+  });
   const startDow = new Date(ym.y, ym.m - 1, 1).getDay();
   const days = daysInMonth(ym.y, ym.m);
   const todayIso = isoOf(todaySegs());

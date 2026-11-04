@@ -17,6 +17,23 @@ export function resetDb() {
   console.log(`测试库已清空(docker:${container} / yangzhou_test)`);
 }
 
+/** 清库后补种默认账号(api.http/e2e 共用 me/secret123;201/409 幂等)——否则清库后所有请求 401。 */
+export async function ensureBootstrapUser() {
+  const api = process.env.E2E_API_URL ?? "http://127.0.0.1:8082";
+  const res = await fetch(`${api}/api/auth/bootstrap`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username: "me", password: "secret123" }),
+  }).catch(() => null);
+  if (res && (res.status === 201 || res.status === 409)) {
+    console.log(`默认账号已就绪(me/secret123,${res.status})`);
+  } else {
+    console.warn(
+      `补种失败(status=${res ? res.status : "网络错误"})——api.http 需先手动跑 Bootstrap 段`,
+    );
+  }
+}
+
 const self = fileURLToPath(import.meta.url);
 if (
   process.argv[1] &&
@@ -28,4 +45,5 @@ if (
     process.exit(0);
   }
   resetDb();
+  await ensureBootstrapUser();
 }
