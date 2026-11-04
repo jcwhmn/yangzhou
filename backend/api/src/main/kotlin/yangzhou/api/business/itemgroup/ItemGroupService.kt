@@ -322,11 +322,14 @@ class ItemGroupService(
         val items: List<ItemService.ItemDto>,
     )
 
-    /** 看板(YPJ-29):active sprint 组的 items 并集;无 active → 全量(降级语义在后端,前端零 sprint 逻辑)。 */
+    /** 看板(YPJ-29):active sprint 组的 items 并集;无 active → backlog 补集(spec 0098:board ∩ backlog = ∅,即终态 ∪ planned sprint 成员)。 */
     fun board(key: String): BoardDto {
         val active = groups.findByProjectObjectIdOrderByCreatedAt(project(key).objectId!!).filter { it.type == "sprint" && it.status == "active" }
         val activeDto = active.map { it.toDto() }
-        if (active.isEmpty()) return BoardDto(emptyList(), itemService.list(key))
+        if (active.isEmpty()) {
+            val backlogIds = itemService.list(key, backlogOnly = true).map { it.itemId }.toSet()
+            return BoardDto(emptyList(), itemService.list(key).filterNot { it.itemId in backlogIds })
+        }
         val rows = active.flatMap { memberships.findByGroupObjectId(it.objectId!!) }
         if (rows.isEmpty()) return BoardDto(activeDto, emptyList())
         val objectIds = itemRepo.findAllByObjectIdIn(rows.map { it.itemObjectId }.toSet()).map { it.objectId }.toSet()

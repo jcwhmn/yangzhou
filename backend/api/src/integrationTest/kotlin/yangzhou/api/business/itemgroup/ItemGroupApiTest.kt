@@ -230,10 +230,10 @@ class ItemGroupApiTest : AbstractApiTest() {
     }
 
     @Test
-    fun `board——无 active 降级全量_active sprint 并集`() {
+    fun `board——active sprint 成员并集_非 sprint active 组不进`() {
         val authed = bootstrapAndAuth()
         createProject(authed, "GRP")
-        // 无 active → 降级全量 items,activeGroups 空
+        // 空项目无 active → 降级补集为空,activeGroups 空
         val board0 = get(authed, "/api/projects/GRP/board")
         assertEquals(0, board0["activeGroups"].size())
         assertEquals(0, board0["items"].size())
@@ -258,6 +258,51 @@ class ItemGroupApiTest : AbstractApiTest() {
         val c = createGroup(authed, "GRP", mapOf("typeKey" to "phase", "name" to "P1"))
         action(authed, "GRP", c["groupId"].asText(), "switch")
         assertEquals(1, get(authed, "/api/projects/GRP/board")["activeGroups"].size())
+    }
+
+    @Test
+    fun `board——无 active 降级为 backlog 补集_与 backlog 互斥`() {
+        val authed = bootstrapAndAuth()
+        val project = createProject(authed, "GRP")
+        val done = project["statuses"].first { it["name"].asText() == "Done" }["statusId"].asText()
+        val todo = createItem(authed, "GRP", "todo")
+        val doneId = json
+            .readTree(
+                authed
+                    .post()
+                    .uri("/api/projects/GRP/items")
+                    .body(mapOf("title" to "done", "type" to "task", "statusItemId" to done))
+                    .exchange()
+                    .expectStatus()
+                    .isCreated()
+                    .expectBody(String::class.java)
+                    .returnResult()
+                    .responseBody!!,
+            )["itemId"]
+            .asText()
+
+        // 无组:board = 终态,backlog = 非终态,交集空(spec 0098)
+        val board = get(authed, "/api/projects/GRP/board")
+        assertEquals(0, board["activeGroups"].size())
+        assertEquals(listOf(doneId), board["items"].map { it["itemId"].asText() })
+        val backlog = get(authed, "/api/projects/GRP/backlog")
+        assertEquals(listOf(todo["itemId"].asText()), backlog.map { it["itemId"].asText() })
+        val backlogIds = backlog.map { it["itemId"].asText() }.toSet()
+        assertTrue(board["items"].none { it["itemId"].asText() in backlogIds })
+    }
+
+    @Test
+    fun `board——无 active 但有 planned sprint_成员随补集进 board`() {
+        val authed = bootstrapAndAuth()
+        createProject(authed, "GRP")
+        val item = createItem(authed, "GRP", "planned-member")["itemId"].asText()
+        val s1 = createGroup(authed, "GRP", mapOf("typeKey" to "sprint", "name" to "S1")) // 初态 planned
+        assign(authed, item, s1["groupId"].asText(), "sprint")
+        // 不 start:组停在 planned;成员非终态但不在 backlog(planned sprint 成员被 currentSprint 排除)
+        assertEquals(0, get(authed, "/api/projects/GRP/backlog").size())
+        val board = get(authed, "/api/projects/GRP/board")
+        assertEquals(0, board["activeGroups"].size())
+        assertEquals(listOf(item), board["items"].map { it["itemId"].asText() })
     }
 
     @Test
