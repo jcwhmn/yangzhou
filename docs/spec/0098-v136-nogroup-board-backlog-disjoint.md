@@ -61,3 +61,25 @@ if (active.isEmpty()) {
 2. backlog:**仍 67**,不变
 3. 互斥肉眼核:看板任一 item 均不在 backlog 列表(反之亦然)
 4. 回归:切到有 active sprint 的项目 → 看板仍显示 sprint 成员(有组行为零变化)
+
+
+## 增补(2026-11-05,方案A 并入):根页落 Backlog
+
+### 真值表(项目状态 × 页面 → 行为)
+
+| 项目状态 | 根页 `/p/{key}` | 侧栏 Backlog | GET /board |
+|---|---|---|---|
+| 有 active sprint | 看板(现状不变) | 不在 sprint 的非终态 | active sprint 成员 |
+| 无 active、有 planned sprint | **重定向 → Backlog** | 非终态 ∧ 不在 planned/active | 终态 ∪ planned 成员 |
+| 无组(NGX) | **重定向 → Backlog** | 全部非终态 | 终态(归档) |
+
+### web 改动
+- `app/p/[key]/page.tsx`:数据就绪且无 active sprint → `router.replace(/backlog)`(根页降级,方案A)
+- `texts.ts` board.noActiveSprint 文案改准确(「以下显示全部 item」已失真)
+- e2e 适配:board.spec 日期红标用例改「API 造 active sprint」(看板卡仅在有 active sprint 时承载);YPJ-29 用例改方案A 断言;item-assign 看板卡两用例同;回收站 URL 断言改 /backlog;sprint.spec planned 成员经侧栏 sprint 链接进详情
+- 无 active 时「补集」视图无独立页面(看板仅在有 active sprint 时承载);侧栏「看板」行标签暂不贴,归侧栏重构票
+
+### 后续票决议(2026-11-05 用户拍板,记录防散佚)
+- **backlog 谓词**未来可能变(通常全 To Do + 极少数其它状态);现谓词单点在 ItemService.list
+- **分组类型去内置(新票,大)**:类型管理不应有内置 sprint;流程 = 「加 level」自底向上(最接近 item 的层先配):name/displayName?/icon?/workflow + **可选起止日期(时间盒,已拍板要加)**;level-1 接管 sprint 结构语义(backlog 排除/开始 item 自动挂载/看板,代码由 type=='sprint' 改按层级);存量项目:已配置 sprint 的保留,否则迁移;release 同理用「数据中配置需要」保语义一致
+- **milestone/release 暂定内置**(将来语义 = time frame 类型);项目设置加打开/关闭开关,关 → 侧栏段消失(与侧栏显隐同票,中小)

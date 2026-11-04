@@ -7,6 +7,7 @@ import {
   apiCall,
   apiCreateItem,
   apiCreateMember,
+  apiCreateSprint,
   apiMeId,
 } from "./support/helpers";
 
@@ -176,7 +177,18 @@ test("看板卡片指派入口——Popover 弹出/Esc 收起/指派成功且不
   page,
   projectKey,
 }) => {
-  await apiCreateItem(projectKey, "AP 卡片指派");
+  const itemId = await apiCreateItem(projectKey, "AP 卡片指派");
+  // 看板卡仅在有 active sprint 时承载(方案A):API 造 active sprint + 成员
+  const sprintId = await apiCreateSprint(projectKey, "AP Sprint");
+  await apiCall("PUT", `/api/items/${itemId}/group-membership`, {
+    groupId: sprintId,
+    groupType: "sprint",
+  });
+  await apiCall(
+    "POST",
+    `/api/projects/${projectKey}/groups/${sprintId}/actions/start`,
+    {},
+  );
   await page.goto(`/p/${projectKey}`);
   const card = page.locator(".MuiCard-root", { hasText: "AP 卡片指派" });
   await card.getByText("未指派").click(); // 占位入口
@@ -200,6 +212,17 @@ test("看板卡片指派入口——Popover 弹出/Esc 收起/指派成功且不
 test("重分配——候选列表标注当前负责人", async ({ page, projectKey }) => {
   const itemId = await apiCreateItem(projectKey, "AP 当前标注");
   await apiAssignMe(itemId);
+  // 看板卡仅在有 active sprint 时承载(方案A):API 造 active sprint + 成员
+  const sprintId = await apiCreateSprint(projectKey, "AP Sprint");
+  await apiCall("PUT", `/api/items/${itemId}/group-membership`, {
+    groupId: sprintId,
+    groupType: "sprint",
+  });
+  await apiCall(
+    "POST",
+    `/api/projects/${projectKey}/groups/${sprintId}/actions/start`,
+    {},
+  );
   await page.goto(`/p/${projectKey}`);
   const card = page.locator(".MuiCard-root", { hasText: "AP 当前标注" });
   await card.getByText(/^👤 /).click();

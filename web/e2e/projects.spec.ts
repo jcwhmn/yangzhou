@@ -2,7 +2,7 @@
 import { expect } from "./support/fixtures";
 import { test } from "./support/fixtures";
 
-test("建项目表单——创建并打开看板(默认五列) @smoke", async ({
+test("建项目表单——创建并落 Backlog(方案A 工作集) @smoke", async ({
   page,
   projectKey,
 }) => {
@@ -12,10 +12,10 @@ test("建项目表单——创建并打开看板(默认五列) @smoke", async ({
   await page.getByRole("button", { name: "创建项目" }).click();
   await expect(page.getByText(`${projectKey}P`, { exact: true })).toBeVisible();
   await page.goto(`/p/${projectKey}P`);
-  await expect(page.getByRole("heading", { name: "To Do(0)" })).toBeVisible();
-  for (const col of ["In Progress(0)", "In Review(0)", "QA(0)", "Done(0)"]) {
-    await expect(page.getByRole("heading", { name: col })).toBeVisible();
-  }
+  // 方案A:新项目无 active sprint → 根页重定向 Backlog(工作集);五列看板仅在有 active sprint 时承载
+  await expect(page).toHaveURL(new RegExp(`/p/${projectKey}P/backlog$`));
+  await expect(page.getByPlaceholder("新建 item")).toBeVisible();
+  await expect(page.getByText("暂无未规划 item。")).toBeVisible();
 });
 
 test("V11-S3 项目列表搜索/排序/显示已归档", async ({ page, projectKey }) => {

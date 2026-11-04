@@ -65,7 +65,8 @@ export const t = {
     addItem: "新建 item",
     dropHere: "拖到这里",
     moveFailed: "迁移失败",
-    noActiveSprint: "当前无进行中 sprint,以下显示全部 item",
+    noActiveSprint:
+      "当前无进行中 sprint,以下显示不在 Backlog 中的 item(已完成/已规划)",
     startSprint: "开始 sprint",
     startFailed: "激活失败",
     detail: "详情",
