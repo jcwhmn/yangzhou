@@ -9,7 +9,7 @@ test("V12-S3 Sprint 全链路——建/指派/开始/完成/backlog/历史 @smok
 }) => {
   test.slow();
   await apiCreateItem(projectKey, "E2E 冒烟 item");
-  await page.goto(`/p/${projectKey}`);
+  await page.goto(`/p/${projectKey}/backlog`);
   // 侧边栏新建 Sprint
   await page.getByRole("button", { name: "新建 Sprint" }).click();
   await page.getByLabel("名称").fill("Sprint 42");
@@ -49,7 +49,7 @@ test("V12-S3 Sprint 全链路——建/指派/开始/完成/backlog/历史 @smok
   await expect(page.getByText("E2E 冒烟 item").first()).toBeVisible();
 
   // 再指派 → 状态单向按钮:开始 → 完成(确认框明示未完成 item 回 Backlog)
-  await page.goto(`/p/${projectKey}`);
+  await page.goto(`/p/${projectKey}/backlog`);
   await page.getByText("E2E 冒烟 item").first().click();
   const reassign = page.waitForResponse(
     (r) => r.url().includes("/api/items/") && r.request().method() === "PUT",
@@ -74,7 +74,7 @@ test("V12-S3 Sprint 全链路——建/指派/开始/完成/backlog/历史 @smok
   await expect(page.getByText("E2E 冒烟 item")).toBeVisible();
 
   // 详情只显示当前 sprint(裁决 2):已完成 sprint 不回填下拉也不在选项中
-  await page.goto(`/p/${projectKey}`);
+  await page.goto(`/p/${projectKey}/backlog`);
   await page.getByText("E2E 冒烟 item").first().click();
   await expect(
     page.getByRole("combobox", { name: "Sprint", exact: true }),

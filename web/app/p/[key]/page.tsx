@@ -28,7 +28,7 @@ import {
   Tooltip,
 } from "@mui/material";
 import Link from "next/link";
-import { usePathname, useParams, useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { t } from "@/lib/texts";
@@ -67,7 +67,6 @@ type SprintLite = { sprintId: string; name: string; status: string };
 export default function BoardPage() {
   const { key } = useParams<{ key: string }>();
   const router = useRouter();
-  const pathname = usePathname();
   const [statuses, setStatuses] = useState<Status[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [newTitle, setNewTitle] = useState("");
@@ -126,13 +125,6 @@ export default function BoardPage() {
   useEffect(() => {
     load();
   }, [load]);
-
-  // spec 0098 方案A:无 active sprint → 根页落 Backlog(工作集);看板仅在有 active sprint 时承载
-  useEffect(() => {
-    // 方案A:根页无 active sprint 落 Backlog;/board 路由不重定向(执行面,spec 0099)
-    if (!loading && activeSprints.length === 0 && pathname === `/p/${key}`)
-      router.replace(`/p/${key}/backlog`);
-  }, [loading, activeSprints, key, router, pathname]);
 
   // 项目级面板(工作流/成员)改动 → 刷新本页数据(面板已上移至 layout,YPJ-13)
   useEffect(() => {
