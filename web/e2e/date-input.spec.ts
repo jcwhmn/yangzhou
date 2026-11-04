@@ -186,3 +186,19 @@ test("ARIA:group role/name、段名、月历按钮名(§2.2/§15)", async ({
     await expect(seg(page, "开始日期", s)).toBeVisible();
   await expect(g.getByRole("button", { name: "月历 开始日期" })).toBeVisible();
 });
+
+test("月历空值以今天为基准(YPJ-145:0.00/无今日/回填空 回归)", async ({
+  page,
+  projectKey,
+}) => {
+  await gotoDetail(page, projectKey, "E2E 月历空值基准");
+  await page.getByRole("button", { name: "月历 截止日期" }).click();
+  const now = new Date();
+  const ym = `${now.getFullYear()}.${String(now.getMonth() + 1).padStart(2, "0")}`;
+  await expect(page.getByText(ym, { exact: true })).toBeVisible(); // 年月栏非 0.00
+  await page.getByRole("button", { name: "今天", exact: true }).click();
+  const iso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  await expect(
+    page.getByRole("group", { name: "截止日期", exact: true }),
+  ).toHaveAttribute("data-value", iso); // 选中回填非空
+});
