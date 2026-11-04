@@ -288,8 +288,8 @@ export default function ProjectLayout({
           </ListItemButton>
           <ListItemButton
             component={Link}
-            href={`/p/${key}`}
-            selected={pathname === `/p/${key}`}
+            href={`/p/${key}/board`}
+            selected={pathname === `/p/${key}/board`}
             sx={itemSx}
           >
             <ListItemText primary={t.projectNav.board} />

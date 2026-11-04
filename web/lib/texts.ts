@@ -67,6 +67,11 @@ export const t = {
     moveFailed: "迁移失败",
     noActiveSprint:
       "当前无进行中 sprint,以下显示不在 Backlog 中的 item(已完成/已规划)",
+    pullItem: "拉入看板",
+    pullTitle: "从 Backlog 拉入看板",
+    pullEmpty: "Backlog 为空",
+    pullConfirm: "拉入",
+    remove: "退回 Backlog",
     startSprint: "开始 sprint",
     startFailed: "激活失败",
     detail: "详情",

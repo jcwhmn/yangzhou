@@ -19,7 +19,7 @@ import {
 import { Dropdown } from "@/components/Dropdown";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { usePathname, useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { t } from "@/lib/texts";
@@ -58,6 +58,7 @@ type SprintLite = { sprintId: string; name: string; status: string };
 export default function BoardPage() {
   const { key } = useParams<{ key: string }>();
   const router = useRouter();
+  const pathname = usePathname();
   const [statuses, setStatuses] = useState<Status[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [newTitle, setNewTitle] = useState("");
@@ -70,6 +71,9 @@ export default function BoardPage() {
   const [sprints, setSprints] = useState<SprintLite[]>([]);
   const [sprintPickOpen, setSprintPickOpen] = useState(false);
   const [pendingTitle, setPendingTitle] = useState("");
+  const [pullOpen, setPullOpen] = useState(false);
+  const [backlogItems, setBacklogItems] = useState<Item[] | null>(null);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
 
   // V9-Q3:看板 30s 自动刷新(手刷按钮同函数)
   useEffect(() => {
@@ -116,9 +120,10 @@ export default function BoardPage() {
 
   // spec 0098 方案A:无 active sprint → 根页落 Backlog(工作集);看板仅在有 active sprint 时承载
   useEffect(() => {
-    if (!loading && activeSprints.length === 0)
+    // 方案A:根页无 active sprint 落 Backlog;/board 路由不重定向(执行面,spec 0099)
+    if (!loading && activeSprints.length === 0 && pathname === `/p/${key}`)
       router.replace(`/p/${key}/backlog`);
-  }, [loading, activeSprints, key, router]);
+  }, [loading, activeSprints, key, router, pathname]);
 
   // 项目级面板(工作流/成员)改动 → 刷新本页数据(面板已上移至 layout,YPJ-13)
   useEffect(() => {
@@ -126,6 +131,29 @@ export default function BoardPage() {
     window.addEventListener("yz:project-changed", h);
     return () => window.removeEventListener("yz:project-changed", h);
   }, [load]);
+
+  function openPull() {
+    setPicked(new Set());
+    api<Item[]>(`/api/projects/${key}/backlog`)
+      .then(setBacklogItems)
+      .catch(() => setBacklogItems([]));
+    setPullOpen(true);
+  }
+
+  async function setBoardItem(itemId: string, on: boolean) {
+    await api(`/api/items/${itemId}/board-membership`, {
+      method: "PUT",
+      body: JSON.stringify({ onBoard: on }),
+    });
+  }
+
+  async function confirmPull() {
+    for (const id of picked) {
+      await setBoardItem(id, true);
+    }
+    setPullOpen(false);
+    await load();
+  }
 
   async function addItem(e: React.FormEvent) {
     e.preventDefault();
@@ -207,6 +235,9 @@ export default function BoardPage() {
     ...new Set(items.map((i) => i.assignee).filter((a): a is string => !!a)),
   ];
 
+  const finalNames = new Set(
+    statuses.filter((s) => s.statusType === "FINAL").map((s) => s.name),
+  );
   const byStatusName = new Map<string, Item[]>();
   statuses.forEach((s) => byStatusName.set(s.name, []));
   filtered.forEach((it) => {
@@ -309,6 +340,9 @@ export default function BoardPage() {
           color={filter === "blocked" ? "primary" : "default"}
           onClick={() => setFilter("blocked")}
         />
+        <Button size="small" variant="outlined" onClick={openPull}>
+          {t.board.pullItem}
+        </Button>
         {memberOptions.map((name) => (
           <Chip
             key={name}
@@ -470,6 +504,17 @@ export default function BoardPage() {
                                 />
                               )}
                             </AssignPopover>
+                            {!finalNames.has(it.status) && (
+                              <Chip
+                                size="small"
+                                variant="outlined"
+                                label={t.board.remove}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setBoardItem(it.itemId, false).then(load);
+                                }}
+                              />
+                            )}
                           </Stack>
                           <Link
                             href={`/p/${key}/i/${it.itemId}`}
@@ -541,6 +586,43 @@ export default function BoardPage() {
                 {sp.name}
               </Button>
             ))}
+          </Stack>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={pullOpen} onClose={() => setPullOpen(false)}>
+        <DialogTitle>{t.board.pullTitle}</DialogTitle>
+        <DialogContent>
+          <Stack spacing={1} sx={{ mt: 1 }}>
+            {(backlogItems ?? []).length === 0 && (
+              <Typography color="text.secondary">
+                {t.board.pullEmpty}
+              </Typography>
+            )}
+            {(backlogItems ?? []).map((it) => (
+              <Button
+                key={it.itemId}
+                variant={picked.has(it.itemId) ? "contained" : "outlined"}
+                onClick={() =>
+                  setPicked((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(it.itemId)) next.delete(it.itemId);
+                    else next.add(it.itemId);
+                    return next;
+                  })
+                }
+              >
+                {it.number} {it.title}
+              </Button>
+            ))}
+            {(backlogItems ?? []).length > 0 && (
+              <Button
+                variant="contained"
+                disabled={picked.size === 0}
+                onClick={confirmPull}
+              >
+                {t.board.pullConfirm}
+              </Button>
+            )}
           </Stack>
         </DialogContent>
       </Dialog>
