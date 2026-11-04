@@ -598,22 +598,27 @@ export default function BoardPage() {
                 {t.board.pullEmpty}
               </Typography>
             )}
-            {(backlogItems ?? []).map((it) => (
-              <Button
-                key={it.itemId}
-                variant={picked.has(it.itemId) ? "contained" : "outlined"}
-                onClick={() =>
-                  setPicked((prev) => {
-                    const next = new Set(prev);
-                    if (next.has(it.itemId)) next.delete(it.itemId);
-                    else next.add(it.itemId);
-                    return next;
-                  })
-                }
-              >
-                {it.number} {it.title}
-              </Button>
-            ))}
+            {[...(backlogItems ?? [])]
+              .sort(
+                (a, b) =>
+                  Number(a.status === "To Do") - Number(b.status === "To Do"),
+              )
+              .map((it) => (
+                <Button
+                  key={it.itemId}
+                  variant={picked.has(it.itemId) ? "contained" : "outlined"}
+                  onClick={() =>
+                    setPicked((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(it.itemId)) next.delete(it.itemId);
+                      else next.add(it.itemId);
+                      return next;
+                    })
+                  }
+                >
+                  {it.number} {it.title} · {it.status}
+                </Button>
+              ))}
             {(backlogItems ?? []).length > 0 && (
               <Button
                 variant="contained"
