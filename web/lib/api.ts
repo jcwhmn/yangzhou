@@ -85,14 +85,14 @@ export async function bootstrapOrLogin(
   password: string,
 ): Promise<string> {
   const post = () =>
-    fetch(`${API_BASE}/api/auth/bootstrap`, {
+    fetchWithRetry("/api/auth/bootstrap", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, password }),
     });
   let res = await post();
   if (res.status === 409) {
-    res = await fetch(`${API_BASE}/api/auth/login`, {
+    res = await fetchWithRetry("/api/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, password }),
