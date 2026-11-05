@@ -32,7 +32,13 @@ import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { t } from "@/lib/texts";
-import { listSprints, sprintAction, assignSprint } from "@/lib/sprints";
+import {
+  listSprints,
+  sprintAction,
+  assignSprint,
+  createSprint,
+  level1Type,
+} from "@/lib/sprints";
 import { AssignPopover } from "@/components/AssignPopover";
 import type { Signal } from "@/components/Verdict";
 
@@ -80,9 +86,13 @@ export default function BoardPage() {
   const [sprintPickOpen, setSprintPickOpen] = useState(false);
   const [pendingTitle, setPendingTitle] = useState("");
   const [pullOpen, setPullOpen] = useState(false);
-  const [launchOpen, setLaunchOpen] = useState(false); // YPJ-104:拉起弹窗(spec 0105)
-  const [launchItemId, setLaunchItemId] = useState<string | null>(null);
+  // 0105:S2/S2m(activate)/S3(create)前置确认弹窗;取消=放弃创建(D6)
+  const [launchOpen, setLaunchOpen] = useState(false);
+  const [launchMode, setLaunchMode] = useState<"activate" | "create">(
+    "activate",
+  );
   const [launchPick, setLaunchPick] = useState("");
+  const [launchName, setLaunchName] = useState("");
   const [backlogItems, setBacklogItems] = useState<Item[] | null>(null);
   const [picked, setPicked] = useState<Set<string>>(new Set());
 
@@ -161,60 +171,113 @@ export default function BoardPage() {
 
   async function addItem(e: React.FormEvent) {
     e.preventDefault();
-    if (!newTitle.trim()) return;
-    if (activeSprints.length > 1) {
-      // YPJ-56:多 active sprint 并存 → UI 选(拍板规则 3)
-      setPendingTitle(newTitle.trim());
+    if (!newTitle.trim() || loading) return; // loading 未就绪时 sprints 可能是空态,误判场景
+    const title = newTitle.trim();
+    const active = sprints.filter((s) => s.status === "active");
+    const planned = sprints.filter((s) => s.status === "planned");
+    if (active.length > 1) {
+      // S1m:多进行中组 → 用户选(归属是用户意图,不代选)
+      setPendingTitle(title);
       setSprintPickOpen(true);
       return;
     }
-    await createItem(newTitle.trim(), activeSprints[0]?.sprintId);
+    if (active.length === 1) {
+      // S1:直挂该组
+      await createInGroup(title, active[0].sprintId);
+      return;
+    }
+    if (planned.length > 0) {
+      // S2/S2m:激活并放入(确认制;取消=放弃创建,D6)
+      setPendingTitle(title);
+      setLaunchPick(planned[0].sprintId);
+      setLaunchMode("activate");
+      setLaunchOpen(true);
+      return;
+    }
+    // 0 进行中 0 计划中:S0(无 level-1 类型)或 S3(有类型无非完成态实例)——查类型区分
+    try {
+      const l1 = await level1Type(key);
+      if (!l1) {
+        // S0:无组概念,onBoard 上看板(0101 铁律);请求失败会 throw → 不静默当 S0
+        await createFree(title);
+        return;
+      }
+      // S3:新建组并激活;默认名=类型名+实例数+1,撞名递增
+      let n = sprints.length + 1;
+      while (sprints.some((s) => s.name === `${l1.name} ${n}`)) n += 1;
+      setPendingTitle(title);
+      setLaunchMode("create");
+      setLaunchName(`${l1.name} ${n}`);
+      setLaunchOpen(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "创建失败");
+    }
   }
 
-  async function createItem(title: string, sprintId?: string) {
-    // YPJ-56:无 active → 不带 sprintId(落 backlog,与看板全量显示自洽);单 active 由调用方带上
+  /** S1/S1m/S2/S3 共用:建 item 并挂入组(后端 create 同事务校验 level-1 ∧ 非 completed)。 */
+  async function createInGroup(title: string, groupId: string) {
     try {
-      const created = await api<{ itemId: string }>(
-        `/api/projects/${key}/items`,
-        {
-          method: "POST",
-          body: JSON.stringify({ title, ...(sprintId ? { sprintId } : {}) }),
-        },
-      );
-      // 语义拍板(2026-11-06 重申):看板建的 item 必进看板——无 active 时 onBoard=true
-      // (参考 sprint 状态:有 active 已挂 sprint;无 active 不挂 sprint 但看板可见,spec 0105 增量)
-      if (!sprintId) {
-        await api(`/api/items/${created.itemId}/board-membership`, {
-          method: "PUT",
-          body: JSON.stringify({ onBoard: true }),
-        });
-      }
+      await api(`/api/projects/${key}/items`, {
+        method: "POST",
+        body: JSON.stringify({ title, sprintId: groupId }),
+      });
       setNewTitle("");
       setSprintPickOpen(false);
-      // YPJ-104:无 active 且有 planned → 提示拉起(确认后激活+放入,spec 0105 方案B)
-      if (!sprintId && sprints.some((s) => s.status === "planned")) {
-        setLaunchItemId(created.itemId);
-        setLaunchPick(
-          sprints.find((s) => s.status === "planned")?.sprintId ?? "",
-        );
-        setLaunchOpen(true);
-      }
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "创建失败");
     }
   }
 
-  // YPJ-104:确认拉起——激活选中 planned sprint 并把刚建 item 放入(方案B)
-  async function confirmLaunch() {
-    if (!launchPick || !launchItemId) return;
+  /** 仅 S0(无组概念):建 item + onBoard 上看板(0099;无 active 时不挂组)。 */
+  async function createFree(title: string) {
     try {
-      await sprintAction(key, launchPick, "start");
-      await assignSprint(key, launchItemId, launchPick);
-      setLaunchOpen(false);
+      const created = await api<{ itemId: string }>(
+        `/api/projects/${key}/items`,
+        { method: "POST", body: JSON.stringify({ title }) },
+      );
+      await api(`/api/items/${created.itemId}/board-membership`, {
+        method: "PUT",
+        body: JSON.stringify({ onBoard: true }),
+      });
+      setNewTitle("");
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : t.board.startFailed);
+      setError(err instanceof Error ? err.message : "创建失败");
+    }
+  }
+
+  /** 0105:确认=S2 激活并放入 / S3 新建组+激活+放入(组先行,item 后行;激活失败降级为挂入计划中组)。 */
+  async function confirmLaunch() {
+    const title = pendingTitle;
+    setLaunchOpen(false);
+    if (launchMode === "activate") {
+      if (!launchPick) return;
+      try {
+        await sprintAction(key, launchPick, "start");
+      } catch (err) {
+        setError(err instanceof Error ? err.message : t.board.startFailed);
+      }
+      await createInGroup(title, launchPick);
+      return;
+    }
+    const name = launchName.trim();
+    if (!name) return;
+    try {
+      // 防重:同名组复用不重建(激活失败重试场景)
+      const existing = sprints.find((s) => s.name === name);
+      const gid = existing
+        ? existing.sprintId
+        : (await createSprint(key, { name, startDate: null, endDate: null }))
+            .sprintId;
+      try {
+        await sprintAction(key, gid, "start");
+      } catch (err) {
+        setError(err instanceof Error ? err.message : t.board.startFailed);
+      }
+      await createInGroup(title, gid);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "创建失败");
     }
   }
 
@@ -614,14 +677,14 @@ export default function BoardPage() {
       )}
 
       <Dialog open={sprintPickOpen} onClose={() => setSprintPickOpen(false)}>
-        <DialogTitle>放入哪个 sprint</DialogTitle>
+        <DialogTitle>放入哪个组</DialogTitle>
         <DialogContent>
           <Stack spacing={1} sx={{ mt: 1 }}>
             {activeSprints.map((sp) => (
               <Button
                 key={sp.sprintId}
                 variant="outlined"
-                onClick={() => createItem(pendingTitle, sp.sprintId)}
+                onClick={() => createInGroup(pendingTitle, sp.sprintId)}
               >
                 {sp.name}
               </Button>
@@ -629,15 +692,25 @@ export default function BoardPage() {
           </Stack>
         </DialogContent>
       </Dialog>
-      {/* YPJ-104:无活动 sprint 建 item → 提示拉起 planned sprint(激活+放入,spec 0105 方案B) */}
+      {/* 0105 S2/S2m/S3:创建前置确认——激活并放入/新建并激活;取消=放弃创建(D6) */}
       <Dialog open={launchOpen} onClose={() => setLaunchOpen(false)}>
         <DialogTitle>
-          {sprints.filter((s) => s.status === "planned").length > 1
+          {launchMode === "activate" &&
+          sprints.filter((s) => s.status === "planned").length > 1
             ? t.board.launchPickTitle
             : t.board.launchTitle}
         </DialogTitle>
         <DialogContent>
-          {sprints.filter((s) => s.status === "planned").length > 1 ? (
+          {launchMode === "create" ? (
+            <TextField
+              label={t.board.newGroupName}
+              value={launchName}
+              onChange={(e) => setLaunchName(e.target.value)}
+              autoFocus
+              fullWidth
+              sx={{ mt: 1 }}
+            />
+          ) : sprints.filter((s) => s.status === "planned").length > 1 ? (
             <Stack spacing={1} sx={{ mt: 1 }}>
               {sprints
                 .filter((s) => s.status === "planned")
@@ -664,10 +737,12 @@ export default function BoardPage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setLaunchOpen(false)}>
-            {t.board.launchLater}
+            {t.board.launchCancel}
           </Button>
           <Button variant="contained" onClick={confirmLaunch}>
-            {t.board.launchConfirm}
+            {launchMode === "create"
+              ? t.board.launchCreateConfirm
+              : t.board.launchConfirm}
           </Button>
         </DialogActions>
       </Dialog>

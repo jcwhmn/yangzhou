@@ -80,8 +80,10 @@ export const t = {
     launchTitle: "项目还没有进行中的组",
     launchBody: "要激活「{name}」吗?激活后新建的 item 将放入该组。",
     launchPickTitle: "要激活哪个组?(激活后新建的 item 将放入)",
-    launchConfirm: "激活",
-    launchLater: "暂不",
+    launchConfirm: "激活并放入",
+    launchCancel: "取消",
+    launchCreateConfirm: "创建并激活",
+    newGroupName: "组名",
   },
   item: {
     title: "标题",

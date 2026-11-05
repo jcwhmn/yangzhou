@@ -19,12 +19,20 @@ type GroupDto = {
   endDate: string | null;
 };
 
-type GroupTypeDto = { typeKey: string; level: number | null };
+type GroupTypeDto = { typeKey: string; name: string; level: number | null };
+
+/** level-1 类型(typeKey+显示名);未配置返回 null(= 项目无组概念,S0)。 */
+export async function level1Type(
+  key: string,
+): Promise<{ typeKey: string; name: string } | null> {
+  const types = await api<GroupTypeDto[]>(`/api/projects/${key}/group-types`);
+  const l1 = types.find((tp) => tp.level === 1);
+  return l1 ? { typeKey: l1.typeKey, name: l1.name } : null;
+}
 
 /** level-1 类型 key(本项目唯一口径);项目未配置 level-1 时报错引导。 */
 export async function level1TypeKey(key: string): Promise<string> {
-  const types = await api<GroupTypeDto[]>(`/api/projects/${key}/group-types`);
-  const l1 = types.find((tp) => tp.level === 1);
+  const l1 = await level1Type(key);
   if (!l1) throw new Error(t.sprints.noLevel1);
   return l1.typeKey;
 }
