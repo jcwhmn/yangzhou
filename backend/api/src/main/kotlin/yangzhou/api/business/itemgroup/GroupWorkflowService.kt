@@ -54,13 +54,13 @@ class GroupWorkflowService(
 
     // ---------- 种子模板(createType / ProjectService.create 复用) ----------
 
-    private fun template(typeKey: String): List<Triple<String, StatusType, List<Edge>>> = when (typeKey) {
-        "sprint" -> listOf(
+    private fun template(type: ItemGroupType): List<Triple<String, StatusType, List<Edge>>> = when {
+        type.timed -> listOf( // 时间盒模板:timed 类型继承 sprint 时间盒语义(spec 0100 切片B,不再挂 typeKey)
             Triple("planned", StatusType.START, listOf(Edge("start", "active"))),
             Triple("active", StatusType.ACTIVE, listOf(Edge("complete", "completed"), Edge("backward", "planned"))),
             Triple("completed", StatusType.FINAL, emptyList()), // 终态无出边 = 护栏
         )
-        "release" -> listOf(
+        type.typeKey == "release" -> listOf(
             Triple("planned", StatusType.START, listOf(Edge("complete", "released"))),
             Triple("released", StatusType.FINAL, emptyList()),
         )
@@ -76,7 +76,7 @@ class GroupWorkflowService(
     @Transactional
     fun seedFor(type: ItemGroupType) {
         groupStatuses.deleteByGroupTypeId(type.id!!)
-        template(type.typeKey).forEachIndexed { pos, (name, statusType, edges) ->
+        template(type).forEachIndexed { pos, (name, statusType, edges) ->
             groupStatuses.save(
                 GroupStatus(
                     groupTypeId = type.id!!,

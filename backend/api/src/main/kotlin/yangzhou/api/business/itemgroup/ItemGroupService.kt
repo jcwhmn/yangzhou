@@ -86,8 +86,6 @@ class ItemGroupService(
         val groupType: String? = null,
     )
 
-    private val builtinKeys = setOf("sprint", "release")
-
     private fun project(key: String) = projects.findByKey(key) ?: throw NotFoundException("项目不存在:$key")
 
     private fun ItemGroupType.toDto() = GroupTypeDto(typeKey, name, builtin, level, timed)
@@ -139,6 +137,9 @@ class ItemGroupService(
         return t.builtin || t.level == 1
     }
 
+    /** 唯一口径:项目 level-1 类型 typeKey(spec 0100 切片B,替代散落 "sprint" 字面量);无 level-1 → null。 */
+    private fun level1Key(projectObjectId: UUID): String? = types.findByProjectObjectIdAndLevel(projectObjectId, 1)?.typeKey
+
     // ---------- 类型 CRUD(0056 语义不变 + workflow 种子) ----------
 
     fun listTypes(key: String): List<GroupTypeDto> = types.findByProjectObjectIdOrderByCreatedAt(project(key).objectId!!).map { it.toDto() }
@@ -155,7 +156,6 @@ class ItemGroupService(
         if (!Regex("[a-z][a-z0-9-]{1,19}").matches(typeKey)) {
             throw BadRequestException("typeKey 需匹配 [a-z][a-z0-9-]{1,19}")
         }
-        if (typeKey in builtinKeys) throw BadRequestException("typeKey 与内建类型冲突:$typeKey")
         val name = request.name?.trim().takeUnless { it.isNullOrEmpty() } ?: throw BadRequestException("name 必填")
         val pid = project(key).objectId!!
         if (types.existsByProjectObjectIdAndTypeKey(pid, typeKey)) {
@@ -189,7 +189,7 @@ class ItemGroupService(
         return types.save(t.copy(name = name)).toDto()
     }
 
-    /** builtin 不可删;类型下仍有组即删除会丢组,409 拒绝(先删组或改类型);group_status 随 FK 级联清除。 */
+    /** builtin 不可删;空类型即可删(含 level-1,2026-11-05 用户拍板);类型下仍有组即删除会丢组,409 拒绝;group_status 随 FK 级联清除。 */
     @Transactional
     fun deleteType(
         key: String,
@@ -200,7 +200,7 @@ class ItemGroupService(
         val t =
             types.findByProjectObjectIdAndTypeKey(pid, typeKey)
                 ?: throw NotFoundException("group 类型不存在:$typeKey")
-        if (t.builtin || t.level == 1) throw ConflictException("内建或层级(level-1)类型不可删除:$typeKey")
+        if (t.builtin) throw ConflictException("内建类型不可删除:$typeKey")
         if (groups.findByProjectObjectIdOrderByCreatedAt(pid).any { it.type == typeKey }) {
             throw ConflictException("类型下仍有组,请先删除:$typeKey")
         }
@@ -215,12 +215,27 @@ class ItemGroupService(
 
     // ---------- 组 CRUD ----------
 
+    /** level-1 组数据源(board/dashboard 等结构语义消费方;无 level-1 → 空表)。 */
+    fun listLevel1Groups(key: String): List<GroupDto> {
+        val l1 = level1Key(project(key).objectId!!) ?: return emptyList()
+        return listGroups(key, l1)
+    }
+
     fun listGroups(
         key: String,
         typeKey: String?,
+        level: Int? = null,
     ): List<GroupDto> {
-        val all = groups.findByProjectObjectIdOrderByCreatedAt(project(key).objectId!!)
-        return (if (typeKey == null) all else all.filter { it.type == typeKey }).map { it.toDto() }
+        val pid = project(key).objectId!!
+        val all = groups.findByProjectObjectIdOrderByCreatedAt(pid)
+        val byType = if (typeKey == null) all else all.filter { it.type == typeKey }
+        val filtered =
+            if (level == null) {
+                byType
+            } else {
+                byType.filter { it.type == types.findByProjectObjectIdAndLevel(pid, level)?.typeKey }
+            }
+        return filtered.map { it.toDto() }
     }
 
     @Transactional
@@ -333,7 +348,7 @@ class ItemGroupService(
         return itemService.list(key).filter { it.itemId in objectIds }
     }
 
-    /** backlog 派生桶:非终态 ∧ 不在任何 planned/active sprint(裁决 2/5,零建模;谓词筛 type='sprint' 在 ItemService)。 */
+    /** backlog 派生桶:非终态 ∧ 不在任何 planned/active level-1 组(裁决 2/5,零建模;谓词筛 level-1 在 ItemService)。 */
     fun backlog(key: String): List<ItemService.ItemDto> = itemService.list(key, backlogOnly = true)
 
     data class BoardDto(
@@ -343,7 +358,8 @@ class ItemGroupService(
 
     /** 看板(YPJ-29):active sprint 组的 items 并集;无 active → backlog 补集(spec 0098:board ∩ backlog = ∅,即终态 ∪ planned sprint 成员)。 */
     fun board(key: String): BoardDto {
-        val active = groups.findByProjectObjectIdOrderByCreatedAt(project(key).objectId!!).filter { it.type == "sprint" && it.status == "active" }
+        val l1 = level1Key(project(key).objectId!!)
+        val active = groups.findByProjectObjectIdOrderByCreatedAt(project(key).objectId!!).filter { it.type == l1 && it.status == "active" }
         val activeDto = active.map { it.toDto() }
         if (active.isEmpty()) {
             val backlogIds = itemService.list(key, backlogOnly = true).map { it.itemId }.toSet()
@@ -421,7 +437,7 @@ class ItemGroupService(
         if (request.onBoard) {
             val active =
                 groups.findByProjectObjectIdOrderByCreatedAt(item.projectObjectId)
-                    .firstOrNull { it.type == "sprint" && it.status == "active" }
+                    .firstOrNull { it.type == level1Key(item.projectObjectId) && it.status == "active" }
             if (active != null) {
                 val rows = memberships.findByItemObjectIdIn(listOf(item.objectId!!))
                 if (rows.none { it.groupObjectId == active.objectId }) {
@@ -430,7 +446,8 @@ class ItemGroupService(
                 }
             }
         } else {
-            replaceMembership(itemObjectId, MembershipRequest(groupId = null, groupType = "sprint"))
+            val l1 = level1Key(item.projectObjectId) ?: return itemService.get(itemObjectId)
+            replaceMembership(itemObjectId, MembershipRequest(groupId = null, groupType = l1))
         }
         return itemService.get(itemObjectId)
     }

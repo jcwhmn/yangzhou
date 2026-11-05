@@ -397,6 +397,18 @@ Authorization: Bearer {{token}}
 ### ============ 11. Sprint(V12-S1,spec 0010) ============
 # 语义:同一 item 至多属于一个 planned/active sprint(替换式写入);
 # 完成 sprint 的成员关系是历史,不可变;组不进匹配输入。
+# spec 0100 切片B:新项目不再种子 sprint 类型,先建 timed level-1 类型(本轮新项目必成功,无重名)。
+
+### 建 sprint 类型(timed level-1)
+POST {{host}}/api/projects/{{pkey}}/group-types
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "typeKey": "sprint",
+  "name": "Sprint",
+  "timed": true
+}
 
 ### 建 Sprint(统一组端点;handler 存变量 sprintId;日期可选,格式 yyyy-MM-dd)
 POST {{host}}/api/projects/{{pkey}}/groups
@@ -541,6 +553,49 @@ Authorization: Bearer {{token}}
 
 ### 删自定义类型
 DELETE {{host}}/api/projects/{{pkey}}/group-types/{{gtypeKey}}
+Authorization: Bearer {{token}}
+
+=== spec 0100 切片B:层级化类型(去内置 sprint;可删性=空即可删,保留字废除) ===
+
+### 建类型列表(新项目只有 release;sprint 由用户加 level 自配)
+GET {{host}}/api/projects/{{pkey}}/group-types
+Authorization: Bearer {{token}}
+
+### 建 timed 类型(handler 存变量 l1Key;无 level-1 时自动补位 level 1)
+POST {{host}}/api/projects/{{pkey}}/group-types
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "typeKey": "sprint2",
+  "name": "冲刺",
+  "timed": true
+}
+
+> {%
+  client.global.set("l1Key", response.body.typeKey);
+%}
+
+### level 查询组(切片C Web 将改用 ?level=1)
+GET {{host}}/api/projects/{{pkey}}/groups?level=1
+Authorization: Bearer {{token}}
+
+### 负例:重名类型 → 409(唯一约束兜底,保留字已废除)
+POST {{host}}/api/projects/{{pkey}}/group-types
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "typeKey": "{{l1Key}}",
+  "name": "重复"
+}
+
+### 负例:删 builtin release → 409(内建不可删)
+DELETE {{host}}/api/projects/{{pkey}}/group-types/release
+Authorization: Bearer {{token}}
+
+### 删空 level-1 类型 → 204(可删性只看空非空)
+DELETE {{host}}/api/projects/{{pkey}}/group-types/{{l1Key}}
 Authorization: Bearer {{token}}
 
 ### 建 Milestone(handler 存变量 milestoneId;targetDate 可选,格式 yyyy-MM-dd)
@@ -1332,7 +1387,7 @@ POST {{host}}/api/projects/{{pkey}}/statuses
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
-{ "name": "自定义中-{{suffix}}", "statusType": "ACTIVE" }
+{ "name": "自定义中-{{run}}", "statusType": "ACTIVE" }
 
 > {% 
 client.global.set("stCustom", response.body.statusId);

@@ -569,7 +569,7 @@ class MetricsService(
 
     fun velocity(key: String): VelocityResponse {
         requireProject(key)
-        val sprints = repo.groups(key, "sprint").filter { it.startDate != null && it.endDate != null }
+        val sprints = repo.level1TypeKey(key).firstOrNull()?.let { t1 -> repo.groups(key, t1) }?.filter { it.startDate != null && it.endDate != null } ?: emptyList()
         val members = repo.groupMembers(key).groupBy { it.groupObjectId }
         val compByItem = completions(key, null).toMap()
         val rows =

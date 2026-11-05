@@ -20,7 +20,7 @@ class GroupWorkflowServiceUnitTest {
     private val mapper = ObjectMapper()
     private val service = GroupWorkflowService(types, groupStatuses, mapper)
 
-    private val sprintType = ItemGroupType(id = 1L, objectId = UUID(0, 1), projectObjectId = UUID(0, 9), typeKey = "sprint", name = "Sprint", builtin = true)
+    private val sprintType = ItemGroupType(id = 1L, objectId = UUID(0, 1), projectObjectId = UUID(0, 9), typeKey = "sprint", name = "Sprint", builtin = true, timed = true)
 
     private fun row(
         name: String,

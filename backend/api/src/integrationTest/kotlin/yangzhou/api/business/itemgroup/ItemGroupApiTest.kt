@@ -340,10 +340,16 @@ class ItemGroupApiTest : AbstractApiTest() {
         val removed = json.readTree(assign(authed, item, null, "phase").responseBody!!)
         assertTrue(removed["sprintId"].isNull)
 
-        // 类型下仍有组不可删 → 删组后可删类型;builtin 不可删
+        // spec 0100 切片B:sprint 非内建,空类型即可删;builtin release 仍不可删
         authed
             .delete()
             .uri("/api/projects/GRP/group-types/sprint")
+            .exchange()
+            .expectStatus()
+            .isNoContent()
+        authed
+            .delete()
+            .uri("/api/projects/GRP/group-types/release")
             .exchange()
             .expectStatus()
             .isEqualTo(409)
@@ -356,7 +362,21 @@ class ItemGroupApiTest : AbstractApiTest() {
     }
 
     @Test
-    fun `内建类型 sprint_release 不可创建冲突_自定义重名 409`() {
+    fun `新项目不再种子 sprint——只种 release(spec 0100 切片B)`() {
+        val authed = bootstrapAndAuth()
+        authed
+            .post()
+            .uri("/api/projects")
+            .body(mapOf("key" to "NEW", "name" to "新项目"))
+            .exchange()
+            .expectStatus()
+            .isCreated()
+        val types = get(authed, "/api/projects/NEW/group-types")
+        assertEquals(listOf("release"), types.map { it["typeKey"].asText() })
+    }
+
+    fun `类型重名冲突_自定义重名 409`() {
+        // spec 0100 切片B:保留字废除,"sprint" 冲突由同项目 typeKey 唯一约束兜底(createProject 测试 helper 已种子)
         val authed = bootstrapAndAuth()
         createProject(authed, "GRP")
         authed
@@ -365,7 +385,7 @@ class ItemGroupApiTest : AbstractApiTest() {
             .body(mapOf("typeKey" to "sprint", "name" to "x"))
             .exchange()
             .expectStatus()
-            .isBadRequest()
+            .isEqualTo(409)
         authed
             .post()
             .uri("/api/projects/GRP/group-types")

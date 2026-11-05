@@ -86,6 +86,7 @@ class ItemServiceUnitTest {
     private val groups = mockk<ItemGroupRepository>(relaxed = true)
 
     private val memberships = mockk<ItemGroupMemberRepository>(relaxed = true)
+    private val groupTypes = mockk<yangzhou.persistence.repository.ItemGroupTypeRepository>(relaxed = true)
 
     private val allMocks =
         arrayOf(
@@ -127,6 +128,7 @@ class ItemServiceUnitTest {
             feasibilityService = feasibilityService,
             dependencyService = mockk(relaxed = true),
             groups = groups,
+            groupTypes = groupTypes,
             memberships = memberships,
             notificationService = notificationService,
             memberHistory = mockk(relaxed = true),
@@ -359,6 +361,9 @@ class ItemServiceUnitTest {
                 listOf(ItemGroupMember(groupObjectId = UUID(0, 7), itemObjectId = UUID(0, 997)))
 
             every { groups.findAllByObjectIdIn(setOf(UUID(0, 7))) } returns listOf(sprint)
+
+            val sprintTypeRow = mockk<yangzhou.persistence.ItemGroupType> { every { typeKey } returns "sprint" }
+            every { groupTypes.findByProjectObjectIdAndLevel(projectObjectId, 1) } returns sprintTypeRow
 
             val dtos = service.list("CHE", backlogOnly = true)
 

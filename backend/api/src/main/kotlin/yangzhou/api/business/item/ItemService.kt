@@ -17,6 +17,7 @@ import yangzhou.persistence.repository.ItemGitRefRepository
 import yangzhou.persistence.repository.ItemGroupMemberHistoryRepository
 import yangzhou.persistence.repository.ItemGroupMemberRepository
 import yangzhou.persistence.repository.ItemGroupRepository
+import yangzhou.persistence.repository.ItemGroupTypeRepository
 import yangzhou.persistence.repository.ItemNumberRepository
 import yangzhou.persistence.repository.ItemRepository
 import yangzhou.persistence.repository.ItemTreeRepository
@@ -49,6 +50,7 @@ class ItemService(
     private val feasibilityService: yangzhou.api.business.feasibility.FeasibilityService,
     private val dependencyService: yangzhou.api.business.dependency.DependencyService,
     private val groups: ItemGroupRepository,
+    private val groupTypes: ItemGroupTypeRepository,
     private val memberships: ItemGroupMemberRepository,
     private val notificationService: yangzhou.api.business.notification.NotificationService,
     private val memberHistory: yangzhou.persistence.repository.ItemGroupMemberHistoryRepository,
@@ -170,7 +172,7 @@ class ItemService(
         if (sprintId != null) { // YPJ-56:创建时初始归属,校验同 assignItem(sprint 归属该项目;completed 拒);同事务,负例下 item 不落库
             val sprint =
                 groups.findByProjectObjectIdAndObjectId(projectObjectId, sprintId)
-                    ?.takeIf { it.type == "sprint" } // spec 0097 泄漏 2 收口:只认 sprint 组(404 语义不变)
+                    ?.takeIf { it.type == level1Key(projectObjectId) } // spec 0100 切片B:只认 level-1 组
                     ?: throw NotFoundException("sprint 不存在")
             if (sprint.status == "completed") throw ConflictException("sprint 已完成,不能指派")
             memberships.save(ItemGroupMember(groupObjectId = sprint.objectId!!, itemObjectId = itemId))
@@ -293,10 +295,10 @@ class ItemService(
                     groups.findAllByObjectIdIn(rows.map { it.groupObjectId }.toSet()).associateBy { it.objectId!! }
                 }
                 // spec 0097 泄漏 4 收口:只认 sprint 归属为 live(release/自定义组不再抑制自动挂载)
-                val hasLive = rows.any { rowGroups[it.groupObjectId]?.let { g -> g.status != "completed" && g.type == "sprint" } == true }
+                val hasLive = rows.any { rowGroups[it.groupObjectId]?.let { g -> g.status != "completed" && g.type == level1Key(projectObjectId) } == true }
                 if (!hasLive) {
                     val first = groups.findByProjectObjectIdOrderByCreatedAt(projectObjectId)
-                        .firstOrNull { it.type == "sprint" && it.status == "active" } // spec 0097 泄漏 3 收口:自动挂载只挂 sprint
+                        .firstOrNull { it.type == level1Key(projectObjectId) && it.status == "active" } // spec 0100 切片B:自动挂载只挂 level-1
                     if (first != null) { // 同 create 初始归属模式(YPJ-56):save + 留痕,同事务
                         memberships.save(ItemGroupMember(groupObjectId = first.objectId!!, itemObjectId = current.objectId!!))
                         memberHistory.recordAdd(first.objectId!!, current.objectId!!, clock.instant())
@@ -559,6 +561,9 @@ class ItemService(
         val createdAt: java.time.Instant,
     )
 
+    /** 项目 level-1 类型 key(spec 0100 切片B 唯一口径);无 level-1 → null(项目无 sprint 语义)。 */
+    private fun level1Key(projectObjectId: UUID): String? = groupTypes.findByProjectObjectIdAndLevel(projectObjectId, 1)?.typeKey
+
     fun activity(itemId: UUID): List<ActivityDto> {
         val item = itemRepo.findByObjectId(itemId) ?: throw NotFoundException("item 不存在")
         return activityRepo
@@ -613,7 +618,7 @@ class ItemService(
         val currentSprint =
             ms
                 .mapNotNull { m ->
-                    groupById[m.groupObjectId]?.takeIf { it.status != "completed" && it.type == "sprint" }?.let { m.itemObjectId to it }
+                    groupById[m.groupObjectId]?.takeIf { it.status != "completed" && it.type == level1Key(projectObjectId) }?.let { m.itemObjectId to it }
                 }.toMap()
         // V15:release 归属(单选,spec 0012)
         val currentRelease =

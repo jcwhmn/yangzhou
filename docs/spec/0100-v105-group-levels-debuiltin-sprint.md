@@ -144,3 +144,25 @@ alter table item_group alter column type drop default;            -- type 去隐
 - **实现决议①**:ProjectService.create 种子同步 V48 形状——sprint 种子= level-1/timed/builtin=false(新项目数据模型即刻一致;否则运行时种子与迁移回填形状分裂,自定义类型会被误分 level-1);切片B 去种子
 - **实现决议②**:deleteType 守卫扩为 `builtin ∨ level==1`——既有「sprint 不可删」契约保持(集成用例断言在);level-1 删除政策(是否放开空 level-1 删除)归切片B 决议
 - 验证:gradle build + integrationTest 绿(切片A 行为零变化判据)
+
+
+## 切片B 拍板与 As-built(2026-11-05)
+
+### 用户拍板(2026-11-05)
+1. **可删性**:只看空非空(有组不可删,空即可删),level 不参与——空 level-1 也可删;守卫 = builtin ∨ 有组。
+2. **builtinKeys 保留字废除**:createType 不再拒绝 "sprint"/"release";冲突由同项目 typeKey 唯一约束兜底(用户:实践中不会拿内建名当自定义名,但模型不阻止)。
+3. **release/milestone 需求与设计暂缓**:用户重新思考后另写文档(docs/designs/ItemGroup.md);切片B 不动 release 种子与 workflow 模板。
+
+### 实现(按 §三.3)
+- ItemGroupService:deleteType 守卫改 builtin ∨ 有组;删 builtinKeys;新增 level1Key(pid) 唯一口径 + listLevel1Groups;listGroups 加 `level` 参数(controller 同步);board 拉入挂 level-1 active、退回无 level-1 时跳过
+- GroupWorkflowService.template(type):release 分支挂 typeKey==release(builtin 兜底);timed → 时间盒模板(原 sprint 内容不变);否则三态 switch
+- ProjectService.create:种子只留 release(builtin,level=NULL,timed=false)——**新项目不再有 sprint 段,用户「加 level」自配**
+- ItemService:创建初始归属/hasLive/自动挂载/activity 归属判定 → level-1
+- DashboardService → listLevel1Groups;MetricsRepository.level1TypeKey(key)(@Query)+ velocity 数据源改 level-1
+- CLI:level1TypeKey(api,key) helper;sprints list/create/move、items assign 均寻型 level-1,无 level-1 明确报错「项目未配置 level-1 组类型(Web 类型管理加 level)」;命令面不变
+- api.http:group-types 区块补 timed 建型 / `?level=1` / 负例(重名 409、删 release 409、删空 level-1 204)
+
+### 测试
+- 单元:ItemGroupServiceUnitTest(sprintType fixture 改 V48 形状 builtin=false/level=1/timed=true;新增 deleteTypeAllowsEmptyLevel1;内建冲突测试改重名 409)、GroupWorkflowServiceUnitTest(sprint fixture timed=true)、ProjectServiceUnitTest(种子 2→1)、DashboardServiceUnitTest(listLevel1Groups)、ItemServiceUnitTest(groupTypes mock + level stub)
+- 集成:AbstractApiTest.createProject 补种 timed level-1 sprint 类型(=V48 存量形状,既有用例语义零改);ItemGroupApiTest(sprint 删类型 204 + release 409;重名 400→409;新增「新项目不再种子 sprint——只种 release」)
+- 验证:`gradle test` 326 绿 + `gradle integrationTest` 218 绿
