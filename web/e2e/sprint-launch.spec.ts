@@ -16,7 +16,7 @@ test("board 降级态建 item → 弹窗拉起 → 确认后激活并放入 @smo
   // 弹窗:单 planned → 标题+正文含 sprint 名;确认 → 激活+放入
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
-  await expect(dialog.getByText(/项目还没有活动 sprint/)).toBeVisible();
+  await expect(dialog.getByText(/项目还没有进行中的组/)).toBeVisible();
   await expect(dialog.getByText(/Launch S1/)).toBeVisible();
   await dialog.getByRole("button", { name: "激活" }).click();
   await expect(dialog).toBeHidden();
