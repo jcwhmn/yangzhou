@@ -507,6 +507,9 @@ export const t = {
       completed: "已完成",
     },
   },
+  connection: {
+    down: "后端不可达,数据可能不完整——正在自动重试…",
+  },
   footer: {
     copyright: "© Jiang Chuanwei",
     versionFallback: "dev",
