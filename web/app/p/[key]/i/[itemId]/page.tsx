@@ -980,54 +980,57 @@ export default function ItemDetailPage() {
                 ]}
               />
 
-              <Dropdown
-                label={t.item.sprint}
+              {sprints.length > 0 && (
+                <Dropdown
+                  label={t.item.sprint}
 
-                size="small"
+                  size="small"
 
-                value={item.sprintId ?? ""}
+                  value={item.sprintId ?? ""}
 
-                onChange={(v) => applySprint(v || null)}
+                  onChange={(v) => applySprint(v || null)}
 
-                sx={{ width: 170 }}
+                  sx={{ width: 170 }}
 
-                clearable
+                  clearable
 
-                options={sprints
+                  options={sprints
 
-                  .filter(
-                    (s) =>
-                      s.status !== "completed" || s.sprintId === item.sprintId,
-                  )
+                    .filter(
+                      (s) =>
+                        s.status !== "completed" ||
+                        s.sprintId === item.sprintId,
+                    )
 
-                  .sort(
-                    (a, b) =>
-                      ["active", "planned", "completed"].indexOf(a.status) -
-                      ["active", "planned", "completed"].indexOf(b.status),
-                  )
+                    .sort(
+                      (a, b) =>
+                        ["active", "planned", "completed"].indexOf(a.status) -
+                        ["active", "planned", "completed"].indexOf(b.status),
+                    )
 
-                  .map((s) => ({
-                    value: s.sprintId,
+                    .map((s) => ({
+                      value: s.sprintId,
 
-                    label: s.name,
+                      label: s.name,
 
-                    disabled: s.status === "completed",
+                      disabled: s.status === "completed",
 
-                    chip: {
-                      label:
-                        t.projectNav.sprintStatus[
-                          s.status as keyof typeof t.projectNav.sprintStatus
-                        ],
+                      chip: {
+                        label:
+                          t.projectNav.sprintStatus[
+                            s.status as keyof typeof t.projectNav.sprintStatus
+                          ],
 
-                      color:
-                        s.status === "active"
-                          ? "primary"
-                          : s.status === "planned"
-                            ? "warning"
-                            : "default",
-                    },
-                  }))}
-              />
+                        color:
+                          s.status === "active"
+                            ? "primary"
+                            : s.status === "planned"
+                              ? "warning"
+                              : "default",
+                      },
+                    }))}
+                />
+              )}
 
               {item.sprintId && (
                 <Link

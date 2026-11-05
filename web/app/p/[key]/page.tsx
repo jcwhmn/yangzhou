@@ -295,7 +295,7 @@ export default function BoardPage() {
       {!loading && activeSprints.length === 0 && (
         <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
           <Alert severity="info" sx={{ py: 0.5, flex: 1 }}>
-            {t.board.noActiveSprint}
+            {sprints.length === 0 ? t.board.noGroups : t.board.noActiveSprint}
           </Alert>
           {sprints.some((s) => s.status === "planned") && (
             <Dropdown

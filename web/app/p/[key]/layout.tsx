@@ -46,6 +46,7 @@ import { GroupTypesPanel } from "@/components/GroupTypesPanel";
 import { DateInput } from "@/components/DateInput";
 
 type Sprint = { sprintId: string; name: string; status: string };
+type GroupTypeLite = { name: string; level: number | null };
 type NavItem = {
   itemId: string;
   number: string;
@@ -68,6 +69,8 @@ export default function ProjectLayout({
   const { key } = useParams<{ key: string }>();
   const pathname = usePathname();
   const [sprints, setSprints] = useState<Sprint[] | null>(null);
+  // YPJ-150 案B:level-1 类型完全用户配置——段头显示类型名;无类型 → 无段(null=加载中不渲染)
+  const [l1, setL1] = useState<{ name: string } | null>(null);
   const [items, setItems] = useState<NavItem[]>([]);
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [msOpen, setMsOpen] = useState(false);
@@ -95,6 +98,9 @@ export default function ProjectLayout({
       )
       .then(setSprints)
       .catch(() => setSprints([]));
+    api<GroupTypeLite[]>(`/api/projects/${key}/group-types`)
+      .then((ts) => setL1(ts.find((tp) => tp.level === 1) ?? null))
+      .catch(() => setL1(null));
   };
 
   const loadSide = () => {
@@ -311,23 +317,6 @@ export default function ProjectLayout({
             <ListItemText primary={t.projectNav.table} />
           </ListItemButton>
           <Divider sx={{ my: 1 }} />
-          <ListSubheader
-            disableSticky
-            sx={{
-              bgcolor: "transparent",
-              display: "flex",
-              alignItems: "center",
-            }}
-          >
-            <span style={{ flex: 1 }}>{t.projectNav.sprints}</span>
-            <IconButton
-              size="small"
-              aria-label="新建 Sprint"
-              onClick={() => setCreateOpen(true)}
-            >
-              <AddIcon fontSize="small" />
-            </IconButton>
-          </ListSubheader>
           <ListItemButton
             component={Link}
             href={`/p/${key}/backlog`}
@@ -336,35 +325,56 @@ export default function ProjectLayout({
           >
             <ListItemText primary={t.projectNav.backlog} />
           </ListItemButton>
-          {(sprints ?? []).length === 0 && sprints !== null && (
-            <ListItemButton disabled sx={{ py: 0.25 }}>
-              <ListItemText
-                primary={t.projectNav.empty}
-                primaryTypographyProps={{
-                  variant: "caption",
-                  color: "text.secondary",
+          {l1 && (
+            <>
+              <ListSubheader
+                disableSticky
+                sx={{
+                  bgcolor: "transparent",
+                  display: "flex",
+                  alignItems: "center",
                 }}
-              />
-            </ListItemButton>
+              >
+                <span style={{ flex: 1 }}>{l1.name}</span>
+                <IconButton
+                  size="small"
+                  aria-label={`新建 ${l1.name}`}
+                  onClick={() => setCreateOpen(true)}
+                >
+                  <AddIcon fontSize="small" />
+                </IconButton>
+              </ListSubheader>
+              {(sprints ?? []).length === 0 && sprints !== null && (
+                <ListItemButton disabled sx={{ py: 0.25 }}>
+                  <ListItemText
+                    primary={`暂无${l1.name}`}
+                    primaryTypographyProps={{
+                      variant: "caption",
+                      color: "text.secondary",
+                    }}
+                  />
+                </ListItemButton>
+              )}
+              {sorted.map((s) => (
+                <ListItemButton
+                  key={s.sprintId}
+                  component={Link}
+                  href={`/p/${key}/sprint/${s.sprintId}`}
+                  selected={pathname === `/p/${key}/sprint/${s.sprintId}`}
+                  sx={itemSx}
+                >
+                  <ListItemText
+                    primary={s.name}
+                    secondary={
+                      t.projectNav.sprintStatus[
+                        s.status as keyof typeof t.projectNav.sprintStatus
+                      ] ?? s.status
+                    }
+                  />
+                </ListItemButton>
+              ))}
+            </>
           )}
-          {sorted.map((s) => (
-            <ListItemButton
-              key={s.sprintId}
-              component={Link}
-              href={`/p/${key}/sprint/${s.sprintId}`}
-              selected={pathname === `/p/${key}/sprint/${s.sprintId}`}
-              sx={itemSx}
-            >
-              <ListItemText
-                primary={s.name}
-                secondary={
-                  t.projectNav.sprintStatus[
-                    s.status as keyof typeof t.projectNav.sprintStatus
-                  ] ?? s.status
-                }
-              />
-            </ListItemButton>
-          ))}
           <Divider sx={{ my: 1 }} />
           <ListSubheader
             disableSticky
@@ -467,7 +477,7 @@ export default function ProjectLayout({
         maxWidth="xs"
         fullWidth
       >
-        <DialogTitle>{t.projectNav.create}</DialogTitle>
+        <DialogTitle>{`新建${l1?.name ?? ""}`}</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
             <TextField
@@ -543,7 +553,10 @@ export default function ProjectLayout({
       <GroupTypesPanel
         projectKey={String(key)}
         open={gtypeOpen}
-        onClose={() => setGtypeOpen(false)}
+        onClose={() => {
+          setGtypeOpen(false);
+          loadSprints(); // YPJ-150:类型管理可能新建 level-1 → 重判 Sprint 段显隐
+        }}
       />
     </Box>
   );

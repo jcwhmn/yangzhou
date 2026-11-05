@@ -53,6 +53,8 @@ export default function OverviewPage() {
   const [items, setItems] = useState<Item[]>([]);
   const [me, setMe] = useState<string | null>(null);
   const [sprint, setSprint] = useState<SprintBrief | null>(null);
+  // YPJ-150 案B:无 level-1 类型 → 整段隐藏;段头/空态用类型名
+  const [l1, setL1] = useState<{ name: string } | null>(null);
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
@@ -66,6 +68,11 @@ export default function OverviewPage() {
       const finalByName = new Map(
         proj.statuses.map((s) => [s.name, s.statusType === "FINAL"]),
       );
+      api<{ name: string; level: number | null }[]>(
+        `/api/projects/${key}/group-types`,
+      )
+        .then((ts) => setL1(ts.find((tp) => tp.level === 1) ?? null))
+        .catch(() => setL1(null));
       setStatuses(proj.statuses);
       setItems(its);
       setMe(mems.find((m) => !m.virtual)?.displayName ?? null);
@@ -230,50 +237,56 @@ export default function OverviewPage() {
             )}
           </CardContent>
         </Card>
-        <Card sx={{ gridColumn: { md: "1 / -1" } }}>
-          <CardContent>
-            <Typography color="text.secondary" variant="subtitle2" gutterBottom>
-              {t.overview.sprint}
-            </Typography>
-            {!sprint ? (
-              <Typography variant="body2" color="text.secondary">
-                {t.overview.noSprint}
+        {l1 && (
+          <Card sx={{ gridColumn: { md: "1 / -1" } }}>
+            <CardContent>
+              <Typography
+                color="text.secondary"
+                variant="subtitle2"
+                gutterBottom
+              >
+                {l1?.name}
               </Typography>
-            ) : (
-              <>
-                <Box
-                  sx={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    py: 0.5,
-                  }}
-                >
-                  <Typography
-                    component={Link}
-                    href={`/p/${key}/sprint/${sprint.sprintId}`}
-                    variant="body2"
-                    sx={{ color: "primary.main", textDecoration: "none" }}
+              {!sprint ? (
+                <Typography variant="body2" color="text.secondary">
+                  {`暂无${l1?.name ?? ""}`}
+                </Typography>
+              ) : (
+                <>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      py: 0.5,
+                    }}
                   >
-                    {sprint.name}
-                  </Typography>
-                  <Typography variant="body2">
-                    {sprint.done}/{sprint.total} {t.overview.done}
-                  </Typography>
-                </Box>
-                {sprint.byMember.map((m) => (
-                  <Typography
-                    key={m.name}
-                    variant="body2"
-                    color="text.secondary"
-                    sx={{ py: 0.25 }}
-                  >
-                    {m.name} · {m.done}/{m.total}
-                  </Typography>
-                ))}
-              </>
-            )}
-          </CardContent>
-        </Card>
+                    <Typography
+                      component={Link}
+                      href={`/p/${key}/sprint/${sprint.sprintId}`}
+                      variant="body2"
+                      sx={{ color: "primary.main", textDecoration: "none" }}
+                    >
+                      {sprint.name}
+                    </Typography>
+                    <Typography variant="body2">
+                      {sprint.done}/{sprint.total} {t.overview.done}
+                    </Typography>
+                  </Box>
+                  {sprint.byMember.map((m) => (
+                    <Typography
+                      key={m.name}
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ py: 0.25 }}
+                    >
+                      {m.name} · {m.done}/{m.total}
+                    </Typography>
+                  ))}
+                </>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </Box>
     </Box>
   );
