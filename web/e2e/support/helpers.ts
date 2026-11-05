@@ -83,6 +83,21 @@ export async function apiCreateProject(key: string): Promise<void> {
   });
   // 409 = 并行下同名 key 已存在(理论不发生),容忍
   if (!res.ok && res.status !== 409) await assertOk(res, `创建项目 ${key}`);
+  // spec 0100 切片B:新项目不再种子 sprint;按 V48 存量形状补种 timed level-1 类型
+  await ensureSprintType(key);
+}
+
+/** sprint 类型不存在则补种(409=已有,容忍);UI/接口建 sprint 依赖它。 */
+async function ensureSprintType(key: string): Promise<void> {
+  const res = await fetch(`${config.apiURL}/api/projects/${key}/group-types`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${await apiToken()}`,
+    },
+    body: JSON.stringify({ typeKey: "sprint", name: "Sprint", timed: true }),
+  });
+  if (!res.ok && res.status !== 409) await assertOk(res, `补种 sprint 类型 ${key}`);
 }
 
 export async function apiCreateMember(displayName: string): Promise<void> {
