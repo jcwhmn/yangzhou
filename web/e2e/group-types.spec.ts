@@ -65,15 +65,19 @@ test("level 动线——UI 建 timed level-1 类型 → 建 Sprint 组(数据源
   await page.getByRole("button", { name: "关闭" }).click();
   await expect(dialog).toBeHidden(); // MUI 淡出期吞点击,先等关
   // 类型建好 → 侧栏 Sprint 段出现
-  await expect(page.getByRole("button", { name: "新建 Sprint" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "新建 Iteration" }),
+  ).toBeVisible();
+  // 段头 = 类型名,不是 "Sprint"
+  await expect(page.getByText("Iteration", { exact: true })).toBeVisible();
 
   // 侧栏新建 Sprint:走 level-1 解析(不再按 typeKey=sprint 寻型)
-  await page.getByRole("button", { name: "新建 Sprint" }).click();
+  await page.getByRole("button", { name: "新建 Iteration" }).click();
   const createDialog = page.getByRole("dialog");
   await expect(createDialog).toBeVisible();
   await createDialog.getByLabel("名称").fill(" iteration-1");
   await createDialog.getByRole("button", { name: "创建" }).click();
   await expect(createDialog).toBeHidden();
   await expect(page.getByText("iteration-1")).toBeVisible();
-  await expect(page.getByText("暂无 Sprint")).toHaveCount(0);
+  await expect(page.getByText("暂无Iteration")).toHaveCount(0);
 });

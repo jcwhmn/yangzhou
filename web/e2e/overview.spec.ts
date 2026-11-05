@@ -108,5 +108,6 @@ test("Overview 空项目——空态文案,不炸", async ({ page, projectKey })
   await expect(page.getByText(`${startName} · 0`)).toBeVisible();
   await expect(page.getByText("没有分配给我的未完成 item")).toBeVisible();
   await expect(page.getByText("没有风险 item")).toBeVisible();
-  await expect(page.getByText("暂无进行中的 Sprint")).toBeVisible();
+  // spec 0101 案B:空项目无 level-1 类型 → sprint 概况段整段隐藏
+  await expect(page.getByText("暂无进行中的 Sprint")).toHaveCount(0);
 });

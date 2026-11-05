@@ -139,6 +139,8 @@ export default function FlowPage() {
     burnup?: Burnup;
   }>({});
   const [loaded, setLoaded] = useState(false);
+  // YPJ-150 案B:项目无 level-1 组 → 空态文案中性化(不出现 sprint 字样)
+  const [noGroups, setNoGroups] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -160,6 +162,7 @@ export default function FlowPage() {
           api<Velocity>(`/api/projects/${key}/metrics/velocity`),
           listSprints(key),
         ]);
+      setNoGroups((sprints ?? []).length === 0);
       const active = (sprints ?? []).find((s) => s.status === "active");
       const burnup =
         active && active.startDate && active.endDate
@@ -412,7 +415,7 @@ export default function FlowPage() {
       <Box>
         <Card2 title={t.flow.burnup}>
           {!data.burnup ? (
-            <Empty text={t.flow.noActiveSprint} />
+            <Empty text={noGroups ? t.flow.noGroups : t.flow.noActiveSprint} />
           ) : (
             <LineChart height={280} {...burnupSeries} />
           )}
