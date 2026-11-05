@@ -97,7 +97,8 @@ async function ensureSprintType(key: string): Promise<void> {
     },
     body: JSON.stringify({ typeKey: "sprint", name: "Sprint", timed: true }),
   });
-  if (!res.ok && res.status !== 409) await assertOk(res, `补种 sprint 类型 ${key}`);
+  if (!res.ok && res.status !== 409)
+    await assertOk(res, `补种 sprint 类型 ${key}`);
 }
 
 export async function apiCreateMember(displayName: string): Promise<void> {
