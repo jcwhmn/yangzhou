@@ -52,7 +52,7 @@ test("level 动线——UI 建 timed level-1 类型 → 建 Sprint 组(数据源
   await dialog.getByLabel("名称", { exact: true }).fill("Iteration");
   await dialog.getByText("时间盒", { exact: true }).click();
   await dialog.getByRole("button", { name: "新增" }).click();
-  await expect(dialog.getByText("Iteration")).toBeVisible();
+  await expect(dialog.getByText("Iteration", { exact: true })).toBeVisible();
   await expect(dialog.getByText("L1", { exact: true })).toBeVisible();
   await expect(dialog.getByText("时间盒", { exact: true })).toHaveCount(2); // 开关 + 徽标
   await expect(
