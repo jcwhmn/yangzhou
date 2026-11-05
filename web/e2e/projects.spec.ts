@@ -16,8 +16,11 @@ test("建项目表单——创建并进入看板(根页=看板) @smoke", async (
   await expect(page).toHaveURL(new RegExp(`/p/${projectKey}P$`));
   await expect(page.getByText("当前无进行中 sprint")).toBeVisible();
   await expect(page.getByRole("button", { name: "拉入看板" })).toBeVisible();
-  // spec 0100 切片C:新项目无组 → 侧栏 Sprint 段空态
-  await expect(page.getByText("暂无 Sprint")).toBeVisible();
+  // spec 0101:新项目无 level-1 类型 → 侧栏无 Sprint 段(标题/+ 按钮均不渲染)
+  await expect(page.getByRole("button", { name: "新建 Sprint" })).toHaveCount(
+    0,
+  );
+  await expect(page.getByText("暂无 Sprint")).toHaveCount(0);
 });
 
 test("V11-S3 项目列表搜索/排序/显示已归档", async ({ page, projectKey }) => {
