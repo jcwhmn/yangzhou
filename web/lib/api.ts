@@ -1,6 +1,34 @@
 // API 瘦客户端:token 存 localStorage;401 → 登录页。
 // 默认同源(经 Next rewrites 代理到后端,浏览器零 CORS);自部署 API 时用 NEXT_PUBLIC_API_URL 覆盖。
+import { setDown, setUp } from "@/lib/connection-store";
+
 export const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
+
+// 连接失败退避重试间隔(0104):仍失败才置全局不可达
+const RETRY_DELAYS_MS = [1000, 2000];
+
+/** 连接失败(TypeError/代理 502/504)退避重试;耗尽则 setDown + 抛 ApiError(0)。业务错误不进这里。 */
+async function fetchWithRetry(
+  path: string,
+  init: RequestInit,
+): Promise<Response> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const res = await fetch(`${API_BASE}${path}`, init);
+      if (res.status !== 502 && res.status !== 504) {
+        setUp(); // 有响应即可达,横幅自愈
+        return res;
+      }
+    } catch (e) {
+      if (!(e instanceof TypeError)) throw e; // abort 等非网络层错误不重试
+    }
+    if (attempt >= RETRY_DELAYS_MS.length) {
+      setDown();
+      throw new ApiError(0, "后端不可达");
+    }
+    await new Promise((r) => setTimeout(r, RETRY_DELAYS_MS[attempt]));
+  }
+}
 
 export class ApiError extends Error {
   constructor(
@@ -16,7 +44,7 @@ export async function api<T = unknown>(
   init: RequestInit = {},
 ): Promise<T> {
   const token = localStorage.getItem("yz-token");
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await fetchWithRetry(path, {
     ...init,
     headers: {
       "Content-Type": "application/json",
