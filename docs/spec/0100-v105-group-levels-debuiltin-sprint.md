@@ -166,3 +166,22 @@ alter table item_group alter column type drop default;            -- type 去隐
 - 单元:ItemGroupServiceUnitTest(sprintType fixture 改 V48 形状 builtin=false/level=1/timed=true;新增 deleteTypeAllowsEmptyLevel1;内建冲突测试改重名 409)、GroupWorkflowServiceUnitTest(sprint fixture timed=true)、ProjectServiceUnitTest(种子 2→1)、DashboardServiceUnitTest(listLevel1Groups)、ItemServiceUnitTest(groupTypes mock + level stub)
 - 集成:AbstractApiTest.createProject 补种 timed level-1 sprint 类型(=V48 存量形状,既有用例语义零改);ItemGroupApiTest(sprint 删类型 204 + release 409;重名 400→409;新增「新项目不再种子 sprint——只种 release」)
 - 验证:`gradle test` 326 绿 + `gradle integrationTest` 218 绿
+
+## 切片C As-built(2026-11-06)
+
+### 实现(按 §三.4)
+
+- `web/lib/sprints.ts`(唯一数据源,其余页面自动跟随):`listSprints` → `GET /groups?level=1`;新增 `level1TypeKey(key)`(GET /group-types 解析 `level===1`,缺失抛 `t.sprints.noLevel1` 引导文案);`createSprint` 的 `typeKey`、`assignSprint(null)` 的 `groupType` 均走该解析——`"sprint"` 字面量×3 全数清除;assign 路径(带 groupId)不再传 groupType(后端自证类型)
+- `web/components/GroupTypesPanel.tsx`:建类型表单加「时间盒」勾选(= `timed`,模板由后端按 timed 选);列表加 `L{n}`(primary 色)与「时间盒」徽标
+- `web/lib/texts.ts`:文案外置(`groupTypes.timed` / `sprints.noLevel1` / hint 更新为 level-1 语义)
+- 侧栏 `layout.tsx` 零改动(§三.4 约定:显隐逻辑不动,数据驱动显隐=侧栏票);`sprint/[id]` 页零改动
+
+### e2e
+
+- `projects.spec`:新项目(有 level-1 类型、无组)侧栏「暂无 Sprint」空态断言
+- `group-types.spec`:全链用例——删 fixture 补种的 sprint 类型 → UI 建 timed「Iteration」(验 L1 徽标 + 时间盒模板 workflow)→ 侧栏建组(走 level-1 解析);踩坑:`getByText` 大小写不敏感,name/typeKey 仅大小写差时须 `exact: true`
+- 全量 67 例绿(本地 8082 test 容器);存量回归由既有套件覆盖(fixture 各用例补种 sprint 类型 = level-1)
+
+### 与设计偏差
+
+- `GroupTypesPanel` 未做「模板选择」独立控件——`timed` 勾选即模板选择(后端按 timed 种模板),§三.4 的两项合为一项
