@@ -1,5 +1,6 @@
 package yangzhou.api.business.itemgroup
 
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import yangzhou.api.business.item.ItemService
@@ -44,11 +45,14 @@ class ItemGroupService(
         val typeKey: String,
         val name: String,
         val builtin: Boolean,
+        val level: Int? = null,
+        val timed: Boolean = false,
     )
 
     data class CreateGroupTypeRequest(
         val typeKey: String?,
         val name: String?,
+        val timed: Boolean = false,
     )
 
     data class UpdateGroupTypeRequest(
@@ -86,7 +90,7 @@ class ItemGroupService(
 
     private fun project(key: String) = projects.findByKey(key) ?: throw NotFoundException("项目不存在:$key")
 
-    private fun ItemGroupType.toDto() = GroupTypeDto(typeKey, name, builtin)
+    private fun ItemGroupType.toDto() = GroupTypeDto(typeKey, name, builtin, level, timed)
 
     private fun ItemGroup.toDto() = GroupDto(
         groupId = objectId!!,
@@ -126,8 +130,14 @@ class ItemGroupService(
         return groups.findByProjectObjectIdAndObjectId(p.objectId!!, groupId) ?: throw NotFoundException("group 不存在")
     }
 
-    /** 归属是交付/规划历史事实的类型(sprint/release):非空不可删。 */
-    private fun membershipIsHistory(typeKey: String) = typeKey in builtinKeys
+    /** 归属是交付/规划历史事实的类型(builtin 或 level-1,spec 0100 切片A):非空不可删;自定义类型 membership 视作展示组织,可删。 */
+    private fun membershipIsHistory(
+        key: String,
+        typeKey: String,
+    ): Boolean {
+        val t = typeOf(key, typeKey)
+        return t.builtin || t.level == 1
+    }
 
     // ---------- 类型 CRUD(0056 语义不变 + workflow 种子) ----------
 
@@ -151,7 +161,16 @@ class ItemGroupService(
         if (types.existsByProjectObjectIdAndTypeKey(pid, typeKey)) {
             throw ConflictException("group 类型已存在:$typeKey")
         }
-        val saved = types.save(ItemGroupType(projectObjectId = pid, typeKey = typeKey, name = name))
+        // spec 0100 切片A:「加 level」自底向上 = 最小未占正整数(恰一 level-1;删 level-1 后新类型回落补位);
+        // release 等 builtin level=NULL 不参与;并发竞态由 (project_id, level) 唯一索引兜底。
+        val used = types.findByProjectObjectIdOrderByCreatedAt(pid).mapNotNull { it.level }.toSet()
+        val level = (1..used.size + 1).first { it !in used }
+        val saved =
+            try {
+                types.save(ItemGroupType(projectObjectId = pid, typeKey = typeKey, name = name, level = level, timed = request.timed))
+            } catch (_: DataIntegrityViolationException) {
+                throw ConflictException("group 类型层级并发冲突,请重试:$typeKey")
+            }
         workflow.seedFor(saved)
         return saved.toDto()
     }
@@ -181,7 +200,7 @@ class ItemGroupService(
         val t =
             types.findByProjectObjectIdAndTypeKey(pid, typeKey)
                 ?: throw NotFoundException("group 类型不存在:$typeKey")
-        if (t.builtin) throw ConflictException("内建类型不可删除:$typeKey")
+        if (t.builtin || t.level == 1) throw ConflictException("内建或层级(level-1)类型不可删除:$typeKey")
         if (groups.findByProjectObjectIdOrderByCreatedAt(pid).any { it.type == typeKey }) {
             throw ConflictException("类型下仍有组,请先删除:$typeKey")
         }
@@ -273,7 +292,7 @@ class ItemGroupService(
     ) {
         leaderGuard.requireLeader(key)
         val g = findGroup(key, groupId)
-        if (membershipIsHistory(g.type) && memberships.existsByGroupObjectId(g.objectId!!)) {
+        if (membershipIsHistory(key, g.type) && memberships.existsByGroupObjectId(g.objectId!!)) {
             throw ConflictException("组非空,请先移出 items")
         }
         val gid = g.objectId!!

@@ -107,6 +107,8 @@ class ItemGroupType {
   typeKey: String
   name: String
   builtin: Boolean
+  level: Int?
+  timed: Boolean
 }
 class ItemGroupMember
 class ItemGroupMemberHistory

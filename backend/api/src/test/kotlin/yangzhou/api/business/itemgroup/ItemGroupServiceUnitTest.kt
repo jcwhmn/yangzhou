@@ -6,6 +6,7 @@ import io.mockk.mockk
 import io.mockk.verify
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
+import org.springframework.dao.DataIntegrityViolationException
 import yangzhou.api.error.BadRequestException
 import yangzhou.api.error.ConflictException
 import yangzhou.api.error.NotFoundException
@@ -104,6 +105,28 @@ class ItemGroupServiceUnitTest {
         fun deleteTypeUnknownNotFound() {
             every { types.findByProjectObjectIdAndTypeKey(UUID(0, 1), "ghost") } returns null // relaxed mock 默认给子 mock,须显式 null
             assertFailsWith<NotFoundException> { service.deleteType("CHE", "ghost") }
+        }
+
+        @Test
+        fun createTypeAssignsLevelBottomUpAndTimed() {
+            // 项目里尚无非 NULL level(如仅有 builtin release)→ 首个用户类型 = level 1;timed 透传
+            every { types.findByProjectObjectIdOrderByCreatedAt(UUID(0, 1)) } returns listOf(sprintType.copy(level = null))
+            every { types.save(any()) } answers { firstArg<ItemGroupType>().copy(id = 3L, objectId = UUID(0, 11)) }
+            val dto = service.createType("CHE", ItemGroupService.CreateGroupTypeRequest("iteration", "迭代", timed = true))
+            assertEquals(1, dto.level)
+            assertEquals(true, dto.timed)
+            // 已有 level-1 → 下一个 level 2;timed 缺省 false
+            every { types.findByProjectObjectIdOrderByCreatedAt(UUID(0, 1)) } returns listOf(sprintType.copy(level = 1))
+            val dto2 = service.createType("CHE", ItemGroupService.CreateGroupTypeRequest("epic", "Epic"))
+            assertEquals(2, dto2.level)
+            assertEquals(false, dto2.timed)
+        }
+
+        @Test
+        fun createTypeMapsUniqueLevelRaceToConflict() {
+            every { types.findByProjectObjectIdOrderByCreatedAt(UUID(0, 1)) } returns emptyList()
+            every { types.save(any()) } throws DataIntegrityViolationException("ux_item_group_type_project_level")
+            assertFailsWith<ConflictException> { service.createType("CHE", ItemGroupService.CreateGroupTypeRequest("iteration", "迭代")) }
         }
     }
 

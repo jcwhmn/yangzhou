@@ -65,8 +65,11 @@ class ProjectService(
             ),
         )
         // 0056:内建 group 类型种子(sprint/release);既有项目由 V35 迁移种子
+        // V48(spec 0100 切片A):sprint 按 V48 回填形状种子(level-1/timed/非 builtin,语义不变);切片B 去 sprint 种子
+        val seedShape = mapOf("sprint" to (1 to true), "release" to (null to false))
         listOf("sprint" to "Sprint", "release" to "Release").forEach { (k, n) ->
-            val t = groupTypes.save(yangzhou.persistence.ItemGroupType(projectObjectId = project.objectId!!, typeKey = k, name = n, builtin = true))
+            val (lv, td) = seedShape.getValue(k)
+            val t = groupTypes.save(yangzhou.persistence.ItemGroupType(projectObjectId = project.objectId!!, typeKey = k, name = n, builtin = k == "release", level = lv, timed = td))
             groupWorkflow.seedFor(t) // spec 0097 S2:类型落库同步种默认状态机
         }
         return get(key)

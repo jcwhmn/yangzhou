@@ -381,4 +381,34 @@ class ItemGroupApiTest : AbstractApiTest() {
             .expectStatus()
             .isEqualTo(409)
     }
+
+    @Test
+    fun `spec 0100A 类型携带 level 与 timed,sprint 去内置回填`() {
+        val authed = bootstrapAndAuth()
+        createProject(authed, "GRP")
+        val types = get(authed, "/api/projects/GRP/group-types")
+        // V48 回填:sprint = level 1 / timed true / builtin false(语义保留,身份去内置)
+        val sprint = types.first { it["typeKey"].asText() == "sprint" }
+        assertEquals(1, sprint["level"].asInt())
+        assertEquals(true, sprint["timed"].asBoolean())
+        assertEquals(false, sprint["builtin"].asBoolean())
+        // release 保持 builtin,level 非嵌套(空),timed false
+        val release = types.first { it["typeKey"].asText() == "release" }
+        assertEquals(true, release["builtin"].asBoolean())
+        assertEquals(false, release["timed"].asBoolean())
+        assertTrue(release["level"].isNull || release["level"].isMissingNode)
+        // 新类型自底向上:已有 level-1 → level 2;timed 透传
+        val r =
+            authed
+                .post()
+                .uri("/api/projects/GRP/group-types")
+                .body(mapOf("typeKey" to "iteration", "name" to "迭代", "timed" to true))
+                .exchange()
+                .expectBody(String::class.java)
+                .returnResult()
+        assertEquals(201, r.status.value(), r.responseBody)
+        val created = json.readTree(r.responseBody!!)
+        assertEquals(2, created["level"].asInt())
+        assertEquals(true, created["timed"].asBoolean())
+    }
 }
