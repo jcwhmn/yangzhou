@@ -173,6 +173,8 @@ data class Project(
     val lastItemNumber: Int = 0,
     val archivedAt: Instant? = null,
     val feasSignal: String? = null,
+    val releaseEnabled: Boolean = true,
+    val milestoneEnabled: Boolean = true,
     @CreatedDate
     var createdAt: Instant = Instant.now(),
     @LastModifiedDate

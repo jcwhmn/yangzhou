@@ -63,6 +63,25 @@ Authorization: Bearer {{token}}
     client.global.set("statusTo", response.body.statuses[1].name);
  %}
 
+### 项目设置——关 milestone 开关(YPJ-151;null=不改)
+PATCH {{host}}/api/projects/{{pkey}}/settings
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "milestoneEnabled": false
+}
+
+### 项目设置——重开(幂等恢复默认)
+PATCH {{host}}/api/projects/{{pkey}}/settings
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "releaseEnabled": true,
+  "milestoneEnabled": true
+}
+
 ### 项目列表
 GET {{host}}/api/projects
 Authorization: Bearer {{token}}

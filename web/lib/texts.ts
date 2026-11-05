@@ -252,6 +252,16 @@ export const t = {
     noLevel1:
       "项目未配置 level-1 组类型,请先在「分组类型管理」新增(勾选时间盒即为 Sprint 语义)。",
   },
+  settings: {
+    title: "项目设置",
+    release: "Release 段",
+    milestone: "Milestone 段",
+    hint: "关闭后侧栏不再显示对应段(数据不删除,重开即恢复)。",
+    cancel: "取消",
+    save: "保存",
+    loadFailed: "加载设置失败",
+    saveFailed: "保存失败",
+  },
   gh: {
     patTitle: "GitHub PAT(workspace 级)",
     patHint:
