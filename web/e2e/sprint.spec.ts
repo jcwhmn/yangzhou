@@ -1,7 +1,7 @@
 // Sprint 全链路(状态单向按钮/拉入对话框/回链)+ Backlog 派生桶
 import { expect } from "./support/fixtures";
 import { test } from "./support/fixtures";
-import { apiCreateItem, selectOption } from "./support/helpers";
+import { apiCreateItem, openSelect } from "./support/helpers";
 
 test("V12-S3 Sprint 全链路——建/指派/开始/完成/backlog/历史 @smoke", async ({
   page,
@@ -18,7 +18,14 @@ test("V12-S3 Sprint 全链路——建/指派/开始/完成/backlog/历史 @smok
 
   // 详情指派(item 详情常驻区 Sprint 下拉)
   await page.getByText("E2E 冒烟 item").first().click();
-  await selectOption(page, "Sprint", "Sprint 42");
+  // YPJ-104 触发点②:挂 planned 且无 active → 挂载即弹拉起窗;selectOption 的读回断言会被 modal
+  // aria-hidden 挡死,故手写挂载流程:开菜单→选项→关弹窗(本用例走 sprint 页「开始」流程,选暂不)
+  await openSelect(page, "Sprint");
+  await page.getByRole("option", { name: "Sprint 42" }).click();
+  const launchDialog = page.getByRole("dialog");
+  await expect(launchDialog).toBeVisible();
+  await launchDialog.getByRole("button", { name: "暂不" }).click();
+  await expect(launchDialog).toBeHidden();
   await expect(
     page.getByRole("combobox", { name: "Sprint", exact: true }),
   ).toHaveValue("Sprint 42");
@@ -54,8 +61,14 @@ test("V12-S3 Sprint 全链路——建/指派/开始/完成/backlog/历史 @smok
   const reassign = page.waitForResponse(
     (r) => r.url().includes("/api/items/") && r.request().method() === "PUT",
   );
-  await selectOption(page, "Sprint", "Sprint 42");
-  await reassign; // 等 PUT 落库再导航,否则指派可能被打断丢失
+  // YPJ-104:再挂回 planned 且无 active → 弹窗必现;selectOption 读回会被 modal 挡死,手写流程
+  await openSelect(page, "Sprint");
+  await page.getByRole("option", { name: "Sprint 42" }).click();
+  await reassign;
+  const dlg2 = page.getByRole("dialog");
+  await expect(dlg2).toBeVisible();
+  await dlg2.getByRole("button", { name: "暂不" }).click();
+  await expect(dlg2).toBeHidden(); // 等 PUT 落库再导航,否则指派可能被打断丢失
   await page
     .getByRole("link", { name: /Sprint 42/ })
     .first()
