@@ -35,7 +35,7 @@ import { api } from "@/lib/api";
 import { resolveBack } from "@/lib/back";
 
 import { t } from "@/lib/texts";
-import { listSprints, assignSprint } from "@/lib/sprints";
+import { listSprints, sprintAction, assignSprint } from "@/lib/sprints";
 
 import {
   SignalChip,
@@ -338,6 +338,7 @@ export default function ItemDetailPage() {
   const [saved, setSaved] = useState(false);
 
   const [sprintHint, setSprintHint] = useState(""); // YPJ-120:开始动作自动入 sprint 的轻提示
+  const [launchAskId, setLaunchAskId] = useState<string | null>(null); // YPJ-104:挂 planned 后提示激活(spec 0105)
 
   const [error, setError] = useState("");
 
@@ -600,8 +601,29 @@ export default function ItemDetailPage() {
       const it = await api<Item>(`/api/items/${itemId}`);
 
       setItem(it);
+      // YPJ-104:挂 planned 且项目无活动 sprint → 提示激活(确认后 item 随组可见,spec 0105)
+      const target = sprints.find((s) => s.sprintId === sprintId);
+      if (
+        target?.status === "planned" &&
+        !sprints.some((s) => s.status === "active")
+      ) {
+        setLaunchAskId(sprintId);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "指派失败");
+    }
+  }
+
+  // YPJ-104:确认激活——sprint 变 active,item 随组立即可见于看板(零迁移)
+  async function confirmLaunchAsk() {
+    const id = launchAskId;
+    setLaunchAskId(null);
+    if (!id) return;
+    try {
+      await sprintAction(key, id, "start");
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t.board.startFailed);
     }
   }
 
@@ -1960,6 +1982,26 @@ export default function ItemDetailPage() {
           </Box>
         </Box>
       </Box>
+      {/* YPJ-104:挂 planned 且无活动 sprint → 提示激活(spec 0105) */}
+      <Dialog open={launchAskId !== null} onClose={() => setLaunchAskId(null)}>
+        <DialogTitle>{t.item.launchAskTitle}</DialogTitle>
+        <DialogContent>
+          <Typography>
+            {t.item.launchAsk.replace(
+              "{name}",
+              sprints.find((s) => s.sprintId === launchAskId)?.name ?? "",
+            )}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setLaunchAskId(null)}>
+            {t.item.launchLater}
+          </Button>
+          <Button variant="contained" onClick={confirmLaunchAsk}>
+            {t.item.launchConfirm}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </PageShell>
   );
 }

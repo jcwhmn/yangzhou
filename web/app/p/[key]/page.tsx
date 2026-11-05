@@ -32,7 +32,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { t } from "@/lib/texts";
-import { listSprints, sprintAction } from "@/lib/sprints";
+import { listSprints, sprintAction, assignSprint } from "@/lib/sprints";
 import { AssignPopover } from "@/components/AssignPopover";
 import type { Signal } from "@/components/Verdict";
 
@@ -80,6 +80,9 @@ export default function BoardPage() {
   const [sprintPickOpen, setSprintPickOpen] = useState(false);
   const [pendingTitle, setPendingTitle] = useState("");
   const [pullOpen, setPullOpen] = useState(false);
+  const [launchOpen, setLaunchOpen] = useState(false); // YPJ-104:拉起弹窗(spec 0105)
+  const [launchItemId, setLaunchItemId] = useState<string | null>(null);
+  const [launchPick, setLaunchPick] = useState("");
   const [backlogItems, setBacklogItems] = useState<Item[] | null>(null);
   const [picked, setPicked] = useState<Set<string>>(new Set());
 
@@ -171,15 +174,39 @@ export default function BoardPage() {
   async function createItem(title: string, sprintId?: string) {
     // YPJ-56:无 active → 不带 sprintId(落 backlog,与看板全量显示自洽);单 active 由调用方带上
     try {
-      await api(`/api/projects/${key}/items`, {
-        method: "POST",
-        body: JSON.stringify({ title, ...(sprintId ? { sprintId } : {}) }),
-      });
+      const created = await api<{ itemId: string }>(
+        `/api/projects/${key}/items`,
+        {
+          method: "POST",
+          body: JSON.stringify({ title, ...(sprintId ? { sprintId } : {}) }),
+        },
+      );
       setNewTitle("");
       setSprintPickOpen(false);
+      // YPJ-104:无 active 且有 planned → 提示拉起(确认后激活+放入,spec 0105 方案B)
+      if (!sprintId && sprints.some((s) => s.status === "planned")) {
+        setLaunchItemId(created.itemId);
+        setLaunchPick(
+          sprints.find((s) => s.status === "planned")?.sprintId ?? "",
+        );
+        setLaunchOpen(true);
+      }
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "创建失败");
+    }
+  }
+
+  // YPJ-104:确认拉起——激活选中 planned sprint 并把刚建 item 放入(方案B)
+  async function confirmLaunch() {
+    if (!launchPick || !launchItemId) return;
+    try {
+      await sprintAction(key, launchPick, "start");
+      await assignSprint(key, launchItemId, launchPick);
+      setLaunchOpen(false);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t.board.startFailed);
     }
   }
 
@@ -593,6 +620,48 @@ export default function BoardPage() {
             ))}
           </Stack>
         </DialogContent>
+      </Dialog>
+      {/* YPJ-104:无活动 sprint 建 item → 提示拉起 planned sprint(激活+放入,spec 0105 方案B) */}
+      <Dialog open={launchOpen} onClose={() => setLaunchOpen(false)}>
+        <DialogTitle>
+          {sprints.filter((s) => s.status === "planned").length > 1
+            ? t.board.launchPickTitle
+            : t.board.launchTitle}
+        </DialogTitle>
+        <DialogContent>
+          {sprints.filter((s) => s.status === "planned").length > 1 ? (
+            <Stack spacing={1} sx={{ mt: 1 }}>
+              {sprints
+                .filter((s) => s.status === "planned")
+                .map((sp) => (
+                  <Button
+                    key={sp.sprintId}
+                    variant={
+                      launchPick === sp.sprintId ? "contained" : "outlined"
+                    }
+                    onClick={() => setLaunchPick(sp.sprintId)}
+                  >
+                    {sp.name}
+                  </Button>
+                ))}
+            </Stack>
+          ) : (
+            <Typography>
+              {t.board.launchBody.replace(
+                "{name}",
+                sprints.find((s) => s.status === "planned")?.name ?? "",
+              )}
+            </Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setLaunchOpen(false)}>
+            {t.board.launchLater}
+          </Button>
+          <Button variant="contained" onClick={confirmLaunch}>
+            {t.board.launchConfirm}
+          </Button>
+        </DialogActions>
       </Dialog>
       <Dialog
         open={pullOpen}

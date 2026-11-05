@@ -77,6 +77,12 @@ export const t = {
     startFailed: "激活失败",
     detail: "详情",
     refresh: "刷新",
+    launchTitle: "项目还没有活动 sprint",
+    launchBody:
+      "要激活 planned sprint「{name}」吗?激活后新建的 item 将放入该 sprint。",
+    launchPickTitle: "要激活哪个 sprint?(激活后新建的 item 将放入)",
+    launchConfirm: "激活",
+    launchLater: "暂不",
   },
   item: {
     title: "标题",
@@ -117,6 +123,11 @@ export const t = {
       sprint: "← 返回 Sprint",
       search: "← 返回搜索",
     },
+    launchAskTitle: "现在激活该 sprint?",
+    launchAsk:
+      "已挂入 planned sprint「{name}」——项目还没有活动 sprint,要现在激活它吗?",
+    launchConfirm: "激活",
+    launchLater: "暂不",
   },
   caps: {
     title: "我的能力",
