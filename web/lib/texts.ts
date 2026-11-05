@@ -234,7 +234,7 @@ export const t = {
   },
   groupTypes: {
     title: "分组类型管理",
-    hint: "项目分组的类型(如 季度/周);内建类型不可删除,sprint/release 请用对应功能。",
+    hint: "项目分组的类型;level-1(时间盒)即 Sprint 语义——backlog/board/图表数据源,恰一个;release 为内建类型不可删除。",
     typeKey: "typeKey(小写字母开头)",
     name: "名称",
     create: "新增",
@@ -245,6 +245,11 @@ export const t = {
     close: "关闭",
     workflow: "Workflow",
     wfEmpty: "(无状态)",
+    timed: "时间盒",
+  },
+  sprints: {
+    noLevel1:
+      "项目未配置 level-1 组类型,请先在「分组类型管理」新增(勾选时间盒即为 Sprint 语义)。",
   },
   gh: {
     patTitle: "GitHub PAT(workspace 级)",

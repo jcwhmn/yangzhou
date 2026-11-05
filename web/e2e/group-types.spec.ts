@@ -33,3 +33,41 @@ test("GroupTypesPanel——类型 workflow 只读展示(自定义类型默认三
     dialog.getByText(/完成 → completed、后退 → planned/),
   ).toBeVisible();
 });
+
+test("level 动线——UI 建 timed level-1 类型 → 建 Sprint 组(数据源=level-1)", async ({
+  page,
+  projectKey,
+}) => {
+  // 删 fixture 补种的 sprint 类型,回到「无 level-1」起点
+  await apiCall("DELETE", `/api/projects/${projectKey}/group-types/sprint`);
+
+  await page.goto(`/p/${projectKey}`);
+  await expect(page.getByText("暂无 Sprint")).toBeVisible();
+
+  // UI 建类型:timed 勾选 → 时间盒模板 + level-1
+  await page.getByRole("button", { name: "分组类型管理" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  await dialog.getByLabel("typeKey(小写字母开头)").fill("iteration");
+  await dialog.getByLabel("名称", { exact: true }).fill("Iteration");
+  await dialog.getByText("时间盒", { exact: true }).click();
+  await dialog.getByRole("button", { name: "新增" }).click();
+  await expect(dialog.getByText("Iteration", { exact: true })).toBeVisible();
+  await expect(dialog.getByText("L1", { exact: true })).toBeVisible();
+  await expect(dialog.getByText("时间盒", { exact: true })).toHaveCount(2); // 开关 + 徽标
+  await expect(
+    dialog.getByText(/planned · 起点 · 开始 → active/),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "关闭" }).click();
+  await expect(dialog).toBeHidden(); // MUI 淡出期吞点击,先等关
+
+  // 侧栏新建 Sprint:走 level-1 解析(不再按 typeKey=sprint 寻型)
+  await page.getByRole("button", { name: "新建 Sprint" }).click();
+  const createDialog = page.getByRole("dialog");
+  await expect(createDialog).toBeVisible();
+  await createDialog.getByLabel("名称").fill(" iteration-1");
+  await createDialog.getByRole("button", { name: "创建" }).click();
+  await expect(createDialog).toBeHidden();
+  await expect(page.getByText("iteration-1")).toBeVisible();
+  await expect(page.getByText("暂无 Sprint")).toHaveCount(0);
+});

@@ -17,13 +17,21 @@ import {
   Stack,
   TextField,
   Typography,
+  FormControlLabel,
+  Checkbox,
 } from "@mui/material";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { t } from "@/lib/texts";
 
-type GroupType = { typeKey: string; name: string; builtin: boolean };
+type GroupType = {
+  typeKey: string;
+  name: string;
+  builtin: boolean;
+  level: number | null;
+  timed: boolean;
+};
 // spec 0097 S3:类型 workflow 只读形状(同 GroupWorkflowService.GroupStatusDto)
 type WfStatus = {
   name: string;
@@ -78,6 +86,7 @@ export function GroupTypesPanel({
   >({});
   const [typeKey, setTypeKey] = useState("");
   const [name, setName] = useState("");
+  const [timed, setTimed] = useState(false);
   const [error, setError] = useState("");
 
   const load = () => {
@@ -103,6 +112,7 @@ export function GroupTypesPanel({
       load();
       setTypeKey("");
       setName("");
+      setTimed(false);
       setError("");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -112,7 +122,11 @@ export function GroupTypesPanel({
     try {
       await api(`/api/projects/${projectKey}/group-types`, {
         method: "POST",
-        body: JSON.stringify({ typeKey: typeKey.trim(), name: name.trim() }),
+        body: JSON.stringify({
+          typeKey: typeKey.trim(),
+          name: name.trim(),
+          timed,
+        }),
       });
       setTypeKey("");
       setName("");
@@ -151,6 +165,21 @@ export function GroupTypesPanel({
                   secondary={g.typeKey}
                   sx={{ flex: 1 }}
                 />
+                {g.level != null && (
+                  <Chip
+                    size="small"
+                    color="primary"
+                    label={`L${g.level}`}
+                    sx={{ mr: 1 }}
+                  />
+                )}
+                {g.timed && (
+                  <Chip
+                    size="small"
+                    label={t.groupTypes.timed}
+                    sx={{ mr: 1 }}
+                  />
+                )}
                 {g.builtin && (
                   <Chip
                     size="small"
@@ -227,6 +256,16 @@ export function GroupTypesPanel({
             value={name}
             onChange={(e) => setName(e.target.value)}
             sx={{ flex: 1 }}
+          />
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={timed}
+                onChange={(e) => setTimed(e.target.checked)}
+              />
+            }
+            label={t.groupTypes.timed}
+            sx={{ mr: 1 }}
           />
           <Button
             type="submit"

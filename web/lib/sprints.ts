@@ -1,5 +1,6 @@
-// spec 0097 S2:sprint = 组(type='sprint');本 helper 把统一组端点映射成 sprint 语义,页面零散调用收敛于此。
+// spec 0100 切片C:sprint = level-1 组(不再按 typeKey 寻型);本 helper 把统一组端点映射成 sprint 语义,页面零散调用收敛于此。
 import { api } from "./api";
+import { t } from "./texts";
 
 export type Sprint = {
   sprintId: string;
@@ -18,6 +19,16 @@ type GroupDto = {
   endDate: string | null;
 };
 
+type GroupTypeDto = { typeKey: string; level: number | null };
+
+/** level-1 类型 key(本项目唯一口径);项目未配置 level-1 时报错引导。 */
+export async function level1TypeKey(key: string): Promise<string> {
+  const types = await api<GroupTypeDto[]>(`/api/projects/${key}/group-types`);
+  const l1 = types.find((tp) => tp.level === 1);
+  if (!l1) throw new Error(t.sprints.noLevel1);
+  return l1.typeKey;
+}
+
 function toSprint(g: GroupDto): Sprint {
   return {
     sprintId: g.groupId,
@@ -29,9 +40,7 @@ function toSprint(g: GroupDto): Sprint {
 }
 
 export async function listSprints(key: string): Promise<Sprint[]> {
-  const groups = await api<GroupDto[]>(
-    `/api/projects/${key}/groups?type=sprint`,
-  );
+  const groups = await api<GroupDto[]>(`/api/projects/${key}/groups?level=1`);
   return groups.map(toSprint);
 }
 
@@ -51,7 +60,7 @@ export async function createSprint(
   return toSprint(
     await api<GroupDto>(`/api/projects/${key}/groups`, {
       method: "POST",
-      body: JSON.stringify({ typeKey: "sprint", ...body }),
+      body: JSON.stringify({ typeKey: await level1TypeKey(key), ...body }),
     }),
   );
 }
@@ -76,8 +85,12 @@ export async function assignSprint(
   itemId: string,
   sprintId: string | null,
 ): Promise<void> {
+  const body =
+    sprintId === null
+      ? { groupId: null, groupType: await level1TypeKey(key) }
+      : { groupId: sprintId };
   await api(`/api/items/${itemId}/group-membership`, {
     method: "PUT",
-    body: JSON.stringify({ groupId: sprintId, groupType: "sprint" }),
+    body: JSON.stringify(body),
   });
 }
