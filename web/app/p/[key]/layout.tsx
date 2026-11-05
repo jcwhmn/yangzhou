@@ -401,9 +401,9 @@ export default function ProjectLayout({
               ))}
             </>
           )}
-          <Divider sx={{ my: 1 }} />
           {flags?.milestone !== false && (
             <>
+              <Divider sx={{ my: 1 }} />
               <ListSubheader
                 disableSticky
                 sx={{
@@ -449,9 +449,9 @@ export default function ProjectLayout({
               ))}
             </>
           )}
-          <Divider sx={{ my: 1 }} />
           {flags?.release !== false && (
             <>
+              <Divider sx={{ my: 1 }} />
               <ListSubheader
                 disableSticky
                 sx={{
