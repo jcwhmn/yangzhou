@@ -42,10 +42,11 @@ test("board 降级态建 item → 弹窗取消 → sprint 仍 planned,item 留 b
   await dialog.getByRole("button", { name: "暂不" }).click();
   await expect(dialog).toBeHidden();
 
-  // sprint 未激活:降级提示仍在;item 未入 sprint → backlog 可见
+  // sprint 未激活:降级提示仍在;看板建的 item onBoard=true → 看板可见、Backlog 不见(必进看板+互斥,2026-11-06 拍板)
   await expect(page.getByText(/当前无进行中 sprint/)).toBeVisible();
-  await page.goto(`/p/${projectKey}/backlog`);
   await expect(page.getByText("取消 item")).toBeVisible();
+  await page.goto(`/p/${projectKey}/backlog`);
+  await expect(page.getByText("取消 item")).toHaveCount(0);
 });
 
 test("详情页挂 planned sprint → 弹窗激活 → item 随组进看板", async ({
@@ -91,4 +92,20 @@ test("详情页挂 planned → 弹窗取消 → sprint 未激活,item 不可见�
   await page.goto(`/p/${projectKey}`);
   await expect(page.getByText(/当前无进行中 sprint/)).toBeVisible();
   await expect(page.getByText("挂载取消 item")).toBeVisible();
+});
+
+test("无组项目看板建 item → 不弹窗 + onBoard 看板可见、Backlog 不可见", async ({
+  page,
+  projectKey,
+}) => {
+  // fixture 项目有 level-1 类型但无任何组(=T104Z 形态);0098 补集视图 + 0105 增量拍板
+  await page.goto(`/p/${projectKey}`);
+  await expect(page.getByText(/项目未配置组/)).toBeVisible();
+  await page.getByPlaceholder("新建 item").fill("无组板建 item");
+  await page.getByRole("button", { name: "新建 item" }).click();
+
+  await expect(page.getByText(/项目未配置组/)).toBeVisible();
+  await expect(page.getByText("无组板建 item")).toBeVisible(); // onBoard=true
+  await page.goto(`/p/${projectKey}/backlog`);
+  await expect(page.getByText("无组板建 item")).toHaveCount(0);
 });

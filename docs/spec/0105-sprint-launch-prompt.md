@@ -54,3 +54,14 @@
 4. **触发点②·确认**:详情页挂 planned sprint → 弹窗 → 确认 → sprint active,item 随组在看板可见
 5. **触发点②·取消**:挂 planned → 弹窗 → 取消 → 挂载生效(sprint 标注 planned),sprint 未激活
 6. **不弹场景**:挂 active sprint;移出 sprint;有 active sprint 时建 item——均无弹窗
+
+## 增量(2026-11-06,手工验证中发现):看板建 item 必进看板
+
+> 用户重申既有拍板:在看板建的 item 必进看板,同时参考 sprint 状态决定去向(有 active → 进 active sprint;无 active → 不挂 sprint 但看板可见)。
+
+- **根因**:0098(2026-11-05)改了 board 降级分支为「全量 − backlog 桶」,前端 board 建item 还是 0098 之前世界的语义(「不带 sprintId 落 backlog,与看板全量显示自洽」注释)→ 看板建的 item 隐身进 Backlog、看板不可见。T104Z(预置无组项目)实测照亮。
+- **修复(前端单点,后端零改动)**:board 建item 无 sprintId 分支,建成功后 `PUT /api/items/{id}/board-membership {onBoard:true}`(0099 端点;无 active 时后端只置标志不挂组,实锤 ItemGroupService.kt:431-453)。与 0098 不变量自洽:onBoard=true 被 backlog 谓词排除 → **board ∩ backlog = ∅ 仍成立**,item 在看板可见、Backlog 页不可见。
+- **文案对齐 0098 端点语义**(0101 案B 遗留失真):board.noGroups「以下显示全部非终态 item」→「以下显示不在 Backlog 中的 item」(与 noActiveSprint 同口径)。
+- **0105 弹窗语义随之更顺**:触发点①「暂不」→ item 仍 onBoard 在看板可见(不再隐身);「激活」→ 挂入 sprint。触发点②不受影响(挂 sprint 的 item 天然看板可见)。
+- **e2e**:sprint-launch 用例 2 断言改看板可见;新增无组项目用例(建item 不弹 + onBoard 可见 + Backlog 不可见)。
+- **欠账提示(另票,不扩本票 scope)**:0098 增补的「根页无 active 重定向 Backlog」在修订二已撤(根页恒看板),但看板降级视图当前无显式「拉入」提示,Backlog 页的拉入入口承担此职——观感另行观察。

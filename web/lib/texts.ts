@@ -65,7 +65,7 @@ export const t = {
     addItem: "新建 item",
     dropHere: "拖到这里",
     moveFailed: "迁移失败",
-    noGroups: "项目未配置组——以下显示全部非终态 item",
+    noGroups: "项目未配置组——以下显示不在 Backlog 中的 item",
     noActiveSprint:
       "当前无进行中 sprint,以下显示不在 Backlog 中的 item(已完成/已规划)",
     pullItem: "拉入看板",

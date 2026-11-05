@@ -181,6 +181,14 @@ export default function BoardPage() {
           body: JSON.stringify({ title, ...(sprintId ? { sprintId } : {}) }),
         },
       );
+      // 语义拍板(2026-11-06 重申):看板建的 item 必进看板——无 active 时 onBoard=true
+      // (参考 sprint 状态:有 active 已挂 sprint;无 active 不挂 sprint 但看板可见,spec 0105 增量)
+      if (!sprintId) {
+        await api(`/api/items/${created.itemId}/board-membership`, {
+          method: "PUT",
+          body: JSON.stringify({ onBoard: true }),
+        });
+      }
       setNewTitle("");
       setSprintPickOpen(false);
       // YPJ-104:无 active 且有 planned → 提示拉起(确认后激活+放入,spec 0105 方案B)
