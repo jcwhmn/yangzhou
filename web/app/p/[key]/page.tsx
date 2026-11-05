@@ -274,6 +274,8 @@ export default function BoardPage() {
         await sprintAction(key, gid, "start");
       } catch (err) {
         setError(err instanceof Error ? err.message : t.board.startFailed);
+        // 降级:新组已建但未激活,组列表已变化 → 手工补广播(sprintAction 失败不广播)
+        window.dispatchEvent(new Event("sprints-changed"));
       }
       await createInGroup(title, gid);
     } catch (err) {
@@ -363,7 +365,7 @@ export default function BoardPage() {
             value={newTitle}
             onChange={(e) => setNewTitle(e.target.value)}
           />
-          <Button type="submit" variant="outlined">
+          <Button type="submit" variant="outlined" disabled={loading}>
             {t.board.addItem}
           </Button>
         </Stack>

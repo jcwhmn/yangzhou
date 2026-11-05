@@ -79,12 +79,17 @@ export async function sprintAction(
   sprintId: string,
   fn: "start" | "complete" | "backward",
 ): Promise<Sprint> {
-  return toSprint(
+  const s = toSprint(
     await api<GroupDto>(
       `/api/projects/${key}/groups/${sprintId}/actions/${fn}`,
       { method: "POST", body: JSON.stringify({}) },
     ),
   );
+  // YPJ-74/0105:组状态变化广播,sidebar 即时重拉(sprint 详情页手工派发收口至此)
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("sprints-changed"));
+  }
+  return s;
 }
 
 /** 指派/移出 sprint(groupId=null = 移出);按类型替换归属,release 正交不受影响。 */

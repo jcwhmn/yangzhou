@@ -10,14 +10,6 @@ import {
   uniqueKey,
 } from "./support/helpers";
 
-/** 等看板首屏两个请求落定(sprints state 填充后,提交的场景判定才成立) */
-async function waitBoardData(page: import("@playwright/test").Page) {
-  await Promise.all([
-    page.waitForResponse((r) => r.url().includes("/board")),
-    page.waitForResponse((r) => r.url().includes("/groups")),
-  ]);
-}
-
 test("S2 建item→激活并放入 @smoke", async ({ page, projectKey }) => {
   await apiCreateSprint(projectKey, "计划中B"); // planned
   await page.goto(`/p/${projectKey}`);
@@ -86,11 +78,8 @@ test("S1 单进行中组→直挂,无弹窗", async ({ page, projectKey }) => {
     "POST",
     `/api/projects/${projectKey}/groups/${gid}/actions/start`,
   );
-  const board = page.waitForResponse((r) => r.url().includes("/board"));
-  const groups = page.waitForResponse((r) => r.url().includes("/groups"));
   await page.goto(`/p/${projectKey}`);
-  await board;
-  await groups;
+  // 提交钮 disabled={loading}:点击自动等数据就绪(响应到达≠state 已提交,response 等待有缝)
 
   await page.getByPlaceholder("新建 item").fill("直挂 item");
   await page.getByRole("button", { name: "新建 item" }).click();
@@ -130,6 +119,8 @@ test("S3 有类型无非完成态实例→默认名可改→创建并激活", as
 
   await expect(page.getByText(/当前无进行中 sprint/)).toBeHidden();
   await expect(page.getByText("新建组 item")).toBeVisible();
+  // 侧栏即时出现新组(sprints-changed 广播,不刷新)
+  await expect(page.getByRole("link", { name: /冲刺X/ })).toBeVisible();
 });
 
 test("S3-Z 有类型 0 实例→默认名 序号1", async ({ page, projectKey }) => {
@@ -147,6 +138,7 @@ test("S3-Z 有类型 0 实例→默认名 序号1", async ({ page, projectKey })
 
   await expect(page.getByText(/项目未配置组/)).toBeHidden();
   await expect(page.getByText("首个 item")).toBeVisible();
+  await expect(page.getByRole("link", { name: /Sprint 1/ })).toBeVisible();
 });
 
 test("S0 无组类型项目建 item→onBoard 看板可见,Backlog 不可见,无组字样", async ({

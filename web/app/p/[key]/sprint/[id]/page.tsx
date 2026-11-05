@@ -141,8 +141,7 @@ export default function SprintPage() {
         status === "completed" ? "complete" : "start",
       );
       setSprint(s);
-      // YPJ-74:通知 sidebar 重拉 sprints(状态/排序即时同步)
-      window.dispatchEvent(new Event("sprints-changed"));
+      // YPJ-74:sidebar 重拉由 sprintAction 内部广播(0105 收口)
     } catch (e) {
       setError(e instanceof Error ? e.message : "更新失败");
     }
