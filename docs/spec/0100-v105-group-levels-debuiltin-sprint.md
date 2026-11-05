@@ -59,9 +59,13 @@ alter table item_group_type add column level int;                 -- NULL=非嵌
 alter table item_group_type add column timed boolean not null default false;
 update item_group_type set level = 1, timed = true, builtin = false
     where type_key = 'sprint';                                    -- 存量:保留语义,去内置标
-create unique index uk_item_group_type_project_level1
-    on item_group_type(project_id) where level = 1;               -- 不变量①:至多一个 level-1
+create unique index ux_item_group_type_project_level
+    on item_group_type (project_object_id, level)
+    where level is not null;                                      -- 不变量①扩展:每 level 恰一类型(2026-11-06 用户确认整列唯一)
+alter table item_group alter column type drop default;            -- type 去隐式默认(实体同步去 Kotlin 默认)
 ```
+
+> **level 是原生列(非计算/派生)**:创建时应用层赋值「最小未占正整数」。不可派生的根因:①值依赖同项目其它行,PG generated column 仅能同行派生;②不变量靠 partial unique index 强制,索引需物理列;③「加 level」是配置动作语义,非属性推导。
 
 - 无新表 → cleanDatabase 清单不动;`entities.puml` 同步 `ItemGroupType.level/timed`。
 - `item_group.type` 列保留(= type_key 引用,不改名);`Entities.kt` 去掉 `default "sprint"`。
@@ -96,7 +100,7 @@ create unique index uk_item_group_type_project_level1
 
 ### 3.6 不变量(护栏,实现须断言)
 
-1. 每项目至多一个 level-1 类型(partial unique index + createType 校验)
+1. 每 level 恰一类型(partial unique index `(project_id, level)`;level-1 语义同前;createType 应用层校验 + 竞态 409)
 2. board ∩ backlog = ∅(0098,不变,回归)
 3. completed 组 = 终态:出边空(V46 已有)+ 成员行历史不可变(退回/换组只动非 completed 行,0099 已有)
 4. 自动挂载/拉入只挂 **active** level-1(取最早创建,YPJ-120 语义)
@@ -129,3 +133,14 @@ create unique index uk_item_group_type_project_level1
 ## Out of Scope
 
 - 组嵌套树(YPJ-110/111/112)、侧栏数据驱动显隐票、milestone/release 开关票、release/milestone 去内置、displayName/icon、看板列语义、Calendar/Roadmap ViewType
+
+## As-built(切片A,2026-11-06)
+
+- **V48__group_type_level_timed.sql**(§三.2 SQL 原样落地,唯一索引为整列 `(project_id, level)` 版)
+- **Entities**:ItemGroupType + `level`/`timed` + KDoc 更新;ItemGroup.type 去 Kotlin 默认(DB default 同步 drop;构造点 ReleaseService:141/ItemServiceUnitTest:349/ReleaseServiceUnitTest:62 均显式传 type,编译验证)
+- **ItemGroupService**:GroupTypeDto/CreateGroupTypeRequest + level/timed;toDto 透传;createType 层级分配(最小未占正整数,删 level-1 后新类型回落补位;DataIntegrityViolationException → 409「层级并发冲突」);membershipIsHistory(key, typeKey)= builtin ∨ level==1(deleteGroup 调用点同步);builtinKeys 保留字检查暂留("sprint"/"release" 仍不可作新 typeKey,切片B 复议)
+- entities.puml ItemGroupType + level/timed ✓;cleanDatabase 无新表不动
+- 测试:单测 +2(自底向上分配/唯一竞态→409);集成 +1(V48 回填 sprint level=1/timed=true/builtin=false、release NULL、新类型 level=2/timed 透传)
+- **实现决议①**:ProjectService.create 种子同步 V48 形状——sprint 种子= level-1/timed/builtin=false(新项目数据模型即刻一致;否则运行时种子与迁移回填形状分裂,自定义类型会被误分 level-1);切片B 去种子
+- **实现决议②**:deleteType 守卫扩为 `builtin ∨ level==1`——既有「sprint 不可删」契约保持(集成用例断言在);level-1 删除政策(是否放开空 level-1 删除)归切片B 决议
+- 验证:gradle build + integrationTest 绿(切片A 行为零变化判据)

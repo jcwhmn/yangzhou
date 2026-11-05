@@ -448,7 +448,7 @@ data class ItemGroup(
     @Id val id: Long? = null,
     val objectId: UUID = UUID.randomUUID(),
     val projectObjectId: UUID,
-    val type: String = "sprint",
+    val type: String,
     val name: String,
     val status: String = "planned",
     val startDate: LocalDate? = null,
@@ -465,7 +465,7 @@ data class ItemGroup(
     var updatedByObjectId: UUID? = null,
 )
 
-/** V35 YPJ-48:项目级 group 类型运行时定义(PRD §6);builtin 种子 sprint/release,自定义类型走最小语义。 */
+/** V35 YPJ-48:项目级 group 类型运行时定义(PRD §6)。V48 spec 0100 切片A:level=嵌套层级(自底向上分配,恰一 level-1;NULL=非嵌套如 release),timed=时间盒;sprint 已去内置(存量回填 level=1/timed=true/builtin=false)。 */
 @Table("item_group_type")
 data class ItemGroupType(
     @Id val id: Long? = null,
@@ -474,6 +474,8 @@ data class ItemGroupType(
     val typeKey: String,
     val name: String,
     val builtin: Boolean = false,
+    val level: Int? = null,
+    val timed: Boolean = false,
     @CreatedDate
     var createdAt: Instant = Instant.now(),
     @LastModifiedDate
