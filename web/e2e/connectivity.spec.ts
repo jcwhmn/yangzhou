@@ -15,3 +15,13 @@ test("API 不可达显示横幅,恢复后自愈 @smoke", async ({ page }) => {
   await expect(page).toHaveURL(/\/capabilities$/);
   await expect(page.getByText(/后端不可达/)).toBeHidden();
 });
+
+test("代理 502 同样触发横幅(Next rewrites 断连形态)", async ({ page }) => {
+  await injectToken(page);
+  await page.route("**/api/**", (route) =>
+    route.fulfill({ status: 502, body: "Bad Gateway" }),
+  );
+  await page.goto("/");
+  // 502 走重试路径(非业务错误),耗尽后 setDown;自愈已由上一用例覆盖
+  await expect(page.getByText(/后端不可达/)).toBeVisible({ timeout: 15_000 });
+});
