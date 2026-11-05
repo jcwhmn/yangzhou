@@ -171,17 +171,29 @@ abstract class AbstractApiTest {
         authed: RestTestClient,
         key: String,
         name: String = key,
-    ): JsonNode = authed
-        .post()
-        .uri("/api/projects")
-        .body(mapOf("key" to key, "name" to name))
-        .exchange()
-        .expectStatus()
-        .isCreated()
-        .expectBody(String::class.java)
-        .returnResult()
-        .responseBody!!
-        .let { json.readTree(it) }
+    ): JsonNode {
+        val project =
+            authed
+                .post()
+                .uri("/api/projects")
+                .body(mapOf("key" to key, "name" to name))
+                .exchange()
+                .expectStatus()
+                .isCreated()
+                .expectBody(String::class.java)
+                .returnResult()
+                .responseBody!!
+                .let { json.readTree(it) }
+        // spec 0100 切片B:新项目不再种子 sprint;测试按 V48 存量形状补种 timed level-1 类型
+        authed
+            .post()
+            .uri("/api/projects/$key/group-types")
+            .body(mapOf("typeKey" to "sprint", "name" to "Sprint", "timed" to true))
+            .exchange()
+            .expectStatus()
+            .isCreated()
+        return project
+    }
 
     /** 0047:创建者(me)自动入池,测试常需要其 memberId。 */
     protected fun meMemberId(authed: RestTestClient): String = json

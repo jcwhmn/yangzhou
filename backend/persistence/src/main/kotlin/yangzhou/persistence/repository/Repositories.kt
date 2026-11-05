@@ -394,6 +394,8 @@ interface ItemGroupTypeRepository : CrudRepository<ItemGroupType, Long> {
         projectObjectId: UUID,
         typeKey: String,
     ): Boolean
+
+    fun findByProjectObjectIdAndLevel(projectObjectId: UUID, level: Int): ItemGroupType?
 }
 
 interface ItemGroupMemberRepository : CrudRepository<ItemGroupMember, Long> {
@@ -498,6 +500,13 @@ interface MetricsRepository : Repository<Status, Long> {
         key: String,
         type: String?,
     ): List<MetricsGroupRow>
+
+    /** level-1 类型 key(spec 0100 切片B 唯一口径);无则空表。 */
+    @Query(
+        """SELECT t.type_key FROM item_group_type t JOIN project p ON p.object_id = t.project_object_id
+            WHERE p.key = :key AND t.level = 1""",
+    )
+    fun level1TypeKey(key: String): List<String>
 
     @Query(
         """SELECT gm.group_object_id, gm.item_object_id, gm.created_at

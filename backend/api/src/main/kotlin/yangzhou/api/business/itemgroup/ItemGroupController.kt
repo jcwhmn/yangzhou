@@ -61,7 +61,8 @@ class ItemGroupController(
     fun listGroups(
         @PathVariable key: String,
         @RequestParam(required = false) type: String?,
-    ): List<ItemGroupService.GroupDto> = service.listGroups(key, type)
+        @RequestParam(required = false) level: Int?,
+    ): List<ItemGroupService.GroupDto> = service.listGroups(key, type, level)
 
     @PostMapping("/projects/{key}/groups")
     @ResponseStatus(HttpStatus.CREATED)

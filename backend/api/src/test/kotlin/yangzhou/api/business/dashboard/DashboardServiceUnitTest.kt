@@ -43,13 +43,13 @@ class DashboardServiceUnitTest {
 
     @Test
     fun activeSprintMakesProjectLive() {
-        every { groups.listGroups("CHE", "sprint") } returns
+        every { groups.listLevel1Groups("CHE") } returns
             listOf(
                 ItemGroupService.GroupDto(UUID.randomUUID(), "sprint", "V24", "active", null, null),
                 ItemGroupService.GroupDto(UUID.randomUUID(), "sprint", "V23", "completed", null, null),
             )
         every { milestoneService.list("CHE") } returns emptyList()
-        every { groups.listGroups("OLD", "sprint") } returns emptyList()
+        every { groups.listLevel1Groups("OLD") } returns emptyList()
         every { milestoneService.list("OLD") } returns emptyList()
         val dto = service.dashboard()
         assertEquals(listOf("CHE"), dto.live.map { it.projectKey })
@@ -58,7 +58,7 @@ class DashboardServiceUnitTest {
 
     @Test
     fun inProgressMilestoneAloneMakesProjectLive() {
-        every { groups.listGroups(any(), "sprint") } returns emptyList()
+        every { groups.listLevel1Groups(any()) } returns emptyList()
         every { milestoneService.list("CHE") } returns
             listOf(
                 MilestoneService.MilestoneDto(UUID.randomUUID(), "M1", "in_progress", "2026-11-01"),
@@ -72,7 +72,7 @@ class DashboardServiceUnitTest {
 
     @Test
     fun idleProjectsDropped() {
-        every { groups.listGroups(any(), "sprint") } returns emptyList()
+        every { groups.listLevel1Groups(any()) } returns emptyList()
         every { milestoneService.list(any()) } returns emptyList()
         assertTrue(service.dashboard().live.isEmpty())
     }

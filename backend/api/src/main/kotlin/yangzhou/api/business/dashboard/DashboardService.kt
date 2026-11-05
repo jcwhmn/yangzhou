@@ -49,7 +49,7 @@ class DashboardService(
                         projectKey = p.key,
                         sprints =
                         groups
-                            .listGroups(p.key, "sprint")
+                            .listLevel1Groups(p.key)
                             .filter { it.status == "active" }
                             .map { LiveSprintDto(it.groupId, it.name, it.endDate) },
                         milestones =

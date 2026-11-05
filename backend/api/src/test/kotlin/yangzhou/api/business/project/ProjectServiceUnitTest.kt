@@ -89,7 +89,7 @@ class ProjectServiceUnitTest {
             val saved = service.create("CHE", "CHE")
             assertEquals("CHE", saved.key)
             verify(exactly = 5) { statuses.save(any()) } // V7 五列
-            verify(exactly = 2) { groupTypes.save(any()) } // sprint/release 内建
+            verify(exactly = 1) { groupTypes.save(any()) } // spec 0100 切片B:只种 release(sprint 不再种子)
             verify { projectMembers.save(any()) } // 0047 创建者入池
         }
     }

@@ -374,7 +374,7 @@ private fun run(args: List<String>) {
 
         "sprints list" -> {
             val key = rest.getOrNull(0) ?: error("缺少项目 KEY")
-            val body = api.json("GET", "/api/projects/$key/groups?type=sprint")
+            val body = api.json("GET", "/api/projects/$key/groups?type=" + level1TypeKey(api, key))
             if (flags.containsKey("json")) return printRaw(body.toString())
             if (body.size() == 0) return println("(无 sprint)")
             println("sprintId                            名称             状态       起止")
@@ -470,7 +470,7 @@ private fun run(args: List<String>) {
             val key = rest.getOrNull(0) ?: error("缺少项目 KEY")
             val name = rest.drop(1).joinToString(" ").trim()
             if (name.isEmpty()) error("缺少 sprint 名称")
-            val body = api.json("POST", "/api/projects/$key/groups", mapOf("typeKey" to "sprint", "name" to name))
+            val body = api.json("POST", "/api/projects/$key/groups", mapOf("typeKey" to level1TypeKey(api, key), "name" to name))
             println("已建 sprint:${body["name"].asString()}(${body["status"].asString()})")
         }
 
@@ -494,13 +494,15 @@ private fun run(args: List<String>) {
         "items assign" -> {
             val itemId = resolveItemId(api, rest.getOrNull(0) ?: error("缺少 item ID(支持 YPJ-58 或 UUID)"))
             val ref = rest.getOrNull(1) ?: error("缺少 sprint 引用(sprint 名/UUID/backlog)")
-            val sprintId: String? = if (ref.equals("backlog", ignoreCase = true)) {
-                null
-            } else {
-                val item = api.json("GET", "/api/items/$itemId")
-                resolveSprintId(api, item["number"].asString().substringBefore("-"), ref)
-            }
-            val body = api.json("PUT", "/api/items/$itemId/group-membership", mapOf("groupId" to sprintId, "groupType" to "sprint"))
+            val item = api.json("GET", "/api/items/$itemId")
+            val ikey = item["number"].asString().substringBefore("-")
+            val sprintId: String? =
+                if (ref.equals("backlog", ignoreCase = true)) {
+                    null
+                } else {
+                    resolveSprintId(api, ikey, ref)
+                }
+            val body = api.json("PUT", "/api/items/$itemId/group-membership", mapOf("groupId" to sprintId, "groupType" to level1TypeKey(api, ikey)))
             val sprintName = body["sprintName"]?.takeUnless { it.isNull }?.asString()
             println(if (sprintName == null) "已移出 sprint:${body["number"].asString()}" else "已指派:${body["number"].asString()} → $sprintName")
         }
@@ -603,12 +605,19 @@ private fun memberIdByDisplayName(api: ApiClient, name: String): String? {
 /** --sprint 引用:UUID 直过;否则按项目 sprint 名称精确匹配(0/多匹配报错列候选)。 */
 private fun resolveSprintId(api: ApiClient, key: String, ref: String): String {
     if (Regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$").matches(ref)) return ref
-    val sprints = api.json("GET", "/api/projects/$key/groups?type=sprint")
+    val sprints = api.json("GET", "/api/projects/$key/groups?type=" + level1TypeKey(api, key))
     val names = sprints.joinToString("/") { it["name"].asString() }
     val hits = sprints.filter { it["name"].asString() == ref }
     if (hits.size == 1) return hits[0]["groupId"].asString()
     if (hits.isEmpty()) error("项目 $key 无名为「$ref」的 sprint(可用:$names)")
     error("sprint 名「$ref」不唯一,请用 UUID:${hits.joinToString("/") { it["groupId"].asString() }}")
+}
+
+/** 项目 level-1 类型 key(spec 0100 切片B 唯一口径);无 level-1 报错引导配置。 */
+private fun level1TypeKey(api: ApiClient, key: String): String {
+    val types = api.json("GET", "/api/projects/$key/group-types")
+    val hit = types.firstOrNull { !it["level"].isNull && !it["level"].isMissingNode && it["level"].asInt() == 1 }
+    return hit?.get("typeKey")?.asString() ?: error("项目 $key 未配置 level-1 组类型(Web 类型管理加 level)")
 }
 
 /** KEY-N(如 CHE-1)→ itemId;直接给 UUID 也认。 */

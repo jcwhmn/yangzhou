@@ -42,7 +42,7 @@ class ItemGroupServiceUnitTest {
         ItemGroupService(leaderGuard, projects, types, workflow, groups, memberships, itemRepo, itemService, memberHistory, Clock.systemUTC())
 
     private val project = Project(id = 1L, objectId = UUID(0, 1), workspaceObjectId = UUID(0, 9), key = "CHE", name = "CHE")
-    private val sprintType = ItemGroupType(id = 1L, objectId = UUID(0, 2), projectObjectId = UUID(0, 1), typeKey = "sprint", name = "Sprint", builtin = true)
+    private val sprintType = ItemGroupType(id = 1L, objectId = UUID(0, 2), projectObjectId = UUID(0, 1), typeKey = "sprint", name = "Sprint", level = 1, timed = true, builtin = false)
     private val phaseType = ItemGroupType(id = 2L, objectId = UUID(0, 3), projectObjectId = UUID(0, 1), typeKey = "phase", name = "阶段")
 
     private var groupSeq = 10L
@@ -63,6 +63,7 @@ class ItemGroupServiceUnitTest {
         every { types.findByProjectObjectIdAndTypeKey(UUID(0, 1), "sprint") } returns sprintType
         every { types.findByProjectObjectIdAndTypeKey(UUID(0, 1), "phase") } returns phaseType
         every { types.findByProjectObjectIdOrderByCreatedAt(UUID(0, 1)) } returns listOf(sprintType, phaseType)
+        every { types.findByProjectObjectIdAndLevel(UUID(0, 1), 1) } returns sprintType
         every { groups.findByProjectObjectIdOrderByCreatedAt(UUID(0, 1)) } returns listOf(group("S1"), group("P1", "phase"))
         every { groups.findByProjectObjectIdAndObjectId(UUID(0, 1), any()) } answers { group("S1") }
         every { workflow.startStatusName(any()) } returns "planned"
@@ -75,8 +76,10 @@ class ItemGroupServiceUnitTest {
     @Nested
     inner class TypeCrud {
         @Test
-        fun createTypeRejectsBuiltinConflict() {
-            assertFailsWith<BadRequestException> { service.createType("CHE", ItemGroupService.CreateGroupTypeRequest("sprint", "x")) }
+        fun createTypeRejectsDupSprintKey() {
+            // spec 0100 切片B:保留字废除,"sprint" 可用但同项目 typeKey 唯一约束照常
+            every { types.existsByProjectObjectIdAndTypeKey(UUID(0, 1), "sprint") } returns true
+            assertFailsWith<ConflictException> { service.createType("CHE", ItemGroupService.CreateGroupTypeRequest("sprint", "x")) }
         }
 
         @Test
@@ -99,6 +102,14 @@ class ItemGroupServiceUnitTest {
             assertFailsWith<ConflictException> { service.deleteType("CHE", "sprint") }
             // phase 下有组 P1
             assertFailsWith<ConflictException> { service.deleteType("CHE", "phase") }
+        }
+
+        @Test
+        fun deleteTypeAllowsEmptyLevel1() {
+            // spec 0100 切片B:可删性只看空非空,空 level-1 可删(2026-11-05 用户拍板)
+            every { groups.findByProjectObjectIdOrderByCreatedAt(UUID(0, 1)) } returns emptyList()
+            service.deleteType("CHE", "sprint")
+            verify { types.delete(sprintType) }
         }
 
         @Test
