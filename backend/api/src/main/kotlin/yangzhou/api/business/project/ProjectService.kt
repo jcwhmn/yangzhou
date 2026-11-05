@@ -46,6 +46,8 @@ class ProjectService(
         val name: String,
         val archived: Boolean,
         val feasSignal: String?,
+        val releaseEnabled: Boolean,
+        val milestoneEnabled: Boolean,
         val statuses: List<StatusDto>,
     )
 
@@ -81,7 +83,32 @@ class ProjectService(
         val statusDtos = statuses.findByProjectObjectIdOrderByPosition(project.objectId!!).map {
             StatusDto(it.objectId, it.name, it.icon, it.statusType, it.position)
         }
-        return ProjectDto(project.objectId, project.key, project.name, project.archivedAt != null, project.feasSignal, statusDtos)
+        return ProjectDto(
+            project.objectId,
+            project.key,
+            project.name,
+            project.archivedAt != null,
+            project.feasSignal,
+            project.releaseEnabled,
+            project.milestoneEnabled,
+            statusDtos,
+        )
+    }
+
+    /** YPJ-151:项目设置——release/milestone 启停(null=不改);仅存取,门控在前端。 */
+    fun updateSettings(
+        key: String,
+        request: UpdateProjectSettingsRequest,
+    ): ProjectDto {
+        val project = projects.findByKey(key) ?: throw NotFoundException("项目不存在:$key")
+        val saved =
+            projects.save(
+                project.copy(
+                    releaseEnabled = request.releaseEnabled ?: project.releaseEnabled,
+                    milestoneEnabled = request.milestoneEnabled ?: project.milestoneEnabled,
+                ),
+            )
+        return get(saved.key)
     }
 
     /** YPJ-60:删除预览——将随项目物理删除的数据量(只读,不动库)。 */
@@ -215,4 +242,9 @@ data class CreateProjectRequest(
     @field:Pattern(regexp = "^[A-Z][A-Z0-9]{1,9}$", message = "key 为 2–10 位大写字母/数字,如 CHE")
     val key: String,
     @field:NotBlank val name: String,
+)
+
+data class UpdateProjectSettingsRequest(
+    val releaseEnabled: Boolean? = null,
+    val milestoneEnabled: Boolean? = null,
 )

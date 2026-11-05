@@ -1,0 +1,103 @@
+"use client";
+
+// YPJ-151:项目设置——release/milestone 启停(仅存取+UI 门控;服务端不拦截,见 spec 0102)
+import {
+  Alert,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  FormControlLabel,
+  Button,
+  Stack,
+  Switch,
+} from "@mui/material";
+import { useEffect, useState } from "react";
+import { api } from "@/lib/api";
+import { t } from "@/lib/texts";
+
+export function ProjectSettingsPanel({
+  projectKey,
+  open,
+  onClose,
+  onChanged,
+}: {
+  projectKey: string;
+  open: boolean;
+  onClose: () => void;
+  onChanged: () => void;
+}) {
+  const [release, setRelease] = useState(true);
+  const [milestone, setMilestone] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!open) return;
+    setError("");
+    api<{
+      releaseEnabled: boolean;
+      milestoneEnabled: boolean;
+    }>(`/api/projects/${projectKey}`)
+      .then((p) => {
+        setRelease(p.releaseEnabled);
+        setMilestone(p.milestoneEnabled);
+      })
+      .catch(() => setError(t.settings.loadFailed));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, projectKey]);
+
+  async function save() {
+    try {
+      await api(`/api/projects/${projectKey}/settings`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          releaseEnabled: release,
+          milestoneEnabled: milestone,
+        }),
+      });
+      setError("");
+      onChanged();
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t.settings.saveFailed);
+    }
+  }
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
+      <DialogTitle>{t.settings.title}</DialogTitle>
+      <DialogContent>
+        <Stack spacing={1} sx={{ mt: 1 }}>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={release}
+                onChange={(e) => setRelease(e.target.checked)}
+              />
+            }
+            label={t.settings.release}
+          />
+          <FormControlLabel
+            control={
+              <Switch
+                checked={milestone}
+                onChange={(e) => setMilestone(e.target.checked)}
+              />
+            }
+            label={t.settings.milestone}
+          />
+          <Alert severity="info" variant="outlined" sx={{ py: 0.5 }}>
+            {t.settings.hint}
+          </Alert>
+          {error && <Alert severity="error">{error}</Alert>}
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>{t.settings.cancel}</Button>
+        <Button variant="contained" onClick={save}>
+          {t.settings.save}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}

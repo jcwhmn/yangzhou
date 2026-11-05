@@ -36,6 +36,7 @@ import {
   Group as GroupIcon,
   Star as StarIcon,
   StarBorder as StarBorderIcon,
+  Settings as SettingsIcon,
   Tune as TuneIcon,
 } from "@mui/icons-material";
 import type { Signal } from "@/components/Verdict";
@@ -43,6 +44,7 @@ import { WorkflowEditor } from "@/components/WorkflowEditor";
 import { ProjectMembersPanel } from "@/components/ProjectMembersPanel";
 import { GithubSettingsPanel } from "@/components/GithubSettingsPanel";
 import { GroupTypesPanel } from "@/components/GroupTypesPanel";
+import { ProjectSettingsPanel } from "@/components/ProjectSettingsPanel";
 import { DateInput } from "@/components/DateInput";
 
 type Sprint = { sprintId: string; name: string; status: string };
@@ -85,6 +87,12 @@ export default function ProjectLayout({
   const [membersOpen, setMembersOpen] = useState(false);
   const [ghOpen, setGhOpen] = useState(false);
   const [gtypeOpen, setGtypeOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  // YPJ-151:release/milestone 启停(null=加载中按 true 渲染防闪;失败 fail-open)
+  const [flags, setFlags] = useState<{
+    release: boolean;
+    milestone: boolean;
+  } | null>(null);
   const [fav, setFav] = useState<boolean | null>(null);
 
   const loadSprints = () => {
@@ -103,7 +111,18 @@ export default function ProjectLayout({
       .catch(() => setL1(null));
   };
 
+  const loadFlags = () => {
+    api<{ releaseEnabled: boolean; milestoneEnabled: boolean }>(
+      `/api/projects/${key}`,
+    )
+      .then((p) =>
+        setFlags({ release: p.releaseEnabled, milestone: p.milestoneEnabled }),
+      )
+      .catch(() => setFlags({ release: true, milestone: true }));
+  };
+
   const loadSide = () => {
+    loadFlags();
     api<NavItem[]>(`/api/projects/${key}/items`)
       .then(setItems)
       .catch(() => setItems([]));
@@ -262,6 +281,13 @@ export default function ProjectLayout({
           </IconButton>
           <IconButton
             size="small"
+            aria-label={t.settings.title}
+            onClick={() => setSettingsOpen(true)}
+          >
+            <SettingsIcon fontSize="small" />
+          </IconButton>
+          <IconButton
+            size="small"
             aria-label={t.gh.button}
             onClick={() => setGhOpen(true)}
           >
@@ -375,97 +401,107 @@ export default function ProjectLayout({
               ))}
             </>
           )}
-          <Divider sx={{ my: 1 }} />
-          <ListSubheader
-            disableSticky
-            sx={{
-              bgcolor: "transparent",
-              display: "flex",
-              alignItems: "center",
-            }}
-          >
-            <span style={{ flex: 1 }}>{t.projectNav.milestones}</span>
-            <IconButton
-              size="small"
-              aria-label={t.projectNav.manage}
-              onClick={() => setMsOpen(true)}
-            >
-              <TuneIcon fontSize="small" />
-            </IconButton>
-          </ListSubheader>
-          {milestones.length === 0 && (
-            <ListItemButton disabled sx={{ py: 0.25 }}>
-              <ListItemText
-                primary={t.projectNav.noMilestones}
-                primaryTypographyProps={{
-                  variant: "caption",
-                  color: "text.secondary",
+          {flags?.milestone !== false && (
+            <>
+              <Divider sx={{ my: 1 }} />
+              <ListSubheader
+                disableSticky
+                sx={{
+                  bgcolor: "transparent",
+                  display: "flex",
+                  alignItems: "center",
                 }}
-              />
-            </ListItemButton>
+              >
+                <span style={{ flex: 1 }}>{t.projectNav.milestones}</span>
+                <IconButton
+                  size="small"
+                  aria-label={t.projectNav.manage}
+                  onClick={() => setMsOpen(true)}
+                >
+                  <TuneIcon fontSize="small" />
+                </IconButton>
+              </ListSubheader>
+              {milestones.length === 0 && (
+                <ListItemButton disabled sx={{ py: 0.25 }}>
+                  <ListItemText
+                    primary={t.projectNav.noMilestones}
+                    primaryTypographyProps={{
+                      variant: "caption",
+                      color: "text.secondary",
+                    }}
+                  />
+                </ListItemButton>
+              )}
+              {milestones.map((m) => (
+                <ListItemButton key={m.milestoneId} disabled sx={{ py: 0.25 }}>
+                  <ListItemText
+                    primary={m.name}
+                    secondary={[
+                      t.milestone.status[
+                        m.status as keyof typeof t.milestone.status
+                      ],
+                      m.targetDate,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  />
+                </ListItemButton>
+              ))}
+            </>
           )}
-          {milestones.map((m) => (
-            <ListItemButton key={m.milestoneId} disabled sx={{ py: 0.25 }}>
-              <ListItemText
-                primary={m.name}
-                secondary={[
-                  t.milestone.status[
-                    m.status as keyof typeof t.milestone.status
-                  ],
-                  m.targetDate,
-                ]
-                  .filter(Boolean)
-                  .join(" · ")}
-              />
-            </ListItemButton>
-          ))}
-          <Divider sx={{ my: 1 }} />
-          <ListSubheader
-            disableSticky
-            sx={{
-              bgcolor: "transparent",
-              display: "flex",
-              alignItems: "center",
-            }}
-          >
-            <span style={{ flex: 1 }}>{t.projectNav.releases}</span>
-            <IconButton
-              size="small"
-              aria-label={t.projectNav.manageRelease}
-              onClick={() => setRelOpen(true)}
-            >
-              <TuneIcon fontSize="small" />
-            </IconButton>
-          </ListSubheader>
-          {releases.length === 0 && (
-            <ListItemButton disabled sx={{ py: 0.25 }}>
-              <ListItemText
-                primary={t.projectNav.noReleases}
-                primaryTypographyProps={{
-                  variant: "caption",
-                  color: "text.secondary",
+          {flags?.release !== false && (
+            <>
+              <Divider sx={{ my: 1 }} />
+              <ListSubheader
+                disableSticky
+                sx={{
+                  bgcolor: "transparent",
+                  display: "flex",
+                  alignItems: "center",
                 }}
-              />
-            </ListItemButton>
+              >
+                <span style={{ flex: 1 }}>{t.projectNav.releases}</span>
+                <IconButton
+                  size="small"
+                  aria-label={t.projectNav.manageRelease}
+                  onClick={() => setRelOpen(true)}
+                >
+                  <TuneIcon fontSize="small" />
+                </IconButton>
+              </ListSubheader>
+              {releases.length === 0 && (
+                <ListItemButton disabled sx={{ py: 0.25 }}>
+                  <ListItemText
+                    primary={t.projectNav.noReleases}
+                    primaryTypographyProps={{
+                      variant: "caption",
+                      color: "text.secondary",
+                    }}
+                  />
+                </ListItemButton>
+              )}
+              {releases.map((r) => (
+                <ListItemButton key={r.releaseId} disabled sx={{ py: 0.25 }}>
+                  <ListItemText
+                    primary={`${r.name} (${r.memberCount})`}
+                    secondary={[
+                      t.release.status[
+                        r.status as keyof typeof t.release.status
+                      ],
+                      r.targetDate
+                        ? `${t.release.targetDate} ${r.targetDate}`
+                        : null,
+                      r.releasedDate
+                        ? `${t.release.releasedDate} ${r.releasedDate}`
+                        : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  />
+                </ListItemButton>
+              ))}
+            </>
           )}
-          {releases.map((r) => (
-            <ListItemButton key={r.releaseId} disabled sx={{ py: 0.25 }}>
-              <ListItemText
-                primary={`${r.name} (${r.memberCount})`}
-                secondary={[
-                  t.release.status[r.status as keyof typeof t.release.status],
-                  r.targetDate
-                    ? `${t.release.targetDate} ${r.targetDate}`
-                    : null,
-                  r.releasedDate
-                    ? `${t.release.releasedDate} ${r.releasedDate}`
-                    : null,
-                ]
-                  .filter(Boolean)
-                  .join(" · ")}
-              />
-            </ListItemButton>
-          ))}
         </List>
       </Box>
       <Box component="main" sx={{ flex: 1, minWidth: 0 }}>
@@ -549,6 +585,12 @@ export default function ProjectLayout({
         projectKey={String(key)}
         open={ghOpen}
         onClose={() => setGhOpen(false)}
+      />
+      <ProjectSettingsPanel
+        projectKey={String(key)}
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        onChanged={loadFlags}
       />
       <GroupTypesPanel
         projectKey={String(key)}
