@@ -1,4 +1,4 @@
-// 0105:看板建 item 落点语义——必进组(选/激活/新建)+ 拉起弹窗;无组类型项目 onBoard 兜底
+// 0105:看板创建 item 需求(0105-board-item-creation)——场景矩阵逐项;现行实现=v1,增量二(前置决策树)过目后替换
 import { expect, test } from "./support/fixtures";
 import { apiCreateItem, apiCreateSprint } from "./support/helpers";
 
