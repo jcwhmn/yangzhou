@@ -43,7 +43,11 @@ class GroupWorkflowServiceUnitTest {
         val edges = mapper.readTree(saved[0].transitions)
         assertEquals("start", edges[0]["function"].asString())
         assertEquals("active", edges[0]["target"].asString())
-        assertEquals("[]", saved[2].transitions) // completed 终态护栏
+        // 0108:completed 加 reopen→active(重开=撤销内部收尾判断)
+        val reopenEdges = mapper.readTree(saved[2].transitions)
+        assertEquals(1, reopenEdges.size())
+        assertEquals("reopen", reopenEdges[0]["function"].asString())
+        assertEquals("active", reopenEdges[0]["target"].asString())
     }
 
     @Test

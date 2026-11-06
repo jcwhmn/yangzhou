@@ -500,6 +500,10 @@ export const t = {
     dispSummaryMove: "将转入",
     dispSummaryBack: "个;回 Backlog",
     dispSummaryTail: "个",
+    // 0108:组重开(撤销内部收尾判断;纯状态迁移,成员与历史不变)
+    reopenBtn: "↺ 重开组",
+    reopenConfirm:
+      "重开将撤销完成态,回到进行中;成员与历史不变,可重新拉入 item。仍要重开?",
     startBtn: "▶ 开始 Sprint",
     completeBtn: "✓ 完成 Sprint",
   },

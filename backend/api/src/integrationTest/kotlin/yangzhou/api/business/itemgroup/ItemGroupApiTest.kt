@@ -146,7 +146,9 @@ class ItemGroupApiTest : AbstractApiTest() {
         assertEquals("start", wf[0]["transitions"][0]["function"].asText())
         assertEquals("active", wf[0]["transitions"][0]["target"].asText())
         assertEquals(2, wf[1]["transitions"].size()) // complete + backward
-        assertEquals(0, wf[2]["transitions"].size()) // completed 终态护栏
+        assertEquals(1, wf[2]["transitions"].size()) // 0108:completed 加 reopen→active(重开=撤销内部收尾判断)
+        assertEquals("reopen", wf[2]["transitions"][0]["function"].asText())
+        assertEquals("active", wf[2]["transitions"][0]["target"].asText())
 
         val rwf = get(authed, "/api/projects/GRP/group-types/release/workflow")
         assertEquals(2, rwf.size())
