@@ -306,7 +306,9 @@ export default function SprintPage() {
     if (fn === "reopen") return setConfirmFlow("reopen");
   }
   async function doReopen() {
-    await changeStatus("active");
+    // 0108:重开出边是 reopen,不走 changeStatus(其 active 映射 start,completed 态无此出边)
+    const s = await sprintAction(key, id, "reopen");
+    setSprint(s);
     setConfirmFlow(null);
   }
 

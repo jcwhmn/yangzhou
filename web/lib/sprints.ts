@@ -77,7 +77,7 @@ export async function createSprint(
 export async function sprintAction(
   key: string,
   sprintId: string,
-  fn: "start" | "complete" | "backward",
+  fn: "start" | "complete" | "backward" | "reopen",
 ): Promise<Sprint> {
   const s = toSprint(
     await api<GroupDto>(
