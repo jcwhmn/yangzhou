@@ -268,6 +268,27 @@ export default function SprintPage() {
     setBusy(false);
   }
 
+  // 0107:目标组表达式,弹窗顶部与摘要行共用(单一实现)
+  function targetLabel(d: typeof disp): string {
+    if (!d) return "";
+    if (d.actives.length > 1 || d.planned.length > 1)
+      return t.sprintPage.dispPickTitle;
+    if (d.actives.length === 1) return `转入进行中的「${d.actives[0].name}」`;
+    if (d.planned.length === 1)
+      return `将激活计划中的「${d.planned[0].name}」并转入`;
+    return `将新建组「${d.newName}」并激活,转入`;
+  }
+  // 摘要行用:目标组名(多选时取 pick,与 confirmDisposition 落库一致)
+  function targetGroupName(d: NonNullable<typeof disp>): string {
+    if (d.actives.length > 0)
+      return (d.actives.find((s) => s.sprintId === d.pick) ?? d.actives[0])
+        .name;
+    if (d.planned.length > 0)
+      return (d.planned.find((s) => s.sprintId === d.pick) ?? d.planned[0])
+        .name;
+    return d.newName;
+  }
+
   // spec 0097 S3:按钮 = 当前状态出边(backward 仅 CLI/API 可及,UI 现状一致)
   function actionLabel(fn: string): string {
     return fn === "start"
@@ -664,7 +685,7 @@ export default function SprintPage() {
               </Button>
             </DialogActions>
           </Dialog>
-          {/* 0106:非终态成员处置——目标组决策树 + 逐行覆写回 Backlog(D2/D3) */}
+          {/* 0106:非终态成员处置——目标组决策树 + 逐行覆写回 Backlog(D2/D3);0107 行内显式按钮 + 提交前摘要(方案A,消除 checkbox 误勾事故) */}
           <Dialog open={disp !== null} maxWidth="sm" fullWidth>
             <DialogTitle>
               完成「{sprint?.name ?? ""}」——{disp?.rows.length ?? 0} 个未完成
@@ -672,17 +693,7 @@ export default function SprintPage() {
             </DialogTitle>
             <DialogContent>
               <Typography sx={{ mt: 1, mb: 1, fontWeight: 600 }}>
-                {disp && disp.actives.length > 1
-                  ? t.sprintPage.dispPickTitle
-                  : disp && disp.actives.length === 1
-                    ? `转入进行中的「${disp.actives[0].name}」`
-                    : disp && disp.planned.length === 1
-                      ? `将激活计划中的「${disp.planned[0].name}」并转入`
-                      : disp && disp.planned.length > 1
-                        ? t.sprintPage.dispPickTitle
-                        : disp
-                          ? `将新建组「${disp.newName}」并激活,转入`
-                          : ""}
+                {targetLabel(disp)}
               </Typography>
               {disp && (disp.actives.length > 1 || disp.planned.length > 1) && (
                 <Stack spacing={1} sx={{ mb: 1 }}>
@@ -722,18 +733,26 @@ export default function SprintPage() {
                       flex: 1,
                       overflow: "hidden",
                       textOverflow: "ellipsis",
+                      color: r.toBacklog ? "warning.dark" : "text.primary",
                     }}
                   >
                     {r.title}
                   </Box>
-                  <Typography variant="body2" color="text.secondary">
-                    {r.toBacklog ? "回 Backlog" : "转入目标组"}
-                  </Typography>
-                  <Checkbox
-                    edge="end"
-                    inputProps={{ "aria-label": `回Backlog ${r.title}` }}
-                    checked={r.toBacklog}
-                    onChange={() =>
+                  {r.toBacklog && (
+                    <Typography
+                      variant="body2"
+                      color="warning.dark"
+                      fontWeight={600}
+                    >
+                      {t.sprintPage.dispRowMarked}
+                    </Typography>
+                  )}
+                  <Button
+                    size="small"
+                    variant={r.toBacklog ? "contained" : "text"}
+                    color={r.toBacklog ? "warning" : "inherit"}
+                    aria-label={`${r.toBacklog ? t.sprintPage.dispRowUndo : t.sprintPage.dispRowBacklog} ${r.title}`}
+                    onClick={() =>
                       setDisp({
                         ...disp,
                         rows: disp.rows.toSpliced(idx, 1, {
@@ -742,13 +761,26 @@ export default function SprintPage() {
                         }),
                       })
                     }
-                  />
+                  >
+                    {r.toBacklog
+                      ? t.sprintPage.dispRowUndo
+                      : t.sprintPage.dispRowBacklog}
+                  </Button>
                 </Box>
               ))}
-              <Typography variant="body2" color="text.secondary">
-                勾选 = 回 Backlog;未勾选 = 转入目标组。取消处置则全部回
-                Backlog,可稍后手动处理。
-              </Typography>
+              {disp && disp.rows.length > 0 && (
+                <Typography
+                  variant="body2"
+                  sx={{ mt: 1 }}
+                  color={
+                    disp.rows.some((r) => r.toBacklog)
+                      ? "warning.dark"
+                      : "text.secondary"
+                  }
+                >
+                  {`${t.sprintPage.dispSummaryMove}「${targetGroupName(disp)}」 ${disp.rows.filter((r) => !r.toBacklog).length} ${t.sprintPage.dispSummaryBack} ${disp.rows.filter((r) => r.toBacklog).length} ${t.sprintPage.dispSummaryTail}`}
+                </Typography>
+              )}
             </DialogContent>
             <DialogActions>
               <Button onClick={() => setDisp(null)}>

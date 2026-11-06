@@ -493,6 +493,13 @@ export const t = {
     dispPickTitle: "转入哪个组?",
     dispConfirm: "确认处置",
     dispCancel: "取消处置",
+    // 0107:行内显式按钮替换 checkbox(方案A);摘要行防误操作
+    dispRowBacklog: "回 Backlog",
+    dispRowMarked: "将回 Backlog",
+    dispRowUndo: "撤销",
+    dispSummaryMove: "将转入",
+    dispSummaryBack: "个;回 Backlog",
+    dispSummaryTail: "个",
     startBtn: "▶ 开始 Sprint",
     completeBtn: "✓ 完成 Sprint",
   },
