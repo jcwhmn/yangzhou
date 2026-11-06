@@ -16,7 +16,7 @@ test("项目设置——关 milestone 段消失,release 段不受影响;重开�
   await expect(dialog).toBeVisible();
   await dialog.getByRole("switch", { name: "Milestone 段" }).uncheck();
   await dialog.getByRole("button", { name: "保存" }).click();
-  await expect(dialog).toBeHidden(); // MUI 淡出期吞点击,先等关
+  await expect(dialog).toBeHidden({ timeout: 15000 }); // MUI 淡出期吞点击,先等关;关=等 PATCH 响应,负载下可 >5s(实测 max 5.3s)
 
   // 侧栏:Milestone 段消失,Release 段仍在
   await expect(page.getByText("Milestone", { exact: true })).toHaveCount(0);
@@ -32,6 +32,6 @@ test("项目设置——关 milestone 段消失,release 段不受影响;重开�
   await expect(dialog2).toBeVisible();
   await dialog2.getByRole("switch", { name: "Milestone 段" }).check();
   await dialog2.getByRole("button", { name: "保存" }).click();
-  await expect(dialog2).toBeHidden();
+  await expect(dialog2).toBeHidden({ timeout: 15000 });
   await expect(page.getByText("Milestone", { exact: true })).toBeVisible();
 });
