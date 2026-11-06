@@ -84,14 +84,23 @@ test("V12-S3 Sprint 全链路——建/指派/开始/完成/backlog/历史 @smok
   await expect(page.getByText(/进入处置/)).toBeVisible();
   await page.getByRole("button", { name: "确认完成" }).click();
   await expect(page.getByText(/此 Sprint 已完成/)).toBeVisible();
-  await expect(page.getByText("E2E 冒烟 item")).toBeVisible();
+  // 0106:非终态成员进处置弹窗(项目内无其它组 → 默认新建「Sprint 2」并激活转入)
+  const disp = page.getByRole("dialog");
+  await expect(disp.getByText("E2E 冒烟 item")).toBeVisible();
+  const moved = page.waitForResponse(
+    (r) =>
+      r.url().includes("/group-membership") && r.request().method() === "PUT",
+  );
+  await disp.getByRole("button", { name: "确认处置" }).click();
+  await moved;
+  await expect(disp).toBeHidden();
 
-  // 详情只显示当前 sprint(裁决 2):已完成 sprint 不回填下拉也不在选项中
-  await page.goto(`/p/${projectKey}/backlog`);
+  // item 转入新组:看板可见;详情只显示当前 sprint(裁决 2:已完成 Sprint 42 不回填)
+  await page.goto(`/p/${projectKey}`);
   await page.getByText("E2E 冒烟 item").first().click();
   await expect(
     page.getByRole("combobox", { name: "Sprint", exact: true }),
-  ).not.toHaveValue("Sprint 42");
+  ).toHaveValue("Sprint 2");
 });
 
 test("V13-S3 拉入对话框——多选勾入/移出 + 详情回链", async ({
