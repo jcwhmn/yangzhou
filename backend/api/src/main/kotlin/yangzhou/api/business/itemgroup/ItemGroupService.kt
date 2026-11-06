@@ -418,8 +418,9 @@ class ItemGroupService(
 
         if (target != null) {
             if (target.status in finalNames) throw ConflictException("组已完成,不能指派")
-            if (stale.isEmpty() && live.size == 1 && live[0].groupObjectId == target.objectId)
+            if (stale.isEmpty() && live.size == 1 && live[0].groupObjectId == target.objectId) {
                 return itemService.get(itemObjectId)
+            }
         }
         (live + stale).forEach { m ->
             memberships.delete(m)

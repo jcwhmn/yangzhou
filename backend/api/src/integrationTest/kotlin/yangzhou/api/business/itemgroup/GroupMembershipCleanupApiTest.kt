@@ -94,8 +94,7 @@ class GroupMembershipCleanupApiTest : AbstractApiTest() {
         authed: RestTestClient,
         key: String,
         groupId: String,
-    ): Set<String> =
-        get(authed, "/api/projects/$key/groups/$groupId/items").map { it["title"].asText() }.toSet()
+    ): Set<String> = get(authed, "/api/projects/$key/groups/$groupId/items").map { it["title"].asText() }.toSet()
 
     @Test
     fun `转出清理——处置后完成组仅剩 Done 成员_被转 item 仅目标组行`() {
