@@ -480,10 +480,11 @@ private fun run(args: List<String>) {
             val status = rest.getOrNull(2) ?: error("缺少目标状态(planned/active/completed)")
             if (status !in setOf("planned", "active", "completed")) error("状态只能是 planned/active/completed")
             val groupId = resolveSprintId(api, key, ref)
-            // spec 0097 S2:状态变更走动作端点(planned→active=start,→completed=complete,active→planned=backward)
+            // spec 0097 S2 + 0108:状态变更走动作端点,函数按当前态+目标态选(completed→active=reopen)
+            val current = api.json("GET", "/api/projects/$key/groups/$groupId")["status"].asString()
             val function = when (status) {
                 "planned" -> "backward"
-                "active" -> "start"
+                "active" -> if (current == "completed") "reopen" else "start"
                 "completed" -> "complete"
                 else -> error("目标状态只能是 planned/active/completed")
             }

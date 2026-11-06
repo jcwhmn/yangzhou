@@ -101,9 +101,9 @@ export default function SprintPage() {
   const [busy, setBusy] = useState(false);
   const [allSprints, setAllSprints] = useState<Sprint[]>([]);
   const [wf, setWf] = useState<TypeWorkflow[]>([]);
-  const [confirmFlow, setConfirmFlow] = useState<null | "start" | "complete">(
-    null,
-  );
+  const [confirmFlow, setConfirmFlow] = useState<
+    null | "start" | "complete" | "reopen"
+  >(null);
   // 0106:组完成后的非终态成员处置(rows 默认全转入目标组,逐行可覆写回 Backlog;D2/D3)
   const [disp, setDisp] = useState<null | {
     rows: { itemId: string; title: string; toBacklog: boolean }[];
@@ -295,11 +295,19 @@ export default function SprintPage() {
       ? t.sprintPage.startBtn
       : fn === "complete"
         ? t.sprintPage.completeBtn
-        : fn;
+        : fn === "reopen"
+          ? t.sprintPage.reopenBtn
+          : fn;
   }
   function actionClick(fn: string) {
     if (fn === "start") return startSprint();
     if (fn === "complete") return completeSprint();
+    // 0108:重开低显著(outlined 由确认弹窗双闸防误触)+确认制
+    if (fn === "reopen") return setConfirmFlow("reopen");
+  }
+  async function doReopen() {
+    await changeStatus("active");
+    setConfirmFlow(null);
   }
 
   useEffect(() => {
@@ -446,7 +454,10 @@ export default function SprintPage() {
                   <Button
                     key={tr.function}
                     size="small"
-                    variant="contained"
+                    variant={
+                      tr.function === "reopen" ? "outlined" : "contained"
+                    }
+                    color={tr.function === "reopen" ? "inherit" : "primary"}
                     onClick={() => actionClick(tr.function)}
                   >
                     {actionLabel(tr.function)}
@@ -465,7 +476,7 @@ export default function SprintPage() {
               color="text.secondary"
               sx={{ display: "block", mb: 2 }}
             >
-              此 Sprint 已完成,以下为历史 items(成员关系不可再变)。
+              此 Sprint 已完成,以下为历史 items(成员关系不可再变,可重开组)。
             </Typography>
           )}
 
@@ -666,22 +677,38 @@ export default function SprintPage() {
             fullWidth
           >
             <DialogTitle>
-              {confirmFlow === "start" ? "开始 Sprint" : "完成 Sprint"}
+              {confirmFlow === "start"
+                ? "开始 Sprint"
+                : confirmFlow === "reopen"
+                  ? "重开组"
+                  : "完成 Sprint"}
             </DialogTitle>
             <DialogContent>
               <Typography>
                 {confirmFlow === "start"
                   ? `项目已有进行中的 Sprint「${allSprints.find((s) => s.status === "active" && s.sprintId !== id)?.name ?? ""}」,允许同时存在多个进行中。仍要开始本 Sprint?`
-                  : `完成后,${(items ?? []).filter((it) => !(statuses.find((st) => st.name === it.status)?.statusType === "FINAL")).length} 个未完成 item 将进入处置(选定去向);已完成 item 保留在本页历史。`}
+                  : confirmFlow === "reopen"
+                    ? t.sprintPage.reopenConfirm
+                    : `完成后,${(items ?? []).filter((it) => !(statuses.find((st) => st.name === it.status)?.statusType === "FINAL")).length} 个未完成 item 将进入处置(选定去向);已完成 item 保留在本页历史。`}
               </Typography>
             </DialogContent>
             <DialogActions>
               <Button onClick={() => setConfirmFlow(null)}>取消</Button>
               <Button
                 variant="contained"
-                onClick={confirmFlow === "start" ? doStart : doComplete}
+                onClick={
+                  confirmFlow === "start"
+                    ? doStart
+                    : confirmFlow === "reopen"
+                      ? doReopen
+                      : doComplete
+                }
               >
-                {confirmFlow === "start" ? "仍要开始" : "确认完成"}
+                {confirmFlow === "start"
+                  ? "仍要开始"
+                  : confirmFlow === "reopen"
+                    ? "确认重开"
+                    : "确认完成"}
               </Button>
             </DialogActions>
           </Dialog>

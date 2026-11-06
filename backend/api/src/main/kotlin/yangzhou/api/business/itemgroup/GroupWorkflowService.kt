@@ -58,7 +58,11 @@ class GroupWorkflowService(
         type.timed -> listOf( // 时间盒模板:timed 类型继承 sprint 时间盒语义(spec 0100 切片B,不再挂 typeKey)
             Triple("planned", StatusType.START, listOf(Edge("start", "active"))),
             Triple("active", StatusType.ACTIVE, listOf(Edge("complete", "completed"), Edge("backward", "planned"))),
-            Triple("completed", StatusType.FINAL, emptyList()), // 终态无出边 = 护栏
+            Triple(
+                "completed",
+                StatusType.FINAL,
+                listOf(Edge("reopen", "active")),
+            ), // 0108:重开=撤销内部收尾判断(纯状态迁移,成员不动);release 不可重开
         )
         type.typeKey == "release" -> listOf(
             Triple("planned", StatusType.START, listOf(Edge("complete", "released"))),
