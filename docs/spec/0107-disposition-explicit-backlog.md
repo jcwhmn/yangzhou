@@ -66,3 +66,10 @@
 3. 点「撤销」→ 行回默认;摘要复原
 4. 确认处置 → 未标记行入目标组、标记行入 Backlog(与摘要一致)
 5. 取消处置 → 成员留已完成组(现状兜底不变)
+
+## As-built(2026-11-06,PR #190)
+
+- **落地**:`sprint/[id]/page.tsx` 处置弹窗行区重写:裸 Checkbox → 行尾显式 Button(默认 text「回 Backlog」/标记后 contained warning「撤销」,aria-label 平移「{动作} {title}」;标题行警示色)+ 常驻摘要行 Typography(「将转入「{targetGroupName}」 N 个;回 Backlog M 个」,M>0 warning.dark);新增 `targetLabel(d)`(弹窗顶部目标表达式单一实现)与 `targetGroupName(d)`(摘要组名:actives/planned 按 pick 匹配否则首个,新建态用 newName——与 confirmDisposition 落库逻辑镜像);原「勾选=回 Backlog」底部说明文字删除。`texts.ts` 新键 6(dispRowBacklog/dispRowMarked/dispRowUndo/dispSummaryMove/dispSummaryBack/dispSummaryTail)。数据结构 rows[].toBacklog 与 confirmDisposition 零改;零后端
+- **e2e**:group-complete-disposition 覆写例改按钮点击(aria-label「回 Backlog 回池A2」)+ 默认态摘要(2 个/0 个)与标记态摘要(1 个/1 个)断言;其余 4 例未动;全量 86/86 绿(独占两轮)
+- **流程事故注**:首推 CI format 红——本地只对改动文件跑了 --write,未跑全仓 --check,`targetGroupName` 两处超长行漏格式化;补 `ec9aad9` 修正。教训:提交 web 改动后、推送前跑 `npx prettier --check .`(AGENTS YPJ-121 已有此规矩,执行漏)
+- **事故闭环**:本票修的正是 2026-11-06 T104Z 事故根因(checkbox 误语义致静默落池);数据已手工修复(test3/test4 入 Sprint 3);同日另立 YPJ-154(日志/可观测性权衡)、YPJ-156(e2e 套件并发互踩+断言窗),均 To Do 未排期
