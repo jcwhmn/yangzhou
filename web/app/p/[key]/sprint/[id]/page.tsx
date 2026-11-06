@@ -289,6 +289,33 @@ export default function SprintPage() {
     return d.newName;
   }
 
+  /** 0109:「进 Backlog」——全部非终态成员显式回池落库(含 completed 组旧行清理,由 replaceMembership 承担) */
+  async function doBacklogAll() {
+    if (!disp || busy) return;
+    setBusy(true);
+    const l1 = await level1Type(key);
+    const failed: string[] = [];
+    if (l1)
+      for (const r of disp.rows) {
+        try {
+          await api(`/api/items/${r.itemId}/group-membership`, {
+            method: "PUT",
+            body: JSON.stringify({ groupId: null, groupType: l1.typeKey }),
+          });
+        } catch {
+          failed.push(r.title);
+        }
+      }
+    if (failed.length > 0) {
+      setError(
+        `回池失败 ${failed.length} 个(留本组历史行,可手动处理):${failed.join("、")}`,
+      );
+    }
+    setItems(await api<Item[]>(`/api/projects/${key}/groups/${id}/items`));
+    setDisp(null);
+    setBusy(false);
+  }
+
   // spec 0097 S3:按钮 = 当前状态出边(backward 仅 CLI/API 可及,UI 现状一致)
   function actionLabel(fn: string): string {
     return fn === "start"
@@ -812,15 +839,16 @@ export default function SprintPage() {
               )}
             </DialogContent>
             <DialogActions>
-              <Button onClick={() => setDisp(null)}>
-                {t.sprintPage.dispCancel}
+              {/* 0109:主按钮=执行逐行计划(进「组名」,混合合法);次按钮=全部显式回池落库 */}
+              <Button onClick={doBacklogAll} disabled={busy}>
+                {t.sprintPage.dispGoBacklog}
               </Button>
               <Button
                 variant="contained"
                 onClick={confirmDisposition}
                 disabled={busy}
               >
-                {t.sprintPage.dispConfirm}
+                {disp && `进「${targetGroupName(disp)}」`}
               </Button>
             </DialogActions>
           </Dialog>

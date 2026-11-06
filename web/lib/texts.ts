@@ -491,8 +491,8 @@ export const t = {
   },
   sprintPage: {
     dispPickTitle: "转入哪个组?",
-    dispConfirm: "确认处置",
-    dispCancel: "取消处置",
+    // 0109:主按钮=进「组名」(页面内插 targetGroupName);次按钮=全部显式回池;原 确认处置/取消处置 废
+    dispGoBacklog: "进 Backlog",
     // 0107:行内显式按钮替换 checkbox(方案A);摘要行防误操作
     dispRowBacklog: "回 Backlog",
     dispRowMarked: "将回 Backlog",

@@ -410,16 +410,22 @@ class ItemGroupService(
                 groups.findAllByObjectIdIn(rows.map { it.groupObjectId }.toSet()).associateBy { it.objectId!! }
             }
         val live = rows.filter { rowGroups[it.groupObjectId]?.type == typeKey && rowGroups[it.groupObjectId]?.status !in finalNames }
+        // 0109:FINAL 组的残留行(组先行 completed 后旧行非 live 永不删,双行并存事故源)——迁移时一并清,member 表=当前归属真相
+        val stale =
+            rows.filter {
+                rowGroups[it.groupObjectId]?.type == typeKey && rowGroups[it.groupObjectId]?.status in finalNames
+            }
 
         if (target != null) {
             if (target.status in finalNames) throw ConflictException("组已完成,不能指派")
-            if (live.size == 1 && live[0].groupObjectId == target.objectId) return itemService.get(itemObjectId)
+            if (stale.isEmpty() && live.size == 1 && live[0].groupObjectId == target.objectId)
+                return itemService.get(itemObjectId)
         }
-        live.forEach { m ->
+        (live + stale).forEach { m ->
             memberships.delete(m)
             memberHistory.recordRemove(m.groupObjectId, m.itemObjectId, clock.instant())
         }
-        if (target != null) {
+        if (target != null && live.none { it.groupObjectId == target.objectId }) {
             memberships.save(ItemGroupMember(groupObjectId = target.objectId!!, itemObjectId = item.objectId!!))
             memberHistory.recordAdd(target.objectId!!, item.objectId!!, clock.instant())
         }
