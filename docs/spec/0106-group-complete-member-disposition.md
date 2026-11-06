@@ -90,3 +90,11 @@
 ## 四、演化记录
 
 - 2026-11-06 用户拍板(0105 验收讨论中引出):组完成语义定稿 = Done 留组 + 其余按新创逻辑进组(可回 Backlog)。现状实锤:complete 为纯状态迁移、零成员操作;非终态成员经派生桶谓词进 Backlog(不分状态);本票给其显式处置交互。独立于 0105(建 item 落点)。
+
+## As-built(2026-11-06,PR #189)
+
+- **落地**:`sprint/[id]/page.tsx` `disp` state + `doComplete()`(组先行(D3):changeStatus→按 `statusType!=="FINAL"` 过滤非终态→无则现状结束(D5);有则弹窗数据:actives/planned 过滤自身、`l1Name` 经 `level1Type` 极端缺类型回退 "Sprint"、默认新名「类型名 序号」跳过重名)+ `confirmDisposition()`(busy 防中断,处置完才关窗;目标解析:进行中 pick‖首个→计划中 1 个激活→多个选定激活→新建防重同名复用+激活;逐行 `PUT /items/{id}/group-membership`(覆写行 `{groupId:null, groupType:l1.typeKey}`);失败收集 `setError`「处置失败 N 个(留本组历史行,可手动处理)」;完毕 refetch 组 items);`lib/texts.ts` 处置文案;e2e `group-complete-disposition.spec.ts`。后端零改动
+- **降级不对称(§2.3 微偏,实锤标注)**:新建组激活失败=组留计划中、item 照常挂入(同 0105);**激活既有计划中组失败=setError 提前 return,全部未处置行经 Backlog 谓词落池兜底**(不挂失败组)——比设计保守,合不变式 3
+- **e2e 覆盖**:5 例(三类成员弹窗列非终态+默认转入单进行中 / 覆写回 Backlog / S3 新建并激活 / 取消兜底落池 / 无非终态现行框);§3.1 场景 4(目标组=多进行中列表选择)未单列,复用 0105 同型选择组件(board-item-creation S2m 已验);sprint.spec V12-S3(@smoke)适配走处置流,断言看板可见+详情归属新组
+- **验证**:e2e 全量 86/86 绿;prettier 过
+- **勘误**:上会话 handoff 记「group-complete-disposition 8/8、board-item-creation 12/12」,实数 5/9(对账:main 72 + 新增 14 = 86)

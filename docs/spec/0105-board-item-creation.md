@@ -96,3 +96,9 @@ S3 全链:查组列表(防重+算默认名)→ 建组 → 激活 → 建 item(�
 
 - 2026-10-27 立票:窄题「无活动 sprint 拉起弹窗」(v1 三件套,已被本版取代)
 - 2026-11-06:手工验证暴露看板建 item 隐身 → D1;升级必进组 D2-D6;去 sprint 字样 D9;主题定稿=看板创建 item 完整需求(本版;v1 增量节并入 §一/§二,不再保留分层档案)
+
+## As-built(2026-11-06,PR #189)
+
+- **落地**:`app/p/[key]/page.tsx` 建 item 前置决策树(§2.1 组先行,item 后行:进行中直指/多选/激活计划中/新建组(默认名=类型名+序号,同名防重复用)后再行 item;建 item+挂入后端同事务,任何失败点无游离);S0 无组类型走既有 onBoard 标志;`app/p/[key]/i/[itemId]/page.tsx` 触发点②(D10):挂 planned 且无 active→挂载即弹拉起窗(激活/暂不,取消=挂载生效不激活);`lib/sprints.ts` `sprintAction` 内部广播 `sprints-changed`(新建/激活组后侧栏即时刷新,sprint 详情页手工派发移除);`lib/texts.ts` 文案中性化(一律「组」)。后端零改动
+- **e2e**:`board-item-creation.spec.ts` 9 例=S0/S1/S2(确认+取消)/S2m/S3/S3-Z/D10 两分支;矩阵全覆盖;sprint.spec(触发点②弹窗下 selectOption 读回被 modal 挡,改 openSelect 手写流程)、projects.spec(noGroups 文案)适配
+- **验证**:e2e 全量 86/86 绿;prettier 过;手工用例 §3.2 预置数据 dev T104S1/S2/S2X/S3/Z/NT(用户已验)
