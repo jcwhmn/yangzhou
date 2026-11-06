@@ -490,6 +490,9 @@ export const t = {
     count: "item 数",
   },
   sprintPage: {
+    dispPickTitle: "转入哪个组?",
+    dispConfirm: "确认处置",
+    dispCancel: "取消处置",
     startBtn: "▶ 开始 Sprint",
     completeBtn: "✓ 完成 Sprint",
   },

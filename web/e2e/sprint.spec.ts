@@ -81,7 +81,7 @@ test("V12-S3 Sprint 全链路——建/指派/开始/完成/backlog/历史 @smok
     page.getByRole("button", { name: "✓ 完成 Sprint" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "✓ 完成 Sprint" }).click();
-  await expect(page.getByText(/回到 Backlog/)).toBeVisible();
+  await expect(page.getByText(/进入处置/)).toBeVisible();
   await page.getByRole("button", { name: "确认完成" }).click();
   await expect(page.getByText(/此 Sprint 已完成/)).toBeVisible();
   await expect(page.getByText("E2E 冒烟 item")).toBeVisible();
@@ -174,7 +174,7 @@ test("V13-S4 状态单向按钮——开始时多进行中提示 + 完成", asyn
   ).toBeVisible();
   // 完成 B:确认框明示未完成 item 回 Backlog
   await page.getByRole("button", { name: "✓ 完成 Sprint" }).click();
-  await expect(page.getByText(/回到 Backlog/)).toBeVisible();
+  await expect(page.getByText(/进入处置/)).toBeVisible();
   await page.getByRole("button", { name: "确认完成" }).click();
   await expect(page.getByText(/此 Sprint 已完成/)).toBeVisible();
 });
