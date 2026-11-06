@@ -108,8 +108,16 @@ test("处置覆写回 Backlog→该 item 入池,其余转入目标组", async ({
   await completeAndOpen(page, projectKey, gid);
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
-  // 覆写「回池A2」为回 Backlog:行内 Checkbox 勾选
-  await dialog.getByRole("checkbox", { name: /回池A2/ }).click();
+  // 0107:行内显式按钮替换 checkbox;摘要行常驻(默认全转入,无警示)
+  await expect(
+    dialog.getByText(/将转入「接盘B2」 2 个;回 Backlog 0 个/),
+  ).toBeVisible();
+  // 覆写「回池A2」:点行内「回 Backlog」按钮 → 行进警示态 + 摘要变警示色计数
+  await dialog.getByRole("button", { name: `回 Backlog 回池A2` }).click();
+  await expect(dialog.getByText("将回 Backlog")).toBeVisible();
+  await expect(
+    dialog.getByText(/将转入「接盘B2」 1 个;回 Backlog 1 个/),
+  ).toBeVisible();
   await dialog.getByRole("button", { name: "确认处置" }).click();
   await expect(dialog).toBeHidden();
 
