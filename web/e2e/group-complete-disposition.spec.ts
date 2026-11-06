@@ -112,7 +112,8 @@ test("重开组——completed 回 active 可拉入,再完成走现行确认(010
   const refreshed = page.waitForResponse((r) =>
     r.url().includes(`/api/projects/${projectKey}/groups/${gid}/items`),
   );
-  await disp.getByRole("button", { name: "确认处置" }).click();
+  // 0109:无其它组 → 主按钮=进「新建组名」(内插名),用前缀匹配
+  await disp.getByRole("button", { name: /进「/ }).click();
   await refreshed;
   await expect(disp).toBeHidden();
   await expect(page.getByText(/此 Sprint 已完成/)).toBeVisible();
