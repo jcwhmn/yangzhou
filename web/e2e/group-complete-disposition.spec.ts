@@ -96,6 +96,43 @@ test("完成组→处置弹窗列出非终态成员(Done 不列),默认全转入
   await expect(page.getByText("终态成员")).toBeVisible();
 });
 
+// 0108:重开 = 撤销内部收尾判断(timed 模板 completed→active;确认制;纯状态迁移)
+test("重开组——completed 回 active 可拉入,再完成走现行确认(0108)", async ({
+  page,
+  projectKey,
+}) => {
+  const gid = await group(projectKey, "冲刺R", "planned");
+  await member(projectKey, "重开成员", gid);
+  // 先完成:非终态成员经处置转出(复用既有 UI 完成流)
+  await completeAndOpen(page, projectKey, gid);
+  const disp = page.getByRole("dialog");
+  const refreshed = page.waitForResponse((r) =>
+    r.url().includes(`/api/projects/${projectKey}/groups/${gid}/items`),
+  );
+  await disp.getByRole("button", { name: "确认处置" }).click();
+  await refreshed;
+  await expect(disp).toBeHidden();
+  await expect(page.getByText(/此 Sprint 已完成/)).toBeVisible();
+
+  // 重开:低显著按钮 → 确认弹窗 → 回 active
+  await page.getByRole("button", { name: /重开/ }).click();
+  const confirmDlg = page.getByRole("dialog");
+  await expect(confirmDlg).toBeVisible();
+  await expect(confirmDlg.getByText(/撤销完成态/)).toBeVisible();
+  await confirmDlg.getByRole("button", { name: "确认重开" }).click();
+  await expect(confirmDlg).toBeHidden();
+  // active 形态:完成按钮回归,历史 banner 消失
+  await expect(
+    page.getByRole("button", { name: "✓ 完成 Sprint" }),
+  ).toBeVisible();
+  await expect(page.getByText(/此 Sprint 已完成/)).toHaveCount(0);
+
+  // 再完成:组成员已处置转出(空组),无处置步(D5)直落历史
+  await page.getByRole("button", { name: "✓ 完成 Sprint" }).click();
+  await page.getByRole("button", { name: "确认完成" }).click();
+  await expect(page.getByText(/此 Sprint 已完成/)).toBeVisible();
+});
+
 test("处置覆写回 Backlog→该 item 入池,其余转入目标组", async ({
   page,
   projectKey,
