@@ -281,9 +281,11 @@ export default function SprintPage() {
   // 摘要行用:目标组名(多选时取 pick,与 confirmDisposition 落库一致)
   function targetGroupName(d: NonNullable<typeof disp>): string {
     if (d.actives.length > 0)
-      return (d.actives.find((s) => s.sprintId === d.pick) ?? d.actives[0]).name;
+      return (d.actives.find((s) => s.sprintId === d.pick) ?? d.actives[0])
+        .name;
     if (d.planned.length > 0)
-      return (d.planned.find((s) => s.sprintId === d.pick) ?? d.planned[0]).name;
+      return (d.planned.find((s) => s.sprintId === d.pick) ?? d.planned[0])
+        .name;
     return d.newName;
   }
 
