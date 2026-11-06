@@ -32,7 +32,13 @@ import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { t } from "@/lib/texts";
-import { listSprints, sprintAction } from "@/lib/sprints";
+import {
+  listSprints,
+  sprintAction,
+  assignSprint,
+  createSprint,
+  level1Type,
+} from "@/lib/sprints";
 import { AssignPopover } from "@/components/AssignPopover";
 import type { Signal } from "@/components/Verdict";
 
@@ -80,6 +86,13 @@ export default function BoardPage() {
   const [sprintPickOpen, setSprintPickOpen] = useState(false);
   const [pendingTitle, setPendingTitle] = useState("");
   const [pullOpen, setPullOpen] = useState(false);
+  // 0105:S2/S2m(activate)/S3(create)前置确认弹窗;取消=放弃创建(D6)
+  const [launchOpen, setLaunchOpen] = useState(false);
+  const [launchMode, setLaunchMode] = useState<"activate" | "create">(
+    "activate",
+  );
+  const [launchPick, setLaunchPick] = useState("");
+  const [launchName, setLaunchName] = useState("");
   const [backlogItems, setBacklogItems] = useState<Item[] | null>(null);
   const [picked, setPicked] = useState<Set<string>>(new Set());
 
@@ -158,26 +171,113 @@ export default function BoardPage() {
 
   async function addItem(e: React.FormEvent) {
     e.preventDefault();
-    if (!newTitle.trim()) return;
-    if (activeSprints.length > 1) {
-      // YPJ-56:多 active sprint 并存 → UI 选(拍板规则 3)
-      setPendingTitle(newTitle.trim());
+    if (!newTitle.trim() || loading) return; // loading 未就绪时 sprints 可能是空态,误判场景
+    const title = newTitle.trim();
+    const active = sprints.filter((s) => s.status === "active");
+    const planned = sprints.filter((s) => s.status === "planned");
+    if (active.length > 1) {
+      // S1m:多进行中组 → 用户选(归属是用户意图,不代选)
+      setPendingTitle(title);
       setSprintPickOpen(true);
       return;
     }
-    await createItem(newTitle.trim(), activeSprints[0]?.sprintId);
+    if (active.length === 1) {
+      // S1:直挂该组
+      await createInGroup(title, active[0].sprintId);
+      return;
+    }
+    if (planned.length > 0) {
+      // S2/S2m:激活并放入(确认制;取消=放弃创建,D6)
+      setPendingTitle(title);
+      setLaunchPick(planned[0].sprintId);
+      setLaunchMode("activate");
+      setLaunchOpen(true);
+      return;
+    }
+    // 0 进行中 0 计划中:S0(无 level-1 类型)或 S3(有类型无非完成态实例)——查类型区分
+    try {
+      const l1 = await level1Type(key);
+      if (!l1) {
+        // S0:无组概念,onBoard 上看板(0101 铁律);请求失败会 throw → 不静默当 S0
+        await createFree(title);
+        return;
+      }
+      // S3:新建组并激活;默认名=类型名+实例数+1,撞名递增
+      let n = sprints.length + 1;
+      while (sprints.some((s) => s.name === `${l1.name} ${n}`)) n += 1;
+      setPendingTitle(title);
+      setLaunchMode("create");
+      setLaunchName(`${l1.name} ${n}`);
+      setLaunchOpen(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "创建失败");
+    }
   }
 
-  async function createItem(title: string, sprintId?: string) {
-    // YPJ-56:无 active → 不带 sprintId(落 backlog,与看板全量显示自洽);单 active 由调用方带上
+  /** S1/S1m/S2/S3 共用:建 item 并挂入组(后端 create 同事务校验 level-1 ∧ 非 completed)。 */
+  async function createInGroup(title: string, groupId: string) {
     try {
       await api(`/api/projects/${key}/items`, {
         method: "POST",
-        body: JSON.stringify({ title, ...(sprintId ? { sprintId } : {}) }),
+        body: JSON.stringify({ title, sprintId: groupId }),
       });
       setNewTitle("");
       setSprintPickOpen(false);
       await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "创建失败");
+    }
+  }
+
+  /** 仅 S0(无组概念):建 item + onBoard 上看板(0099;无 active 时不挂组)。 */
+  async function createFree(title: string) {
+    try {
+      const created = await api<{ itemId: string }>(
+        `/api/projects/${key}/items`,
+        { method: "POST", body: JSON.stringify({ title }) },
+      );
+      await api(`/api/items/${created.itemId}/board-membership`, {
+        method: "PUT",
+        body: JSON.stringify({ onBoard: true }),
+      });
+      setNewTitle("");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "创建失败");
+    }
+  }
+
+  /** 0105:确认=S2 激活并放入 / S3 新建组+激活+放入(组先行,item 后行;激活失败降级为挂入计划中组)。 */
+  async function confirmLaunch() {
+    const title = pendingTitle;
+    setLaunchOpen(false);
+    if (launchMode === "activate") {
+      if (!launchPick) return;
+      try {
+        await sprintAction(key, launchPick, "start");
+      } catch (err) {
+        setError(err instanceof Error ? err.message : t.board.startFailed);
+      }
+      await createInGroup(title, launchPick);
+      return;
+    }
+    const name = launchName.trim();
+    if (!name) return;
+    try {
+      // 防重:同名组复用不重建(激活失败重试场景)
+      const existing = sprints.find((s) => s.name === name);
+      const gid = existing
+        ? existing.sprintId
+        : (await createSprint(key, { name, startDate: null, endDate: null }))
+            .sprintId;
+      try {
+        await sprintAction(key, gid, "start");
+      } catch (err) {
+        setError(err instanceof Error ? err.message : t.board.startFailed);
+        // 降级:新组已建但未激活,组列表已变化 → 手工补广播(sprintAction 失败不广播)
+        window.dispatchEvent(new Event("sprints-changed"));
+      }
+      await createInGroup(title, gid);
     } catch (err) {
       setError(err instanceof Error ? err.message : "创建失败");
     }
@@ -265,7 +365,7 @@ export default function BoardPage() {
             value={newTitle}
             onChange={(e) => setNewTitle(e.target.value)}
           />
-          <Button type="submit" variant="outlined">
+          <Button type="submit" variant="outlined" disabled={loading}>
             {t.board.addItem}
           </Button>
         </Stack>
@@ -579,20 +679,74 @@ export default function BoardPage() {
       )}
 
       <Dialog open={sprintPickOpen} onClose={() => setSprintPickOpen(false)}>
-        <DialogTitle>放入哪个 sprint</DialogTitle>
+        <DialogTitle>放入哪个组</DialogTitle>
         <DialogContent>
           <Stack spacing={1} sx={{ mt: 1 }}>
             {activeSprints.map((sp) => (
               <Button
                 key={sp.sprintId}
                 variant="outlined"
-                onClick={() => createItem(pendingTitle, sp.sprintId)}
+                onClick={() => createInGroup(pendingTitle, sp.sprintId)}
               >
                 {sp.name}
               </Button>
             ))}
           </Stack>
         </DialogContent>
+      </Dialog>
+      {/* 0105 S2/S2m/S3:创建前置确认——激活并放入/新建并激活;取消=放弃创建(D6) */}
+      <Dialog open={launchOpen} onClose={() => setLaunchOpen(false)}>
+        <DialogTitle>
+          {launchMode === "activate" &&
+          sprints.filter((s) => s.status === "planned").length > 1
+            ? t.board.launchPickTitle
+            : t.board.launchTitle}
+        </DialogTitle>
+        <DialogContent>
+          {launchMode === "create" ? (
+            <TextField
+              label={t.board.newGroupName}
+              value={launchName}
+              onChange={(e) => setLaunchName(e.target.value)}
+              autoFocus
+              fullWidth
+              sx={{ mt: 1 }}
+            />
+          ) : sprints.filter((s) => s.status === "planned").length > 1 ? (
+            <Stack spacing={1} sx={{ mt: 1 }}>
+              {sprints
+                .filter((s) => s.status === "planned")
+                .map((sp) => (
+                  <Button
+                    key={sp.sprintId}
+                    variant={
+                      launchPick === sp.sprintId ? "contained" : "outlined"
+                    }
+                    onClick={() => setLaunchPick(sp.sprintId)}
+                  >
+                    {sp.name}
+                  </Button>
+                ))}
+            </Stack>
+          ) : (
+            <Typography>
+              {t.board.launchBody.replace(
+                "{name}",
+                sprints.find((s) => s.status === "planned")?.name ?? "",
+              )}
+            </Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setLaunchOpen(false)}>
+            {t.board.launchCancel}
+          </Button>
+          <Button variant="contained" onClick={confirmLaunch}>
+            {launchMode === "create"
+              ? t.board.launchCreateConfirm
+              : t.board.launchConfirm}
+          </Button>
+        </DialogActions>
       </Dialog>
       <Dialog
         open={pullOpen}

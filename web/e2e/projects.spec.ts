@@ -16,7 +16,7 @@ test("建项目表单——创建并进入看板(根页=看板) @smoke", async (
   await expect(page).toHaveURL(new RegExp(`/p/${projectKey}P$`));
   // spec 0101 案B:无组 → 中性文案,不出现 sprint 字样
   await expect(
-    page.getByText("项目未配置组——以下显示全部非终态 item"),
+    page.getByText("项目未配置组——以下显示不在 Backlog 中的 item"),
   ).toBeVisible();
   await expect(page.getByRole("button", { name: "拉入看板" })).toBeVisible();
   // spec 0101:新项目无 level-1 类型 → 侧栏无 Sprint 段(标题/+ 按钮均不渲染)

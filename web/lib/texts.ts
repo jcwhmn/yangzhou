@@ -65,7 +65,7 @@ export const t = {
     addItem: "新建 item",
     dropHere: "拖到这里",
     moveFailed: "迁移失败",
-    noGroups: "项目未配置组——以下显示全部非终态 item",
+    noGroups: "项目未配置组——以下显示不在 Backlog 中的 item",
     noActiveSprint:
       "当前无进行中 sprint,以下显示不在 Backlog 中的 item(已完成/已规划)",
     pullItem: "拉入看板",
@@ -77,6 +77,13 @@ export const t = {
     startFailed: "激活失败",
     detail: "详情",
     refresh: "刷新",
+    launchTitle: "项目还没有进行中的组",
+    launchBody: "要激活「{name}」吗?激活后新建的 item 将放入该组。",
+    launchPickTitle: "要激活哪个组?(激活后新建的 item 将放入)",
+    launchConfirm: "激活并放入",
+    launchCancel: "取消",
+    launchCreateConfirm: "创建并激活",
+    newGroupName: "组名",
   },
   item: {
     title: "标题",
@@ -117,6 +124,10 @@ export const t = {
       sprint: "← 返回 Sprint",
       search: "← 返回搜索",
     },
+    launchAskTitle: "现在激活该组?",
+    launchAsk: "已挂入「{name}」——项目还没有进行中的组,要现在激活它吗?",
+    launchConfirm: "激活",
+    launchLater: "暂不",
   },
   caps: {
     title: "我的能力",
@@ -479,6 +490,9 @@ export const t = {
     count: "item 数",
   },
   sprintPage: {
+    dispPickTitle: "转入哪个组?",
+    dispConfirm: "确认处置",
+    dispCancel: "取消处置",
     startBtn: "▶ 开始 Sprint",
     completeBtn: "✓ 完成 Sprint",
   },

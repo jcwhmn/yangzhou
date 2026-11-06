@@ -1,9 +1,11 @@
 "use client";
 
 import {
+  Box,
   Button,
   Chip,
   Checkbox,
+  TextField,
   Dialog,
   DialogActions,
   DialogContent,
@@ -35,6 +37,8 @@ import {
   getSprint,
   sprintAction,
   assignSprint,
+  createSprint,
+  level1Type,
 } from "@/lib/sprints";
 import { AssignPopover } from "@/components/AssignPopover";
 import { SignalChip, type Signal } from "@/components/Verdict";
@@ -100,6 +104,15 @@ export default function SprintPage() {
   const [confirmFlow, setConfirmFlow] = useState<null | "start" | "complete">(
     null,
   );
+  // 0106:组完成后的非终态成员处置(rows 默认全转入目标组,逐行可覆写回 Backlog;D2/D3)
+  const [disp, setDisp] = useState<null | {
+    rows: { itemId: string; title: string; toBacklog: boolean }[];
+    actives: Sprint[];
+    planned: Sprint[];
+    l1Name: string;
+    pick: string;
+    newName: string;
+  }>(null);
   // YPJ-73:图表视图切换(燃専数据不足时显示空态而非整块消失)
   const [chartView, setChartView] = useState<
     "burndown" | "byStatus" | "byAssignee"
@@ -141,8 +154,7 @@ export default function SprintPage() {
         status === "completed" ? "complete" : "start",
       );
       setSprint(s);
-      // YPJ-74:通知 sidebar 重拉 sprints(状态/排序即时同步)
-      window.dispatchEvent(new Event("sprints-changed"));
+      // YPJ-74:sidebar 重拉由 sprintAction 内部广播(0105 收口)
     } catch (e) {
       setError(e instanceof Error ? e.message : "更新失败");
     }
@@ -164,6 +176,96 @@ export default function SprintPage() {
   async function doComplete() {
     await changeStatus("completed");
     setConfirmFlow(null);
+    // 0106:组先行——迁移落定后,非终态成员进处置(无则现状结束)
+    const nonFinal = (items ?? []).filter(
+      (it) =>
+        statuses.find((st) => st.name === it.status)?.statusType !== "FINAL",
+    );
+    if (nonFinal.length === 0) return;
+    const others = allSprints.filter((s) => s.sprintId !== id);
+    const actives = others.filter((s) => s.status === "active");
+    const planned = others.filter((s) => s.status === "planned");
+    let l1Name = "Sprint";
+    try {
+      l1Name = (await level1Type(key))?.name ?? l1Name;
+    } catch {
+      /* 无类型极端:谓词天然收容 Backlog,弹窗仍可全回 Backlog */
+    }
+    let n = allSprints.length + 1; // 含本组:新建的是「下一号」
+    while (allSprints.some((s) => s.name === `${l1Name} ${n}`)) n += 1;
+    setDisp({
+      rows: nonFinal.map((it) => ({
+        itemId: it.itemId,
+        title: it.title,
+        toBacklog: false,
+      })),
+      actives,
+      planned,
+      l1Name,
+      pick: (actives[0] ?? planned[0])?.sprintId ?? "",
+      newName: `${l1Name} ${n}`,
+    });
+  }
+
+  /** 0106:确认处置——目标组解析(0105 决策树)→ 逐行落归属(非原子,失败收集名单)。 */
+  async function confirmDisposition() {
+    if (!disp || busy) return;
+    const rows = disp.rows;
+    const { actives, planned, pick } = disp;
+    setBusy(true); // 处置完成前保持弹窗开(防导航/重复提交打断逐个 PUT)
+    let target: string | null = null;
+    try {
+      if (actives.length > 0) {
+        target = pick || actives[0].sprintId;
+      } else if (planned.length === 1) {
+        await sprintAction(key, planned[0].sprintId, "start");
+        target = planned[0].sprintId;
+      } else if (planned.length > 1) {
+        await sprintAction(key, pick, "start");
+        target = pick;
+      } else {
+        const name = disp.newName.trim() || `${disp.l1Name} 1`;
+        const existing = allSprints.find((s) => s.name === name);
+        target = (
+          existing ??
+          (await createSprint(key, { name, startDate: null, endDate: null }))
+        ).sprintId;
+        try {
+          await sprintAction(key, target, "start");
+        } catch (err) {
+          setError(err instanceof Error ? err.message : t.board.startFailed);
+        }
+      }
+    } catch (err) {
+      // 目标组未就绪 → 未处置成员落 Backlog 兜底(组已完成,合法)
+      setError(err instanceof Error ? err.message : t.board.startFailed);
+      return;
+    }
+    const l1 = await level1Type(key);
+    if (!l1) return;
+    const failed: string[] = [];
+    for (const r of rows) {
+      try {
+        await api(`/api/items/${r.itemId}/group-membership`, {
+          method: "PUT",
+          body: JSON.stringify(
+            r.toBacklog
+              ? { groupId: null, groupType: l1.typeKey }
+              : { groupId: target },
+          ),
+        });
+      } catch {
+        failed.push(r.title);
+      }
+    }
+    if (failed.length > 0) {
+      setError(
+        `处置失败 ${failed.length} 个(留本组历史行,可手动处理):${failed.join("、")}`,
+      );
+    }
+    setItems(await api<Item[]>(`/api/projects/${key}/groups/${id}/items`));
+    setDisp(null);
+    setBusy(false);
   }
 
   // spec 0097 S3:按钮 = 当前状态出边(backward 仅 CLI/API 可及,UI 现状一致)
@@ -549,7 +651,7 @@ export default function SprintPage() {
               <Typography>
                 {confirmFlow === "start"
                   ? `项目已有进行中的 Sprint「${allSprints.find((s) => s.status === "active" && s.sprintId !== id)?.name ?? ""}」,允许同时存在多个进行中。仍要开始本 Sprint?`
-                  : `未完成的 ${(items ?? []).filter((it) => !(statuses.find((st) => st.name === it.status)?.statusType === "FINAL")).length} 个 item 将回到 Backlog 供重新规划;已完成 item 保留在本页历史。`}
+                  : `完成后,${(items ?? []).filter((it) => !(statuses.find((st) => st.name === it.status)?.statusType === "FINAL")).length} 个未完成 item 将进入处置(选定去向);已完成 item 保留在本页历史。`}
               </Typography>
             </DialogContent>
             <DialogActions>
@@ -559,6 +661,105 @@ export default function SprintPage() {
                 onClick={confirmFlow === "start" ? doStart : doComplete}
               >
                 {confirmFlow === "start" ? "仍要开始" : "确认完成"}
+              </Button>
+            </DialogActions>
+          </Dialog>
+          {/* 0106:非终态成员处置——目标组决策树 + 逐行覆写回 Backlog(D2/D3) */}
+          <Dialog open={disp !== null} maxWidth="sm" fullWidth>
+            <DialogTitle>
+              完成「{sprint?.name ?? ""}」——{disp?.rows.length ?? 0} 个未完成
+              item 待处置
+            </DialogTitle>
+            <DialogContent>
+              <Typography sx={{ mt: 1, mb: 1, fontWeight: 600 }}>
+                {disp && disp.actives.length > 1
+                  ? t.sprintPage.dispPickTitle
+                  : disp && disp.actives.length === 1
+                    ? `转入进行中的「${disp.actives[0].name}」`
+                    : disp && disp.planned.length === 1
+                      ? `将激活计划中的「${disp.planned[0].name}」并转入`
+                      : disp && disp.planned.length > 1
+                        ? t.sprintPage.dispPickTitle
+                        : disp
+                          ? `将新建组「${disp.newName}」并激活,转入`
+                          : ""}
+              </Typography>
+              {disp && (disp.actives.length > 1 || disp.planned.length > 1) && (
+                <Stack spacing={1} sx={{ mb: 1 }}>
+                  {[...disp.actives, ...disp.planned].map((sp) => (
+                    <Button
+                      key={sp.sprintId}
+                      variant={
+                        disp.pick === sp.sprintId ? "contained" : "outlined"
+                      }
+                      onClick={() => setDisp({ ...disp, pick: sp.sprintId })}
+                    >
+                      {sp.name}
+                    </Button>
+                  ))}
+                </Stack>
+              )}
+              {disp &&
+                disp.actives.length === 0 &&
+                disp.planned.length === 0 && (
+                  <TextField
+                    label={t.board.newGroupName}
+                    value={disp.newName}
+                    onChange={(e) =>
+                      setDisp({ ...disp, newName: e.target.value })
+                    }
+                    fullWidth
+                    sx={{ mb: 1 }}
+                  />
+                )}
+              {disp?.rows.map((r, idx) => (
+                <Box
+                  key={r.itemId}
+                  sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                >
+                  <Box
+                    sx={{
+                      flex: 1,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
+                    {r.title}
+                  </Box>
+                  <Typography variant="body2" color="text.secondary">
+                    {r.toBacklog ? "回 Backlog" : "转入目标组"}
+                  </Typography>
+                  <Checkbox
+                    edge="end"
+                    inputProps={{ "aria-label": `回Backlog ${r.title}` }}
+                    checked={r.toBacklog}
+                    onChange={() =>
+                      setDisp({
+                        ...disp,
+                        rows: disp.rows.toSpliced(idx, 1, {
+                          ...r,
+                          toBacklog: !r.toBacklog,
+                        }),
+                      })
+                    }
+                  />
+                </Box>
+              ))}
+              <Typography variant="body2" color="text.secondary">
+                勾选 = 回 Backlog;未勾选 = 转入目标组。取消处置则全部回
+                Backlog,可稍后手动处理。
+              </Typography>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setDisp(null)}>
+                {t.sprintPage.dispCancel}
+              </Button>
+              <Button
+                variant="contained"
+                onClick={confirmDisposition}
+                disabled={busy}
+              >
+                {t.sprintPage.dispConfirm}
               </Button>
             </DialogActions>
           </Dialog>
