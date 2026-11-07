@@ -326,21 +326,17 @@ class ItemGroupApiTest : AbstractApiTest() {
         val g = createGroup(authed, "GRP", mapOf("typeKey" to "phase", "name" to "设计期"))
         assertEquals("planned", g["status"].asText())
         val gid = g["groupId"].asText()
-        assertEquals("active", json.readTree(action(authed, "GRP", gid, "switch").responseBody!!)["status"].asText())
-        assertEquals("completed", json.readTree(action(authed, "GRP", gid, "switch").responseBody!!)["status"].asText())
-        assertEquals("planned", json.readTree(action(authed, "GRP", gid, "switch").responseBody!!)["status"].asText())
-
-        // 非空自定义组删除 = 级联(membership + 留痕)
+        // spec 0111:phase 自底向上拿 level=2 = 父层——禁手动动作、禁挂 item(0056 平面自定义组语义在两层世界里收窄为父层语义)
+        assertEquals(409, action(authed, "GRP", gid, "switch").status.value())
         val item = createItem(authed, "GRP", "y")["itemId"].asText()
-        assign(authed, item, gid, "phase")
+        assertEquals(409, assign(authed, item, gid, "phase").status.value())
+        // 空父层组可删
         authed
             .delete()
             .uri("/api/projects/GRP/groups/$gid")
             .exchange()
             .expectStatus()
             .isNoContent()
-        val removed = json.readTree(assign(authed, item, null, "phase").responseBody!!)
-        assertTrue(removed["sprintId"].isNull)
 
         // spec 0100 切片B:sprint 非内建,空类型即可删;builtin release 仍不可删
         authed

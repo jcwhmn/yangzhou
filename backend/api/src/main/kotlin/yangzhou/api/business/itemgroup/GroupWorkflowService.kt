@@ -104,6 +104,18 @@ class GroupWorkflowService(
     /** FINAL 态名集(如 sprint={completed}, release={released})——membership「历史不可变」判定用。 */
     fun finalStatusNames(type: ItemGroupType): Set<String> = groupStatuses.findByGroupTypeIdOrderByPosition(type.id!!).filter { it.statusType == StatusType.FINAL }.map { it.name }.toSet()
 
+    /** spec 0111:状态名 → statusType(不在类型 workflow 内 → null,联动推导用)。 */
+    fun statusType(
+        type: ItemGroupType,
+        statusName: String,
+    ): StatusType? = groupStatuses.findByGroupTypeIdAndName(type.id!!, statusName)?.statusType
+
+    /** spec 0111:类型 workflow 中首个指定 statusType 的状态名(缺 → null)。 */
+    fun statusNameByType(
+        type: ItemGroupType,
+        wanted: StatusType,
+    ): String? = groupStatuses.findByGroupTypeIdOrderByPosition(type.id!!).firstOrNull { it.statusType == wanted }?.name
+
     // ---------- 动作(白名单) ----------
 
     /** 当前状态出边含此 function → 意图校验(§3.6 注册表)后返回目标状态名;无匹配出边 → 409。 */

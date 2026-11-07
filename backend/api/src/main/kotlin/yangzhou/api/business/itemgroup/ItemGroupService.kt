@@ -11,6 +11,7 @@ import yangzhou.api.guard.LeaderGuard
 import yangzhou.persistence.ItemGroup
 import yangzhou.persistence.ItemGroupMember
 import yangzhou.persistence.ItemGroupType
+import yangzhou.persistence.StatusType
 import yangzhou.persistence.repository.ItemGroupMemberHistoryRepository
 import yangzhou.persistence.repository.ItemGroupMemberRepository
 import yangzhou.persistence.repository.ItemGroupRepository
@@ -66,6 +67,8 @@ class ItemGroupService(
         val status: String,
         val startDate: String? = null,
         val endDate: String? = null,
+        /** spec 0111:父组(level-2)公开 ID;叶层组可带,父层组恒 null。 */
+        val parentGroupId: UUID? = null,
     )
 
     data class CreateGroupRequest(
@@ -73,6 +76,8 @@ class ItemGroupService(
         val name: String?,
         val startDate: String? = null,
         val endDate: String? = null,
+        /** spec 0111:仅叶层(level-1)组可挂;父组类型须 level=2 且自身无父(固定两层)。 */
+        val parentGroupId: String? = null,
     )
 
     data class UpdateGroupRequest(
@@ -107,6 +112,7 @@ class ItemGroupService(
         status = status,
         startDate = startDate?.toString(),
         endDate = endDate?.toString(),
+        parentGroupId = parentObjectId,
     )
 
     private fun parseDate(
@@ -235,16 +241,19 @@ class ItemGroupService(
         key: String,
         typeKey: String?,
         level: Int? = null,
+        parentId: UUID? = null,
     ): List<GroupDto> {
         val pid = project(key).objectId!!
         val all = groups.findByProjectObjectIdOrderByCreatedAt(pid)
         val byType = if (typeKey == null) all else all.filter { it.type == typeKey }
-        val filtered =
+        val byLevel =
             if (level == null) {
                 byType
             } else {
                 byType.filter { it.type == types.findByProjectObjectIdAndLevel(pid, level)?.typeKey }
             }
+        // spec 0111:按父组过滤(固定两层树;树形组装由前端完成)
+        val filtered = if (parentId == null) byLevel else byLevel.filter { it.parentObjectId == parentId }
         return filtered.map { it.toDto() }
     }
 
@@ -259,6 +268,22 @@ class ItemGroupService(
                 ?: throw BadRequestException("typeKey 必填")
         val t = typeOf(key, typeKey)
         val name = request.name?.trim().takeUnless { it.isNullOrEmpty() } ?: throw BadRequestException("name 必填")
+        // spec 0111:固定两层——仅叶层(level-1)组可挂父;父组类型 level=2 且自身无父
+        val parent =
+            request.parentGroupId?.let { raw ->
+                if (t.level != 1) throw BadRequestException("仅叶层(level-1)组可挂父组")
+                val id =
+                    try {
+                        UUID.fromString(raw)
+                    } catch (_: IllegalArgumentException) {
+                        throw BadRequestException("parentGroupId 不合法:" + raw)
+                    }
+                val pid = project(key).objectId!!
+                val pg = groups.findByProjectObjectIdAndObjectId(pid, id) ?: throw NotFoundException("父组不存在")
+                if (typeOf(key, pg.type).level != 2) throw BadRequestException("父组类型层级须为 2")
+                if (pg.parentObjectId != null) throw BadRequestException("父组不可再挂父组(固定两层)")
+                pg
+            }
         val saved =
             groups.save(
                 ItemGroup(
@@ -268,6 +293,7 @@ class ItemGroupService(
                     status = workflow.startStatusName(t), // 初始态 = 类型 workflow 的 START
                     startDate = parseDate(request.startDate, "startDate"),
                     endDate = parseDate(request.endDate, "endDate"),
+                    parentObjectId = parent?.objectId,
                 ),
             )
         return saved.toDto()
@@ -317,6 +343,10 @@ class ItemGroupService(
     ) {
         leaderGuard.requireLeader(key)
         val g = findGroup(key, groupId)
+        // spec 0111:父组含子组不可删(先删子组)
+        if (g.objectId != null && groups.findAllByProjectObjectIdAndParentObjectId(g.projectObjectId, g.objectId).isNotEmpty()) {
+            throw ConflictException("组含子组,请先删除子组")
+        }
         if (membershipIsHistory(key, g.type) && memberships.existsByGroupObjectId(g.objectId!!)) {
             throw ConflictException("组非空,请先移出 items")
         }
@@ -326,6 +356,7 @@ class ItemGroupService(
             memberships.delete(m)
         }
         groups.delete(g)
+        propagateParent(g) // spec 0111:删子组后联动重算父组状态
     }
 
     // ---------- 动作(spec 0097:组状态变更白名单) ----------
@@ -341,14 +372,44 @@ class ItemGroupService(
         leaderGuard.requireLeader(key)
         val g = findGroup(key, groupId)
         val t = typeOf(key, g.type)
+        // spec 0111:父层(level-2)组状态由子组联动推导,不开放手动动作
+        if (t.level == 2) throw ConflictException("父层组状态由子组联动,不支持手动动作")
         val target = workflow.applyAction(t, g.status, function)
         val saved = groups.save(g.copy(status = target, updatedAt = Instant.now())).toDto()
         // spec 0110(YPJ-159):完成 + 处置同一事务——迁移已落库后逐行 replaceMembership,失败整体回滚(含状态迁移)
         if (function == "complete" && request != null && request.dispositions.isNotEmpty()) {
             applyDispositions(g, request.dispositions)
         }
+        propagateParent(g.copy(status = target))
         return saved
     }
+
+    /** spec 0111:子组动作/删除后联动父组状态(同事务)。任一子 ACTIVE→父 ACTIVE;全子 FINAL→父 FINAL;有子其余→父 START;无子不动。状态名经父组类型 workflow 按 statusType 解析,不写字面量。 */
+    private fun propagateParent(child: ItemGroup) {
+        val pid = child.projectObjectId
+        val parentObjectId = child.parentObjectId ?: return
+        val parent = groups.findByProjectObjectIdAndObjectId(pid, parentObjectId) ?: return
+        val children = groups.findAllByProjectObjectIdAndParentObjectId(pid, parentObjectId)
+        if (children.isEmpty()) return
+        val childStatusTypes = children.map { c -> workflow.statusType(typeOfPid(pid, c.type), c.status) }
+        val wanted =
+            when {
+                childStatusTypes.any { it == StatusType.ACTIVE } -> StatusType.ACTIVE
+                childStatusTypes.all { it == StatusType.FINAL } -> StatusType.FINAL
+                else -> StatusType.START
+            }
+        val parentType = typeOfPid(pid, parent.type)
+        println("DBG propagate pid=$pid parent=$parentObjectId children=" + children.size + " wanted=$wanted parentStatus=" + parent.status)
+        if (workflow.statusType(parentType, parent.status) == wanted) return
+        val targetName = workflow.statusNameByType(parentType, wanted) ?: return
+        groups.save(parent.copy(status = targetName, updatedAt = Instant.now()))
+    }
+
+    /** 内部不变式口径(pid 版 typeOf);类型缺失即数据破损,error。 */
+    private fun typeOfPid(
+        pid: UUID,
+        typeKey: String,
+    ): ItemGroupType = types.findByProjectObjectIdAndTypeKey(pid, typeKey) ?: error("group 类型不存在:" + typeKey)
 
     /** spec 0110:完成组处置计划落库。itemId=item 公开 ID(=objectId);targetGroupId=null 回池。 */
     private fun applyDispositions(
@@ -444,6 +505,8 @@ class ItemGroupService(
                     ?: throw BadRequestException("groupType 必填(groupId 为空时)")
         }
         val t = types.findByProjectObjectIdAndTypeKey(item.projectObjectId, typeKey) ?: throw NotFoundException("group 类型不存在:$typeKey")
+        // spec 0111:item 只挂叶层组,父层组(level=2)不直接持有 item
+        if (t.level == 2) throw ConflictException("父层组不直接挂 item,item 挂叶层组")
         val finalNames = workflow.finalStatusNames(t)
 
         val rows = memberships.findByItemObjectIdIn(listOf(item.objectId!!))
