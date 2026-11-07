@@ -13,6 +13,7 @@ import {
   ListItemButton,
   ListItemText,
   ListSubheader,
+  MenuItem,
   Stack,
   TextField,
   Typography,
@@ -23,7 +24,11 @@ import { usePathname, useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api, API_BASE } from "@/lib/api";
 import { t } from "@/lib/texts";
-import { listSprints, createSprint as createSprintApi } from "@/lib/sprints";
+import {
+  listGroupTree,
+  createSprint as createSprintApi,
+  type GroupTree,
+} from "@/lib/sprints";
 import {
   MilestoneManager,
   type Milestone,
@@ -79,6 +84,11 @@ export default function ProjectLayout({
   const [releases, setReleases] = useState<Release[]>([]);
   const [relOpen, setRelOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  // spec 0112:两级树——null = 平面模式(无 level-2 类型,现状);expanded = 用户手动开合的父层组集合
+  const [tree, setTree] = useState<GroupTree | null>(null);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [currentParentId, setCurrentParentId] = useState<string | null>(null);
+  const [parentPick, setParentPick] = useState<string>("");
   const [name, setName] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -97,15 +107,48 @@ export default function ProjectLayout({
 
   const loadSprints = () => {
     // CI 冷 JVM 偶发连接重置(status -1):失败隔 1s 重试一次
-    listSprints(key)
+    const apply = (t: GroupTree) => {
+      if (t.parents.length === 0) {
+        // 平面模式(无 level-2):orphans = 全部 level-1 组,现状渲染
+        setTree(null);
+        setSprints([...t.parents, ...t.orphans]);
+        return;
+      }
+      setTree(t);
+      setSprints(t.orphans);
+      // 当前 epic:active 父层优先 → localStorage 记忆(关掉最后一个 active 子组后新建仍落本 epic)→ 无
+      const active = t.parents.find((p) => p.status === "active");
+      let cur = active?.sprintId ?? null;
+      if (!cur && typeof window !== "undefined") {
+        try {
+          cur = window.localStorage.getItem(`yz-current-parent:${key}`);
+        } catch {
+          /* 隐私模式等:忽略 */
+        }
+      }
+      setCurrentParentId(cur);
+      if (cur && typeof window !== "undefined") {
+        try {
+          window.localStorage.setItem(`yz-current-parent:${key}`, cur);
+        } catch {
+          /* 忽略 */
+        }
+      }
+      // 展开态:active 父层默认展开(仅加入不移除,保留用户手动开合)
+      if (active) setExpanded((prev) => new Set(prev).add(active.sprintId));
+    };
+    listGroupTree(key)
       .catch(
         () =>
-          new Promise<Sprint[]>((res) =>
-            setTimeout(() => res(listSprints(key)), 1000),
+          new Promise<GroupTree>((res) =>
+            setTimeout(() => res(listGroupTree(key)), 1000),
           ),
       )
-      .then(setSprints)
-      .catch(() => setSprints([]));
+      .then(apply)
+      .catch(() => {
+        setTree(null);
+        setSprints([]);
+      });
     api<GroupTypeLite[]>(`/api/projects/${key}/group-types`)
       .then((ts) => setL1(ts.find((tp) => tp.level === 1) ?? null))
       .catch(() => setL1(null));
@@ -179,6 +222,7 @@ export default function ProjectLayout({
         name,
         startDate: startDate || null,
         endDate: endDate || null,
+        parentGroupId: parentPick || null, // spec 0112:默认当前 epic,可改
       });
       setCreateOpen(false);
       setName("");
@@ -199,6 +243,26 @@ export default function ProjectLayout({
   );
 
   const itemSx = { py: 0.5 };
+
+  // spec 0112:叶层组行(树内缩进 / 平面区无缩进,样式与导航逻辑同现状)
+  const sprintRow = (s: Sprint, indent = false) => (
+    <ListItemButton
+      key={s.sprintId}
+      component={Link}
+      href={`/p/${key}/sprint/${s.sprintId}`}
+      selected={pathname === `/p/${key}/sprint/${s.sprintId}`}
+      sx={{ ...itemSx, ...(indent ? { pl: 4 } : {}) }}
+    >
+      <ListItemText
+        primary={s.name}
+        secondary={
+          t.projectNav.sprintStatus[
+            s.status as keyof typeof t.projectNav.sprintStatus
+          ] ?? s.status
+        }
+      />
+    </ListItemButton>
+  );
 
   async function exportXlsx(projectKey: string) {
     const token = localStorage.getItem("yz-token");
@@ -365,7 +429,11 @@ export default function ProjectLayout({
                 <IconButton
                   size="small"
                   aria-label={`新建 ${l1.name}`}
-                  onClick={() => setCreateOpen(true)}
+                  onClick={() => {
+                    // spec 0112:父层选择器默认「当前 epic」(active → localStorage → 无)
+                    setParentPick(currentParentId ?? "");
+                    setCreateOpen(true);
+                  }}
                 >
                   <AddIcon fontSize="small" />
                 </IconButton>
@@ -381,24 +449,46 @@ export default function ProjectLayout({
                   />
                 </ListItemButton>
               )}
-              {sorted.map((s) => (
-                <ListItemButton
-                  key={s.sprintId}
-                  component={Link}
-                  href={`/p/${key}/sprint/${s.sprintId}`}
-                  selected={pathname === `/p/${key}/sprint/${s.sprintId}`}
-                  sx={itemSx}
-                >
-                  <ListItemText
-                    primary={s.name}
-                    secondary={
-                      t.projectNav.sprintStatus[
-                        s.status as keyof typeof t.projectNav.sprintStatus
-                      ] ?? s.status
-                    }
-                  />
-                </ListItemButton>
-              ))}
+              {tree ? (
+                <>
+                  {tree.parents.map((p) => {
+                    const kids = tree.childrenByParent[p.sprintId] ?? [];
+                    // spec 0112:空父层组无 +/− 前缀且不响应点击;其余点行开合
+                    const toggle = () =>
+                      setExpanded((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(p.sprintId)) next.delete(p.sprintId);
+                        else next.add(p.sprintId);
+                        return next;
+                      });
+                    const open = expanded.has(p.sprintId);
+                    return (
+                      <Box key={p.sprintId}>
+                        <ListItemButton
+                          onClick={kids.length > 0 ? toggle : undefined}
+                          sx={itemSx}
+                        >
+                          <ListItemText
+                            primary={
+                              (kids.length === 0 ? "" : open ? "− " : "+ ") +
+                              p.name
+                            }
+                            secondary={
+                              t.projectNav.sprintStatus[
+                                p.status as keyof typeof t.projectNav.sprintStatus
+                              ] ?? p.status
+                            }
+                          />
+                        </ListItemButton>
+                        {open && kids.map((s) => sprintRow(s, true))}
+                      </Box>
+                    );
+                  })}
+                  {tree.orphans.map((s) => sprintRow(s))}
+                </>
+              ) : (
+                sorted.map((s) => sprintRow(s))
+              )}
             </>
           )}
           {flags?.milestone !== false && (
@@ -535,6 +625,22 @@ export default function ProjectLayout({
               value={endDate}
               onChange={setEndDate}
             />
+            {(tree?.parents.length ?? 0) > 0 && (
+              <TextField
+                select
+                size="small"
+                label={`所属${tree?.parentTypeName ?? ""}`}
+                value={parentPick}
+                onChange={(e) => setParentPick(e.target.value)}
+              >
+                <MenuItem value="">无</MenuItem>
+                {tree!.parents.map((p) => (
+                  <MenuItem key={p.sprintId} value={p.sprintId}>
+                    {p.name}
+                  </MenuItem>
+                ))}
+              </TextField>
+            )}
             {error && (
               <Typography color="error" variant="body2">
                 {error}
