@@ -1,5 +1,5 @@
 // 0106:组完成时未完成 item 处置——Done 留组;非终态按 0105 决策树进目标组,可覆写回 Backlog
-// 先完成组(组先行),处置弹窗列出非终态成员;取消处置=全部落 Backlog 兜底
+// 先完成组(组先行),处置弹窗列出非终态成员;0109:进「组名」/进 Backlog(显式回池落库)
 import { expect, test } from "./support/fixtures";
 import {
   apiAssignMe,
@@ -85,7 +85,7 @@ test("完成组→处置弹窗列出非终态成员(Done 不列),默认全转入
   const refreshed = page.waitForResponse((r) =>
     r.url().includes(`/api/projects/${projectKey}/groups/${doneGid}/items`),
   );
-  await dialog.getByRole("button", { name: "确认处置" }).click();
+  await dialog.getByRole("button", { name: "进「接盘B」" }).click();
   await refreshed;
   await expect(dialog).toBeHidden();
   // 目标组看板可见转入的 item;Done 留在冲刺A 历史行
@@ -93,7 +93,10 @@ test("完成组→处置弹窗列出非终态成员(Done 不列),默认全转入
   await expect(page.getByText("待办成员")).toBeVisible();
   await expect(page.getByText("进行中成员")).toBeVisible();
   await page.goto(`/p/${projectKey}/sprint/${doneGid}`);
+  // 0109 缺口断言:完成组页只显示 Done 成员,被转出的非终态成员不再出现
   await expect(page.getByText("终态成员")).toBeVisible();
+  await expect(page.getByText("待办成员")).toHaveCount(0);
+  await expect(page.getByText("进行中成员")).toHaveCount(0);
 });
 
 // 0108:重开 = 撤销内部收尾判断(timed 模板 completed→active;确认制;纯状态迁移)
@@ -109,7 +112,8 @@ test("重开组——completed 回 active 可拉入,再完成走现行确认(010
   const refreshed = page.waitForResponse((r) =>
     r.url().includes(`/api/projects/${projectKey}/groups/${gid}/items`),
   );
-  await disp.getByRole("button", { name: "确认处置" }).click();
+  // 0109:无其它组 → 主按钮=进「新建组名」(内插名),用前缀匹配
+  await disp.getByRole("button", { name: /进「/ }).click();
   await refreshed;
   await expect(disp).toBeHidden();
   await expect(page.getByText(/此 Sprint 已完成/)).toBeVisible();
@@ -155,7 +159,7 @@ test("处置覆写回 Backlog→该 item 入池,其余转入目标组", async ({
   await expect(
     dialog.getByText(/将转入「接盘B2」 1 个;回 Backlog 1 个/),
   ).toBeVisible();
-  await dialog.getByRole("button", { name: "确认处置" }).click();
+  await dialog.getByRole("button", { name: "进「接盘B2」" }).click();
   await expect(dialog).toBeHidden();
 
   // 转入项在目标组看板;回池项在 Backlog
@@ -176,13 +180,13 @@ test("S3 型目标:完成组时无进行中/计划中→弹窗默认新建名→
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
   await expect(dialog.getByText(/将新建组「Sprint 2」并激活/)).toBeVisible();
-  await dialog.getByRole("button", { name: "确认处置" }).click();
+  await dialog.getByRole("button", { name: "进「Sprint 2」" }).click();
   await expect(dialog).toBeHidden();
   await page.goto(`/p/${projectKey}`);
   await expect(page.getByText("遗孤 item")).toBeVisible();
 });
 
-test("取消处置→非终态成员全部落 Backlog(兜底)", async ({
+test("进 Backlog→非终态成员显式回池落库(0109),完成组页仅 Done", async ({
   page,
   projectKey,
 }) => {
@@ -191,11 +195,14 @@ test("取消处置→非终态成员全部落 Backlog(兜底)", async ({
   await completeAndOpen(page, projectKey, gid);
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
-  await dialog.getByRole("button", { name: "取消处置" }).click();
+  await dialog.getByRole("button", { name: "进 Backlog" }).click();
   await expect(dialog).toBeHidden();
 
   await page.goto(`/p/${projectKey}/backlog`);
   await expect(page.getByText("兜底 item")).toBeVisible();
+  // 0109:完成组页不再显示已回池的非终态成员
+  await page.goto(`/p/${projectKey}/sprint/${gid}`);
+  await expect(page.getByText("兜底 item")).toHaveCount(0);
 });
 
 test("无非终态成员→现行确认框,无处置步", async ({ page, projectKey }) => {

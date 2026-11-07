@@ -91,7 +91,7 @@ test("V12-S3 Sprint 全链路——建/指派/开始/完成/backlog/历史 @smok
     (r) =>
       r.url().includes("/group-membership") && r.request().method() === "PUT",
   );
-  await disp.getByRole("button", { name: "确认处置" }).click();
+  await disp.getByRole("button", { name: "进「Sprint 2」" }).click();
   await moved;
   await expect(disp).toBeHidden();
 
