@@ -82,3 +82,12 @@ create index ix_item_group_parent on item_group(parent_object_id);
 ## 五、验收(YPJ-111)
 
 - V53 迁移 + 实体/DTO/API 改动 + 联动逻辑,集成测试绿(建树/联动三规则/无子不动/409 群/membership 拒绝),`gradle build` + `integrationTest` 绿;entities.puml 同步;api.http 补样例。
+## 六、As-built(2026-11-11,PR #194 合入)
+
+- 迁移 V53:`item_group.parent_object_id` 自引用 FK + `ix_item_group_parent`。
+- 实体 `ItemGroup.parentObjectId`;`ItemGroupRepository.findAllByProjectObjectIdAndParentObjectId`。
+- 服务:`GroupDto.parentGroupId` / `CreateGroupRequest.parentGroupId`(仅 level-1 可挂,父须 level-2 且无父);`listGroups(parentId)` 过滤(controller `?parentId=`);`propagateParent`(action/delete 同事务,statusType 推导,无子不动);`GroupWorkflowService.statusType/statusNameByType` 两助手;level-2 组 action 409 / membership 409 / 含子删除 409。
+- 测试:`GroupParentApiTest` 7 例(树过滤/联动四规则/无子不动/删子重算/删父 409/守卫群/父引用 404);`ItemGroupApiTest` 自定义类型用例按新语义适配(phase=level-2 → switch 409、挂 item 409)。
+- **语义变化实锤**:`createType` 自底向上分配 → 每个新建自定义类型即 level-2 父层;0056 平面自定义组语义收窄(用户 2026-11-11 确认)。
+- 手测:api.http @ test 容器全过(用户执行,含 Flyway 首启等待)。
+- 差异:与设计一致;待办 = Web 侧栏树(YPJ-112)、多层同构推广、metrics rollup(另票)。
