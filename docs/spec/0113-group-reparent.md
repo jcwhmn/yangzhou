@@ -103,3 +103,14 @@ export async function updateGroup(key: string, groupId: string, body: { parentGr
 1. 置空语义:两级项目禁止置空(§一设计决策)——可否?
 2. UI 位置:sprint 详情页头部选择器(而非侧栏行内菜单,因 sprintRow 整行是 Link,嵌按钮有合法性与淡出期坑)——可否?
 3. YPJ-160 是否挂入 V28 sprint?(当前 backlog,按约定不自动挂)
+
+## 五、As-built(PR #196,e1230c5)
+
+与设计基本一致,偏差与顺带项如下:
+
+- **后端**:`ItemGroupService` PATCH groups 扩 `parentGroupId`(仅叶层可改挂/目标须无父 level-2/两级项目禁置空,null=不动);`recomputeParentStatus` 从激活路径提取复用,新旧父联动重算(设计兑现)。集成 `GroupParentApiTest` 4 例。
+- **前端**:sprint 详情页「所属 Epic」选择器(两级项目才渲染;悬空显示「未分组(悬空)」可归挂,已挂不可选回);`lib/sprints.ts` 增 `updateGroupParent`/`listParents`;改后广播 `sprints-changed` 侧栏重拉。
+- **api.http 0113 节改自含**(设计外,过程拍板):原节横跨 0110/0111/0112 取变量,点选/跳跑必踩空(三次复发实锤);改为自带项目/类型/双 Epic/叶组/item,变量 160 后缀隔离;8082 curl 复刻 18/18 后交付。
+- **顺带修复(设计外)**:①e2e expect 5s→10s(本地 8 workers 下 POST 端点 JVM 首击 4s+ 踩线,trace 实锤);②ProjectSettingsPanel 覆盖竞态——打开时异步拉取落地前用户切换被响应覆盖、PATCH 存回旧值(e2e 惯犯红实为真 bug,DB 实锤 milestone_enabled=f),加载完成前禁用开关/保存;③测试环境政策落 AGENTS.md(api.http/e2e 只在 test,dev 仅手工)+ 复盘文档 `docs/planning/2026-11-08-apihttp-0113-复盘.md`。
+- **验证**:build + integrationTest 双绿;e2e 全量 91 passed(×2,与历史红灯同条件);api.http 自含节用户 IntelliJ 实跑过;dev 手测 T160A–D 用户过。
+- **票务**:YPJ-160 Done;父票 YPJ-105 维持 In Progress(110 等 163,163 To Do)。
