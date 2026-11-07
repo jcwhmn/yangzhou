@@ -78,11 +78,12 @@ export async function sprintAction(
   key: string,
   sprintId: string,
   fn: "start" | "complete" | "backward" | "reopen",
+  body?: Record<string, unknown>, // 0110:complete 可携处置计划,与状态迁移同事务
 ): Promise<Sprint> {
   const s = toSprint(
     await api<GroupDto>(
       `/api/projects/${key}/groups/${sprintId}/actions/${fn}`,
-      { method: "POST", body: JSON.stringify({}) },
+      { method: "POST", body: JSON.stringify(body ?? {}) },
     ),
   );
   // YPJ-74/0105:组状态变化广播,sidebar 即时重拉(sprint 详情页手工派发收口至此)

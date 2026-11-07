@@ -678,6 +678,13 @@ Content-Type: application/json
   "groupType": "sprint"
 }
 
+### 完成 Sprint + 处置同事务(spec 0110:dispositions 随 complete 一次落库;targetGroupId=null 回池)
+POST {{host}}/api/projects/{{pkey}}/groups/{{sprintId}}/actions/complete
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{"dispositions":[{"itemId":"{{itemId}}","targetGroupId":null}]}
+
 ### 完成 Sprint(动作端点:active→completed;终态无出边,再动 409)
 POST {{host}}/api/projects/{{pkey}}/groups/{{sprintId}}/actions/complete
 Authorization: Bearer {{token}}
@@ -1441,3 +1448,10 @@ Content-Type: application/json
 
 ### 跨类型归属正交:item 挂 sprint 后再挂 release,两者共存(响应 sprintId 与 releaseId 同时非空)
 ### PUT {{host}}/api/items/{{itemId}}/group-membership {"groupId": "{{releaseId}}", "groupType": "release"}
+
+### [预期 400] 完成+处置——处置行 itemId 不属于本组(整体回滚,组仍 active;spec 0110)
+POST {{host}}/api/projects/{{pkey}}/groups/{{sprintId}}/actions/complete
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{"dispositions":[{"itemId":"00000000-0000-0000-0000-000000000000","targetGroupId":null}]}

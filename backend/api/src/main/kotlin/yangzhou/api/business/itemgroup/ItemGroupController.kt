@@ -91,13 +91,14 @@ class ItemGroupController(
         @PathVariable groupId: UUID,
     ) = service.deleteGroup(key, groupId)
 
-    /** 动作端点:查 currentStatus 出边,无匹配 function → 409「当前状态无此动作」。 */
+    /** 动作端点:查 currentStatus 出边,无匹配 function → 409「当前状态无此动作」。complete 可带处置计划(spec 0110)。 */
     @PostMapping("/projects/{key}/groups/{groupId}/actions/{function}")
     fun action(
         @PathVariable key: String,
         @PathVariable groupId: UUID,
         @PathVariable function: String,
-    ): ItemGroupService.GroupDto = service.action(key, groupId, function)
+        @RequestBody(required = false) request: ItemGroupService.GroupActionRequest? = null,
+    ): ItemGroupService.GroupDto = service.action(key, groupId, function, request)
 
     @GetMapping("/projects/{key}/groups/{groupId}/items")
     fun items(
