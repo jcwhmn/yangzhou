@@ -99,3 +99,4 @@
 - **验证**:e2e 全量 86/86 绿;prettier 过
 - **勘误**:上会话 handoff 记「group-complete-disposition 8/8、board-item-creation 12/12」,实数 5/9(对账:main 72 + 新增 14 = 86)
 - 2026-11-07:终态展示语义与处置按钮命名由 **0109** 修订(member 表=当前归属真相,完成组只留 Done;进「组名」/进 Backlog)。
+2026-11-07:完成流由 **0110** 事务化修订(complete+dispositions 单端点同事务,前端不再逐条 PUT group-membership)。

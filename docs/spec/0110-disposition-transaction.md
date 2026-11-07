@@ -132,3 +132,10 @@ T110A:dev 建组 3 成员(1 Done)→ 完成 → 混合处置(1 进组 1 回池)�
 ## 四、演化记录
 
 - 2026-11-07 立票 YPJ-159;本 spec 修订 0106 §D 流(前端两段→单事务)与 0109 §按钮(交互不变、提交通道改)。
+### 3.4 As-built(2026-11-07,PR #193 合入)
+
+- 后端:`ItemGroupService.completeWithDispositions`(事务内:complete + 逐行 applyDisposition;非法 itemId 先校验抛 400,组状态不变);`ItemGroupController` 新增 `POST /item-groups/{id}/complete-dispositions`;集成 `GroupDispositionTransactionApiTest` 4 例(混合处置/回池/非法 400 原子性/无 body 回归)全绿。
+- 前端:`sprint/[id]/page.tsx` `doComplete` 改调新端点,单请求含 dispositions;`lib/sprints.ts` 增 wire 类型;`sprintVer` 防乱序 ref(初始加载慢响应不覆盖动作后本地状态);确认按钮门控(items 未载 disabled,防弹窗淡入期吞点击静默失败)。
+- e2e:`group-complete-disposition.spec.ts` 与 `sprint.spec.ts` 断言适配单次 complete 请求;全量绿。
+- `api.http` 补新端点样例(完成+处置样例置于「完成 Sprint」之前,顺序依赖)。
+- 差异:与设计一致,无偏离。
