@@ -640,6 +640,46 @@ Content-Type: application/json
 GET {{host}}/api/projects/{{pkey}}/groups?parentId={{parentGroupIdSample}}
 Authorization: Bearer {{token}}
 
+### ---------- spec 0113(YPJ-160):组改父 ----------
+
+### 建第二父层组(handler 存 parentGroupId2)
+POST {{host}}/api/projects/{{pkey}}/groups
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "typeKey": "epic",
+  "name": "Epic 2"
+}
+
+> {%
+  client.global.set("parentGroupId2", response.body.groupId);
+%}
+
+### 建叶层组挂 Epic 1(handler 存 reparentGroupId)
+POST {{host}}/api/projects/{{pkey}}/groups
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "typeKey": "{{l1Key}}",
+  "name": "S-0113",
+  "parentGroupId": "{{parentGroupIdSample}}"
+}
+
+> {%
+  client.global.set("reparentGroupId", response.body.groupId);
+%}
+
+### 组改父:S-0113 从 Epic 1 改挂 Epic 2 → 200(新旧 epic 状态按 0111 规则联动)
+PATCH {{host}}/api/projects/{{pkey}}/groups/{{reparentGroupId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "parentGroupId": "{{parentGroupId2}}"
+}
+
 ### 负例:父层组手动动作 → 409(状态由子组联动)
 POST {{host}}/api/projects/{{pkey}}/groups/{{parentGroupIdSample}}/actions/start
 Authorization: Bearer {{token}}
@@ -656,6 +696,34 @@ Content-Type: application/json
 ### 负例:删含子组的父层组 → 409(先删子组)
 DELETE {{host}}/api/projects/{{pkey}}/groups/{{parentGroupIdSample}}
 Authorization: Bearer {{token}}
+
+### 负例:组改父——目标为叶层组 → 400
+PATCH {{host}}/api/projects/{{pkey}}/groups/{{reparentGroupId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "parentGroupId": "{{sprintId}}" }
+
+### 负例:组改父——目标不存在 → 404(目标自身有父分支由集成测试 jdbc 造数覆盖)
+PATCH {{host}}/api/projects/{{pkey}}/groups/{{reparentGroupId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "parentGroupId": "00000000-0000-0000-0000-000000000000" }
+
+### 负例:父层组自己改挂 → 400(父层组为顶层)
+PATCH {{host}}/api/projects/{{pkey}}/groups/{{parentGroupIdSample}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "parentGroupId": "{{parentGroupId2}}" }
+
+### 负例:组改父——置空(空串)→ 400(两级项目不提供置空)
+PATCH {{host}}/api/projects/{{pkey}}/groups/{{reparentGroupId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "parentGroupId": "" }
 
 ### 负例:重名类型 → 409(唯一约束兜底,保留字已废除)
 POST {{host}}/api/projects/{{pkey}}/group-types

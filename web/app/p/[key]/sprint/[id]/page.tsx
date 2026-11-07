@@ -497,6 +497,7 @@ export default function SprintPage() {
                   labelId="epic-select-label"
                   label={t.sprintPage.parentLabel}
                   value={sprint.parentGroupId ?? ""}
+                  displayEmpty
                   onChange={(e) => void reparent(e.target.value as string)}
                 >
                   {sprint.parentGroupId == null && (
