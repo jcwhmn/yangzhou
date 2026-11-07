@@ -10,9 +10,13 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  FormControl,
+  InputLabel,
   List,
   ListItem,
   ListItemText,
+  MenuItem,
+  Select,
   Stack,
   Table,
   ToggleButton,
@@ -39,6 +43,9 @@ import {
   assignSprint,
   createSprint,
   level1Type,
+  listParents,
+  updateGroupParent,
+  type TreeSprint,
 } from "@/lib/sprints";
 import { AssignPopover } from "@/components/AssignPopover";
 import { SignalChip, type Signal } from "@/components/Verdict";
@@ -103,6 +110,8 @@ export default function SprintPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [allSprints, setAllSprints] = useState<Sprint[]>([]);
+  // spec 0113:父层组选项(null=平面项目,不渲染「所属 Epic」选择器)
+  const [epics, setEpics] = useState<TreeSprint[] | null>(null);
   const [wf, setWf] = useState<TypeWorkflow[]>([]);
   const [confirmFlow, setConfirmFlow] = useState<
     null | "start" | "complete" | "reopen"
@@ -149,6 +158,13 @@ export default function SprintPage() {
       });
   }, [key, id]);
 
+  useEffect(() => {
+    // spec 0113:父层组选项独立轻拉;无 level-2 类型(平面)→ null
+    listParents(key)
+      .then(setEpics)
+      .catch(() => setEpics(null));
+  }, [key]);
+
   async function changeStatus(status: string) {
     if (!sprint) return;
     try {
@@ -163,6 +179,18 @@ export default function SprintPage() {
       // YPJ-74:sidebar 重拉由 sprintAction 内部广播(0105 收口)
     } catch (e) {
       setError(e instanceof Error ? e.message : "更新失败");
+    }
+  }
+
+  /** spec 0113:改挂父 epic;成功后广播侧栏重拉 + 刷新本页。置空不存在(选择器无空选项,后端兜底 400)。 */
+  async function reparent(target: string) {
+    if (!sprint || !target) return;
+    try {
+      await updateGroupParent(key, id, target);
+      window.dispatchEvent(new Event("sprints-changed"));
+      setSprint(await getSprint(key, id));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t.sprintPage.reparentFailed);
     }
   }
 
@@ -459,6 +487,31 @@ export default function SprintPage() {
             <Typography color="text.secondary" variant="body2">
               {sprint.startDate ?? "—"} ~ {sprint.endDate ?? "—"}
             </Typography>
+            {/* spec 0113:两级项目才渲染;悬空组显示占位但不可选回(无置空语义) */}
+            {epics && epics.length > 0 && (
+              <FormControl size="small" sx={{ minWidth: 160 }}>
+                <InputLabel id="epic-select-label">
+                  {t.sprintPage.parentLabel}
+                </InputLabel>
+                <Select
+                  labelId="epic-select-label"
+                  label={t.sprintPage.parentLabel}
+                  value={sprint.parentGroupId ?? ""}
+                  onChange={(e) => void reparent(e.target.value as string)}
+                >
+                  {sprint.parentGroupId == null && (
+                    <MenuItem value="" disabled>
+                      {t.sprintPage.parentDangling}
+                    </MenuItem>
+                  )}
+                  {epics.map((ep) => (
+                    <MenuItem key={ep.sprintId} value={ep.sprintId}>
+                      {ep.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            )}
             {/* V14 组级 rollup:组内 items feasSignal 取最差(红>黄>绿;无信号不显示) */}
             {(() => {
               if (!items || items.length === 0) return null;
