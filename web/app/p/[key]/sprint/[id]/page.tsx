@@ -29,7 +29,7 @@ import { BarChart } from "@mui/x-charts/BarChart";
 import { LineChart } from "@mui/x-charts/LineChart";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { t } from "@/lib/texts";
 import {
@@ -91,6 +91,8 @@ export default function SprintPage() {
   const { key, id } = useParams<{ key: string; id: string }>();
   const router = useRouter();
   const [sprint, setSprint] = useState<Sprint | null>(null);
+  // 0110:版本号防乱序覆盖——初始加载的慢响应不得覆盖动作后的本地状态(单步弹出后点击更快,竞态实测)
+  const sprintVer = useRef(0);
   const [items, setItems] = useState<Item[] | null>(null);
   const [statuses, setStatuses] = useState<Status[]>([]);
   const [error, setError] = useState("");
@@ -124,6 +126,7 @@ export default function SprintPage() {
   } | null>(null);
 
   useEffect(() => {
+    const ver = ++sprintVer.current;
     Promise.all([
       getSprint(key, id),
       api<Item[]>(`/api/projects/${key}/groups/${id}/items`),
@@ -132,6 +135,7 @@ export default function SprintPage() {
       api<TypeWorkflow[]>(`/api/projects/${key}/group-types/sprint/workflow`),
     ])
       .then(([s, its, p, all, w]) => {
+        if (sprintVer.current === ver) setSprint(s);
         setSprint(s);
         setItems(its);
         setStatuses(p.statuses);
@@ -153,6 +157,7 @@ export default function SprintPage() {
         id,
         status === "completed" ? "complete" : "start",
       );
+      sprintVer.current += 1;
       setSprint(s);
       // YPJ-74:sidebar 重拉由 sprintAction 内部广播(0105 收口)
     } catch (e) {
@@ -170,18 +175,27 @@ export default function SprintPage() {
     await changeStatus("active");
     setConfirmFlow(null);
   }
-  function completeSprint() {
-    setConfirmFlow("complete");
-  }
-  async function doComplete() {
+  /** 0110:全 Done 完成路径(确认弹窗「确认完成」)——无处置,直迁状态。 */
+  async function completeEmpty() {
     await changeStatus("completed");
     setConfirmFlow(null);
-    // 0106:组先行——迁移落定后,非终态成员进处置(无则现状结束)
+  }
+  function completeSprint() {
+    // 0110:有非终态成员直接弹处置(取消|进 Backlog|进「组名」);全 Done 走确认弹窗
+    const nonFinal = (items ?? []).some(
+      (it) =>
+        statuses.find((st) => st.name === it.status)?.statusType !== "FINAL",
+    );
+    if (nonFinal) void doComplete();
+    else setConfirmFlow("complete");
+  }
+  async function doComplete() {
+    // 0110:完成+处置同一事务,状态迁移随处置一次性提交
     const nonFinal = (items ?? []).filter(
       (it) =>
         statuses.find((st) => st.name === it.status)?.statusType !== "FINAL",
     );
-    if (nonFinal.length === 0) return;
+    setConfirmFlow(null); // 开处置前关确认弹窗,避免双 dialog 叠置
     const others = allSprints.filter((s) => s.sprintId !== id);
     const actives = others.filter((s) => s.status === "active");
     const planned = others.filter((s) => s.status === "planned");
@@ -207,12 +221,11 @@ export default function SprintPage() {
     });
   }
 
-  /** 0106:确认处置——目标组解析(0105 决策树)→ 逐行落归属(非原子,失败收集名单)。 */
+  /** 0110:处置计划随完成单次提交——状态迁移+处置同一后端事务;失败整体回滚,弹窗保留可改计划重试。 */
   async function confirmDisposition() {
     if (!disp || busy) return;
-    const rows = disp.rows;
     const { actives, planned, pick } = disp;
-    setBusy(true); // 处置完成前保持弹窗开(防导航/重复提交打断逐个 PUT)
+    setBusy(true);
     let target: string | null = null;
     try {
       if (actives.length > 0) {
@@ -230,45 +243,34 @@ export default function SprintPage() {
           existing ??
           (await createSprint(key, { name, startDate: null, endDate: null }))
         ).sprintId;
-        try {
-          await sprintAction(key, target, "start");
-        } catch (err) {
-          setError(err instanceof Error ? err.message : t.board.startFailed);
-        }
+        await sprintAction(key, target, "start");
       }
     } catch (err) {
-      // 目标组未就绪 → 未处置成员落 Backlog 兜底(组已完成,合法)
+      // 目标组未就绪 → 事务未发生,组未完成;改计划重试
       setError(err instanceof Error ? err.message : t.board.startFailed);
+      setBusy(false);
       return;
     }
-    const l1 = await level1Type(key);
-    if (!l1) return;
-    const failed: string[] = [];
-    for (const r of rows) {
-      try {
-        await api(`/api/items/${r.itemId}/group-membership`, {
-          method: "PUT",
-          body: JSON.stringify(
-            r.toBacklog
-              ? { groupId: null, groupType: l1.typeKey }
-              : { groupId: target },
-          ),
-        });
-      } catch {
-        failed.push(r.title);
-      }
-    }
-    if (failed.length > 0) {
-      setError(
-        `处置失败 ${failed.length} 个(留本组历史行,可手动处理):${failed.join("、")}`,
-      );
+    try {
+      const s = await sprintAction(key, id, "complete", {
+        dispositions: disp.rows.map((r) => ({
+          itemId: r.itemId,
+          targetGroupId: r.toBacklog ? null : target,
+        })),
+      });
+      sprintVer.current += 1;
+      setSprint(s);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t.board.startFailed);
+      setBusy(false);
+      return;
     }
     setItems(await api<Item[]>(`/api/projects/${key}/groups/${id}/items`));
     setDisp(null);
+    setConfirmFlow(null);
     setBusy(false);
   }
 
-  // 0107:目标组表达式,弹窗顶部与摘要行共用(单一实现)
   function targetLabel(d: typeof disp): string {
     if (!d) return "";
     if (d.actives.length > 1 || d.planned.length > 1)
@@ -289,30 +291,27 @@ export default function SprintPage() {
     return d.newName;
   }
 
-  /** 0109:「进 Backlog」——全部非终态成员显式回池落库(含 completed 组旧行清理,由 replaceMembership 承担) */
+  /** 0110:「进 Backlog」——全部非终态成员显式回池,随完成同事务落库(旧行清理由 replaceMembership 承担)。 */
   async function doBacklogAll() {
     if (!disp || busy) return;
     setBusy(true);
-    const l1 = await level1Type(key);
-    const failed: string[] = [];
-    if (l1)
-      for (const r of disp.rows) {
-        try {
-          await api(`/api/items/${r.itemId}/group-membership`, {
-            method: "PUT",
-            body: JSON.stringify({ groupId: null, groupType: l1.typeKey }),
-          });
-        } catch {
-          failed.push(r.title);
-        }
-      }
-    if (failed.length > 0) {
-      setError(
-        `回池失败 ${failed.length} 个(留本组历史行,可手动处理):${failed.join("、")}`,
-      );
+    try {
+      const s = await sprintAction(key, id, "complete", {
+        dispositions: disp.rows.map((r) => ({
+          itemId: r.itemId,
+          targetGroupId: null,
+        })),
+      });
+      sprintVer.current += 1;
+      setSprint(s);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t.board.startFailed);
+      setBusy(false);
+      return;
     }
     setItems(await api<Item[]>(`/api/projects/${key}/groups/${id}/items`));
     setDisp(null);
+    setConfirmFlow(null);
     setBusy(false);
   }
 
@@ -335,6 +334,7 @@ export default function SprintPage() {
   async function doReopen() {
     // 0108:重开出边是 reopen,不走 changeStatus(其 active 映射 start,completed 态无此出边)
     const s = await sprintAction(key, id, "reopen");
+    sprintVer.current += 1;
     setSprint(s);
     setConfirmFlow(null);
   }
@@ -487,6 +487,7 @@ export default function SprintPage() {
                       tr.function === "reopen" ? "outlined" : "contained"
                     }
                     color={tr.function === "reopen" ? "inherit" : "primary"}
+                    disabled={items === null} // 0110:items 未载禁用,防误开处置/确认弹窗
                     onClick={() => actionClick(tr.function)}
                   >
                     {actionLabel(tr.function)}
@@ -730,7 +731,7 @@ export default function SprintPage() {
                     ? doStart
                     : confirmFlow === "reopen"
                       ? doReopen
-                      : doComplete
+                      : completeEmpty
                 }
               >
                 {confirmFlow === "start"
@@ -839,7 +840,10 @@ export default function SprintPage() {
               )}
             </DialogContent>
             <DialogActions>
-              {/* 0109:主按钮=执行逐行计划(进「组名」,混合合法);次按钮=全部显式回池落库 */}
+              {/* 0110:取消|进 Backlog|进「组名」三钮(用户拍板一次弹出) */}
+              <Button onClick={() => setDisp(null)} disabled={busy}>
+                "取消"
+              </Button>
               <Button onClick={doBacklogAll} disabled={busy}>
                 {t.sprintPage.dispGoBacklog}
               </Button>

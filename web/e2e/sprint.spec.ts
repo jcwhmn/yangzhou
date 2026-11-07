@@ -81,19 +81,17 @@ test("V12-S3 Sprint 全链路——建/指派/开始/完成/backlog/历史 @smok
     page.getByRole("button", { name: "✓ 完成 Sprint" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "✓ 完成 Sprint" }).click();
-  await expect(page.getByText(/进入处置/)).toBeVisible();
-  await page.getByRole("button", { name: "确认完成" }).click();
-  await expect(page.getByText(/此 Sprint 已完成/)).toBeVisible();
-  // 0106:非终态成员进处置弹窗(项目内无其它组 → 默认新建「Sprint 2」并激活转入)
+  // 0110:直接弹处置(无确认中间步);处置随完成单次提交,横幅在处置提交后才出现
   const disp = page.getByRole("dialog");
   await expect(disp.getByText("E2E 冒烟 item")).toBeVisible();
   const moved = page.waitForResponse(
     (r) =>
-      r.url().includes("/group-membership") && r.request().method() === "PUT",
+      r.url().includes("/actions/complete") && r.request().method() === "POST",
   );
   await disp.getByRole("button", { name: "进「Sprint 2」" }).click();
   await moved;
   await expect(disp).toBeHidden();
+  await expect(page.getByText(/此 Sprint 已完成/)).toBeVisible();
 
   // item 转入新组:看板可见;详情只显示当前 sprint(裁决 2:已完成 Sprint 42 不回填)
   await page.goto(`/p/${projectKey}`);

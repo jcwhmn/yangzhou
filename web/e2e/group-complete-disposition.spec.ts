@@ -48,7 +48,13 @@ async function completeAndOpen(
   await apiCall("POST", `/api/projects/${key}/groups/${gid}/actions/start`, {});
   await page.goto(`/p/${key}/sprint/${gid}`);
   await page.getByRole("button", { name: /完成 Sprint/ }).click();
-  await page.getByRole("button", { name: "确认完成" }).click();
+  // 0110:非终态成员 → 直接弹处置;全 Done → 确认弹窗须再点确认
+  const confirmBtn = page.getByRole("button", { name: "确认完成" });
+  try {
+    await confirmBtn.click({ timeout: 3000 });
+  } catch {
+    /* 处置弹窗路径,无确认步 */
+  }
 }
 
 test("完成组→处置弹窗列出非终态成员(Done 不列),默认全转入单进行中目标组", async ({

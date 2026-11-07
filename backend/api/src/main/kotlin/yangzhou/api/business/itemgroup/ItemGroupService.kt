@@ -86,6 +86,16 @@ class ItemGroupService(
         val groupType: String? = null,
     )
 
+    /** spec 0110:组动作请求(仅 complete 用 dispositions)。 */
+    data class GroupActionRequest(
+        val dispositions: List<DispositionLine> = emptyList(),
+    )
+
+    data class DispositionLine(
+        val itemId: String,
+        val targetGroupId: String?,
+    )
+
     private fun project(key: String) = projects.findByKey(key) ?: throw NotFoundException("项目不存在:$key")
 
     private fun ItemGroupType.toDto() = GroupTypeDto(typeKey, name, builtin, level, timed)
@@ -326,12 +336,46 @@ class ItemGroupService(
         key: String,
         groupId: UUID,
         function: String,
+        request: GroupActionRequest? = null,
     ): GroupDto {
         leaderGuard.requireLeader(key)
         val g = findGroup(key, groupId)
         val t = typeOf(key, g.type)
         val target = workflow.applyAction(t, g.status, function)
-        return groups.save(g.copy(status = target, updatedAt = Instant.now())).toDto()
+        val saved = groups.save(g.copy(status = target, updatedAt = Instant.now())).toDto()
+        // spec 0110(YPJ-159):完成 + 处置同一事务——迁移已落库后逐行 replaceMembership,失败整体回滚(含状态迁移)
+        if (function == "complete" && request != null && request.dispositions.isNotEmpty()) {
+            applyDispositions(g, request.dispositions)
+        }
+        return saved
+    }
+
+    /** spec 0110:完成组处置计划落库。itemId=item 公开 ID(=objectId);targetGroupId=null 回池。 */
+    private fun applyDispositions(
+        g: ItemGroup,
+        lines: List<DispositionLine>,
+    ) {
+        val ids = lines.map { it.itemId }
+        if (ids.size != ids.toSet().size) throw BadRequestException("处置计划含重复 item")
+        val memberIds = memberships.findByGroupObjectId(g.objectId!!).map { it.itemObjectId }.toSet()
+        for (line in lines) {
+            val id =
+                try {
+                    UUID.fromString(line.itemId)
+                } catch (e: IllegalArgumentException) {
+                    throw BadRequestException("处置行 itemId 不合法:${line.itemId}")
+                }
+            if (id !in memberIds) throw BadRequestException("处置行不属于本组:${line.itemId}")
+            val tg =
+                line.targetGroupId?.let {
+                    try {
+                        UUID.fromString(it)
+                    } catch (e: IllegalArgumentException) {
+                        throw BadRequestException("处置行 targetGroupId 不合法:$it")
+                    }
+                }
+            replaceMembership(id, MembershipRequest(groupId = tg, groupType = if (tg == null) g.type else null))
+        }
     }
 
     // ---------- 成员与派生视图 ----------
