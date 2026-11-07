@@ -38,6 +38,7 @@ import {
   assignSprint,
   createSprint,
   level1Type,
+  syncCurrentParent,
 } from "@/lib/sprints";
 import { AssignPopover } from "@/components/AssignPopover";
 import type { Signal } from "@/components/Verdict";
@@ -68,7 +69,12 @@ type Item = {
 };
 
 type Filter = "all" | "unassigned" | "blocked" | string; // string = memberId
-type SprintLite = { sprintId: string; name: string; status: string };
+type SprintLite = {
+  sprintId: string;
+  name: string;
+  status: string;
+  parentGroupId: string | null;
+};
 
 export default function BoardPage() {
   const { key } = useParams<{ key: string }>();
@@ -268,8 +274,15 @@ export default function BoardPage() {
       const existing = sprints.find((s) => s.name === name);
       const gid = existing
         ? existing.sprintId
-        : (await createSprint(key, { name, startDate: null, endDate: null }))
-            .sprintId;
+        : (
+            await createSprint(key, {
+              name,
+              startDate: null,
+              endDate: null,
+              // spec 0112:新建组落「当前 epic」(active 子组的父 → localStorage 记忆 → 无)
+              parentGroupId: syncCurrentParent(key, sprints),
+            })
+          ).sprintId;
       try {
         await sprintAction(key, gid, "start");
       } catch (err) {

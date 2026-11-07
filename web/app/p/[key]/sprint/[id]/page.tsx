@@ -49,6 +49,7 @@ type Sprint = {
   status: string;
   startDate: string | null;
   endDate: string | null;
+  parentGroupId: string | null;
 };
 type Item = {
   itemId: string;
@@ -241,7 +242,13 @@ export default function SprintPage() {
         const existing = allSprints.find((s) => s.name === name);
         target = (
           existing ??
-          (await createSprint(key, { name, startDate: null, endDate: null }))
+          (await createSprint(key, {
+            name,
+            startDate: null,
+            endDate: null,
+            // spec 0112:处置新建组继承被完成 sprint 的父 epic(否则悬空)
+            parentGroupId: sprint?.parentGroupId ?? null,
+          }))
         ).sprintId;
         await sprintAction(key, target, "start");
       }

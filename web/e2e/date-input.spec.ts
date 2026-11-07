@@ -90,7 +90,10 @@ test("部分输入:只改日段,blur 提交月/年=今天(§17-3)", async ({
   await gotoDetail(page, projectKey, "E2E 日期部分输入");
   const dd = seg(page, "截止日期", "日");
   await dd.click(); // 预填今天
-  await dd.fill("08"); // 逐位写完跳年段(§7.1)
+  // 键盘写入而非 fill:预填=今天时每月 8 号 fill("08") 同值覆写被 React value-tracker 去重,
+  // onChange 不派发 → §7.1 跳段不触发 → blur 年段 no-op(2026-10-20 实证,同 "draft 不外泄" 用例)
+  await dd.press("Home");
+  await dd.pressSequentially("08"); // 逐位写完跳年段(§7.1)
   await seg(page, "截止日期", "年").blur(); // 从年段离开触发 commit
   const t = new Date();
   const exp = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-08`;

@@ -268,6 +268,13 @@ class ItemGroupService(
                 ?: throw BadRequestException("typeKey 必填")
         val t = typeOf(key, typeKey)
         val name = request.name?.trim().takeUnless { it.isNullOrEmpty() } ?: throw BadRequestException("name 必填")
+        val pid = project(key).objectId!!
+        // spec 0112:两层项目不变量——有 level-2 类型 ⇒ 新建 level-1 组必挂父(存量悬空 grandfather 不迁移);
+        // 组改父能力另票(YPJ-160)。0 个 epic 实例时同样拒绝,引导先建 epic。
+        val hasParentType = types.findByProjectObjectIdAndLevel(pid, 2) != null
+        if (hasParentType && t.level == 1 && request.parentGroupId.isNullOrBlank()) {
+            throw BadRequestException("两级项目新建叶层组须挂父层组;请先建父层组(如 Epic)")
+        }
         // spec 0111:固定两层——仅叶层(level-1)组可挂父;父组类型 level=2 且自身无父
         val parent =
             request.parentGroupId?.let { raw ->
@@ -278,7 +285,6 @@ class ItemGroupService(
                     } catch (_: IllegalArgumentException) {
                         throw BadRequestException("parentGroupId 不合法:" + raw)
                     }
-                val pid = project(key).objectId!!
                 val pg = groups.findByProjectObjectIdAndObjectId(pid, id) ?: throw NotFoundException("父组不存在")
                 if (typeOf(key, pg.type).level != 2) throw BadRequestException("父组类型层级须为 2")
                 if (pg.parentObjectId != null) throw BadRequestException("父组不可再挂父组(固定两层)")
@@ -399,7 +405,6 @@ class ItemGroupService(
                 else -> StatusType.START
             }
         val parentType = typeOfPid(pid, parent.type)
-        println("DBG propagate pid=$pid parent=$parentObjectId children=" + children.size + " wanted=$wanted parentStatus=" + parent.status)
         if (workflow.statusType(parentType, parent.status) == wanted) return
         val targetName = workflow.statusNameByType(parentType, wanted) ?: return
         groups.save(parent.copy(status = targetName, updatedAt = Instant.now()))
