@@ -84,6 +84,7 @@ class ItemGroupService(
         val name: String? = null,
         val startDate: String? = null,
         val endDate: String? = null,
+        val parentGroupId: String? = null, // spec 0113:null=不动;非空=改挂该父(两级项目不提供置空)
     )
 
     data class MembershipRequest(
@@ -310,7 +311,7 @@ class ItemGroupService(
         groupId: UUID,
     ): GroupDto = findGroup(key, groupId).toDto()
 
-    /** PATCH 仅 name/日期(spec 0097:status 改走动作端点,不再自由 PATCH)。 */
+    /** PATCH name/日期/父组(spec 0097:status 改走动作端点;0113 增 parentGroupId,null=不动、无置空)。 */
     @Transactional
     fun updateGroup(
         key: String,
@@ -319,8 +320,25 @@ class ItemGroupService(
     ): GroupDto {
         leaderGuard.requireLeader(key)
         val g = findGroup(key, groupId)
+        val pid = g.projectObjectId
         val name = request.name?.trim()
         if (name != null && name.isEmpty()) throw BadRequestException("name 不能为空")
+        // spec 0113:改父——仅叶层组可改挂;目标须 level-2 组且自身无父;失败 fast-throw 整体不落库
+        val targetParent =
+            request.parentGroupId?.let { raw ->
+                val id =
+                    try {
+                        UUID.fromString(raw.trim())
+                    } catch (_: IllegalArgumentException) {
+                        throw BadRequestException("parentGroupId 不合法:$raw")
+                    }
+                if (typeOfPid(pid, g.type).level != 1) throw BadRequestException("父层组为顶层,不可改挂")
+                val target = groups.findByProjectObjectIdAndObjectId(pid, id) ?: throw NotFoundException("目标父组不存在")
+                if (typeOfPid(pid, target.type).level != 2) throw BadRequestException("目标父组类型层级须为 2")
+                if (target.parentObjectId != null) throw BadRequestException("目标父组不可再挂父组(固定两层)")
+                target
+            }
+        val parentChanged = targetParent != null && targetParent.objectId != g.parentObjectId
         val updated =
             g.copy(
                 name = name ?: g.name,
@@ -336,9 +354,16 @@ class ItemGroupService(
                     request.endDate.isEmpty() -> null
                     else -> parseDate(request.endDate, "endDate")
                 },
+                parentObjectId = targetParent?.objectId ?: g.parentObjectId,
                 updatedAt = Instant.now(),
             )
-        return groups.save(updated).toDto()
+        val saved = groups.save(updated)
+        // 改父后新旧父都按 0111 规则重算(同事务)
+        if (parentChanged) {
+            g.parentObjectId?.let { recomputeParentStatus(pid, it) }
+            recomputeParentStatus(pid, targetParent!!.objectId!!)
+        }
+        return saved.toDto()
     }
 
     /** sprint/release:membership 是历史/在途事实,非空 409;自定义组:membership 展示性组织,级联删(含留痕行)。 */
@@ -390,10 +415,17 @@ class ItemGroupService(
         return saved
     }
 
-    /** spec 0111:子组动作/删除后联动父组状态(同事务)。任一子 ACTIVE→父 ACTIVE;全子 FINAL→父 FINAL;有子其余→父 START;无子不动。状态名经父组类型 workflow 按 statusType 解析,不写字面量。 */
+    /** spec 0111:子组动作/删除后联动父组状态(同事务);0113 改父复用。定位父后交 recomputeParentStatus。 */
     private fun propagateParent(child: ItemGroup) {
-        val pid = child.projectObjectId
         val parentObjectId = child.parentObjectId ?: return
+        recomputeParentStatus(child.projectObjectId, parentObjectId)
+    }
+
+    /** spec 0111:按子组状态重算父组状态(0113 改父后新旧父共用)。任一子 ACTIVE→父 ACTIVE;全子 FINAL→父 FINAL;有子其余→父 START;无子不动。状态名经父组类型 workflow 按 statusType 解析,不写字面量。 */
+    private fun recomputeParentStatus(
+        pid: UUID,
+        parentObjectId: UUID,
+    ) {
         val parent = groups.findByProjectObjectIdAndObjectId(pid, parentObjectId) ?: return
         val children = groups.findAllByProjectObjectIdAndParentObjectId(pid, parentObjectId)
         if (children.isEmpty()) return

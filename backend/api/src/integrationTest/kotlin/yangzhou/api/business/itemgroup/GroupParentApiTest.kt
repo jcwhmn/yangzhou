@@ -3,6 +3,7 @@ package yangzhou.api.business.itemgroup
 import com.fasterxml.jackson.databind.JsonNode
 import org.springframework.test.web.servlet.client.RestTestClient
 import yangzhou.api.AbstractApiTest
+import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -201,5 +202,100 @@ class GroupParentApiTest : AbstractApiTest() {
             post(authed, "/api/projects/$key/groups", mapOf("typeKey" to "sprint", "name" to "S1", "parentGroupId" to "00000000-0000-0000-0000-000000000000"))
         assertEquals(404, code)
         assertEquals(0, get(authed, "/api/projects/$key/groups").size())
+    }
+
+    // ---------- spec 0113(YPJ-160):组改父 ----------
+
+    private fun patch(
+        authed: RestTestClient,
+        key: String,
+        groupId: String,
+        body: Map<String, Any?>,
+    ): Pair<Int, JsonNode> {
+        val r =
+            authed
+                .patch()
+                .uri("/api/projects/$key/groups/$groupId")
+                .body(body)
+                .exchange()
+                .expectBody(String::class.java)
+                .returnResult()
+        return r.status.value() to json.readTree(r.responseBody ?: "{}")
+    }
+
+    @Test
+    fun `reparent moves leaf group and recomputes both parents`() {
+        val (authed, key) = setup("DEC160A")
+        val (_, e1) = post(authed, "/api/projects/$key/groups", mapOf("typeKey" to "epic", "name" to "E1"))
+        val e1Id = e1["groupId"].asText()
+        val (_, e2) = post(authed, "/api/projects/$key/groups", mapOf("typeKey" to "epic", "name" to "E2"))
+        val e2Id = e2["groupId"].asText()
+        val (_, s1) = post(authed, "/api/projects/$key/groups", mapOf("typeKey" to "sprint", "name" to "S1", "parentGroupId" to e1Id))
+        val s1Id = s1["groupId"].asText()
+        post(authed, "/api/projects/$key/groups", mapOf("typeKey" to "sprint", "name" to "S2", "parentGroupId" to e1Id))
+        fun status(id: String): String = get(authed, "/api/projects/$key/groups/$id")["status"].asText()
+        assertEquals(200, action(authed, key, s1Id, "start").first)
+        assertEquals("active", status(e1Id))
+        assertEquals("planned", status(e2Id))
+        // S1(active)从 E1 改挂 E2 → 旧父剩 planned 子回 START,新父收 active 子
+        val (code, body) = patch(authed, key, s1Id, mapOf("parentGroupId" to e2Id))
+        assertEquals(200, code, body.toString())
+        assertEquals(e2Id, body["parentGroupId"].asText())
+        assertEquals("planned", status(e1Id))
+        assertEquals("active", status(e2Id))
+    }
+
+    @Test
+    fun `reparent rejects invalid targets`() {
+        val (authed, key) = setup("DEC160B")
+        val (_, e1) = post(authed, "/api/projects/$key/groups", mapOf("typeKey" to "epic", "name" to "E1"))
+        val e1Id = e1["groupId"].asText()
+        val (_, s1) = post(authed, "/api/projects/$key/groups", mapOf("typeKey" to "sprint", "name" to "S1", "parentGroupId" to e1Id))
+        val s1Id = s1["groupId"].asText()
+        val (_, s2) = post(authed, "/api/projects/$key/groups", mapOf("typeKey" to "sprint", "name" to "S2", "parentGroupId" to e1Id))
+        val s2Id = s2["groupId"].asText()
+        // 目标为 level-1 组 → 400
+        assertEquals(400, patch(authed, key, s1Id, mapOf("parentGroupId" to s2Id)).first)
+        // 目标不存在 → 404
+        assertEquals(404, patch(authed, key, s1Id, mapOf("parentGroupId" to "00000000-0000-0000-0000-000000000000")).first)
+        // 自身为父层组 → 400
+        assertEquals(400, patch(authed, key, e1Id, mapOf("parentGroupId" to s1Id)).first)
+        // 非法串(含置空语义)→ 400
+        assertEquals(400, patch(authed, key, s1Id, mapOf("parentGroupId" to " ")).first)
+    }
+
+    @Test
+    fun `reparent rejects target that has a parent`() {
+        val (authed, key) = setup("DEC160C")
+        val (_, e1) = post(authed, "/api/projects/$key/groups", mapOf("typeKey" to "epic", "name" to "E1"))
+        val e1Id = e1["groupId"].asText()
+        val (_, e2) = post(authed, "/api/projects/$key/groups", mapOf("typeKey" to "epic", "name" to "E2"))
+        val e2Id = e2["groupId"].asText()
+        val (_, s1) = post(authed, "/api/projects/$key/groups", mapOf("typeKey" to "sprint", "name" to "S1", "parentGroupId" to e1Id))
+        val s1Id = s1["groupId"].asText()
+        // 存量 grandfather 模拟:jdbc 令 E2 挂 E1(正常创建拒绝该形态)
+        jdbc.update("update item_group set parent_object_id = ? where object_id = ?", UUID.fromString(e1Id), UUID.fromString(e2Id))
+        assertEquals(400, patch(authed, key, s1Id, mapOf("parentGroupId" to e2Id)).first)
+    }
+
+    @Test
+    fun `reparent null keeps parent and same value is noop`() {
+        val (authed, key) = setup("DEC160D")
+        val (_, e1) = post(authed, "/api/projects/$key/groups", mapOf("typeKey" to "epic", "name" to "E1"))
+        val e1Id = e1["groupId"].asText()
+        val (_, s1) = post(authed, "/api/projects/$key/groups", mapOf("typeKey" to "sprint", "name" to "S1", "parentGroupId" to e1Id))
+        val s1Id = s1["groupId"].asText()
+        assertEquals(200, action(authed, key, s1Id, "start").first)
+        // 无 parentGroupId 字段 → 父不动
+        val (c1, b1) = patch(authed, key, s1Id, mapOf("name" to "S1-renamed"))
+        assertEquals(200, c1, b1.toString())
+        assertEquals("S1-renamed", b1["name"].asText())
+        assertEquals(e1Id, b1["parentGroupId"].asText())
+        assertEquals("active", get(authed, "/api/projects/$key/groups/$e1Id")["status"].asText())
+        // 同值 → 200 no-op,不触发联动
+        val (c2, b2) = patch(authed, key, s1Id, mapOf("parentGroupId" to e1Id))
+        assertEquals(200, c2, b2.toString())
+        assertEquals(e1Id, b2["parentGroupId"].asText())
+        assertEquals("active", get(authed, "/api/projects/$key/groups/$e1Id")["status"].asText())
     }
 }
