@@ -30,10 +30,13 @@ export function ProjectSettingsPanel({
   const [release, setRelease] = useState(true);
   const [milestone, setMilestone] = useState(true);
   const [error, setError] = useState("");
+  // 加载完成前禁用开关/保存:初始拉取落地前用户切换会被响应覆盖(YPJ-151 e2e 实锤:check 后被 setMilestone(false) 冲掉,PATCH 存回旧值)
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     setError("");
+    setLoaded(false);
     api<{
       releaseEnabled: boolean;
       milestoneEnabled: boolean;
@@ -41,8 +44,12 @@ export function ProjectSettingsPanel({
       .then((p) => {
         setRelease(p.releaseEnabled);
         setMilestone(p.milestoneEnabled);
+        setLoaded(true);
       })
-      .catch(() => setError(t.settings.loadFailed));
+      .catch(() => {
+        setError(t.settings.loadFailed);
+        setLoaded(true);
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, projectKey]);
 
@@ -72,6 +79,7 @@ export function ProjectSettingsPanel({
             control={
               <Switch
                 checked={release}
+                disabled={!loaded}
                 onChange={(e) => setRelease(e.target.checked)}
               />
             }
@@ -81,6 +89,7 @@ export function ProjectSettingsPanel({
             control={
               <Switch
                 checked={milestone}
+                disabled={!loaded}
                 onChange={(e) => setMilestone(e.target.checked)}
               />
             }
@@ -94,7 +103,7 @@ export function ProjectSettingsPanel({
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>{t.settings.cancel}</Button>
-        <Button variant="contained" onClick={save}>
+        <Button variant="contained" onClick={save} disabled={!loaded}>
           {t.settings.save}
         </Button>
       </DialogActions>
