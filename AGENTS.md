@@ -110,6 +110,7 @@ docs/      adr/ · spec/ · architecture/(puml 类图) · requirement/(PRD) · p
 - context-mode 批处理工具实际跑 PowerShell——`&&`、`find`、`/dev/null` 语法会挂;简单命令直接用 Bash。
 - headroom 压缩开启时:被压缩的读取输出不可当编辑锚点(原文会被搅坏);大文件读改一律 python 原地处理。
 - CLI/脚本中文输出在 PowerShell 显示乱码(UTF-8 被按 GBK 解码):先 `chcp 65001` 或改用 Git Bash。
+- **api.http/测试环境纪律(2026-11-08 拍板,0113 三轮复盘,详见 docs/planning/2026-11-08-apihttp-0113-复盘.md)**:api.http 与 e2e 等自动化只在 test(8082)跑;dev 只做手工 UI 测试,含准真实数据,禁自动清、禁自动化指 dev。api.http 新增节必须自含(节内自建前置,变量后缀隔离)或文件头声明整文件按序跑;交付用户前先脚本逐请求复刻全绿。用户报错先确认「哪个入口/环境/有无新产物」再归因;e2e 红例单跑绿只记疑似漂移,同晚二次复现即按真 bug 实锤归因。
 
 ## 工作流
 
