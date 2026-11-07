@@ -71,6 +71,7 @@ class ItemWorkflow
 class Workflow
 
 ItemGroup "1" o- "0..*" Item
+ItemGroup "0..1" --> "0..*" ItemGroup : parent（固定两层：level-2 父层 / level-1 叶层）
 ItemGroup "1" --> "1" GroupWorkflow
 Item "1" -->  "1" ItemWorkflow
 ItemWorkflow --> Workflow
@@ -117,6 +118,8 @@ now, epic 26-3 is an active epic, means it's neither isStart now isFinal, but is
 
 I'd like to show Epic 26-2, 26-3 and 26-4 in Side directly
 
+> 落地（2026-11，YPJ-111/112，spec 0111/0112）：已实现。level 实际方向：level-1=叶层（挂 item，sprint）、level-2=父层（哑容器：不挂 item、不开放手动动作、状态由子组联动推导）；建类型自底向上分配 level。两层项目不变量：新建叶层组必挂父；侧栏两级树（active 展开/其余折叠）；「当前 epic」三入口单源（syncCurrentParent）。跨 epic 移动 sprint（组改父）未做——YPJ-160。
+
 
 ### 1 levels
 
@@ -125,6 +128,8 @@ Now, all business logical will be at ItemGroupService/ItemGroupController, but '
 
 in sidebar, Epic block will be removed. 
 
+> 落地（2026-11，spec 0100 切片B）：SprintService/SprintController 已删，全归 ItemGroupService；平面模式（无 level-2 类型）侧栏即平面列表，Epic 块不存在。
+
 ### no itemGroup
 
-I need think over again.
+item group的目的是要管理过多的items。在一个没有item group的系统里，所有的items堆到看板里，导致很难快速定位到我们需要的items，我们使用linear管理项目的后期就发生的这种情况，我需要仔细的找才能找到我需要的item。有了backlog可以缓解还重来没有in progress的items的问题，但对于进行中和done的项目，没法避免堆砌在看板上。我曾经的想法是使用搜索，hide done item的方法来提高关心的item的可见性。而现在这又是我们当前这个no item group所面对的问题。系统是否能no itemgrou？如果能no itemgrou，如何管理？
