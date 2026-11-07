@@ -104,3 +104,17 @@ Sprint 孤儿-1       (无父叶层,平面)
 ## 五、验收(YPJ-112)
 
 - e2e:新增树形态用例(建 epic 类型/组 → 断言展开/折叠/空父无前缀/新建默认当前 epic);现有 e2e 全绿(无 level-2 项目不受影响);prettier 过;`npx playwright test` 本地全量。
+## 六、增量:两层项目新建叶层组必挂父(2026-11-11 用户拍板)
+
+- **不变量**:项目存在 level-2 类型 ⇒ 新建 level-1 组必须带 parentGroupId;存量悬空 grandfather 不迁移、照常展示操作(树上平面区仅存量)。
+- **后端**:`createGroup` 校验(400 引导文案「请先建父层组」);0 个 epic 实例同样拒绝。组改父能力另票 **YPJ-160**(epic 保持哑容器)。
+- **前端**:对话框去「无」选项;当前 epic 兜底链 = active → localStorage → 第一个父层组(`syncCurrentParent` 统一判定,侧栏/处置流/看板三入口单源);处置流新建组继承被完成 sprint 的父(悬空 bug 修复,实锤:处置「新建组并激活」未带 parent)。
+- **集成测试**:`GroupParentApiTest` 8 例(新增两级项目无父 400 / 纯 level-1 无父照旧 201)。
+- **验证**:build + integrationTest 双绿;e2e 全量绿(flake 桶复跑单跑绿)。
+
+## 七、As-built(2026-11-11,分支 feat/YPJ-112-group-tree-sidebar)
+
+- `web/lib/sprints.ts`:GroupTree/listGroupTree/syncCurrentParent/createSprint(parentGroupId)。
+- `web/app/p/[key]/layout.tsx`:两级树渲染(+前缀/− 展开/空父层无前缀)、开合互不影响、新建对话框父层选择器。
+- 悬空修复:`sprint/[id]/page.tsx`(处置 S3 继承被完成组父)、`page.tsx`(看板 S3 落当前 epic)。
+- 差异:spec 2.2 原写「前缀为 IconButton」,实现为文本前缀(整行点击开合,更简,交互语义一致)。

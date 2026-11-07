@@ -117,12 +117,14 @@ export default function ProjectLayout({
       }
       setTree(t);
       setSprints(t.orphans);
-      // 当前 epic:active 子组的父优先 → localStorage 记忆(关掉最后一个 active 子组后新建仍落本 epic)→ 无
+      // 当前 epic:active 子组的父优先 → localStorage 记忆;不变量下兜底第一个父层组(spec 0112)
       const leaves = [
         ...t.orphans,
         ...Object.values(t.childrenByParent).flat(),
       ];
-      setCurrentParentId(syncCurrentParent(key, leaves));
+      setCurrentParentId(
+        syncCurrentParent(key, leaves) ?? t.parents[0]?.sprintId ?? null,
+      );
       // 展开态:active 父层默认展开(仅加入不移除,保留用户手动开合)
       const active = t.parents.find((p) => p.status === "active");
       if (active) setExpanded((prev) => new Set(prev).add(active.sprintId));
@@ -420,8 +422,10 @@ export default function ProjectLayout({
                   size="small"
                   aria-label={`新建 ${l1.name}`}
                   onClick={() => {
-                    // spec 0112:父层选择器默认「当前 epic」(active → localStorage → 无)
-                    setParentPick(currentParentId ?? "");
+                    // spec 0112:默认「当前 epic」;不变量下兜底第一个父层组
+                    setParentPick(
+                      currentParentId ?? tree?.parents[0]?.sprintId ?? "",
+                    );
                     setCreateOpen(true);
                   }}
                 >
@@ -623,7 +627,7 @@ export default function ProjectLayout({
                 value={parentPick}
                 onChange={(e) => setParentPick(e.target.value)}
               >
-                <MenuItem value="">无</MenuItem>
+                {/* spec 0112 不变量:两层项目新建必挂父,无「无」选项 */}
                 {tree!.parents.map((p) => (
                   <MenuItem key={p.sprintId} value={p.sprintId}>
                     {p.name}

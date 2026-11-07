@@ -71,13 +71,12 @@ class GroupParentApiTest : AbstractApiTest() {
         val epicId = epic["groupId"].asText()
         val (_, s1) =
             post(authed, "/api/projects/$key/groups", mapOf("typeKey" to "sprint", "name" to "S1", "parentGroupId" to epicId))
-        val s1Id = s1["groupId"].asText()
         assertEquals(epicId, s1["parentGroupId"].asText())
-        post(authed, "/api/projects/$key/groups", mapOf("typeKey" to "sprint", "name" to "S2"))
+        // spec 0112 不变量:两级项目新建叶层组必挂父 → S2 挂同父
+        post(authed, "/api/projects/$key/groups", mapOf("typeKey" to "sprint", "name" to "S2", "parentGroupId" to epicId))
 
         val children = get(authed, "/api/projects/$key/groups?parentId=$epicId")
-        assertEquals(1, children.size())
-        assertEquals("S1", children[0]["name"].asText())
+        assertEquals(2, children.size())
         // 无父过滤 = 全量 3 组
         assertEquals(3, get(authed, "/api/projects/$key/groups").size())
     }
@@ -111,8 +110,9 @@ class GroupParentApiTest : AbstractApiTest() {
         val (authed, key) = setup("DEC111Z")
         val (_, epic) = post(authed, "/api/projects/$key/groups", mapOf("typeKey" to "epic", "name" to "E0"))
         val epicId = epic["groupId"].asText()
-        // 无子 epic:独立 sprint 动作不波及(它本无父子链),epic 保持 planned
-        val (_, s) = post(authed, "/api/projects/$key/groups", mapOf("typeKey" to "sprint", "name" to "SX"))
+        // 无子 epic:E1 下的子组动作不波及 E0(epic 保持 planned)
+        val (_, e1) = post(authed, "/api/projects/$key/groups", mapOf("typeKey" to "epic", "name" to "E1"))
+        val (_, s) = post(authed, "/api/projects/$key/groups", mapOf("typeKey" to "sprint", "name" to "SX", "parentGroupId" to e1["groupId"].asText()))
         assertEquals(200, action(authed, key, s["groupId"].asText(), "start").first)
         assertEquals("planned", get(authed, "/api/projects/$key/groups/$epicId")["status"].asText())
     }
@@ -163,11 +163,35 @@ class GroupParentApiTest : AbstractApiTest() {
         // level-2 组建组带 parentGroupId → 400(仅叶层可挂父)
         val (e2code, _) = post(authed, "/api/projects/$key/groups", mapOf("typeKey" to "epic", "name" to "E2", "parentGroupId" to epicId))
         assertEquals(400, e2code)
-        // 子组挂 level-1 组为父 → 400
-        val (_, sprint0) = post(authed, "/api/projects/$key/groups", mapOf("typeKey" to "sprint", "name" to "S0"))
+        // 子组挂 level-1 组为父 → 400(S0 先合法挂 E0,不变量下叶层组必有父)
+        val (_, e0) = post(authed, "/api/projects/$key/groups", mapOf("typeKey" to "epic", "name" to "E0"))
+        val (_, sprint0) =
+            post(
+                authed,
+                "/api/projects/$key/groups",
+                mapOf("typeKey" to "sprint", "name" to "S0", "parentGroupId" to e0["groupId"].asText()),
+            )
         val (code, _) =
-            post(authed, "/api/projects/$key/groups", mapOf("typeKey" to "sprint", "name" to "SX", "parentGroupId" to sprint0["groupId"].asText()))
+            post(
+                authed,
+                "/api/projects/$key/groups",
+                mapOf("typeKey" to "sprint", "name" to "SX", "parentGroupId" to sprint0["groupId"].asText()),
+            )
         assertEquals(400, code)
+    }
+
+    @Test
+    fun `two-level project requires parent on new leaf group and single level stays flat`() {
+        val (authed, key) = setup("DEC111H")
+        val (code, _) =
+            post(authed, "/api/projects/$key/groups", mapOf("typeKey" to "sprint", "name" to "SX"))
+        assertEquals(400, code)
+        // 纯 level-1 项目(未配 epic):无父照旧
+        val key2 = key + "F"
+        createProject(authed, key2)
+        val (code2, _) =
+            post(authed, "/api/projects/$key2/groups", mapOf("typeKey" to "sprint", "name" to "S1"))
+        assertEquals(201, code2)
     }
 
     @Test
