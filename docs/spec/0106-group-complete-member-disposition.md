@@ -98,3 +98,4 @@
 - **e2e 覆盖**:5 例(三类成员弹窗列非终态+默认转入单进行中 / 覆写回 Backlog / S3 新建并激活 / 取消兜底落池 / 无非终态现行框);§3.1 场景 4(目标组=多进行中列表选择)未单列,复用 0105 同型选择组件(board-item-creation S2m 已验);sprint.spec V12-S3(@smoke)适配走处置流,断言看板可见+详情归属新组
 - **验证**:e2e 全量 86/86 绿;prettier 过
 - **勘误**:上会话 handoff 记「group-complete-disposition 8/8、board-item-creation 12/12」,实数 5/9(对账:main 72 + 新增 14 = 86)
+- 2026-11-07:终态展示语义与处置按钮命名由 **0109** 修订(member 表=当前归属真相,完成组只留 Done;进「组名」/进 Backlog)。

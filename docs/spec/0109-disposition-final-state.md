@@ -89,3 +89,12 @@ FINAL 组(`group_status.status_type='FINAL'` 且组 `item_group.status` 为该 F
 ### 3.3 手工
 
 T106C:完成→进组/进池/混合三走;完成组页核对只剩 Done;重开后再完成回归。
+
+
+## As-built(2026-11-07,YPJ-158 合入 PR #192)
+
+- **后端**:`ItemGroupService.replaceMembership`(itemgroup 垂直切片)——转出/回池先 `memberships.delete` 旧行再落新归属;completed 组旧行随之清理。`V52__completed_group_member_cleanup.sql` 存量清理(DELETE...USING 逗号平铺 join,勿引用 target 别名)。
+- **前端**:`sprint/[id]/page.tsx` doConfirmDisposition/doBacklogAll;`texts.ts` 主按钮=进「组名」(页面内插 targetGroupName)、次按钮=进 Backlog;「确认处置/取消处置」废。
+- **测试**:集成 `GroupMembershipCleanupApiTest`(4 例,含 completed 组旧行清理断言);e2e 处置 spec 9 例适配新按钮 + 完成组页缺口断言。
+- **收口过程实锤**:0108 重开例曾残留「确认处置」按钮名(trace 证实 locator 永不解析),已改 `/进「/` 前缀匹配(5f725f4);project-settings 断言窗放宽 15s(44d93ae,PATCH settings 并行下实测 max 5.3s)。
+- **验证**:gradle build/test/integrationTest 绿(集成 224 例)、ktlintCheck 绿、e2e 全量 87 绿、CI build+e2e 全 pass。
