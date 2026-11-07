@@ -265,7 +265,7 @@ class GroupParentApiTest : AbstractApiTest() {
     }
 
     @Test
-    fun `reparent rejects target that has a parent`() {
+    fun `reparent target with parent is accepted (0114 邻层自洽,废除目标无父约束)`() {
         val (authed, key) = setup("DEC160C")
         val (_, e1) = post(authed, "/api/projects/$key/groups", mapOf("typeKey" to "epic", "name" to "E1"))
         val e1Id = e1["groupId"].asText()
@@ -273,9 +273,10 @@ class GroupParentApiTest : AbstractApiTest() {
         val e2Id = e2["groupId"].asText()
         val (_, s1) = post(authed, "/api/projects/$key/groups", mapOf("typeKey" to "sprint", "name" to "S1", "parentGroupId" to e1Id))
         val s1Id = s1["groupId"].asText()
-        // 存量 grandfather 模拟:jdbc 令 E2 挂 E1(正常创建拒绝该形态)
+        // 存量 grandfather 模拟:jdbc 令 E2 挂 E1(0114 起「目标有父」不再是拒绝理由,邻层校验自洽)
         jdbc.update("update item_group set parent_object_id = ? where object_id = ?", UUID.fromString(e1Id), UUID.fromString(e2Id))
-        assertEquals(400, patch(authed, key, s1Id, mapOf("parentGroupId" to e2Id)).first)
+        assertEquals(200, patch(authed, key, s1Id, mapOf("parentGroupId" to e2Id)).first)
+        assertEquals(e2Id, get(authed, "/api/projects/$key/groups/$s1Id")["parentGroupId"].asText())
     }
 
     @Test
