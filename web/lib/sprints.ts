@@ -103,6 +103,31 @@ export async function listGroupTree(key: string): Promise<GroupTree> {
   };
 }
 
+/** spec 0112:当前 epic 判定——active 子组的父 → localStorage 记忆 → null;发现即回写记忆。 */
+export function syncCurrentParent(
+  key: string,
+  sprints: { status: string; parentGroupId: string | null }[],
+): string | null {
+  const cur =
+    sprints.find((s) => s.status === "active" && s.parentGroupId)
+      ?.parentGroupId ?? null;
+  if (!cur && typeof window !== "undefined") {
+    try {
+      return window.localStorage.getItem(`yz-current-parent:${key}`);
+    } catch {
+      /* 忽略 */
+    }
+  }
+  if (cur && typeof window !== "undefined") {
+    try {
+      window.localStorage.setItem(`yz-current-parent:${key}`, cur);
+    } catch {
+      /* 忽略 */
+    }
+  }
+  return cur;
+}
+
 export async function getSprint(
   key: string,
   sprintId: string,

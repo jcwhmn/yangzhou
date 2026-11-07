@@ -27,6 +27,7 @@ import { t } from "@/lib/texts";
 import {
   listGroupTree,
   createSprint as createSprintApi,
+  syncCurrentParent,
   type GroupTree,
 } from "@/lib/sprints";
 import {
@@ -116,25 +117,14 @@ export default function ProjectLayout({
       }
       setTree(t);
       setSprints(t.orphans);
-      // 当前 epic:active 父层优先 → localStorage 记忆(关掉最后一个 active 子组后新建仍落本 epic)→ 无
-      const active = t.parents.find((p) => p.status === "active");
-      let cur = active?.sprintId ?? null;
-      if (!cur && typeof window !== "undefined") {
-        try {
-          cur = window.localStorage.getItem(`yz-current-parent:${key}`);
-        } catch {
-          /* 隐私模式等:忽略 */
-        }
-      }
-      setCurrentParentId(cur);
-      if (cur && typeof window !== "undefined") {
-        try {
-          window.localStorage.setItem(`yz-current-parent:${key}`, cur);
-        } catch {
-          /* 忽略 */
-        }
-      }
+      // 当前 epic:active 子组的父优先 → localStorage 记忆(关掉最后一个 active 子组后新建仍落本 epic)→ 无
+      const leaves = [
+        ...t.orphans,
+        ...Object.values(t.childrenByParent).flat(),
+      ];
+      setCurrentParentId(syncCurrentParent(key, leaves));
       // 展开态:active 父层默认展开(仅加入不移除,保留用户手动开合)
+      const active = t.parents.find((p) => p.status === "active");
       if (active) setExpanded((prev) => new Set(prev).add(active.sprintId));
     };
     listGroupTree(key)
