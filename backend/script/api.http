@@ -1,14 +1,15 @@
 # yangzhou REST API 手测脚本(IntelliJ HTTP Client)
 #
-# 用法:
-#   1. 起后端(IDEA Run 面板 `api [bootRun]`,改过代码先重启它,避免跑旧构建)
-#   2. 打开本文件,右上角环境选 `local`
-#   3. 首次部署:手动跑一次下面的「Bootstrap」
-#   4. 从「登录」开始按顺序点 ▶。带响应处理器的请求自动回填 token / 成员 / item 等变量
+# 用法(2026-11-08 定:本文件属自动化测试,只在 test 环境跑,不进 dev):
+#   1. 起 test 容器:script/app-infra.ps1 up test(api 8082;改过后端先 rebuild)
+#   2. 打开本文件,右上角环境选 `test`
+#   3. 空库首次才需手动跑「Bootstrap」(e2e globalSetup 清库后会自动补种子账号,通常免)
+#   4. 整文件自上而下按序跑——不要单点中间请求:变量靠上文响应回填,单点会踩上一轮的过期值
+#      (例外:spec 0113 节自含,跑过「登录」后可单跑该节;重跑该节前先重跑「登录」)
 #
 # 可重复跑:登录时每轮生成唯一后缀(变量 run),新建一套项目/成员/团队,不与历史数据冲突 → 全绿。
+# test 库随时会被 e2e globalSetup 清空——无妨,本文件每轮自建全新项目,不依赖库内历史数据。
 # 文件末尾「负例区」的红色(409)是预期行为,故意演示约束生效。
-# 注意:每跑一轮会新增一批数据(项目/成员/团队),dev 手测库无清理端点,属已知取舍。
 # 提示:注释里不写双花括号变量引用——IDEA 会对注释也做变量替换,未替换就报「请求无效」。
 
 ### ============ 0. Bootstrap(仅首次部署跑一次;之后再跑会 409 已初始化,属预期) ============
@@ -574,7 +575,7 @@ Authorization: Bearer {{token}}
 DELETE {{host}}/api/projects/{{pkey}}/group-types/{{gtypeKey}}
 Authorization: Bearer {{token}}
 
-=== spec 0100 切片B:层级化类型(去内置 sprint;可删性=空即可删,保留字废除) ===
+### ========== spec 0100 切片B:层级化类型(去内置 sprint;可删性=空即可删,保留字废除) ==========
 
 ### 建类型列表(新项目只有 release;sprint 由用户加 level 自配)
 GET {{host}}/api/projects/{{pkey}}/group-types
@@ -640,23 +641,171 @@ Content-Type: application/json
 GET {{host}}/api/projects/{{pkey}}/groups?parentId={{parentGroupIdSample}}
 Authorization: Bearer {{token}}
 
-### 负例:父层组手动动作 → 409(状态由子组联动)
-POST {{host}}/api/projects/{{pkey}}/groups/{{parentGroupIdSample}}/actions/start
-Authorization: Bearer {{token}}
+### ---------- spec 0113(YPJ-160):组改父(本节自含:自带项目/类型/双 epic/叶组/item;先跑「登录」即可单跑本节;重跑本节前先重跑「登录」刷新 run 后缀) ----------
 
-### 负例:挂 item 到父层组 → 409(item 挂叶层组)
-PUT {{host}}/api/items/{{itemId}}/group-membership
+### 0113 专用项目(变量全带 160 后缀,不与上文串台;新项目类型层级从零判定)
+POST {{host}}/api/projects
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-  "groupId": "{{parentGroupIdSample}}"
+  "key": "P160{{run}}",
+  "name": "组改父手测 {{run}}"
 }
 
-### 负例:删含子组的父层组 → 409(先删子组)
-DELETE {{host}}/api/projects/{{pkey}}/groups/{{parentGroupIdSample}}
+> {%
+  client.global.set("pkey160", response.body.key);
+%}
+
+### 建 timed 类型(新项目首个类型自动 level 1;handler 存 l1Key160)
+POST {{host}}/api/projects/{{pkey160}}/group-types
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "typeKey": "sprint160",
+  "name": "冲刺",
+  "timed": true
+}
+
+> {%
+  client.global.set("l1Key160", response.body.typeKey);
+%}
+
+### 建 epic 类型(第二个类型自动 level 2)
+POST {{host}}/api/projects/{{pkey160}}/group-types
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "typeKey": "epic",
+  "name": "Epic"
+}
+
+### 建 Epic 1(父层;handler 存 epic1Id160)
+POST {{host}}/api/projects/{{pkey160}}/groups
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "typeKey": "epic",
+  "name": "Epic 1 {{run}}"
+}
+
+> {%
+  client.global.set("epic1Id160", response.body.groupId);
+%}
+
+### 建 Epic 2(第二父层;handler 存 epic2Id160)
+POST {{host}}/api/projects/{{pkey160}}/groups
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "typeKey": "epic",
+  "name": "Epic 2 {{run}}"
+}
+
+> {%
+  client.global.set("epic2Id160", response.body.groupId);
+%}
+
+### 建留守叶组挂 Epic 1(不参与改父;给「删含子组」负例当子组;handler 存 s11Id160)
+POST {{host}}/api/projects/{{pkey160}}/groups
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "typeKey": "{{l1Key160}}",
+  "name": "S-0111 {{run}}",
+  "parentGroupId": "{{epic1Id160}}"
+}
+
+> {%
+  client.global.set("s11Id160", response.body.groupId);
+%}
+
+### 建 item(最小体;handler 存 itemId160)
+POST {{host}}/api/projects/{{pkey160}}/items
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "组改父负例 item {{run}}"
+}
+
+> {%
+  client.global.set("itemId160", response.body.itemId);
+%}
+
+### 建 S-0113 挂 Epic 1(handler 存 reparentId160)
+POST {{host}}/api/projects/{{pkey160}}/groups
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "typeKey": "{{l1Key160}}",
+  "name": "S-0113 {{run}}",
+  "parentGroupId": "{{epic1Id160}}"
+}
+
+> {%
+  client.global.set("reparentId160", response.body.groupId);
+%}
+
+### 组改父正例:S-0113 从 Epic 1 改挂 Epic 2 → 200(新旧 epic 状态按 0111 规则联动)
+PATCH {{host}}/api/projects/{{pkey160}}/groups/{{reparentId160}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "parentGroupId": "{{epic2Id160}}"
+}
+
+### 负例:父层组手动动作 → 409(状态由子组联动)
+POST {{host}}/api/projects/{{pkey160}}/groups/{{epic1Id160}}/actions/start
 Authorization: Bearer {{token}}
 
+### 负例:挂 item 到父层组 → 409(item 只挂叶层组)
+PUT {{host}}/api/items/{{itemId160}}/group-membership
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "groupId": "{{epic1Id160}}"
+}
+
+### 负例:删含子组的父层组 → 409(先删子组;子=留守叶组)
+DELETE {{host}}/api/projects/{{pkey160}}/groups/{{epic1Id160}}
+Authorization: Bearer {{token}}
+
+### 负例:组改父——目标为叶层组 → 400(目标须无父 level-2)
+PATCH {{host}}/api/projects/{{pkey160}}/groups/{{reparentId160}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "parentGroupId": "{{s11Id160}}" }
+
+### 负例:组改父——目标不存在 → 404(目标自身有父分支由集成测试 jdbc 造数覆盖)
+PATCH {{host}}/api/projects/{{pkey160}}/groups/{{reparentId160}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "parentGroupId": "00000000-0000-0000-0000-000000000000" }
+
+### 负例:父层组自己改挂 → 400(父层组为顶层)
+PATCH {{host}}/api/projects/{{pkey160}}/groups/{{epic1Id160}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "parentGroupId": "{{epic2Id160}}" }
+
+### 负例:组改父——置空(空串)→ 400(两级项目不提供置空)
+PATCH {{host}}/api/projects/{{pkey160}}/groups/{{reparentId160}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "parentGroupId": "" }
 ### 负例:重名类型 → 409(唯一约束兜底,保留字已废除)
 POST {{host}}/api/projects/{{pkey}}/group-types
 Authorization: Bearer {{token}}

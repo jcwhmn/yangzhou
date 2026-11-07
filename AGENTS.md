@@ -100,7 +100,7 @@ docs/      adr/ · spec/ · architecture/(puml 类图) · requirement/(PRD) · p
 - CI(GitHub Actions):`backend.yml` 跑 `gradle test`(纯单元,免 Docker;spec 0014);`nightly.yml` 每日全量兜底(含集成,红了必修);`e2e.yml` web/backend 变更起 bootRun + Playwright 整跑 E2E
 - 本机开发库:`yangzhou`/`yangzhou_dev`/`yangzhou_test`(外部共享 postgres,已建)。**三 profile 常驻容器化**(YPJ-118,spec 0087):`script/app-infra.ps1 <build|rebuild|up|down|status> <prod|dev|test>`——prod=web3000+api8080 / dev=web3001+api8081 / test=api8082(仅 api,E2E 用);镜像 2 个(api/web),build 先宿主 `bootJar` 再 docker build。rustfs 起停仍 `script/dev-infra.ps1`。调试改码走 IDE/gradle bootRun,但 test profile 须 `--server.port=8082` 且 test 容器已停(8080/8081 归容器)。
 - **不要猜前端或后端是否已运行,需要运行环境的,告知需要的运行环境,命令,从我这里确认**。
-- **三 profile 与端口格局**(2026-10-30 重排,YPJ-118 容器化):**3000(web)+8080 = prod / PM 日常**(default profile,库 `yangzhou`,dogfood 项目 YPJ,真实数据);**3001(web)+8081 = dev**(dev profile,库 `yangzhou_dev`,scratch 可丢弃,空库首启用 `POST /api/auth/bootstrap` 引导);**8082 = test**(test profile,库 `yangzhou_test`,E2E 用,globalSetup 会清库;无前端,E2E 前端由 Playwright 拉起)。常驻起停 `script/app-infra.ps1 <build|rebuild|up|down|status> <prod|dev|test>`;CLI `yz` 的 session(`~/.yangzhou/session.json`)指向谁就写谁的库——动 PM 数据前确认 server 指向 prod(api 8080)。
+- **三 profile 与端口格局**(2026-10-30 重排,YPJ-118 容器化):**3000(web)+8080 = prod / PM 日常**(default profile,库 `yangzhou`,dogfood 项目 YPJ,真实数据);**3001(web)+8081 = dev**(dev profile,库 `yangzhou_dev`,**仅手工 UI 测试**:含准真实数据,禁止自动清库,自动化测试不得指 dev;空库首启用 `POST /api/auth/bootstrap` 引导);**8082 = test**(test profile,库 `yangzhou_test`,**唯一自动化主场——e2e 与 api.http 都只在这里跑**,globalSetup 会清库属预期;无前端,E2E 前端由 Playwright 拉起;2026-11-08 用户拍板)。常驻起停 `script/app-infra.ps1 <build|rebuild|up|down|status> <prod|dev|test>`;CLI `yz` 的 session(`~/.yangzhou/session.json`)指向谁就写谁的库——动 PM 数据前确认 server 指向 prod(api 8080)。
 - PM 实例部署形态(已拍板):本机常驻即可;Postgres 备份手工期(`pg_dump`),自动化另票。
 - **⚠ 前端命令必须在 `web/` 目录下执行**:`cd /d/code/yangzhou/web && npx next build` / `npm run dev` / `npx playwright test` 等。agent 的 shell CWD 每次重置到 repo 根,漏 cd 会在错误目录跑命令导致 `.next` 污染或路径找不到。
 
@@ -110,6 +110,7 @@ docs/      adr/ · spec/ · architecture/(puml 类图) · requirement/(PRD) · p
 - context-mode 批处理工具实际跑 PowerShell——`&&`、`find`、`/dev/null` 语法会挂;简单命令直接用 Bash。
 - headroom 压缩开启时:被压缩的读取输出不可当编辑锚点(原文会被搅坏);大文件读改一律 python 原地处理。
 - CLI/脚本中文输出在 PowerShell 显示乱码(UTF-8 被按 GBK 解码):先 `chcp 65001` 或改用 Git Bash。
+- **api.http/测试环境纪律(2026-11-08 拍板,0113 三轮复盘,详见 docs/planning/2026-11-08-apihttp-0113-复盘.md)**:api.http 与 e2e 等自动化只在 test(8082)跑;dev 只做手工 UI 测试,含准真实数据,禁自动清、禁自动化指 dev。api.http 新增节必须自含(节内自建前置,变量后缀隔离)或文件头声明整文件按序跑;交付用户前先脚本逐请求复刻全绿。用户报错先确认「哪个入口/环境/有无新产物」再归因;e2e 归因纪律(2026-11-08 升格,元因见复盘文档):红例必须**读 trace + 查库实锤**后才许下结论——单跑绿不能当「漂移」证据(负载型问题单跑永远复现不了),error-context 的 DOM 快照可能是陈旧帧;**flake 桶只作记录不作结案**,条目带复现计数,同用例跨会话累计第 3 次红即强制 root-cause(project-settings 覆盖竞态在桶里躺了多届、YPJ-147 board-membership 同案,均为真 bug)。
 
 ## 工作流
 

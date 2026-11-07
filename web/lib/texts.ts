@@ -506,6 +506,10 @@ export const t = {
       "重开将撤销完成态,回到进行中;成员与历史不变,可重新拉入 item。仍要重开?",
     startBtn: "▶ 开始 Sprint",
     completeBtn: "✓ 完成 Sprint",
+    // 0113:组改父——详情页「所属 Epic」选择器
+    parentLabel: "所属 Epic",
+    parentDangling: "未分组（悬空）",
+    reparentFailed: "改挂失败",
   },
   projectNav: {
     overview: "Overview",

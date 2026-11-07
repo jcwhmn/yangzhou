@@ -13,6 +13,8 @@ export default defineConfig({
   testDir: "./e2e",
   globalSetup: "./e2e/global-setup.mjs",
   timeout: 30_000,
+  // 本地 8 workers 下,POST 端点 JVM 首击(冷类加载+Defender 扫描)可达 4s+,5s 默认窗口踩线红(YPJ-160 手验实锤)
+  expect: { timeout: 10_000 },
   retries: process.env.CI ? 1 : 0,
   fullyParallel: true,
   // YPJ-5:auth 断言依赖 me.last_project_key(用例池唯一共享可变态,任何 /p mount 都会覆盖它),

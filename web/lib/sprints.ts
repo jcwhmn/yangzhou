@@ -195,3 +195,26 @@ export async function assignSprint(
     body: JSON.stringify(body),
   });
 }
+
+/** spec 0113(YPJ-160):组改父——PATCH groups 扩 parentGroupId;置空由后端拒绝(两级项目不变量)。 */
+export async function updateGroupParent(
+  key: string,
+  groupId: string,
+  parentGroupId: string,
+): Promise<void> {
+  await api(`/api/projects/${key}/groups/${groupId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ parentGroupId }),
+  });
+}
+
+/** spec 0113:父层组(level-2 类型)列表——详情页「所属 Epic」选项;无 level-2 类型返回 null(=平面项目,不渲染选择器)。 */
+export async function listParents(key: string): Promise<TreeSprint[] | null> {
+  const types = await api<GroupTypeDto[]>(`/api/projects/${key}/group-types`);
+  const l2 = types.find((tp) => tp.level === 2);
+  if (!l2) return null;
+  const groups = await api<GroupDto[]>(`/api/projects/${key}/groups`);
+  return groups
+    .filter((g) => g.typeKey === l2.typeKey)
+    .map((g) => ({ ...toSprint(g), isParent: true }));
+}
