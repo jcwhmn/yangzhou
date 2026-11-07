@@ -405,7 +405,6 @@ class ItemGroupService(
                 else -> StatusType.START
             }
         val parentType = typeOfPid(pid, parent.type)
-        println("DBG propagate pid=$pid parent=$parentObjectId children=" + children.size + " wanted=$wanted parentStatus=" + parent.status)
         if (workflow.statusType(parentType, parent.status) == wanted) return
         val targetName = workflow.statusNameByType(parentType, wanted) ?: return
         groups.save(parent.copy(status = targetName, updatedAt = Instant.now()))
