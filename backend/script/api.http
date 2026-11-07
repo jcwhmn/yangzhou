@@ -599,6 +599,64 @@ Content-Type: application/json
 GET {{host}}/api/projects/{{pkey}}/groups?level=1
 Authorization: Bearer {{token}}
 
+### ---------- spec 0111(YPJ-111):固定两层嵌套 ----------
+
+### 建父层类型(第二个类型自底向上拿 level=2)
+POST {{host}}/api/projects/{{pkey}}/group-types
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "typeKey": "epic",
+  "name": "Epic"
+}
+
+### 建父层组(handler 存 parentGroupIdSample)
+POST {{host}}/api/projects/{{pkey}}/groups
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "typeKey": "epic",
+  "name": "Epic 1"
+}
+
+> {%
+  client.global.set("parentGroupIdSample", response.body.groupId);
+%}
+
+### 建叶层组挂父(parentGroupId)
+POST {{host}}/api/projects/{{pkey}}/groups
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "typeKey": "{{l1Key}}",
+  "name": "S-0111",
+  "parentGroupId": "{{parentGroupIdSample}}"
+}
+
+### 按父过滤(树形组装由前端完成)
+GET {{host}}/api/projects/{{pkey}}/groups?parentId={{parentGroupIdSample}}
+Authorization: Bearer {{token}}
+
+### 负例:父层组手动动作 → 409(状态由子组联动)
+POST {{host}}/api/projects/{{pkey}}/groups/{{parentGroupIdSample}}/actions/start
+Authorization: Bearer {{token}}
+
+### 负例:挂 item 到父层组 → 409(item 挂叶层组)
+PUT {{host}}/api/items/{{itemId}}/group-membership
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "groupId": "{{parentGroupIdSample}}"
+}
+
+### 负例:删含子组的父层组 → 409(先删子组)
+DELETE {{host}}/api/projects/{{pkey}}/groups/{{parentGroupIdSample}}
+Authorization: Bearer {{token}}
+
 ### 负例:重名类型 → 409(唯一约束兜底,保留字已废除)
 POST {{host}}/api/projects/{{pkey}}/group-types
 Authorization: Bearer {{token}}

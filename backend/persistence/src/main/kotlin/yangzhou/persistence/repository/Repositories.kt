@@ -366,6 +366,12 @@ interface ItemGroupRepository : CrudRepository<ItemGroup, Long> {
 
     fun findByProjectObjectIdOrderByCreatedAt(projectObjectId: UUID): List<ItemGroup>
 
+    /** spec 0111:某父组下的子组(固定两层树)。 */
+    fun findAllByProjectObjectIdAndParentObjectId(
+        projectObjectId: UUID,
+        parentObjectId: UUID,
+    ): List<ItemGroup>
+
     fun findByProjectObjectIdAndObjectId(
         projectObjectId: UUID,
         objectId: UUID,
