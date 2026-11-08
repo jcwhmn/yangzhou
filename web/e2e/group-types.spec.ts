@@ -103,12 +103,11 @@ test("GroupTypesPanel——workflow 编辑:label/icon 覆写保存并持久(spec
 
   // 首条出边(planned→active)配 label/icon
   await li.getByPlaceholder("显示名(可选)").first().fill("启动");
-  await li.getByPlaceholder("图标(可选)").first().fill("▶");
   await li.getByRole("button", { name: "保存" }).click();
 
   // 保存后回只读态,立即显示覆写
   await expect(
-    dialog.getByText(/planned · 起点 · ▶ 启动 → active/),
+    dialog.getByText(/planned · 起点 · ↔ 启动 → active/),
   ).toBeVisible();
 
   // 持久化:刷新重开面板仍在
@@ -116,6 +115,6 @@ test("GroupTypesPanel——workflow 编辑:label/icon 覆写保存并持久(spec
   await page.getByRole("button", { name: "分组类型管理" }).click();
   await expect(page.getByRole("dialog")).toBeVisible();
   await expect(
-    page.getByRole("dialog").getByText(/planned · 起点 · ▶ 启动 → active/),
+    page.getByRole("dialog").getByText(/planned · 起点 · ↔ 启动 → active/),
   ).toBeVisible();
 });

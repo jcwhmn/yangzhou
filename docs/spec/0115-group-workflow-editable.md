@@ -54,10 +54,16 @@ transitions 建类型时由后端种子固化(`group_status.transitions` JSON �
 
 1. 类型:`transitions` 项增 `label?: string; icon?: string`。
 2. 只读行:`icon`(有则前缀)+ `(tr.label || wfFnLabel(tr.function))` + ` → target`(原 R2a 并入)。
-3. 编辑态:每类型 workflow 块头「编辑」按钮 → 出边行内编辑(function Select = 注册表中文名 / target Select = 本类型状态 / label+icon TextField)+ 状态级「加出边」(每状态可多条出边)、边级「删」→ 保存走 PUT → 重拉 workflow;取消还原。
+3. 编辑态:每类型 workflow 块头「编辑」按钮 → 出边行内编辑:
+   - function Select = **英文函数名**,数据字典 `web/lib/groupWorkflow.ts`(`WF_FN_DICT`,与后端 `GroupActionFn` 注册表对齐:fn/中文 label/预定义 icon 三元组,唯一来源)
+   - label/icon **预填字典值**(进编辑态对存量缺省边预填;换 function 即重预填,均可改;保存落库)
+   - icon = **预定义下拉**((无) + 7 个字典符号),不自由输入
+   - target Select = 本类型状态;状态级「加出边」(每状态可多条出边)、边级「删」
+   - 保存走 PUT → 重拉 workflow;取消还原
    - 已知行为(数据驱动,用户自负):删掉某边后,sprint 页对应动作按钮点击将 409(按出边 fn 路由);UI 不拦。
 4. 新文案键入 `web/lib/texts.ts`(中文优先,文案外置)。
-5. **否决**:独立 workflow 编辑对话框——面板已有类型/状态上下文,行内编辑少一层状态同步。
+5. **release 类型不进面板**(release 非用户管理的分组类型,专属功能域;2026-11-09 用户明确)。保存成功即回 W-RO,定义好的 transition 直接显示于面板只读行,无需进编辑态查看。
+6. **否决**:独立 workflow 编辑对话框——面板已有类型/状态上下文,行内编辑少一层状态同步。
 
 #### B-1 操作流程(状态×动作真值表)
 
@@ -95,11 +101,11 @@ transitions 建类型时由后端种子固化(`group_status.transitions` JSON �
 ```text
 │ ● sprint    [chip][chip]        [保存] [取消] │
 │ │   planned (START)                           │ ← 状态行(只读,不可增删/改 statusType)
-│ │     [function▾ 开始] [target▾ active]      [label: 启动] [icon: ▶] [删] │ ← 出边 1
-│ │     [function▾ 切换] [target▾ active]      [label: ] [icon: ] [删] │ ← 出边 2(同状态可多条)
+│ │     [fn▾ start]    [target▾ active]      [label: 启动] [icon▾ ▶] [删] │ ← 出边 1
+│ │     [fn▾ switch]  [target▾ active]      [label: 切换] [icon▾ ↔] [删] │ ← 出边 2(同状态可多条)
 │ │     [＋ 此状态加出边]                        │
 │ │   active (ACTIVE)                           │
-│ │     [function▾ 完成] [target▾ completed]   [label: ] [icon: ] [删] │
+│ │     [fn▾ complete][target▾ completed]   [label: 完成] [icon▾ ✓] [删] │
 │ │     [＋ 此状态加出边]                        │
 │ │   ⚠ 错误条(PUT 409/400 时显示于此,如「状态集不可增改」) │
 ```

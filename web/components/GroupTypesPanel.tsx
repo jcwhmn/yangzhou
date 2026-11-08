@@ -27,6 +27,7 @@ import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { t } from "@/lib/texts";
+import { WF_FN_DICT, wfFnIcon, wfFnLabel } from "@/lib/groupWorkflow";
 
 type GroupType = {
   typeKey: string;
@@ -48,17 +49,6 @@ type WfStatus = {
   transitions: WfTransition[];
 };
 
-// spec 0115:GroupActionFn 注册表(function 下拉;与后端注册表对齐)
-const WF_FNS = [
-  "start",
-  "complete",
-  "backward",
-  "switch",
-  "forward",
-  "reopen",
-  "cancel",
-];
-
 function wfTypeLabel(statusType: string): string {
   switch (statusType) {
     case "START":
@@ -69,25 +59,6 @@ function wfTypeLabel(statusType: string): string {
       return t.wf.active;
     default:
       return statusType;
-  }
-}
-
-function wfFnLabel(fn: string): string {
-  switch (fn) {
-    case "start":
-      return t.wf.fnStart;
-    case "complete":
-      return t.wf.fnComplete;
-    case "switch":
-      return t.wf.fnSwitch;
-    case "forward":
-      return t.wf.fnForward;
-    case "backward":
-      return t.wf.fnBackward;
-    case "cancel":
-      return t.wf.fnCancel;
-    default:
-      return fn;
   }
 }
 
@@ -116,10 +87,12 @@ export function GroupTypesPanel({
   const load = () => {
     api<GroupType[]>(`/api/projects/${projectKey}/group-types`)
       .then(async (ts) => {
-        setTypes(ts);
+        // release 非用户管理的分组类型(专属功能域),面板不展示
+        const visible = ts.filter((g) => g.typeKey !== "release");
+        setTypes(visible);
         // spec 0097 S3:workflow 只读展示,每类型一拉;失败不阻断类型管理(该类型不显示块)
         const entries = await Promise.all(
-          ts.map(async (g) => {
+          visible.map(async (g) => {
             const wf = await api<WfStatus[]>(
               `/api/projects/${projectKey}/group-types/${g.typeKey}/workflow`,
             ).catch(() => undefined);
@@ -181,7 +154,17 @@ export function GroupTypesPanel({
   function startEdit(typeKey: string) {
     // 互斥:进入新类型编辑即静默取消他类型草稿
     setEditing(typeKey);
-    setDraft(structuredClone(workflows[typeKey] ?? []));
+    // 预填:label/icon 缺省取数据字典(用户可改;保存后落库)
+    setDraft(
+      (workflows[typeKey] ?? []).map((st) => ({
+        ...st,
+        transitions: st.transitions.map((tr) => ({
+          ...tr,
+          label: tr.label ?? wfFnLabel(tr.function),
+          icon: tr.icon ?? wfFnIcon(tr.function),
+        })),
+      })),
+    );
     setWfError("");
   }
 
@@ -235,7 +218,12 @@ export function GroupTypesPanel({
               ...st,
               transitions: [
                 ...st.transitions,
-                { function: "switch", target: draft[0]?.name ?? st.name },
+                {
+                  function: "switch",
+                  target: draft[0]?.name ?? st.name,
+                  label: wfFnLabel("switch"),
+                  icon: wfFnIcon("switch"),
+                },
               ],
             }
           : st,
@@ -376,17 +364,21 @@ export function GroupTypesPanel({
                           <Select
                             size="small"
                             value={tr.function}
-                            onChange={(e) =>
+                            onChange={(e) => {
+                              const fn = e.target.value;
+                              // 换函数即重预填 label/icon(可再改)
                               setEdge(si, ti, {
                                 ...tr,
-                                function: e.target.value,
-                              })
-                            }
-                            sx={{ minWidth: 80 }}
+                                function: fn,
+                                label: wfFnLabel(fn),
+                                icon: wfFnIcon(fn),
+                              });
+                            }}
+                            sx={{ minWidth: 90 }}
                           >
-                            {WF_FNS.map((fn) => (
+                            {Object.keys(WF_FN_DICT).map((fn) => (
                               <MenuItem key={fn} value={fn}>
-                                {wfFnLabel(fn)}
+                                {fn}
                               </MenuItem>
                             ))}
                           </Select>
@@ -413,15 +405,23 @@ export function GroupTypesPanel({
                             }
                             sx={{ width: 110 }}
                           />
-                          <TextField
+                          <Select
                             size="small"
-                            placeholder={t.groupTypes.wfIconPh}
                             value={tr.icon ?? ""}
                             onChange={(e) =>
                               setEdge(si, ti, { ...tr, icon: e.target.value })
                             }
-                            sx={{ width: 90 }}
-                          />
+                            sx={{ minWidth: 70 }}
+                          >
+                            <MenuItem value="">
+                              {t.groupTypes.wfIconNone}
+                            </MenuItem>
+                            {Object.entries(WF_FN_DICT).map(([fn, d]) => (
+                              <MenuItem key={fn} value={d.icon}>
+                                {d.icon}
+                              </MenuItem>
+                            ))}
+                          </Select>
                           <IconButton
                             size="small"
                             aria-label={t.groupTypes.deleteBtn}
