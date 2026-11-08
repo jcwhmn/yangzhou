@@ -1308,14 +1308,15 @@ GET {{host}}/api/projects/{{pkey}}/metrics/scope-change?groupId=00000000-0000-00
 GET {{host}}/api/projects/{{pkey}}/metrics/reopen-rate?from=2026-12-31T00:00:00Z&to=2026-09-01T00:00:00Z
 Authorization: Bearer {{token}}
 
-### 建 sprint 供负例(YPJ-56;handler 存 completedSprintId)
+### 建 sprint 供负例(YPJ-56;handler 存 completedSprintId;spec 0114 起叶层必挂父,挂上文 epic 样例组)
 POST {{host}}/api/projects/{{pkey}}/groups
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
   "typeKey": "sprint",
-  "name": "负例用 sprint"
+  "name": "负例用 sprint",
+  "parentGroupId": "{{parentGroupIdSample}}"
 }
 
 > {%
@@ -1337,8 +1338,7 @@ Content-Type: application/json
 
 {
   "title": "负例:直入已完成 sprint",
-  "groupId": "{{completedSprintId}}",
-  "groupType": "sprint"
+  "sprintId": "{{completedSprintId}}"
 }
 
 ### [预期 404] 建 item 带未知 sprint(item 不落库,YPJ-56)
