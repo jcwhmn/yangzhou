@@ -230,6 +230,17 @@ class ItemGroupService(
         typeKey: String,
     ) = workflow.workflow(typeOf(key, typeKey))
 
+    /** spec 0115(YPJ-164):workflow 出边全量替换(状态集/statusType 锁死);校验集中 GroupWorkflowService。 */
+    @Transactional
+    fun updateWorkflow(
+        key: String,
+        typeKey: String,
+        requests: List<GroupWorkflowService.StatusTransitionsRequest>,
+    ): List<GroupWorkflowService.GroupStatusDto> {
+        leaderGuard.requireLeader(key)
+        return workflow.updateWorkflow(typeOf(key, typeKey), requests)
+    }
+
     // ---------- 组 CRUD ----------
 
     /** level-1 组数据源(board/dashboard 等结构语义消费方;无 level-1 → 空表)。 */

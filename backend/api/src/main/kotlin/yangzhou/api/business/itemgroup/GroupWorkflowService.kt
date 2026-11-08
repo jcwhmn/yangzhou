@@ -3,6 +3,7 @@ package yangzhou.api.business.itemgroup
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import tools.jackson.databind.ObjectMapper
+import yangzhou.api.error.BadRequestException
 import yangzhou.api.error.ConflictException
 import yangzhou.persistence.GroupStatus
 import yangzhou.persistence.ItemGroupType
@@ -48,9 +49,33 @@ class GroupWorkflowService(
         val transitions: List<GroupTransitionDto>,
     )
 
-    data class GroupTransitionDto(val function: String, val target: String)
+    data class GroupTransitionDto(
+        val function: String,
+        val target: String,
+        /** spec 0115:显示覆写,缺省回退前端全局映射(缺省 null,GET 契约兼容)。 */
+        val label: String? = null,
+        val icon: String? = null,
+    )
 
-    private data class Edge(val function: String, val target: String)
+    private data class Edge(
+        val function: String,
+        val target: String,
+        val label: String? = null,
+        val icon: String? = null,
+    )
+
+    /** spec 0115:PUT workflow 请求形状——顶层按状态数组全量替换(同 0110 风格);状态集/statusType 锁死。 */
+    data class StatusTransitionsRequest(
+        val name: String,
+        val transitions: List<TransitionRequest>,
+    )
+
+    data class TransitionRequest(
+        val function: String,
+        val target: String,
+        val label: String? = null,
+        val icon: String? = null,
+    )
 
     // ---------- 种子模板(createType / ProjectService.create 复用) ----------
 
@@ -97,6 +122,58 @@ class GroupWorkflowService(
 
     fun workflow(type: ItemGroupType): List<GroupStatusDto> = groupStatuses.findByGroupTypeIdOrderByPosition(type.id!!).map { it.toDto() }
 
+    /** spec 0115(YPJ-164):出边全量替换——状态名集合与 statusType 锁死(0097 种子/0111 联动语义锚);
+     *  function 限注册表并做意图静态预检(同 applyAction 规则),防配置出「点了必 409」的死边。 */
+    @Transactional
+    fun updateWorkflow(
+        type: ItemGroupType,
+        requests: List<StatusTransitionsRequest>,
+    ): List<GroupStatusDto> {
+        val statuses = groupStatuses.findByGroupTypeIdOrderByPosition(type.id!!)
+        val byName = statuses.associateBy { it.name }
+        val nameSet = requests.map { it.name }.toSet()
+        if (requests.size != nameSet.size || nameSet != byName.keys) {
+            throw ConflictException("状态集不可增改:须与现有状态完全一致 $byName.keys")
+        }
+        requests.forEach { req ->
+            val from = byName.getValue(req.name)
+            val functions = mutableSetOf<String>()
+            req.transitions.forEach { e ->
+                val action =
+                    GroupActionFn.of(e.function.trim())
+                        ?: throw ConflictException("未注册动作函数:$e.function")
+                if (!functions.add(action.name)) throw ConflictException("同一状态出边 function 重复:$e.function")
+                val target =
+                    byName[e.target]
+                        ?: throw ConflictException("出边目标不在类型 workflow 内:$e.target")
+                if (action.sourceType != null && from.statusType != action.sourceType) {
+                    throw ConflictException("动作 $e.function 仅允许从 $action.sourceType 态触发")
+                }
+                if (action.targetType != null && target.statusType != action.targetType) {
+                    throw ConflictException("动作 $e.function 的出边目标必须是 $action.targetType 态")
+                }
+                if ((e.label?.trim()?.length ?: 0) > 20) throw BadRequestException("label 超长(≤20)")
+                if ((e.icon?.trim()?.length ?: 0) > 4) throw BadRequestException("icon 超长(≤4)")
+            }
+        }
+        statuses.forEach { st ->
+            val edges =
+                requests
+                    .first { it.name == st.name }
+                    .transitions
+                    .map { e ->
+                        buildMap<String, String> {
+                            put("function", e.function.trim())
+                            put("target", e.target)
+                            e.label?.trim()?.takeIf { it.isNotEmpty() }?.let { put("label", it) }
+                            e.icon?.trim()?.takeIf { it.isNotEmpty() }?.let { put("icon", it) }
+                        }
+                    }
+            groupStatuses.save(st.copy(transitions = mapper.writeValueAsString(edges)))
+        }
+        return workflow(type)
+    }
+
     /** 组初始状态 = 该类型 workflow 的 START 态名(如 sprint=planned)。 */
     fun startStatusName(type: ItemGroupType): String = groupStatuses.findByGroupTypeIdOrderByPosition(type.id!!).firstOrNull { it.statusType == StatusType.START }?.name
         ?: error("类型 ${type.typeKey} 缺 START 状态")
@@ -141,11 +218,20 @@ class GroupWorkflowService(
 
     private fun parseTransitions(status: GroupStatus): List<Edge> = try {
         mapper.readTree(status.transitions).map { node ->
-            Edge(node["function"]?.asString() ?: "switch", node["target"]?.asString() ?: "")
+            Edge(
+                function = node["function"]?.asString() ?: "switch",
+                target = node["target"]?.asString() ?: "",
+                label = node["label"]?.takeIf { !it.isNull }?.asString(),
+                icon = node["icon"]?.takeIf { !it.isNull }?.asString(),
+            )
         }.filter { it.target.isNotEmpty() }
     } catch (_: Exception) {
         emptyList()
     }
 
-    private fun GroupStatus.toDto() = GroupStatusDto(name, statusType, parseTransitions(this).map { GroupTransitionDto(it.function, it.target) })
+    private fun GroupStatus.toDto() = GroupStatusDto(
+        name,
+        statusType,
+        parseTransitions(this).map { GroupTransitionDto(it.function, it.target, it.label, it.icon) },
+    )
 }
