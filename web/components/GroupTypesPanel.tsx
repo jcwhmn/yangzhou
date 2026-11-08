@@ -19,8 +19,11 @@ import {
   Typography,
   FormControlLabel,
   Checkbox,
+  Select,
+  MenuItem,
 } from "@mui/material";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { t } from "@/lib/texts";
@@ -32,12 +35,29 @@ type GroupType = {
   level: number | null;
   timed: boolean;
 };
-// spec 0097 S3:类型 workflow 只读形状(同 GroupWorkflowService.GroupStatusDto)
+// spec 0097 S3:类型 workflow 只读形状(同 GroupWorkflowService.GroupStatusDto);spec 0115 增 label/icon
+type WfTransition = {
+  function: string;
+  target: string;
+  label?: string | null;
+  icon?: string | null;
+};
 type WfStatus = {
   name: string;
   statusType: string;
-  transitions: { function: string; target: string }[];
+  transitions: WfTransition[];
 };
+
+// spec 0115:GroupActionFn 注册表(function 下拉;与后端注册表对齐)
+const WF_FNS = [
+  "start",
+  "complete",
+  "backward",
+  "switch",
+  "forward",
+  "reopen",
+  "cancel",
+];
 
 function wfTypeLabel(statusType: string): string {
   switch (statusType) {
@@ -88,6 +108,10 @@ export function GroupTypesPanel({
   const [name, setName] = useState("");
   const [timed, setTimed] = useState(false);
   const [error, setError] = useState("");
+  // spec 0115:W-EDIT 单类型粒度(同时至多一个);草稿生命周期 = 对话框会话,关框即弃
+  const [editing, setEditing] = useState<string | null>(null);
+  const [draft, setDraft] = useState<WfStatus[]>([]);
+  const [wfError, setWfError] = useState("");
 
   const load = () => {
     api<GroupType[]>(`/api/projects/${projectKey}/group-types`)
@@ -114,6 +138,9 @@ export function GroupTypesPanel({
       setName("");
       setTimed(false);
       setError("");
+      setEditing(null);
+      setDraft([]);
+      setWfError("");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, projectKey]);
@@ -147,6 +174,83 @@ export function GroupTypesPanel({
     } catch (e) {
       setError(e instanceof Error ? e.message : t.groupTypes.failed);
     }
+  }
+
+  // ---------- spec 0115:workflow 编辑(W-EDIT) ----------
+
+  function startEdit(typeKey: string) {
+    // 互斥:进入新类型编辑即静默取消他类型草稿
+    setEditing(typeKey);
+    setDraft(structuredClone(workflows[typeKey] ?? []));
+    setWfError("");
+  }
+
+  function cancelEdit() {
+    setEditing(null);
+    setDraft([]);
+    setWfError("");
+  }
+
+  async function saveEdit(typeKey: string) {
+    try {
+      await api(`/api/projects/${projectKey}/group-types/${typeKey}/workflow`, {
+        method: "PUT",
+        body: JSON.stringify(
+          draft.map((st) => ({
+            name: st.name,
+            transitions: st.transitions.map((tr) => ({
+              function: tr.function,
+              target: tr.target,
+              ...(tr.label ? { label: tr.label } : {}),
+              ...(tr.icon ? { icon: tr.icon } : {}),
+            })),
+          })),
+        ),
+      });
+      cancelEdit();
+      load();
+    } catch (e) {
+      setWfError(e instanceof Error ? e.message : t.groupTypes.wfFailed);
+    }
+  }
+
+  function setEdge(si: number, ti: number, tr: WfTransition) {
+    setDraft(
+      draft.map((st, i) =>
+        i === si
+          ? {
+              ...st,
+              transitions: st.transitions.map((e, j) => (j === ti ? tr : e)),
+            }
+          : st,
+      ),
+    );
+  }
+
+  function addEdge(si: number) {
+    setDraft(
+      draft.map((st, i) =>
+        i === si
+          ? {
+              ...st,
+              transitions: [
+                ...st.transitions,
+                { function: "switch", target: draft[0]?.name ?? st.name },
+              ],
+            }
+          : st,
+      ),
+    );
+  }
+
+  function delEdge(si: number, ti: number) {
+    setDraft(
+      draft.map((st, i) =>
+        i === si
+          ? { ...st, transitions: st.transitions.filter((_, j) => j !== ti) }
+          : st,
+      ),
+    );
   }
 
   return (
@@ -196,9 +300,33 @@ export function GroupTypesPanel({
                     <DeleteOutlineIcon fontSize="small" />
                   </IconButton>
                 )}
+                {editing === g.typeKey ? (
+                  <>
+                    <Button
+                      size="small"
+                      variant="contained"
+                      onClick={() => saveEdit(g.typeKey)}
+                    >
+                      {t.groupTypes.wfSave}
+                    </Button>
+                    <Button size="small" onClick={cancelEdit} sx={{ mr: 1 }}>
+                      {t.groupTypes.wfCancel}
+                    </Button>
+                  </>
+                ) : (
+                  workflows[g.typeKey] !== undefined && (
+                    <IconButton
+                      size="small"
+                      aria-label={t.groupTypes.wfEdit}
+                      onClick={() => startEdit(g.typeKey)}
+                    >
+                      <EditOutlinedIcon fontSize="small" />
+                    </IconButton>
+                  )
+                )}
               </Box>
-              {/* spec 0097 S3:workflow 只读展示(状态 · statusType · 出边动作 → 目标) */}
-              {workflows[g.typeKey] !== undefined && (
+              {/* spec 0097 S3:workflow 展示;spec 0115:W-RO 只读(接 label/icon)/ W-EDIT 行内编辑 */}
+              {workflows[g.typeKey] !== undefined && editing !== g.typeKey && (
                 <Box sx={{ pl: 2, pb: 1 }}>
                   {workflows[g.typeKey]!.length === 0 ? (
                     <Typography variant="caption" color="text.secondary">
@@ -217,11 +345,101 @@ export function GroupTypesPanel({
                           ` · ${st.transitions
                             .map(
                               (tr) =>
-                                `${wfFnLabel(tr.function)} → ${tr.target}`,
+                                `${tr.icon ? `${tr.icon} ` : ""}${
+                                  tr.label || wfFnLabel(tr.function)
+                                } → ${tr.target}`,
                             )
                             .join("、")}`}
                       </Typography>
                     ))
+                  )}
+                </Box>
+              )}
+              {editing === g.typeKey && (
+                <Box sx={{ pl: 2, pb: 1 }}>
+                  {draft.map((st, si) => (
+                    <Box key={st.name} sx={{ mb: 1 }}>
+                      <Typography
+                        variant="caption"
+                        component="div"
+                        color="text.secondary"
+                      >
+                        {st.name} · {wfTypeLabel(st.statusType)}
+                      </Typography>
+                      {st.transitions.map((tr, ti) => (
+                        <Stack
+                          key={ti}
+                          direction="row"
+                          spacing={0.5}
+                          sx={{ pl: 1, alignItems: "center", my: 0.5 }}
+                        >
+                          <Select
+                            size="small"
+                            value={tr.function}
+                            onChange={(e) =>
+                              setEdge(si, ti, {
+                                ...tr,
+                                function: e.target.value,
+                              })
+                            }
+                            sx={{ minWidth: 80 }}
+                          >
+                            {WF_FNS.map((fn) => (
+                              <MenuItem key={fn} value={fn}>
+                                {wfFnLabel(fn)}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                          <Select
+                            size="small"
+                            value={tr.target}
+                            onChange={(e) =>
+                              setEdge(si, ti, { ...tr, target: e.target.value })
+                            }
+                            sx={{ minWidth: 100 }}
+                          >
+                            {draft.map((s) => (
+                              <MenuItem key={s.name} value={s.name}>
+                                {s.name}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                          <TextField
+                            size="small"
+                            placeholder={t.groupTypes.wfLabelPh}
+                            value={tr.label ?? ""}
+                            onChange={(e) =>
+                              setEdge(si, ti, { ...tr, label: e.target.value })
+                            }
+                            sx={{ width: 110 }}
+                          />
+                          <TextField
+                            size="small"
+                            placeholder={t.groupTypes.wfIconPh}
+                            value={tr.icon ?? ""}
+                            onChange={(e) =>
+                              setEdge(si, ti, { ...tr, icon: e.target.value })
+                            }
+                            sx={{ width: 90 }}
+                          />
+                          <IconButton
+                            size="small"
+                            aria-label={t.groupTypes.deleteBtn}
+                            onClick={() => delEdge(si, ti)}
+                          >
+                            <DeleteOutlineIcon fontSize="small" />
+                          </IconButton>
+                        </Stack>
+                      ))}
+                      <Button size="small" onClick={() => addEdge(si)}>
+                        {t.groupTypes.wfAddEdge}
+                      </Button>
+                    </Box>
+                  ))}
+                  {wfError && (
+                    <Alert severity="error" sx={{ mt: 1 }}>
+                      {wfError}
+                    </Alert>
                   )}
                 </Box>
               )}

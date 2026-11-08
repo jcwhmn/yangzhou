@@ -258,6 +258,13 @@ export const t = {
     workflow: "Workflow",
     wfEmpty: "(无状态)",
     timed: "时间盒",
+    wfEdit: "编辑工作流",
+    wfSave: "保存",
+    wfCancel: "取消",
+    wfAddEdge: "加出边",
+    wfLabelPh: "显示名(可选)",
+    wfIconPh: "图标(可选)",
+    wfFailed: "工作流保存失败",
   },
   sprints: {
     noLevel1:

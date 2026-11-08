@@ -81,3 +81,41 @@ test("level 动线——UI 建 timed level-1 类型 → 建 Sprint 组(数据源
   await expect(page.getByText("iteration-1")).toBeVisible();
   await expect(page.getByText("暂无Iteration")).toHaveCount(0);
 });
+
+test("GroupTypesPanel——workflow 编辑:label/icon 覆写保存并持久(spec 0115)", async ({
+  page,
+  projectKey,
+}) => {
+  await apiCall("POST", `/api/projects/${projectKey}/group-types`, {
+    typeKey: "phase",
+    name: "阶段",
+  });
+
+  await page.goto(`/p/${projectKey}`);
+  await page.getByRole("button", { name: "分组类型管理" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+
+  // 进入「阶段」类型的编辑态(W-EDIT;头部变保存/取消)
+  const li = dialog.locator("li").filter({ hasText: "阶段" });
+  await li.getByRole("button", { name: "编辑工作流" }).click();
+  await expect(li.getByRole("button", { name: "保存" })).toBeVisible();
+
+  // 首条出边(planned→active)配 label/icon
+  await li.getByPlaceholder("显示名(可选)").first().fill("启动");
+  await li.getByPlaceholder("图标(可选)").first().fill("▶");
+  await li.getByRole("button", { name: "保存" }).click();
+
+  // 保存后回只读态,立即显示覆写
+  await expect(
+    dialog.getByText(/planned · 起点 · ▶ 启动 → active/),
+  ).toBeVisible();
+
+  // 持久化:刷新重开面板仍在
+  await page.reload();
+  await page.getByRole("button", { name: "分组类型管理" }).click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await expect(
+    page.getByRole("dialog").getByText(/planned · 起点 · ▶ 启动 → active/),
+  ).toBeVisible();
+});
