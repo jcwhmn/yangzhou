@@ -37,12 +37,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { t } from "@/lib/texts";
 import {
-  listSprints,
   getSprint,
+  listGroups,
   sprintAction,
   assignSprint,
   createSprint,
-  level1Type,
   listParentCandidates,
   updateGroupParent,
 } from "@/lib/sprints";
@@ -109,7 +108,8 @@ export default function SprintPage() {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
-  const [allSprints, setAllSprints] = useState<Sprint[]>([]);
+  // spec 0114:全量组——处置目标树/开始提示按本组类型取候选(L1-only 不再够用)
+  const [groups, setGroups] = useState<Sprint[]>([]);
   // spec 0114:上一层组选项(null=顶层组/平面项目,不渲染选择器)
   const [parentSel, setParentSel] = useState<{
     name: string;
@@ -128,7 +128,7 @@ export default function SprintPage() {
     rows: { itemId: string; title: string; toBacklog: boolean }[];
     actives: Sprint[];
     planned: Sprint[];
-    l1Name: string;
+    typeName: string;
     pick: string;
     newName: string;
   }>(null);
@@ -148,18 +148,19 @@ export default function SprintPage() {
       getSprint(key, id),
       api<Item[]>(`/api/projects/${key}/groups/${id}/items`),
       api<{ statuses: Status[] }>(`/api/projects/${key}`),
-      listSprints(key),
+      listGroups(key),
       api<{ typeKey: string; name: string; level: number | null }[]>(
         `/api/projects/${key}/group-types`,
       ),
     ])
-      .then(([s, its, p, all, tps]) => {
+      .then(([s, its, p, gs, tps]) => {
         if (sprintVer.current === ver) setSprint(s);
         setSprint(s);
         setItems(its);
         setStatuses(p.statuses);
-        setAllSprints(all);
-        setL1Key(tps.find((tp) => tp.level === 1)?.typeKey ?? null);
+        setGroups(gs);
+        const l1 = tps.find((tp) => tp.level === 1)?.typeKey ?? null;
+        setL1Key(l1);
         setTypeName(tps.find((tp) => tp.typeKey === s.typeKey)?.name ?? null);
         // spec 0114:workflow 按本组自身类型拉取(类型纯用户配置,不得硬编码 sprint)
         api<TypeWorkflow[]>(
@@ -212,7 +213,14 @@ export default function SprintPage() {
 
   // V13-S4:状态单向——开始/完成各一步;开始时若已有进行中 sprint 则提示(不禁止并存)
   function startSprint() {
-    if (allSprints.some((s) => s.status === "active" && s.sprintId !== id))
+    if (
+      groups.some(
+        (s) =>
+          s.typeKey === sprint?.typeKey &&
+          s.status === "active" &&
+          s.sprintId !== id,
+      )
+    )
       setConfirmFlow("start");
     else void doStart();
   }
@@ -241,17 +249,19 @@ export default function SprintPage() {
         statuses.find((st) => st.name === it.status)?.statusType !== "FINAL",
     );
     setConfirmFlow(null); // 开处置前关确认弹窗,避免双 dialog 叠置
-    const others = allSprints.filter((s) => s.sprintId !== id);
+    // spec 0114:候选=同类型组;计划中再限同父(同季)。L1 无父(null==null)退化为全类型,平面行为不变
+    const others = groups.filter(
+      (g) => g.typeKey === sprint?.typeKey && g.sprintId !== id,
+    );
     const actives = others.filter((s) => s.status === "active");
-    const planned = others.filter((s) => s.status === "planned");
-    let l1Name = "Sprint";
-    try {
-      l1Name = (await level1Type(key))?.name ?? l1Name;
-    } catch {
-      /* 无类型极端:谓词天然收容 Backlog,弹窗仍可全回 Backlog */
-    }
-    let n = allSprints.length + 1; // 含本组:新建的是「下一号」
-    while (allSprints.some((s) => s.name === `${l1Name} ${n}`)) n += 1;
+    const planned = others.filter(
+      (s) =>
+        s.status === "planned" &&
+        (s.parentGroupId ?? null) === (sprint?.parentGroupId ?? null),
+    );
+    const tn = typeName ?? sprint?.typeKey ?? "";
+    let n = others.length + 2; // 含本组(others 不含自身):新建的是「下一号」
+    while (others.some((s) => s.name === `${tn} ${n}`)) n += 1;
     setDisp({
       rows: nonFinal.map((it) => ({
         itemId: it.itemId,
@@ -260,9 +270,9 @@ export default function SprintPage() {
       })),
       actives,
       planned,
-      l1Name,
+      typeName: tn,
       pick: (actives[0] ?? planned[0])?.sprintId ?? "",
-      newName: `${l1Name} ${n}`,
+      newName: `${tn} ${n}`,
     });
   }
 
@@ -282,8 +292,10 @@ export default function SprintPage() {
         await sprintAction(key, pick, "start");
         target = pick;
       } else {
-        const name = disp.newName.trim() || `${disp.l1Name} 1`;
-        const existing = allSprints.find((s) => s.name === name);
+        const name = disp.newName.trim() || `${disp.typeName} 1`;
+        const existing = groups.find(
+          (s) => s.typeKey === sprint?.typeKey && s.name === name,
+        );
         target = (
           existing ??
           (await createSprint(key, {
@@ -822,7 +834,7 @@ export default function SprintPage() {
             <DialogContent>
               <Typography>
                 {confirmFlow === "start"
-                  ? `项目已有进行中的 ${typeName ?? sprint.typeKey}「${allSprints.find((s) => s.status === "active" && s.sprintId !== id)?.name ?? ""}」,允许同时存在多个进行中。仍要开始本 ${typeName ?? sprint.typeKey}?`
+                  ? `项目已有进行中的 ${typeName ?? sprint.typeKey}「${groups.find((s) => s.typeKey === sprint.typeKey && s.status === "active" && s.sprintId !== id)?.name ?? ""}」,允许同时存在多个进行中。仍要开始本 ${typeName ?? sprint.typeKey}?`
                   : confirmFlow === "reopen"
                     ? t.sprintPage.reopenConfirm
                     : `完成后,${(items ?? []).filter((it) => !(statuses.find((st) => st.name === it.status)?.statusType === "FINAL")).length} 个未完成 item 将进入处置(选定去向);已完成 item 保留在本页历史。`}

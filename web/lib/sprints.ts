@@ -78,6 +78,12 @@ export async function listSprints(key: string): Promise<Sprint[]> {
   return groups.map(toSprint);
 }
 
+/** spec 0114:全量组(含中层)——处置目标树/开始提示按本组类型取候选用 */
+export async function listGroups(key: string): Promise<Sprint[]> {
+  const groups = await api<GroupDto[]>(`/api/projects/${key}/groups`);
+  return groups.map(toSprint);
+}
+
 /** spec 0114:多层树数据——一次全量组,按 parentGroupId 组装递归结构;无 level-2 → parentCandidates 空(=平面模式)。 */
 export async function listGroupTree(key: string): Promise<GroupTree> {
   const types = await api<GroupTypeDto[]>(`/api/projects/${key}/group-types`);
