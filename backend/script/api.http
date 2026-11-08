@@ -5,7 +5,7 @@
 #   2. 打开本文件,右上角环境选 `test`
 #   3. 空库首次才需手动跑「Bootstrap」(e2e globalSetup 清库后会自动补种子账号,通常免)
 #   4. 整文件自上而下按序跑——不要单点中间请求:变量靠上文响应回填,单点会踩上一轮的过期值
-#      (例外:spec 0113 节自含,跑过「登录」后可单跑该节;重跑该节前先重跑「登录」)
+#      (例外:spec 0113/0114 节自含,跑过「登录」后可单跑该节;重跑该节前先重跑「登录」)
 #
 # 可重复跑:登录时每轮生成唯一后缀(变量 run),新建一套项目/成员/团队,不与历史数据冲突 → 全绿。
 # test 库随时会被 e2e globalSetup 清空——无妨,本文件每轮自建全新项目,不依赖库内历史数据。
@@ -1662,3 +1662,222 @@ Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {"dispositions":[{"itemId":"00000000-0000-0000-0000-000000000000","targetGroupId":null}]}
+
+### ============================================================
+### ============ 20. 组多层(YPJ-163;spec 0114) ============
+### ============================================================
+### ---------- (本节自含:自带项目 P163/三层类型/Epic/Feature/Sprint/item;先跑「登录」即可单跑本节;重跑本节前先重跑「登录」刷新 run 后缀) ----------
+
+### 0114 专用项目(变量全带 163 后缀,不与上文串台)
+POST {{host}}/api/projects
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "key": "P163{{run}}",
+  "name": "组多层手测 {{run}}"
+}
+
+> {%
+  client.global.set("pkey163", response.body.key);
+%}
+
+### 第 1 个类型 = 叶层 sprint163(自底向上补位;handler 存 l1Key163)
+POST {{host}}/api/projects/{{pkey163}}/group-types
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "typeKey": "sprint163",
+  "name": "冲刺"
+}
+
+> {%
+  client.global.set("l1Key163", response.body.typeKey);
+%}
+
+### 第 2 个类型 = 中层 feat163(level 2)
+POST {{host}}/api/projects/{{pkey163}}/group-types
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "typeKey": "feat163",
+  "name": "特性"
+}
+
+### 第 3 个类型 = 顶层 epic163(level 3)
+POST {{host}}/api/projects/{{pkey163}}/group-types
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "typeKey": "epic163",
+  "name": "史诗"
+}
+
+### [预期 400] 第 4 个类型——层级封顶 3(spec 0114)
+POST {{host}}/api/projects/{{pkey163}}/group-types
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "typeKey": "extra163",
+  "name": "超层"
+}
+
+### [预期 400] Sprint(L1)建漏父——上层存在时叶层必挂父
+POST {{host}}/api/projects/{{pkey163}}/groups
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "typeKey": "{{l1Key163}}",
+  "name": "S漏父 {{run}}"
+}
+
+### [预期 400] Feature(L2)建漏父——存在 level-3 时 L2 也必挂父
+POST {{host}}/api/projects/{{pkey163}}/groups
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "typeKey": "feat163",
+  "name": "F漏父 {{run}}"
+}
+
+### 建 Epic 1(顶层无父;handler 存 epic1Id163)
+POST {{host}}/api/projects/{{pkey163}}/groups
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "typeKey": "epic163",
+  "name": "E1 {{run}}"
+}
+
+> {%
+  client.global.set("epic1Id163", response.body.groupId);
+%}
+
+### 建 Epic 2(handler 存 epic2Id163)
+POST {{host}}/api/projects/{{pkey163}}/groups
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "typeKey": "epic163",
+  "name": "E2 {{run}}"
+}
+
+> {%
+  client.global.set("epic2Id163", response.body.groupId);
+%}
+
+### [预期 400] 越级——Sprint 直挂 Epic(父类型须恰为 L+1)
+POST {{host}}/api/projects/{{pkey163}}/groups
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "typeKey": "{{l1Key163}}",
+  "name": "S越级 {{run}}",
+  "parentGroupId": "{{epic1Id163}}"
+}
+
+### 建 Feature 1 挂 Epic 1(handler 存 feat1Id163)
+POST {{host}}/api/projects/{{pkey163}}/groups
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "typeKey": "feat163",
+  "name": "F1 {{run}}",
+  "parentGroupId": "{{epic1Id163}}"
+}
+
+> {%
+  client.global.set("feat1Id163", response.body.groupId);
+%}
+
+### 建 Feature 2 挂 Epic 2(handler 存 feat2Id163)
+POST {{host}}/api/projects/{{pkey163}}/groups
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "typeKey": "feat163",
+  "name": "F2 {{run}}",
+  "parentGroupId": "{{epic2Id163}}"
+}
+
+> {%
+  client.global.set("feat2Id163", response.body.groupId);
+%}
+
+### 建 Sprint 1 挂 Feature 1(handler 存 sprint1Id163)
+POST {{host}}/api/projects/{{pkey163}}/groups
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "typeKey": "{{l1Key163}}",
+  "name": "S1 {{run}}",
+  "parentGroupId": "{{feat1Id163}}"
+}
+
+> {%
+  client.global.set("sprint1Id163", response.body.groupId);
+%}
+
+### [预期 400] Epic(L3 顶层)改挂——顶层无 L+1 类型不可改
+PATCH {{host}}/api/projects/{{pkey163}}/groups/{{epic1Id163}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "parentGroupId": "{{epic2Id163}}"
+}
+
+### Feature 改父正例:F1 从 Epic 1 改挂 Epic 2 → 200(子树 S1 随迁;新旧父链逐层重算状态)
+PATCH {{host}}/api/projects/{{pkey163}}/groups/{{feat1Id163}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "parentGroupId": "{{epic2Id163}}"
+}
+
+### [预期 409] Epic 手动动作——非叶层状态由子组联动
+POST {{host}}/api/projects/{{pkey163}}/groups/{{epic1Id163}}/actions/start
+Authorization: Bearer {{token}}
+
+### 建 item(handler 存 itemId163)
+POST {{host}}/api/projects/{{pkey163}}/items
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "组多层负例 item {{run}}"
+}
+
+> {%
+  client.global.set("itemId163", response.body.itemId);
+%}
+
+### [预期 409] 挂 item 到 Feature(非叶层)——item 只挂叶层组
+PUT {{host}}/api/items/{{itemId163}}/group-membership
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "groupId": "{{feat1Id163}}"
+}
+
+### [预期 409] 删含子组——Epic 2 下仍有 Feature
+DELETE {{host}}/api/projects/{{pkey163}}/groups/{{epic2Id163}}
+Authorization: Bearer {{token}}
+
+### [预期 409] 删中层类型 feat163——上层 epic163 仍存在(中间链 guard)
+DELETE {{host}}/api/projects/{{pkey163}}/group-types/feat163
+Authorization: Bearer {{token}}
