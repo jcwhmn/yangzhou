@@ -129,7 +129,7 @@ Content-Type: application/json
   "kind": "custom"
 }
 
-> {
+> {%
     client.global.set("attrCustom", response.body.name);
  %}
 
@@ -820,7 +820,7 @@ Content-Type: application/json
 DELETE {{host}}/api/projects/{{pkey}}/group-types/release
 Authorization: Bearer {{token}}
 
-### 删空 level-1 类型 → 204(可删性只看空非空)
+### [预期 409] 删 sprint2(L2)——上下层类型均在,中间链 guard(spec 0114;原「删空即 204」语义已收严)
 DELETE {{host}}/api/projects/{{pkey}}/group-types/{{l1Key}}
 Authorization: Bearer {{token}}
 
@@ -920,6 +920,7 @@ Content-Type: application/json
 
 ### Release 列表(planned 先 target 升序;released 按发布日降序;含 memberCount)
 GET {{host}}/api/projects/{{pkey}}/releases
+Authorization: Bearer {{token}}
 
 ### 改 Release(名称/目标日;日期空串=清除;milestoneId 空串=清除)
 PATCH {{host}}/api/projects/{{pkey}}/releases/{{releaseId}}
@@ -1241,14 +1242,13 @@ Content-Type: application/json
   "memberId": "00000000-0000-0000-0000-000000000000"
 }
 
-### [预期 409] 指派到已完成 Sprint
-PUT {{host}}/api/items/{{itemId}}/sprint
+### [预期 409] 指派到已完成 Sprint(0114 起 PUT group-membership;原 /items/{id}/sprint 端点已废)
+PUT {{host}}/api/items/{{itemId}}/group-membership
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-  "groupId": "{{sprintId}}",
-  "groupType": "sprint"
+  "groupId": "{{sprintId}}"
 }
 
 ### [预期 409] 删除非空 Sprint(成员关系即历史,先空才能删)
@@ -1300,15 +1300,32 @@ Authorization: Bearer {{token}}
 
 ### [预期 404] metrics:未知 sprint
 GET {{host}}/api/projects/{{pkey}}/metrics/burndown?groupId=00000000-0000-0000-0000-000000000000
+Authorization: Bearer {{token}}
 
 ### [预期 404] metrics:scope-change 组不存在(YPJ-54)
 GET {{host}}/api/projects/{{pkey}}/metrics/scope-change?groupId=00000000-0000-0000-0000-000000000000
+Authorization: Bearer {{token}}
 
 ### [预期 400] metrics:reopen-rate from > to(YPJ-54)
 GET {{host}}/api/projects/{{pkey}}/metrics/reopen-rate?from=2026-12-31T00:00:00Z&to=2026-09-01T00:00:00Z
 Authorization: Bearer {{token}}
 
-### 建 sprint 供负例(YPJ-56;handler 存 completedSprintId;spec 0114 起叶层必挂父,挂上文 epic 样例组)
+### 建 L2 组挂 epic 样例组(sprint2 类型=本文件演化后的 level 2;handler 存 l2ForYPJ56)
+POST {{host}}/api/projects/{{pkey}}/groups
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "typeKey": "{{l1Key}}",
+  "name": "F-YPJ56",
+  "parentGroupId": "{{parentGroupIdSample}}"
+}
+
+> {%
+  client.global.set("l2ForYPJ56", response.body.groupId);
+%}
+
+### 建 sprint 供负例(YPJ-56;handler 存 completedSprintId;spec 0114 邻层不变量:父须恰为 L+1,挂 L2 组)
 POST {{host}}/api/projects/{{pkey}}/groups
 Authorization: Bearer {{token}}
 Content-Type: application/json
@@ -1316,7 +1333,7 @@ Content-Type: application/json
 {
   "typeKey": "sprint",
   "name": "负例用 sprint",
-  "parentGroupId": "{{parentGroupIdSample}}"
+  "parentGroupId": "{{l2ForYPJ56}}"
 }
 
 > {%
