@@ -43,9 +43,8 @@ import {
   assignSprint,
   createSprint,
   level1Type,
-  listParents,
+  listParentCandidates,
   updateGroupParent,
-  type TreeSprint,
 } from "@/lib/sprints";
 import { AssignPopover } from "@/components/AssignPopover";
 import { SignalChip, type Signal } from "@/components/Verdict";
@@ -57,6 +56,7 @@ type Sprint = {
   startDate: string | null;
   endDate: string | null;
   parentGroupId: string | null;
+  typeKey: string;
 };
 type Item = {
   itemId: string;
@@ -110,8 +110,13 @@ export default function SprintPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [allSprints, setAllSprints] = useState<Sprint[]>([]);
-  // spec 0113:父层组选项(null=平面项目,不渲染「所属 Epic」选择器)
-  const [epics, setEpics] = useState<TreeSprint[] | null>(null);
+  // spec 0114:上一层组选项(null=顶层组/平面项目,不渲染选择器)
+  const [parentSel, setParentSel] = useState<{
+    name: string;
+    options: { sprintId: string; name: string }[];
+  } | null>(null);
+  // spec 0114:level-1 类型 key(判定本组是否叶层;null=项目无组类型)
+  const [l1Key, setL1Key] = useState<string | null>(null);
   const [wf, setWf] = useState<TypeWorkflow[]>([]);
   const [confirmFlow, setConfirmFlow] = useState<
     null | "start" | "complete" | "reopen"
@@ -142,15 +147,21 @@ export default function SprintPage() {
       api<Item[]>(`/api/projects/${key}/groups/${id}/items`),
       api<{ statuses: Status[] }>(`/api/projects/${key}`),
       listSprints(key),
-      api<TypeWorkflow[]>(`/api/projects/${key}/group-types/sprint/workflow`),
+      level1Type(key),
     ])
-      .then(([s, its, p, all, w]) => {
+      .then(([s, its, p, all, l1]) => {
         if (sprintVer.current === ver) setSprint(s);
         setSprint(s);
         setItems(its);
         setStatuses(p.statuses);
         setAllSprints(all);
-        setWf(w);
+        setL1Key(l1?.typeKey ?? null);
+        // spec 0114:workflow 按本组自身类型拉取(类型纯用户配置,不得硬编码 sprint)
+        api<TypeWorkflow[]>(
+          `/api/projects/${key}/group-types/${s.typeKey}/workflow`,
+        )
+          .then(setWf)
+          .catch(() => setWf([]));
       })
       .catch((e) => {
         if (e instanceof ApiError && e.status === 404) setGone(true);
@@ -159,11 +170,12 @@ export default function SprintPage() {
   }, [key, id]);
 
   useEffect(() => {
-    // spec 0113:父层组选项独立轻拉;无 level-2 类型(平面)→ null
-    listParents(key)
-      .then(setEpics)
-      .catch(() => setEpics(null));
-  }, [key]);
+    // spec 0114:上一层组候选按本组类型 L+1 动态拉取;无上层类型(顶层/平面)→ null
+    if (!sprint) return;
+    listParentCandidates(key, sprint.typeKey)
+      .then(setParentSel)
+      .catch(() => setParentSel(null));
+  }, [key, sprint]);
 
   async function changeStatus(status: string) {
     if (!sprint) return;
@@ -487,15 +499,18 @@ export default function SprintPage() {
             <Typography color="text.secondary" variant="body2">
               {sprint.startDate ?? "—"} ~ {sprint.endDate ?? "—"}
             </Typography>
-            {/* spec 0113:两级项目才渲染;悬空组显示占位但不可选回(无置空语义) */}
-            {epics && epics.length > 0 && (
+            {/* spec 0113/0114:有上层类型才渲染;悬空组显示占位但不可选回(无置空语义) */}
+            {parentSel && parentSel.options.length > 0 && (
               <FormControl size="small" sx={{ minWidth: 160 }}>
                 <InputLabel id="epic-select-label">
-                  {t.sprintPage.parentLabel}
+                  {t.sprintPage.parentLabel.replace("{name}", parentSel.name)}
                 </InputLabel>
                 <Select
                   labelId="epic-select-label"
-                  label={t.sprintPage.parentLabel}
+                  label={t.sprintPage.parentLabel.replace(
+                    "{name}",
+                    parentSel.name,
+                  )}
                   value={sprint.parentGroupId ?? ""}
                   displayEmpty
                   onChange={(e) => void reparent(e.target.value as string)}
@@ -505,7 +520,7 @@ export default function SprintPage() {
                       {t.sprintPage.parentDangling}
                     </MenuItem>
                   )}
-                  {epics.map((ep) => (
+                  {parentSel.options.map((ep) => (
                     <MenuItem key={ep.sprintId} value={ep.sprintId}>
                       {ep.name}
                     </MenuItem>
@@ -539,7 +554,10 @@ export default function SprintPage() {
             >
               {wf
                 .find((s) => s.name === sprint.status)
-                ?.transitions.filter((tr) => tr.function !== "backward")
+                ?.transitions.filter(
+                  (tr) =>
+                    tr.function !== "backward" && sprint.typeKey === l1Key,
+                )
                 .map((tr) => (
                   <Button
                     key={tr.function}
@@ -555,7 +573,7 @@ export default function SprintPage() {
                   </Button>
                 ))}
             </Stack>
-            {sprint.status !== "completed" && (
+            {sprint.status !== "completed" && sprint.typeKey === l1Key && (
               <Button size="small" variant="outlined" onClick={openAdd}>
                 拉入 item
               </Button>

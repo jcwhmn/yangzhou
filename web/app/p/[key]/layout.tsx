@@ -28,7 +28,9 @@ import {
   listGroupTree,
   createSprint as createSprintApi,
   syncCurrentParent,
+  activeChainIds,
   type GroupTree,
+  type GroupNode,
 } from "@/lib/sprints";
 import {
   MilestoneManager,
@@ -109,25 +111,23 @@ export default function ProjectLayout({
   const loadSprints = () => {
     // CI 冷 JVM 偶发连接重置(status -1):失败隔 1s 重试一次
     const apply = (t: GroupTree) => {
-      if (t.parents.length === 0) {
-        // 平面模式(无 level-2):orphans = 全部 level-1 组,现状渲染
+      if (t.parentCandidates.length === 0) {
+        // 平面模式(无 level-2 类型):全部叶层组现状渲染(spec 0114)
         setTree(null);
-        setSprints([...t.parents, ...t.orphans]);
+        setSprints(t.leafSprints);
         return;
       }
       setTree(t);
       setSprints(t.orphans);
-      // 当前 epic:active 子组的父优先 → localStorage 记忆;不变量下兜底第一个父层组(spec 0112)
-      const leaves = [
-        ...t.orphans,
-        ...Object.values(t.childrenByParent).flat(),
-      ];
+      // 当前 epic:active 叶层组的父优先 → localStorage 记忆;兜底第一个 level-2 组(spec 0112→0114)
       setCurrentParentId(
-        syncCurrentParent(key, leaves) ?? t.parents[0]?.sprintId ?? null,
+        syncCurrentParent(key, t.leafSprints) ??
+          t.parentCandidates[0]?.sprintId ??
+          null,
       );
-      // 展开态:active 父层默认展开(仅加入不移除,保留用户手动开合)
-      const active = t.parents.find((p) => p.status === "active");
-      if (active) setExpanded((prev) => new Set(prev).add(active.sprintId));
+      // 展开态:active 叶层父链默认展开(仅加入不移除,保留用户手动开合)
+      const chain = activeChainIds(t);
+      if (chain.length > 0) setExpanded((prev) => new Set([...prev, ...chain]));
     };
     listGroupTree(key)
       .catch(
@@ -236,14 +236,14 @@ export default function ProjectLayout({
 
   const itemSx = { py: 0.5 };
 
-  // spec 0112:叶层组行(树内缩进 / 平面区无缩进,样式与导航逻辑同现状)
-  const sprintRow = (s: Sprint, indent = false) => (
+  // spec 0112/0114:叶层组行(plUnits=缩进档;平面区无缩进,样式与导航逻辑同现状)
+  const sprintRow = (s: Sprint, plUnits = 0) => (
     <ListItemButton
       key={s.sprintId}
       component={Link}
       href={`/p/${key}/sprint/${s.sprintId}`}
       selected={pathname === `/p/${key}/sprint/${s.sprintId}`}
-      sx={{ ...itemSx, ...(indent ? { pl: 4 } : {}) }}
+      sx={{ ...itemSx, ...(plUnits > 0 ? { pl: plUnits } : {}) }}
     >
       <ListItemText
         primary={s.name}
@@ -255,6 +255,41 @@ export default function ProjectLayout({
       />
     </ListItemButton>
   );
+
+  // spec 0114:递归树渲染——非叶层行点开合(+/− 前缀),叶层行走 sprintRow;缩进按深度
+  const nodeRows = (ns: GroupNode[], depth: number) =>
+    ns.map((n) => {
+      if (!n.sprint.isParent) return sprintRow(n.sprint, (depth + 1) * 2);
+      const open = expanded.has(n.sprint.sprintId);
+      const toggle = () =>
+        setExpanded((prev) => {
+          const next = new Set(prev);
+          if (next.has(n.sprint.sprintId)) next.delete(n.sprint.sprintId);
+          else next.add(n.sprint.sprintId);
+          return next;
+        });
+      return (
+        <Box key={n.sprint.sprintId}>
+          <ListItemButton
+            onClick={n.children.length > 0 ? toggle : undefined}
+            sx={{ ...itemSx, ...(depth > 0 ? { pl: depth * 2 } : {}) }}
+          >
+            <ListItemText
+              primary={
+                (n.children.length === 0 ? "" : open ? "− " : "+ ") +
+                n.sprint.name
+              }
+              secondary={
+                t.projectNav.sprintStatus[
+                  n.sprint.status as keyof typeof t.projectNav.sprintStatus
+                ] ?? n.sprint.status
+              }
+            />
+          </ListItemButton>
+          {open && nodeRows(n.children, depth + 1)}
+        </Box>
+      );
+    });
 
   async function exportXlsx(projectKey: string) {
     const token = localStorage.getItem("yz-token");
@@ -424,7 +459,9 @@ export default function ProjectLayout({
                   onClick={() => {
                     // spec 0112:默认「当前 epic」;不变量下兜底第一个父层组
                     setParentPick(
-                      currentParentId ?? tree?.parents[0]?.sprintId ?? "",
+                      currentParentId ??
+                        tree?.parentCandidates[0]?.sprintId ??
+                        "",
                     );
                     setCreateOpen(true);
                   }}
@@ -445,39 +482,7 @@ export default function ProjectLayout({
               )}
               {tree ? (
                 <>
-                  {tree.parents.map((p) => {
-                    const kids = tree.childrenByParent[p.sprintId] ?? [];
-                    // spec 0112:空父层组无 +/− 前缀且不响应点击;其余点行开合
-                    const toggle = () =>
-                      setExpanded((prev) => {
-                        const next = new Set(prev);
-                        if (next.has(p.sprintId)) next.delete(p.sprintId);
-                        else next.add(p.sprintId);
-                        return next;
-                      });
-                    const open = expanded.has(p.sprintId);
-                    return (
-                      <Box key={p.sprintId}>
-                        <ListItemButton
-                          onClick={kids.length > 0 ? toggle : undefined}
-                          sx={itemSx}
-                        >
-                          <ListItemText
-                            primary={
-                              (kids.length === 0 ? "" : open ? "− " : "+ ") +
-                              p.name
-                            }
-                            secondary={
-                              t.projectNav.sprintStatus[
-                                p.status as keyof typeof t.projectNav.sprintStatus
-                              ] ?? p.status
-                            }
-                          />
-                        </ListItemButton>
-                        {open && kids.map((s) => sprintRow(s, true))}
-                      </Box>
-                    );
-                  })}
+                  {nodeRows(tree.nodes, 0)}
                   {tree.orphans.map((s) => sprintRow(s))}
                 </>
               ) : (
@@ -619,7 +624,7 @@ export default function ProjectLayout({
               value={endDate}
               onChange={setEndDate}
             />
-            {(tree?.parents.length ?? 0) > 0 && (
+            {(tree?.parentCandidates.length ?? 0) > 0 && (
               <TextField
                 select
                 size="small"
@@ -627,8 +632,8 @@ export default function ProjectLayout({
                 value={parentPick}
                 onChange={(e) => setParentPick(e.target.value)}
               >
-                {/* spec 0112 不变量:两层项目新建必挂父,无「无」选项 */}
-                {tree!.parents.map((p) => (
+                {/* spec 0112/0114 不变量:新建必挂父(level-2),无「无」选项 */}
+                {tree!.parentCandidates.map((p) => (
                   <MenuItem key={p.sprintId} value={p.sprintId}>
                     {p.name}
                   </MenuItem>

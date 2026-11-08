@@ -507,7 +507,8 @@ export const t = {
     startBtn: "▶ 开始 Sprint",
     completeBtn: "✓ 完成 Sprint",
     // 0113:组改父——详情页「所属 Epic」选择器
-    parentLabel: "所属 Epic",
+    // spec 0114:label 按组类型动态(「所属 Epic」→「所属{父类型名}」)
+    parentLabel: "所属{name}",
     parentDangling: "未分组（悬空）",
     reparentFailed: "改挂失败",
   },
