@@ -227,7 +227,8 @@ export async function createSprint(
 export async function sprintAction(
   key: string,
   sprintId: string,
-  fn: "start" | "complete" | "backward" | "reopen",
+  // YPJ-120/0114:自定义工作流出边 function 可能是 switch 等,按出边实际名传
+  fn: string,
   body?: Record<string, unknown>, // 0110:complete 可携处置计划,与状态迁移同事务
 ): Promise<Sprint> {
   const s = toSprint(

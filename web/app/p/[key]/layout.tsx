@@ -272,7 +272,7 @@ export default function ProjectLayout({
         <Box key={n.sprint.sprintId}>
           <ListItemButton
             onClick={n.children.length > 0 ? toggle : undefined}
-            sx={{ ...itemSx, ...(depth > 0 ? { pl: depth * 2 } : {}) }}
+            sx={{ ...itemSx, pl: (depth + 1) * 2 }}
           >
             <ListItemText
               primary={

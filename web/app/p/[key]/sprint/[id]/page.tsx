@@ -180,12 +180,11 @@ export default function SprintPage() {
   async function changeStatus(status: string) {
     if (!sprint) return;
     try {
-      // spec 0097 S2:状态变更走动作白名单(active=start / completed=complete)
-      const s = await sprintAction(
-        key,
-        id,
-        status === "completed" ? "complete" : "start",
-      );
+      // spec 0097 S2/YPJ-120:状态变更按当前状态到目标态的出边 function 名走
+      // (builtin 工作流=start/complete;自定义默认三态循环=switch,spec 0114 T163B)
+      const fn = edgeFn(status);
+      if (!fn) throw new Error(`当前状态无到 ${status} 的出边`);
+      const s = await sprintAction(key, id, fn);
       sprintVer.current += 1;
       setSprint(s);
       // YPJ-74:sidebar 重拉由 sprintAction 内部广播(0105 收口)
@@ -362,25 +361,40 @@ export default function SprintPage() {
     setBusy(false);
   }
 
-  // spec 0097 S3:按钮 = 当前状态出边(backward 仅 CLI/API 可及,UI 现状一致)
-  function actionLabel(fn: string): string {
-    return fn === "start"
+  // spec 0097 S3/YPJ-120:按钮 = 当前状态出边(backward 仅 CLI/API 可及);
+  // 自定义默认工作流出边 function=switch(T163B),按目标态路由到既有语义
+  function edgeFn(target: string): string | undefined {
+    return wf
+      .find((st) => st.name === sprint?.status)
+      ?.transitions.find((tr) => tr.target === target)?.function;
+  }
+  function actionLabel(fn: string, target?: string): string {
+    // 已知函数名优先;自定义工作流的 switch 等未知函数按出边目标态取文案
+    if (fn === "start") return t.sprintPage.startBtn;
+    if (fn === "complete") return t.sprintPage.completeBtn;
+    if (fn === "reopen") return t.sprintPage.reopenBtn;
+    return target === "active"
       ? t.sprintPage.startBtn
-      : fn === "complete"
+      : target === "completed"
         ? t.sprintPage.completeBtn
-        : fn === "reopen"
+        : target === "planned"
           ? t.sprintPage.reopenBtn
           : fn;
   }
-  function actionClick(fn: string) {
+  function actionClick(fn: string, target?: string) {
     if (fn === "start") return startSprint();
     if (fn === "complete") return completeSprint();
     // 0108:重开低显著(outlined 由确认弹窗双闸防误触)+确认制
     if (fn === "reopen") return setConfirmFlow("reopen");
+    // 自定义默认三态循环(switch):按出边目标态路由到既有语义
+    if (target === "active") return startSprint();
+    if (target === "completed") return completeSprint();
+    if (target === "planned") return setConfirmFlow("reopen");
   }
   async function doReopen() {
-    // 0108:重开出边是 reopen,不走 changeStatus(其 active 映射 start,completed 态无此出边)
-    const s = await sprintAction(key, id, "reopen");
+    // 0108:重开出边按实际 function(reopen / 自定义工作流的 switch)
+    const fn = edgeFn("planned") ?? "reopen";
+    const s = await sprintAction(key, id, fn);
     sprintVer.current += 1;
     setSprint(s);
     setConfirmFlow(null);
@@ -563,13 +577,19 @@ export default function SprintPage() {
                     key={tr.function}
                     size="small"
                     variant={
-                      tr.function === "reopen" ? "outlined" : "contained"
+                      tr.function === "reopen" || tr.target === "planned"
+                        ? "outlined"
+                        : "contained"
                     }
-                    color={tr.function === "reopen" ? "inherit" : "primary"}
+                    color={
+                      tr.function === "reopen" || tr.target === "planned"
+                        ? "inherit"
+                        : "primary"
+                    }
                     disabled={items === null} // 0110:items 未载禁用,防误开处置/确认弹窗
-                    onClick={() => actionClick(tr.function)}
+                    onClick={() => actionClick(tr.function, tr.target)}
                   >
-                    {actionLabel(tr.function)}
+                    {actionLabel(tr.function, tr.target)}
                   </Button>
                 ))}
             </Stack>
