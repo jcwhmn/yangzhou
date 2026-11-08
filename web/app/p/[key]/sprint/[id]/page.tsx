@@ -286,10 +286,10 @@ export default function SprintPage() {
       if (actives.length > 0) {
         target = pick || actives[0].sprintId;
       } else if (planned.length === 1) {
-        await sprintAction(key, planned[0].sprintId, "start");
+        await sprintAction(key, planned[0].sprintId, startFnOf());
         target = planned[0].sprintId;
       } else if (planned.length > 1) {
-        await sprintAction(key, pick, "start");
+        await sprintAction(key, pick, startFnOf());
         target = pick;
       } else {
         const name = disp.newName.trim() || `${disp.typeName} 1`;
@@ -306,7 +306,7 @@ export default function SprintPage() {
             parentGroupId: sprint?.parentGroupId ?? null,
           }))
         ).sprintId;
-        await sprintAction(key, target, "start");
+        await sprintAction(key, target, startFnOf());
       }
     } catch (err) {
       // 目标组未就绪 → 事务未发生,组未完成;改计划重试
@@ -315,7 +315,7 @@ export default function SprintPage() {
       return;
     }
     try {
-      const s = await sprintAction(key, id, "complete", {
+      const s = await sprintAction(key, id, finalFnOf(), {
         dispositions: disp.rows.map((r) => ({
           itemId: r.itemId,
           targetGroupId: r.toBacklog ? null : target,
@@ -359,7 +359,7 @@ export default function SprintPage() {
     if (!disp || busy) return;
     setBusy(true);
     try {
-      const s = await sprintAction(key, id, "complete", {
+      const s = await sprintAction(key, id, finalFnOf(), {
         dispositions: disp.rows.map((r) => ({
           itemId: r.itemId,
           targetGroupId: null,
@@ -384,6 +384,19 @@ export default function SprintPage() {
     return wf
       .find((st) => st.name === sprint?.status)
       ?.transitions.find((tr) => tr.target === target)?.function;
+  }
+  // spec 0114:激活/完成的出边按「目标态 statusType」解析——自定义工作流 fn=switch,不写 start/complete 字面量
+  function startFnOf(): string {
+    const start = wf.find((s) => s.statusType === "START");
+    const activeName = wf.find((s) => s.statusType === "ACTIVE")?.name;
+    return (
+      start?.transitions.find((tr) => tr.target === activeName)?.function ??
+      "start"
+    );
+  }
+  function finalFnOf(): string {
+    const finalName = wf.find((s) => s.statusType === "FINAL")?.name;
+    return (finalName ? edgeFn(finalName) : undefined) ?? "complete";
   }
   function actionLabel(fn: string, target?: string): string {
     const name = typeName ?? sprint?.typeKey ?? "";

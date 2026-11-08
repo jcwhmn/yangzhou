@@ -70,3 +70,56 @@
 - **T163D 负例**(api.http 0114 区块):第 4 个类型 400;Sprint 建漏父 400;Feature 建漏父 400;越级(Sprint 直挂 Epic)400;Epic 改挂 400;Epic 手动动作 409;Feature 挂 item 409;删含子组 409;删中层类型(上层存在)409
 - **T163E 两层回归**:DEMO1107 行为不变——侧栏两层树、新建必挂父、改父、处置流照旧
 - **T163F 平面项目回归**:单类型项目侧栏平面区/Backlog 不变
+
+
+
+## 四、设计增补 v2:无限层级 + workflow/transition/action 前端配置 + 完成链绑定(2026-11-09,待用户过目,未编码)
+
+> v1 已按用户三点反馈作废重写:①无层级封顶(测试数据恰 3 层,非系统约束);②前端 action/transition 配置入口是关键需求;③完成逻辑两层与多层本质同链,直接改原逻辑。
+
+### R1 层级语义修正:无限层级(推翻「封顶 3」拍板)
+
+- 需求:单项目类型层数不设上限;**邻层不变量(组挂父须恰为自身类型 level+1)、叶层挂 item、非叶禁手动动作、删中间链 409、逐层级联**均与层数无关,保持不变,天然支撑 N 层。
+- 改动点(实现时,共 4 处):
+  1. `ItemGroupService.createType` L185-186:删 `level > 3` 封顶 400;
+  2. `GroupMultilayerApiTest.三层建组链成功且第4类型封顶400`(L101):改为「第 4 类型 201,4 层链邻层自洽」正例;
+  3. `backend/script/api.http` L1736 负例节:同步改正例;
+  4. spec 0114 头部拍板记录/§一/§三 T163D 措辞 + 标题「(封顶 3 层)」随 As-built 一并修正(注明 2026-11-09 用户改拍板为无限层级)。
+- e2e 无封顶断言(已核),web 侧栏树/新建挂父候选均递归/按 L+1 动态,无需改。
+
+### R2 action/transition 的前端配置入口(关键需求,主设计)
+
+**现状回答:前端没有任何设置处。** transitions 建类型时由后端种子固化(`group_status.transitions` JSON,依附状态行);前端「分组类型管理」只有只读 workflow 行;**无编辑 UI、无编辑 API**。fn 中文名是前端全局映射(`texts.ts wfFnLabel`),icon 不存在。这就是「看不到/配不了」的根源。
+
+**设计(补齐配置链路,契约变更)**:
+
+- 数据模型:`transitions` JSON 项扩展为 `{function, target, label?, icon?}`——缺省字段回退全局映射,**存量零迁移**。
+- 新 API:`PUT /api/projects/{key}/group-types/{typeKey}/workflow`,body = `[{name, transitions: [{function, target, label?, icon?}]}]`(按状态全量替换,同 0110 处置提交风格)。
+  - 校验:状态名集合与 statusType **不可增改**(START/ACTIVE/FINAL 是 0111 联动推导与叶层判定的语义锚,锁死);`target` 必须属本类型状态集;`function` 必须命中 `GroupActionFn` 注册表;label/icon 长度上限(如 20/4)。
+  - 权限:leaderGuard(同动作端点);api.http 0114 区块同步补节。
+- 前端:「分组类型管理」面板每状态行加编辑态——出边列表行内编辑(function 下拉=注册表中文名/目标态下拉/label/icon 输入),保存走 PUT;文案外置。
+- ⚠ **架构标注**:工作流从「建类型种子固化」变为「运行时可编辑」——锁定状态集与 statusType 是安全边界,否则组状态悬空、联动推导失效。此改动契约+UI 面大,**建议独立成票**(R2b),163 先收 D1+R1+只读 icon(R2a:面板只读行补 icon 映射 `↔ 切换 → active`,零后端)。**待你拍板:163 内做 / 立新票**。
+
+### R3 完成逻辑同一性(回答,无新增改动)
+
+- **原两层 complete 逻辑位置**(0105→0110 演进,唯一一套):前端 `web/app/p/[key]/sprint/[id]/page.tsx` 的 `confirmDisposition()`/`doBacklogAll()`(决策树+提交)+ 后端 `ItemGroupService.action()`(状态迁移+处置同事务)。
+- **≥3 层没有另一套逻辑**:163 切片C 只是把同一条链的「候选范围」(同类型/同父)与「function 解析」参数化;事务、幂等、回滚完全共用。多层没有独立 complete 分支。
+- 「直接在原逻辑上改」正是 D1 所做:改该链两处硬编码 fn(激活目标组 `"start"`、完成/回池提交 `"complete"`)为按出边目标态 statusType 解析(`startFnOf()/finalFnOf()`),后端处置事务门禁 `function=="complete"` 字面量 → 「迁移至 FINAL」语义。无限层级下该链天然成立。
+
+### D1(已实现未提交,3 文件,build+集成双绿;全量 e2e 上轮中断)
+
+前端 fn 解析 + 后端门禁语义化 + `GroupDispositionTransactionApiTest` 新增 switch 完成携处置集成测试(直建项目使自定义类型恰 L1,绕开 helper 补种 sprint 占 L1 的基类约定)。
+
+### 手工测试用例(用户 build/debug;前置 rebuild dev)
+
+- **T163A-F1**:完成带 2 个未完成 item 的 active 月(同季有计划月)→ 处置弹窗目标=该月,确认 200,目标月进行中、item 迁入、原月 completed 仅剩 Done。
+- **T163A-F2**:同季无候选 → 新建月挂同季,item 转入。
+- **T163A-F3**:一行覆写回 Backlog → 该 item 入池,其余迁入(0110 事务经 switch 链)。
+- **T163E**:两层 Sprint(Epic 下)完成处置照旧(start/complete 不变)。
+- **R1 后**:第 4 类型创建 201、4 层树侧栏递归/联动正常。
+
+### 待拍板
+
+1. R2 配置化:163 内做 or 立新票(推荐立新票;163 先收 D1+R1+R2a 只读 icon)。
+2. D1 是否按 v2 提交(我补跑全量 e2e 绿后 commit)。
+3. 「面板看不到 workflow 行」现象确认(整块缺失 vs 缺动作概念/icon)——决定 R2a 之外是否另有只读展示缺陷要修。

@@ -440,7 +440,8 @@ class ItemGroupService(
         val target = workflow.applyAction(t, g.status, function)
         val saved = groups.save(g.copy(status = target, updatedAt = Instant.now())).toDto()
         // spec 0110(YPJ-159):完成 + 处置同一事务——迁移已落库后逐行 replaceMembership,失败整体回滚(含状态迁移)
-        if (function == "complete" && request != null && request.dispositions.isNotEmpty()) {
+        // spec 0114:完成判定按语义「迁移至 FINAL」而非函数字面量——自定义工作流出边 fn=switch,处置同事务照走
+        if (workflow.statusType(t, target) == StatusType.FINAL && request != null && request.dispositions.isNotEmpty()) {
             applyDispositions(g, request.dispositions)
         }
         propagateParent(g.copy(status = target))

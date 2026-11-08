@@ -207,4 +207,67 @@ class GroupDispositionTransactionApiTest : AbstractApiTest() {
         val line = mapOf("itemId" to moved["itemId"].asText(), "targetGroupId" to null)
         assertEquals(400, completeWith(authed, "DTR", gid, listOf(line, line)).status.value())
     }
+
+    /** 指定 function 的动作端点(spec 0114:自定义工作流 fn=switch);dispositions 可空 */
+    private fun actionFn(
+        authed: RestTestClient,
+        key: String,
+        groupId: String,
+        fn: String,
+        dispositions: List<Map<String, String?>>? = null,
+    ) = authed
+        .post()
+        .uri("/api/projects/$key/groups/$groupId/actions/$fn")
+        .let { spec ->
+            (if (dispositions != null) spec.body(mapOf("dispositions" to dispositions)) else spec)
+                .exchange()
+                .expectBody(String::class.java)
+                .returnResult()
+        }
+
+    @Test
+    fun `自定义工作流switch完成携处置——完成判定按FINAL语义而非字面量`() {
+        val authed = bootstrapAndAuth()
+        // 直建项目(不经 createProject helper:其按 V48 存量形状补种 sprint 占 L1)——让 stage 恰为 L1 叶层(同 dev T163A 月类型形状)
+        authed
+            .post()
+            .uri("/api/projects")
+            .body(mapOf("key" to "DTW", "name" to "DTW"))
+            .exchange()
+            .expectStatus()
+            .isCreated
+            .expectBody(String::class.java)
+            .returnResult()
+        authed
+            .post()
+            .uri("/api/projects/DTW/group-types")
+            .body(mapOf("typeKey" to "stage", "name" to "阶段", "timed" to false))
+            .exchange()
+            .expectStatus()
+            .is2xxSuccessful
+        // 叶层前提探针:stage 必须 L1(level>1 手动动作被 0114 守卫禁)
+        val tsAll = get(authed, "/api/projects/DTW/group-types")
+        assertEquals(1, tsAll.first { it["typeKey"].asText() == "stage" }["level"].asInt(), tsAll.toString())
+        val a = createGroup(authed, "DTW", mapOf("typeKey" to "stage", "name" to "阶段A"))
+        val b = createGroup(authed, "DTW", mapOf("typeKey" to "stage", "name" to "阶段B"))
+        val gid = a["groupId"].asText()
+        val tid = b["groupId"].asText()
+        val moved = createItem(authed, "DTW", "switch成员")
+        assign(authed, moved["itemId"].asText(), gid)
+        // 自定义三态循环出边 fn=switch:激活与完成都不走 start/complete 字面量
+        val act = actionFn(authed, "DTW", gid, "switch")
+        assertEquals(200, act.status.value(), act.responseBody)
+        val r =
+            actionFn(
+                authed,
+                "DTW",
+                gid,
+                "switch",
+                listOf(mapOf("itemId" to moved["itemId"].asText(), "targetGroupId" to tid)),
+            )
+        assertEquals(200, r.status.value(), r.responseBody)
+        assertEquals("completed", json.readTree(r.responseBody!!)["status"].asText())
+        assertEquals(emptySet(), memberTitles(authed, "DTW", gid))
+        assertEquals(setOf("switch成员"), memberTitles(authed, "DTW", tid))
+    }
 }
