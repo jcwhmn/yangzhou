@@ -117,6 +117,8 @@ export default function SprintPage() {
   } | null>(null);
   // spec 0114:level-1 类型 key(判定本组是否叶层;null=项目无组类型)
   const [l1Key, setL1Key] = useState<string | null>(null);
+  // spec 0114:本组类型显示名(按钮/确认弹窗文案「开始{类型名}」动态化)
+  const [typeName, setTypeName] = useState<string | null>(null);
   const [wf, setWf] = useState<TypeWorkflow[]>([]);
   const [confirmFlow, setConfirmFlow] = useState<
     null | "start" | "complete" | "reopen"
@@ -147,15 +149,18 @@ export default function SprintPage() {
       api<Item[]>(`/api/projects/${key}/groups/${id}/items`),
       api<{ statuses: Status[] }>(`/api/projects/${key}`),
       listSprints(key),
-      level1Type(key),
+      api<{ typeKey: string; name: string; level: number | null }[]>(
+        `/api/projects/${key}/group-types`,
+      ),
     ])
-      .then(([s, its, p, all, l1]) => {
+      .then(([s, its, p, all, tps]) => {
         if (sprintVer.current === ver) setSprint(s);
         setSprint(s);
         setItems(its);
         setStatuses(p.statuses);
         setAllSprints(all);
-        setL1Key(l1?.typeKey ?? null);
+        setL1Key(tps.find((tp) => tp.level === 1)?.typeKey ?? null);
+        setTypeName(tps.find((tp) => tp.typeKey === s.typeKey)?.name ?? null);
         // spec 0114:workflow 按本组自身类型拉取(类型纯用户配置,不得硬编码 sprint)
         api<TypeWorkflow[]>(
           `/api/projects/${key}/group-types/${s.typeKey}/workflow`,
@@ -369,14 +374,16 @@ export default function SprintPage() {
       ?.transitions.find((tr) => tr.target === target)?.function;
   }
   function actionLabel(fn: string, target?: string): string {
+    const name = typeName ?? sprint?.typeKey ?? "";
     // 已知函数名优先;自定义工作流的 switch 等未知函数按出边目标态取文案
-    if (fn === "start") return t.sprintPage.startBtn;
-    if (fn === "complete") return t.sprintPage.completeBtn;
+    if (fn === "start") return t.sprintPage.startBtn.replace("{name}", name);
+    if (fn === "complete")
+      return t.sprintPage.completeBtn.replace("{name}", name);
     if (fn === "reopen") return t.sprintPage.reopenBtn;
     return target === "active"
-      ? t.sprintPage.startBtn
+      ? t.sprintPage.startBtn.replace("{name}", name)
       : target === "completed"
-        ? t.sprintPage.completeBtn
+        ? t.sprintPage.completeBtn.replace("{name}", name)
         : target === "planned"
           ? t.sprintPage.reopenBtn
           : fn;
@@ -807,15 +814,15 @@ export default function SprintPage() {
           >
             <DialogTitle>
               {confirmFlow === "start"
-                ? "开始 Sprint"
+                ? `开始 ${typeName ?? sprint.typeKey}`
                 : confirmFlow === "reopen"
                   ? "重开组"
-                  : "完成 Sprint"}
+                  : `完成 ${typeName ?? sprint.typeKey}`}
             </DialogTitle>
             <DialogContent>
               <Typography>
                 {confirmFlow === "start"
-                  ? `项目已有进行中的 Sprint「${allSprints.find((s) => s.status === "active" && s.sprintId !== id)?.name ?? ""}」,允许同时存在多个进行中。仍要开始本 Sprint?`
+                  ? `项目已有进行中的 ${typeName ?? sprint.typeKey}「${allSprints.find((s) => s.status === "active" && s.sprintId !== id)?.name ?? ""}」,允许同时存在多个进行中。仍要开始本 ${typeName ?? sprint.typeKey}?`
                   : confirmFlow === "reopen"
                     ? t.sprintPage.reopenConfirm
                     : `完成后,${(items ?? []).filter((it) => !(statuses.find((st) => st.name === it.status)?.statusType === "FINAL")).length} 个未完成 item 将进入处置(选定去向);已完成 item 保留在本页历史。`}
