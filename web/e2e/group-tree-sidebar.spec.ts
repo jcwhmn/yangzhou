@@ -150,7 +150,7 @@ test("组改父:详情页改挂另一 epic,侧栏树更新且旧 epic 联动回�
     {},
   );
   await page.goto(`/p/${projectKey}/sprint/${s1}`);
-  const sel = page.getByRole("combobox", { name: "所属 Epic" });
+  const sel = page.getByRole("combobox", { name: "所属Epic" });
   await expect(sel).toContainText("移E1");
   await sel.click();
   await page.getByRole("option", { name: "移E2" }).click();
@@ -179,7 +179,7 @@ test("组改父:悬空组归挂(平面区消失、进 epic 树;占位不可选�
     name: "悬E1",
   });
   await page.goto(`/p/${projectKey}/sprint/${s1}`);
-  const sel = page.getByRole("combobox", { name: "所属 Epic" });
+  const sel = page.getByRole("combobox", { name: "所属Epic" });
   await expect(sel).toContainText("未分组（悬空）");
   await sel.click();
   await page.getByRole("option", { name: "悬E1" }).click();
