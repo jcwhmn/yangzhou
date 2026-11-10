@@ -50,7 +50,9 @@ transitions 建类型时由后端种子固化(`group_status.transitions` JSON �
    - PATCH 增量边语义:全量替换与 0110 风格一致,幂等,免 diff 逻辑
 6. **api.http**:0114 区块 GET workflow 后补 PUT 节(**自含**:节内建类型→PUT→GET 回读),负例区补:多/少状态 409、target 越界 409、未注册 function 409、意图违规 409、label 超长 400(只在 test 8082 跑)。
 
-### B 前端(`web/components/GroupTypesPanel.tsx` + `web/lib/texts.ts`)
+### B 前端(`web/components/GroupTypesPage.tsx` + `web/app/p/[key]/group-types/page.tsx` + `web/lib/texts.ts`)
+
+> 2026-11-09 二次改版(用户拍板「页面里直接编辑,不进弹窗」):分组类型管理从 sidebar 弹窗(Dialog)改为**独立路由页面** `/p/[key]/group-types`,sidebar 项目导航列表加「分组类型」项;类型卡上 workflow **恒常只读展示**(无需进编辑态即可看到 transition),编辑仍走行内(点笔)。离开页面时由 layout 监听 pathname 自动刷新 Sprint 段(页内可新建 level-1,原 YPJ-150 语义)。原 `GroupTypesPanel.tsx` 删除。
 
 1. 类型:`transitions` 项增 `label?: string; icon?: string`。
 2. 只读行:`icon`(有则前缀)+ `(tr.label || wfFnLabel(tr.function))` + ` → target`(原 R2a 并入)。
@@ -67,7 +69,7 @@ transitions 建类型时由后端种子固化(`group_status.transitions` JSON �
 
 #### B-1 操作流程(状态×动作真值表)
 
-面板态:只读 **W-RO**(默认)/ 编辑 **W-EDIT**(单类型粒度,同时至多一个类型处于 W-EDIT)。草稿生命周期 = 对话框会话,关闭即弃(不拦截,如需关闭前确认另行拍板)。
+页面态:只读 **W-RO**(默认)/ 编辑 **W-EDIT**(单类型粒度,同时至多一个类型处于 W-EDIT)。草稿生命周期 = 页面会话,**离开页面即弃**(不拦截,如需离开前确认另行拍板)。
 
 | 当前态 | 动作 | 行为 |
 |---|---|---|
@@ -75,14 +77,14 @@ transitions 建类型时由后端种子固化(`group_status.transitions` JSON �
 | W-EDIT | 改 function/target 下拉、label/icon 输入、加/删出边行 | 仅改本地草稿,不落库 |
 | W-EDIT | 「保存」 | PUT 全量(该类型全部状态+出边)→ 200:重拉 workflow,回 W-RO;409/400:块底错误条,停留 W-EDIT |
 | W-EDIT | 「取消」 | 丢弃草稿,回 W-RO |
-| W-RO/W-EDIT | 关闭对话框 | 直接关闭;W-EDIT 未保存草稿丢弃 |
+| W-RO/W-EDIT | 离开页面(sidebar 导航) | 直接离开;W-EDIT 未保存草稿丢弃 |
 
-#### B-2 页面示意图(ASCII,贴合 Dialog 实况:maxWidth sm、List dense、workflow 块 pl:2)
+#### B-2 页面示意图(ASCII,贴合页面实况;sidebar 导航项「分组类型」入项目导航列表)
 
 只读态(打开默认;出边行 = icon 前缀 + label‖wfFnLabel → target):
 
 ```text
-┌─ 分组类型管理 ───────────────────────────────┐
+┌─ 分组类型管理(页面 /p/{key}/group-types)────┐
 │ (说明 caption)                               │
 │ ● sprint    [chip][chip]                  ✏  │ ← 类型头部:名称+chips+编辑 icon
 │ │   planned (START)    开始 → active         │
@@ -92,7 +94,7 @@ transitions 建类型时由后端种子固化(`group_status.transitions` JSON �
 │ │   planned (START)    切换 → active         │
 │ │   …(出边以实际种子为准,示意)              │
 │ 新建类型:[typeKey] [名称] [创建]              │
-│                                [关闭]        │
+└──────────────────────────(页面,无关闭按钮)───┘
 └─────────────────────────────────────────────┘
 ```
 
