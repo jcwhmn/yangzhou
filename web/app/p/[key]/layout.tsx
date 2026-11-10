@@ -21,7 +21,7 @@ import {
 import AddIcon from "@mui/icons-material/Add";
 import Link from "next/link";
 import { usePathname, useParams } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { api, API_BASE } from "@/lib/api";
 import { t } from "@/lib/texts";
 import {
@@ -36,6 +36,7 @@ import {
 } from "@/components/MilestoneManager";
 import { ReleaseManager, type Release } from "@/components/ReleaseManager";
 import {
+  Category as CategoryIcon,
   Download as DownloadIcon,
   GitHub as GitHubIcon,
   Group as GroupIcon,
@@ -49,6 +50,7 @@ import { WorkflowEditor } from "@/components/WorkflowEditor";
 import { ProjectMembersPanel } from "@/components/ProjectMembersPanel";
 import { GithubSettingsPanel } from "@/components/GithubSettingsPanel";
 import { ProjectSettingsPanel } from "@/components/ProjectSettingsPanel";
+import { GroupTypesPanel } from "@/components/GroupTypesPanel";
 import { DateInput } from "@/components/DateInput";
 
 type Sprint = { sprintId: string; name: string; status: string };
@@ -96,25 +98,13 @@ export default function ProjectLayout({
   const [membersOpen, setMembersOpen] = useState(false);
   const [ghOpen, setGhOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [gtypeOpen, setGtypeOpen] = useState(false);
   // YPJ-151:release/milestone 启停(null=加载中按 true 渲染防闪;失败 fail-open)
   const [flags, setFlags] = useState<{
     release: boolean;
     milestone: boolean;
   } | null>(null);
   const [fav, setFav] = useState<boolean | null>(null);
-
-  // YPJ-164:离开分组类型页时刷新 Sprint 段(页内可新建 level-1 类型)
-  const prevPathname = useRef(pathname);
-  useEffect(() => {
-    if (
-      prevPathname.current.endsWith("/group-types") &&
-      pathname !== prevPathname.current
-    ) {
-      loadSprints();
-    }
-    prevPathname.current = pathname;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname]);
 
   const loadSprints = () => {
     // CI 冷 JVM 偶发连接重置(status -1):失败隔 1s 重试一次
@@ -340,6 +330,13 @@ export default function ProjectLayout({
           </IconButton>
           <IconButton
             size="small"
+            aria-label={t.groupTypes.title}
+            onClick={() => setGtypeOpen(true)}
+          >
+            <CategoryIcon fontSize="small" />
+          </IconButton>
+          <IconButton
+            size="small"
             aria-label={t.settings.title}
             onClick={() => setSettingsOpen(true)}
           >
@@ -400,14 +397,6 @@ export default function ProjectLayout({
             sx={itemSx}
           >
             <ListItemText primary={t.projectNav.table} />
-          </ListItemButton>
-          <ListItemButton
-            component={Link}
-            href={`/p/${key}/group-types`}
-            selected={pathname === `/p/${key}/group-types`}
-            sx={itemSx}
-          >
-            <ListItemText primary={t.projectNav.groupTypes} />
           </ListItemButton>
           <Divider sx={{ my: 1 }} />
           <ListItemButton
@@ -702,6 +691,14 @@ export default function ProjectLayout({
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
         onChanged={loadFlags}
+      />
+      <GroupTypesPanel
+        projectKey={String(key)}
+        open={gtypeOpen}
+        onClose={() => {
+          setGtypeOpen(false);
+          loadSprints(); // YPJ-150:类型管理可能新建 level-1 → 重判 Sprint 段显隐
+        }}
       />
     </Box>
   );

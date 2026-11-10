@@ -264,6 +264,7 @@ export const t = {
     wfLabelPh: "显示名(可选)",
     wfIconNone: "(无)",
     wfFailed: "工作流保存失败",
+    wfLoadFail: "workflow 加载失败",
   },
   sprints: {
     noLevel1:
@@ -523,7 +524,6 @@ export const t = {
     board: "看板",
     gantt: "甘特",
     table: "表格",
-    groupTypes: "分组类型",
     sprints: "Sprint",
     backlog: "Backlog",
     milestones: "Milestone",
