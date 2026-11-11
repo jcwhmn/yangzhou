@@ -67,7 +67,7 @@ class ItemGroupService(
         val status: String,
         val startDate: String? = null,
         val endDate: String? = null,
-        /** spec 0111:父组(level-2)公开 ID;叶层组可带,父层组恒 null。 */
+        /** 父组公开 ID(邻层:类型 level=自身+1 的组);顶层组恒 null(spec 0114 多层泛化)。 */
         val parentGroupId: UUID? = null,
     )
 
@@ -76,7 +76,7 @@ class ItemGroupService(
         val name: String?,
         val startDate: String? = null,
         val endDate: String? = null,
-        /** spec 0111:仅叶层(level-1)组可挂;父组类型须 level=2 且自身无父(固定两层)。 */
+        /** 仅非顶层组可挂;父组类型须邻层(level=自身+1)且自身无父(spec 0114 泛化)。 */
         val parentGroupId: String? = null,
     )
 
@@ -182,6 +182,8 @@ class ItemGroupService(
         // release 等 builtin level=NULL 不参与;并发竞态由 (project_id, level) 唯一索引兜底。
         val used = types.findByProjectObjectIdOrderByCreatedAt(pid).mapNotNull { it.level }.toSet()
         val level = (1..used.size + 1).first { it !in used }
+        // spec 0114:层级封顶 3(用户 2026-11-15 拍板;builtin level=NULL 不占位不参与)
+        if (level > 3) throw BadRequestException("分组类型层级封顶 3(自底向上;builtin 不占位)")
         val saved =
             try {
                 types.save(ItemGroupType(projectObjectId = pid, typeKey = typeKey, name = name, level = level, timed = request.timed))
@@ -218,6 +220,14 @@ class ItemGroupService(
             types.findByProjectObjectIdAndTypeKey(pid, typeKey)
                 ?: throw NotFoundException("group 类型不存在:$typeKey")
         if (t.builtin) throw ConflictException("内建类型不可删除:$typeKey")
+        // spec 0114:本层为「中间链」(上下层类型都存在)时删除会断开邻接,409;删顶层/底层放行
+        val lvlNow = t.level
+        if (lvlNow != null) {
+            val ls = types.findByProjectObjectIdOrderByCreatedAt(pid).mapNotNull { it.level }
+            if (ls.any { it < lvlNow } && ls.any { it > lvlNow }) {
+                throw ConflictException("中间层类型不可删除(上下层类型均在):$typeKey")
+            }
+        }
         if (groups.findByProjectObjectIdOrderByCreatedAt(pid).any { it.type == typeKey }) {
             throw ConflictException("类型下仍有组,请先删除:$typeKey")
         }
@@ -281,16 +291,24 @@ class ItemGroupService(
         val t = typeOf(key, typeKey)
         val name = request.name?.trim().takeUnless { it.isNullOrEmpty() } ?: throw BadRequestException("name 必填")
         val pid = project(key).objectId!!
-        // spec 0112:两层项目不变量——有 level-2 类型 ⇒ 新建 level-1 组必挂父(存量悬空 grandfather 不迁移);
-        // 组改父能力另票(YPJ-160)。0 个 epic 实例时同样拒绝,引导先建 epic。
-        val hasParentType = types.findByProjectObjectIdAndLevel(pid, 2) != null
-        if (hasParentType && t.level == 1 && request.parentGroupId.isNullOrBlank()) {
-            throw BadRequestException("两级项目新建叶层组须挂父层组;请先建父层组(如 Epic)")
+        // spec 0114:多层不变量泛化(0111/0112 的 N=2 → ≤3)——组类型 level=L:
+        // 存在 level>L 的类型 ⇒ 该层组必挂父,父组类型须恰为 L+1 且父组无父(顶层恒无父);
+        // 无上层类型 ⇒ 该层即顶层,不可带父。builtin(level=NULL)组不参与层级树,不可带父。
+        val levels = types.findByProjectObjectIdOrderByCreatedAt(pid).mapNotNull { it.level }
+        if (t.level != null) {
+            val hasUpper = levels.any { it > t.level!! }
+            if (hasUpper && request.parentGroupId.isNullOrBlank()) {
+                throw BadRequestException("存在上层类型,新建组须挂父层组(先建父层组)")
+            }
+            if (!hasUpper && request.parentGroupId != null) {
+                throw BadRequestException("该层为顶层(无上层类型),不可挂父组")
+            }
+        } else if (request.parentGroupId != null) {
+            throw BadRequestException("builtin 组不参与层级树,不可挂父组")
         }
-        // spec 0111:固定两层——仅叶层(level-1)组可挂父;父组类型 level=2 且自身无父
         val parent =
             request.parentGroupId?.let { raw ->
-                if (t.level != 1) throw BadRequestException("仅叶层(level-1)组可挂父组")
+                val lvl = t.level!!
                 val id =
                     try {
                         UUID.fromString(raw)
@@ -298,8 +316,7 @@ class ItemGroupService(
                         throw BadRequestException("parentGroupId 不合法:" + raw)
                     }
                 val pg = groups.findByProjectObjectIdAndObjectId(pid, id) ?: throw NotFoundException("父组不存在")
-                if (typeOf(key, pg.type).level != 2) throw BadRequestException("父组类型层级须为 2")
-                if (pg.parentObjectId != null) throw BadRequestException("父组不可再挂父组(固定两层)")
+                if (typeOf(key, pg.type).level != lvl + 1) throw BadRequestException("父组类型层级须为 " + (lvl + 1))
                 pg
             }
         val saved =
@@ -334,19 +351,22 @@ class ItemGroupService(
         val pid = g.projectObjectId
         val name = request.name?.trim()
         if (name != null && name.isEmpty()) throw BadRequestException("name 不能为空")
-        // spec 0113:改父——仅叶层组可改挂;目标须 level-2 组且自身无父;失败 fast-throw 整体不落库
+        // spec 0114:改父泛化——非顶层组(存在上层类型)可改挂;目标须邻层(level+1)组且自身无父;
+        // 子树随迁(仅改本组 parent_object_id,子组指向不变);失败 fast-throw 整体不落库
         val targetParent =
             request.parentGroupId?.let { raw ->
+                val lvl = typeOfPid(pid, g.type).level ?: throw BadRequestException("builtin 组不参与层级树,不可改挂")
+                if (types.findByProjectObjectIdOrderByCreatedAt(pid).mapNotNull { it.level }.none { it > lvl }) {
+                    throw BadRequestException("顶层组不可改挂")
+                }
                 val id =
                     try {
                         UUID.fromString(raw.trim())
                     } catch (_: IllegalArgumentException) {
                         throw BadRequestException("parentGroupId 不合法:$raw")
                     }
-                if (typeOfPid(pid, g.type).level != 1) throw BadRequestException("父层组为顶层,不可改挂")
                 val target = groups.findByProjectObjectIdAndObjectId(pid, id) ?: throw NotFoundException("目标父组不存在")
-                if (typeOfPid(pid, target.type).level != 2) throw BadRequestException("目标父组类型层级须为 2")
-                if (target.parentObjectId != null) throw BadRequestException("目标父组不可再挂父组(固定两层)")
+                if (typeOfPid(pid, target.type).level != lvl + 1) throw BadRequestException("目标父组类型层级须为 " + (lvl + 1))
                 target
             }
         val parentChanged = targetParent != null && targetParent.objectId != g.parentObjectId
@@ -371,7 +391,19 @@ class ItemGroupService(
         val saved = groups.save(updated)
         // 改父后新旧父都按 0111 规则重算(同事务)
         if (parentChanged) {
-            g.parentObjectId?.let { recomputeParentStatus(pid, it) }
+            g.parentObjectId?.let { oldParentId ->
+                recomputeParentStatus(pid, oldParentId)
+                // spec 0114:改父后旧父若无子,回起点(0111「无子不动」仅约束删除路径,此处为改父语义)
+                val oldParent = groups.findByProjectObjectIdAndObjectId(pid, oldParentId)
+                if (oldParent != null && groups.findAllByProjectObjectIdAndParentObjectId(pid, oldParentId).isEmpty()) {
+                    workflow.statusNameByType(typeOfPid(pid, oldParent.type), StatusType.START)?.let { startName ->
+                        if (oldParent.status != startName) {
+                            groups.save(oldParent.copy(status = startName, updatedAt = Instant.now()))
+                            oldParent.parentObjectId?.let { recomputeParentStatus(pid, it) }
+                        }
+                    }
+                }
+            }
             recomputeParentStatus(pid, targetParent!!.objectId!!)
         }
         return saved.toDto()
@@ -414,12 +446,13 @@ class ItemGroupService(
         leaderGuard.requireLeader(key)
         val g = findGroup(key, groupId)
         val t = typeOf(key, g.type)
-        // spec 0111:父层(level-2)组状态由子组联动推导,不开放手动动作
-        if (t.level == 2) throw ConflictException("父层组状态由子组联动,不支持手动动作")
+        // spec 0114:非叶层组状态由子组逐层联动推导,不开放手动动作
+        if ((t.level ?: 0) > 1) throw ConflictException("父层组状态由子组联动,不支持手动动作")
         val target = workflow.applyAction(t, g.status, function)
         val saved = groups.save(g.copy(status = target, updatedAt = Instant.now())).toDto()
         // spec 0110(YPJ-159):完成 + 处置同一事务——迁移已落库后逐行 replaceMembership,失败整体回滚(含状态迁移)
-        if (function == "complete" && request != null && request.dispositions.isNotEmpty()) {
+        // spec 0114:完成判定按语义「迁移至 FINAL」而非函数字面量——自定义工作流出边 fn=switch,处置同事务照走
+        if (workflow.statusType(t, target) == StatusType.FINAL && request != null && request.dispositions.isNotEmpty()) {
             applyDispositions(g, request.dispositions)
         }
         propagateParent(g.copy(status = target))
@@ -451,6 +484,8 @@ class ItemGroupService(
         if (workflow.statusType(parentType, parent.status) == wanted) return
         val targetName = workflow.statusNameByType(parentType, wanted) ?: return
         groups.save(parent.copy(status = targetName, updatedAt = Instant.now()))
+        // spec 0114:逐层级联到顶(本层变化才向上;不变则链上无新输入,截断)
+        parent.parentObjectId?.let { recomputeParentStatus(pid, it) }
     }
 
     /** 内部不变式口径(pid 版 typeOf);类型缺失即数据破损,error。 */
@@ -553,8 +588,8 @@ class ItemGroupService(
                     ?: throw BadRequestException("groupType 必填(groupId 为空时)")
         }
         val t = types.findByProjectObjectIdAndTypeKey(item.projectObjectId, typeKey) ?: throw NotFoundException("group 类型不存在:$typeKey")
-        // spec 0111:item 只挂叶层组,父层组(level=2)不直接持有 item
-        if (t.level == 2) throw ConflictException("父层组不直接挂 item,item 挂叶层组")
+        // spec 0114:item 只挂叶层(level-1)组,非叶层由子组并集表达
+        if ((t.level ?: 0) > 1) throw ConflictException("父层组不直接挂 item,item 挂叶层组")
         val finalNames = workflow.finalStatusNames(t)
 
         val rows = memberships.findByItemObjectIdIn(listOf(item.objectId!!))

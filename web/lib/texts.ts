@@ -511,10 +511,12 @@ export const t = {
     reopenBtn: "↺ 重开组",
     reopenConfirm:
       "重开将撤销完成态,回到进行中;成员与历史不变,可重新拉入 item。仍要重开?",
-    startBtn: "▶ 开始 Sprint",
-    completeBtn: "✓ 完成 Sprint",
+    // spec 0114:按钮文案按组类型动态(「开始 Sprint」→「开始{类型名}」;内置 sprint 类型名=Sprint 行为不变)
+    startBtn: "▶ 开始 {name}",
+    completeBtn: "✓ 完成 {name}",
     // 0113:组改父——详情页「所属 Epic」选择器
-    parentLabel: "所属 Epic",
+    // spec 0114:label 按组类型动态(「所属 Epic」→「所属{父类型名}」)
+    parentLabel: "所属{name}",
     parentDangling: "未分组（悬空）",
     reparentFailed: "改挂失败",
   },

@@ -63,7 +63,12 @@ jobs:
 
       - name: 装 Playwright chromium(含系统依赖)
         working-directory: web
-        run: npx playwright install --with-deps chromium
+        # 2026-11-11 晚 runner 侧 DNS 间歇性故障:azure+archive 双源随机解析失败(其余下载正常)——
+        # 双源镜像行保留 + apt 层 Acquire::Retries + 整步 3 次循环重试(安装幂等,重试只补缺包)
+        run: |
+          printf 'http://archive.ubuntu.com/ubuntu\nhttp://azure.archive.ubuntu.com/ubuntu\n' | sudo tee /etc/apt/apt-mirrors.txt
+          echo 'Acquire::Retries "8";' | sudo tee /etc/apt/apt.conf.d/99acquire-retries
+          ok=0; for i in 1 2 3; do if npx playwright install --with-deps chromium; then ok=1; break; fi; echo "attempt $i failed, retrying"; sleep 20; done; [ "$ok" = 1 ]
 
       - name: 跑 E2E
         working-directory: web

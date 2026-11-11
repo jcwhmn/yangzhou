@@ -8,18 +8,29 @@ export type Sprint = {
   status: string;
   startDate: string | null;
   endDate: string | null;
-  /** spec 0111:父层组公开 ID;叶层组可带,父层/无父恒 null。 */
+  /** spec 0111:父层组公开 ID;顶层/无父恒 null(spec 0114 多层泛化)。 */
   parentGroupId: string | null;
+  /** spec 0114:组类型 key——详情页按自身层位找 L+1 候选/workflow。 */
+  typeKey: string;
 };
 
-/** spec 0112:两级树节点(父层组带 isParent 标记)。 */
+/** spec 0112:树节点(非叶层组带 isParent 标记)。 */
 export type TreeSprint = Sprint & { isParent: boolean };
 
+/** spec 0114:递归树节点(多层缩进渲染)。 */
+export type GroupNode = { sprint: TreeSprint; children: GroupNode[] };
+
 export type GroupTree = {
-  parents: TreeSprint[];
+  /** 顶层组(无父的非叶层组)及其子链;每层按 active→planned→completed 排序。 */
+  nodes: GroupNode[];
+  /** 悬空叶层组(无父的 level-1 组),平面区渲染。 */
   orphans: TreeSprint[];
-  childrenByParent: Record<string, TreeSprint[]>;
+  /** level-2 组全集(叶层新建挂父候选;两层项目=原 parents)。 */
+  parentCandidates: TreeSprint[];
+  /** level-2 类型名(「所属X」标签);无 level-2 类型为 null(=平面模式)。 */
   parentTypeName: string | null;
+  /** level-1 组全集(叶层;syncCurrentParent 判定用)。 */
+  leafSprints: TreeSprint[];
 };
 
 type GroupDto = {
@@ -58,6 +69,7 @@ function toSprint(g: GroupDto): Sprint {
     startDate: g.startDate,
     endDate: g.endDate,
     parentGroupId: g.parentGroupId,
+    typeKey: g.typeKey,
   };
 }
 
@@ -66,7 +78,13 @@ export async function listSprints(key: string): Promise<Sprint[]> {
   return groups.map(toSprint);
 }
 
-/** spec 0112:两级树数据——一次全量组,前端分桶(父层/子组/孤儿);无 level-2 → parents 空(=平面模式)。 */
+/** spec 0114:全量组(含中层)——处置目标树/开始提示按本组类型取候选用 */
+export async function listGroups(key: string): Promise<Sprint[]> {
+  const groups = await api<GroupDto[]>(`/api/projects/${key}/groups`);
+  return groups.map(toSprint);
+}
+
+/** spec 0114:多层树数据——一次全量组,按 parentGroupId 组装递归结构;无 level-2 → parentCandidates 空(=平面模式)。 */
 export async function listGroupTree(key: string): Promise<GroupTree> {
   const types = await api<GroupTypeDto[]>(`/api/projects/${key}/group-types`);
   const l1 = types.find((tp) => tp.level === 1)?.typeKey;
@@ -74,33 +92,60 @@ export async function listGroupTree(key: string): Promise<GroupTree> {
   const groups = await api<GroupDto[]>(`/api/projects/${key}/groups`);
   const toTree = (g: GroupDto): TreeSprint => ({
     ...toSprint(g),
-    isParent: g.typeKey === l2?.typeKey,
+    isParent: g.typeKey !== l1,
   });
   const rank = { active: 0, planned: 1, completed: 2 } as const;
   const byRank = (a: TreeSprint, b: TreeSprint) =>
     (rank[a.status as keyof typeof rank] ?? 9) -
     (rank[b.status as keyof typeof rank] ?? 9);
-  const parents = groups
+  const nodeOf = new Map<string, GroupNode>(
+    groups.map((g) => [g.groupId, { sprint: toTree(g), children: [] }]),
+  );
+  const nodes: GroupNode[] = [];
+  const orphans: TreeSprint[] = [];
+  for (const g of groups) {
+    const n = nodeOf.get(g.groupId)!;
+    const p = g.parentGroupId ? nodeOf.get(g.parentGroupId) : null;
+    if (p) p.children.push(n);
+    else if (g.typeKey === l1) orphans.push(n.sprint);
+    else nodes.push(n);
+  }
+  const sortNodes = (ns: GroupNode[]) => {
+    ns.sort((a, b) => byRank(a.sprint, b.sprint));
+    ns.forEach((n) => sortNodes(n.children));
+  };
+  sortNodes(nodes);
+  orphans.sort(byRank);
+  const parentCandidates = groups
     .filter((g) => g.typeKey === l2?.typeKey)
     .map(toTree)
     .sort(byRank);
-  const childrenByParent: Record<string, TreeSprint[]> = {};
-  groups
-    .filter((g) => g.typeKey === l1 && g.parentGroupId)
-    .map(toTree)
-    .forEach((c) => {
-      (childrenByParent[c.parentGroupId as string] ??= []).push(c);
-    });
-  Object.values(childrenByParent).forEach((arr) => arr.sort(byRank));
-  const orphans = groups
-    .filter((g) => g.typeKey === l1 && !g.parentGroupId)
-    .map(toTree);
   return {
-    parents,
+    nodes,
     orphans,
-    childrenByParent,
+    parentCandidates,
     parentTypeName: l2?.name ?? null,
+    leafSprints: groups.filter((g) => g.typeKey === l1).map(toTree),
   };
+}
+
+/** spec 0114:active 叶层组的父链节点 id(侧栏默认展开);无 active 叶层返回空。 */
+export function activeChainIds(tree: GroupTree): string[] {
+  const leafIds = new Set(tree.leafSprints.map((s) => s.sprintId));
+  const walk = (n: GroupNode, path: string[]): string[] | null => {
+    if (leafIds.has(n.sprint.sprintId))
+      return n.sprint.status === "active" ? path : null;
+    for (const c of n.children) {
+      const hit = walk(c, [...path, n.sprint.sprintId]);
+      if (hit) return hit;
+    }
+    return null;
+  };
+  for (const r of tree.nodes) {
+    const hit = walk(r, []);
+    if (hit) return hit;
+  }
+  return [];
 }
 
 /** spec 0112:当前 epic 判定——active 子组的父 → localStorage 记忆 → null;发现即回写记忆。 */
@@ -137,6 +182,30 @@ export async function getSprint(
   );
 }
 
+/** spec 0114:某组类型 L 的上一层组候选(L+1 类型组列表);无上层类型返回 null(顶层/平面项目,不渲染选择器)。 */
+export async function listParentCandidates(
+  key: string,
+  groupTypeKey: string,
+): Promise<{ name: string; options: TreeSprint[] } | null> {
+  const types = await api<GroupTypeDto[]>(`/api/projects/${key}/group-types`);
+  const self = types.find((tp) => tp.typeKey === groupTypeKey);
+  const up =
+    self?.level != null
+      ? types.find((tp) => tp.level === self.level! + 1)
+      : undefined;
+  if (!up) return null;
+  const groups = await api<GroupDto[]>(`/api/projects/${key}/groups`);
+  const options = groups
+    .filter((g) => g.typeKey === up.typeKey)
+    .map((g) => ({ ...toSprint(g), isParent: true }));
+  options.sort(byRank);
+  return { name: up.name, options };
+}
+const rank3 = { active: 0, planned: 1, completed: 2 } as const;
+const byRank = (a: TreeSprint, b: TreeSprint) =>
+  (rank3[a.status as keyof typeof rank3] ?? 9) -
+  (rank3[b.status as keyof typeof rank3] ?? 9);
+
 export async function createSprint(
   key: string,
   body: {
@@ -164,7 +233,8 @@ export async function createSprint(
 export async function sprintAction(
   key: string,
   sprintId: string,
-  fn: "start" | "complete" | "backward" | "reopen",
+  // YPJ-120/0114:自定义工作流出边 function 可能是 switch 等,按出边实际名传
+  fn: string,
   body?: Record<string, unknown>, // 0110:complete 可携处置计划,与状态迁移同事务
 ): Promise<Sprint> {
   const s = toSprint(
@@ -206,15 +276,4 @@ export async function updateGroupParent(
     method: "PATCH",
     body: JSON.stringify({ parentGroupId }),
   });
-}
-
-/** spec 0113:父层组(level-2 类型)列表——详情页「所属 Epic」选项;无 level-2 类型返回 null(=平面项目,不渲染选择器)。 */
-export async function listParents(key: string): Promise<TreeSprint[] | null> {
-  const types = await api<GroupTypeDto[]>(`/api/projects/${key}/group-types`);
-  const l2 = types.find((tp) => tp.level === 2);
-  if (!l2) return null;
-  const groups = await api<GroupDto[]>(`/api/projects/${key}/groups`);
-  return groups
-    .filter((g) => g.typeKey === l2.typeKey)
-    .map((g) => ({ ...toSprint(g), isParent: true }));
 }
