@@ -251,12 +251,17 @@ class MilestoneApiTest : AbstractApiTest() {
 
         // 终态后删除 409(§6 #1 拍板);非终态删除仍 204
         assertEquals(200, patch(authed, "DO", mid, mapOf("status" to "completed")).status.value())
-        authed
-            .delete()
-            .uri("/api/projects/DO/milestones/$mid")
-            .exchange()
-            .expectStatus()
-            .isConflict()
+        assertEquals(
+            409,
+            authed
+                .delete()
+                .uri("/api/projects/DO/milestones/$mid")
+                .exchange()
+                .expectBody(String::class.java)
+                .returnResult()
+                .status
+                .value(),
+        )
         val plain = createMilestone(authed, "DO", mapOf("name" to "可删"))["milestoneId"].asText()
         authed
             .delete()
