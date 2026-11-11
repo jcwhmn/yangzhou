@@ -64,9 +64,9 @@ jobs:
       - name: 装 Playwright chromium(含系统依赖)
         working-directory: web
         # Azure runner 的 azure.archive.ubuntu.com 镜像源间歇性 DNS 故障(2026-11-11 连续 4 次 red,其余下载全正常)——
-        # 装依赖前把 apt 镜像指到 canonical archive.ubuntu.com,绕开该源
+        # 镜像行须完整 URI(mirror+file 逐行依序尝试):archive 优先,azure 回退
         run: |
-          sudo sh -c 'echo archive.ubuntu.com > /etc/apt/apt-mirrors.txt'
+          printf 'http://archive.ubuntu.com/ubuntu\nhttp://azure.archive.ubuntu.com/ubuntu\n' | sudo tee /etc/apt/apt-mirrors.txt
           npx playwright install --with-deps chromium
 
       - name: 跑 E2E
