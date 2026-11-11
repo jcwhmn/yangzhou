@@ -1,14 +1,17 @@
 "use client";
 
-// YPJ-48(spec 0056)最小前端:项目设置页的 group 类型管理(列/增/删)。
+// YPJ-48(spec 0056)最小前端:项目页图标行弹出的分组类型管理面板(列/增/删)。
 // 改名走 API 不做 UI(手工验证经 api.http);sprint/release 的组管理在专属功能里。
+// spec 0115(YPJ-164,§四修订):workflow 两态同一行骨架——
+// W-RO(默认)= 出边 4 槽展示行(fn/target/label/icon 同编辑态槽位,纯展示,零点击可见);
+// W-EDIT(点笔)= 同槽位变控件 + 删边 + 加出边 + 保存/取消;无二级弹出。
+// release 类型不展示(非用户管理的分组类型);2026-11-09 用户拍板。
 import {
   Alert,
   Box,
   Button,
   Chip,
   Dialog,
-  DialogActions,
   DialogContent,
   DialogTitle,
   IconButton,
@@ -19,11 +22,15 @@ import {
   Typography,
   FormControlLabel,
   Checkbox,
+  Select,
+  MenuItem,
 } from "@mui/material";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { t } from "@/lib/texts";
+import { WF_FN_DICT, wfFnIcon, wfFnLabel } from "@/lib/groupWorkflow";
 
 type GroupType = {
   typeKey: string;
@@ -32,11 +39,17 @@ type GroupType = {
   level: number | null;
   timed: boolean;
 };
-// spec 0097 S3:类型 workflow 只读形状(同 GroupWorkflowService.GroupStatusDto)
+// spec 0097 S3:类型 workflow 只读形状(同 GroupWorkflowService.GroupStatusDto);spec 0115 增 label/icon
+type WfTransition = {
+  function: string;
+  target: string;
+  label?: string | null;
+  icon?: string | null;
+};
 type WfStatus = {
   name: string;
   statusType: string;
-  transitions: { function: string; target: string }[];
+  transitions: WfTransition[];
 };
 
 function wfTypeLabel(statusType: string): string {
@@ -52,23 +65,45 @@ function wfTypeLabel(statusType: string): string {
   }
 }
 
-function wfFnLabel(fn: string): string {
-  switch (fn) {
-    case "start":
-      return t.wf.fnStart;
-    case "complete":
-      return t.wf.fnComplete;
-    case "switch":
-      return t.wf.fnSwitch;
-    case "forward":
-      return t.wf.fnForward;
-    case "backward":
-      return t.wf.fnBackward;
-    case "cancel":
-      return t.wf.fnCancel;
-    default:
-      return fn;
-  }
+// W-RO 出边 4 槽展示行:槽位/顺序/宽度与 W-EDIT 控件一致(90/100/110/70),纯展示不可编辑
+function EdgeView({
+  fn,
+  target,
+  label,
+  icon,
+}: {
+  fn: string;
+  target: string;
+  label: string;
+  icon: string;
+}) {
+  const slot = (v: string, min: number) => (
+    <Box
+      sx={{
+        minWidth: min,
+        height: 40,
+        display: "flex",
+        alignItems: "center",
+        px: 1,
+        border: 1,
+        borderColor: "divider",
+        borderRadius: 1,
+        fontSize: 13,
+        overflow: "hidden",
+        whiteSpace: "nowrap",
+      }}
+    >
+      {v}
+    </Box>
+  );
+  return (
+    <Stack direction="row" spacing={0.5} sx={{ pl: 1, my: 0.5 }}>
+      {slot(fn, 90)}
+      {slot(target, 100)}
+      {slot(label, 110)}
+      {slot(icon, 70)}
+    </Stack>
+  );
 }
 
 export function GroupTypesPanel({
@@ -88,14 +123,20 @@ export function GroupTypesPanel({
   const [name, setName] = useState("");
   const [timed, setTimed] = useState(false);
   const [error, setError] = useState("");
+  // spec 0115:W-EDIT 单类型粒度(同时至多一个);草稿生命周期 = 面板会话,关面板即弃
+  const [editing, setEditing] = useState<string | null>(null);
+  const [draft, setDraft] = useState<WfStatus[]>([]);
+  const [wfError, setWfError] = useState("");
 
   const load = () => {
     api<GroupType[]>(`/api/projects/${projectKey}/group-types`)
       .then(async (ts) => {
-        setTypes(ts);
+        // release 非用户管理的分组类型(专属功能域),面板不展示
+        const visible = ts.filter((g) => g.typeKey !== "release");
+        setTypes(visible);
         // spec 0097 S3:workflow 只读展示,每类型一拉;失败不阻断类型管理(该类型不显示块)
         const entries = await Promise.all(
-          ts.map(async (g) => {
+          visible.map(async (g) => {
             const wf = await api<WfStatus[]>(
               `/api/projects/${projectKey}/group-types/${g.typeKey}/workflow`,
             ).catch(() => undefined);
@@ -114,6 +155,9 @@ export function GroupTypesPanel({
       setName("");
       setTimed(false);
       setError("");
+      setEditing(null);
+      setDraft([]);
+      setWfError("");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, projectKey]);
@@ -147,6 +191,98 @@ export function GroupTypesPanel({
     } catch (e) {
       setError(e instanceof Error ? e.message : t.groupTypes.failed);
     }
+  }
+
+  // ---------- spec 0115:workflow 编辑(W-EDIT) ----------
+
+  function startEdit(typeKey: string) {
+    // 互斥:进入新类型编辑即静默取消他类型草稿
+    setEditing(typeKey);
+    // 预填:label/icon 缺省取数据字典(用户可改;保存后落库)
+    setDraft(
+      (workflows[typeKey] ?? []).map((st) => ({
+        ...st,
+        transitions: st.transitions.map((tr) => ({
+          ...tr,
+          label: tr.label ?? wfFnLabel(tr.function),
+          icon: tr.icon ?? wfFnIcon(tr.function),
+        })),
+      })),
+    );
+    setWfError("");
+  }
+
+  function cancelEdit() {
+    setEditing(null);
+    setDraft([]);
+    setWfError("");
+  }
+
+  async function saveEdit(typeKey: string) {
+    try {
+      await api(`/api/projects/${projectKey}/group-types/${typeKey}/workflow`, {
+        method: "PUT",
+        body: JSON.stringify(
+          draft.map((st) => ({
+            name: st.name,
+            transitions: st.transitions.map((tr) => ({
+              function: tr.function,
+              target: tr.target,
+              ...(tr.label ? { label: tr.label } : {}),
+              ...(tr.icon ? { icon: tr.icon } : {}),
+            })),
+          })),
+        ),
+      });
+      cancelEdit();
+      load();
+    } catch (e) {
+      setWfError(e instanceof Error ? e.message : t.groupTypes.wfFailed);
+    }
+  }
+
+  function setEdge(si: number, ti: number, tr: WfTransition) {
+    setDraft(
+      draft.map((st, i) =>
+        i === si
+          ? {
+              ...st,
+              transitions: st.transitions.map((e, j) => (j === ti ? tr : e)),
+            }
+          : st,
+      ),
+    );
+  }
+
+  function addEdge(si: number) {
+    setDraft(
+      draft.map((st, i) =>
+        i === si
+          ? {
+              ...st,
+              transitions: [
+                ...st.transitions,
+                {
+                  function: "switch",
+                  target: draft[0]?.name ?? st.name,
+                  label: wfFnLabel("switch"),
+                  icon: wfFnIcon("switch"),
+                },
+              ],
+            }
+          : st,
+      ),
+    );
+  }
+
+  function delEdge(si: number, ti: number) {
+    setDraft(
+      draft.map((st, i) =>
+        i === si
+          ? { ...st, transitions: st.transitions.filter((_, j) => j !== ti) }
+          : st,
+      ),
+    );
   }
 
   return (
@@ -196,9 +332,33 @@ export function GroupTypesPanel({
                     <DeleteOutlineIcon fontSize="small" />
                   </IconButton>
                 )}
+                {editing === g.typeKey ? (
+                  <>
+                    <Button
+                      size="small"
+                      variant="contained"
+                      onClick={() => saveEdit(g.typeKey)}
+                    >
+                      {t.groupTypes.wfSave}
+                    </Button>
+                    <Button size="small" onClick={cancelEdit} sx={{ mr: 1 }}>
+                      {t.groupTypes.wfCancel}
+                    </Button>
+                  </>
+                ) : (
+                  workflows[g.typeKey] !== undefined && (
+                    <IconButton
+                      size="small"
+                      aria-label={t.groupTypes.wfEdit}
+                      onClick={() => startEdit(g.typeKey)}
+                    >
+                      <EditOutlinedIcon fontSize="small" />
+                    </IconButton>
+                  )
+                )}
               </Box>
-              {/* spec 0097 S3:workflow 只读展示(状态 · statusType · 出边动作 → 目标) */}
-              {workflows[g.typeKey] !== undefined && (
+              {/* spec 0115 §四:W-RO = 出边 4 槽展示行(同编辑态骨架,零点击可见)/ W-EDIT = 同槽位变控件 */}
+              {workflows[g.typeKey] !== undefined && editing !== g.typeKey && (
                 <Box sx={{ pl: 2, pb: 1 }}>
                   {workflows[g.typeKey]!.length === 0 ? (
                     <Typography variant="caption" color="text.secondary">
@@ -206,22 +366,134 @@ export function GroupTypesPanel({
                     </Typography>
                   ) : (
                     workflows[g.typeKey]!.map((st) => (
+                      <Box key={st.name} sx={{ mb: 0.5 }}>
+                        <Typography
+                          variant="caption"
+                          component="div"
+                          color="text.secondary"
+                        >
+                          {st.name} · {wfTypeLabel(st.statusType)}
+                        </Typography>
+                        {st.transitions.map((tr, ti) => (
+                          <EdgeView
+                            key={ti}
+                            fn={tr.function}
+                            target={tr.target}
+                            label={tr.label || wfFnLabel(tr.function)}
+                            icon={tr.icon || wfFnIcon(tr.function)}
+                          />
+                        ))}
+                      </Box>
+                    ))
+                  )}
+                </Box>
+              )}
+              {workflows[g.typeKey] === undefined && (
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ pl: 2, pb: 1, display: "block" }}
+                >
+                  {t.groupTypes.wfLoadFail}
+                </Typography>
+              )}
+              {editing === g.typeKey && (
+                <Box sx={{ pl: 2, pb: 1 }}>
+                  {draft.map((st, si) => (
+                    <Box key={st.name} sx={{ mb: 1 }}>
                       <Typography
-                        key={st.name}
                         variant="caption"
                         component="div"
                         color="text.secondary"
                       >
                         {st.name} · {wfTypeLabel(st.statusType)}
-                        {st.transitions.length > 0 &&
-                          ` · ${st.transitions
-                            .map(
-                              (tr) =>
-                                `${wfFnLabel(tr.function)} → ${tr.target}`,
-                            )
-                            .join("、")}`}
                       </Typography>
-                    ))
+                      {st.transitions.map((tr, ti) => (
+                        <Stack
+                          key={ti}
+                          direction="row"
+                          spacing={0.5}
+                          sx={{ pl: 1, alignItems: "center", my: 0.5 }}
+                        >
+                          <Select
+                            size="small"
+                            value={tr.function}
+                            onChange={(e) => {
+                              const fn = e.target.value;
+                              // 换函数即重预填 label/icon(可再改)
+                              setEdge(si, ti, {
+                                ...tr,
+                                function: fn,
+                                label: wfFnLabel(fn),
+                                icon: wfFnIcon(fn),
+                              });
+                            }}
+                            sx={{ minWidth: 90 }}
+                          >
+                            {Object.keys(WF_FN_DICT).map((fn) => (
+                              <MenuItem key={fn} value={fn}>
+                                {fn}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                          <Select
+                            size="small"
+                            value={tr.target}
+                            onChange={(e) =>
+                              setEdge(si, ti, { ...tr, target: e.target.value })
+                            }
+                            sx={{ minWidth: 100 }}
+                          >
+                            {draft.map((s) => (
+                              <MenuItem key={s.name} value={s.name}>
+                                {s.name}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                          <TextField
+                            size="small"
+                            placeholder={t.groupTypes.wfLabelPh}
+                            value={tr.label ?? ""}
+                            onChange={(e) =>
+                              setEdge(si, ti, { ...tr, label: e.target.value })
+                            }
+                            sx={{ width: 110 }}
+                          />
+                          <Select
+                            size="small"
+                            value={tr.icon ?? ""}
+                            onChange={(e) =>
+                              setEdge(si, ti, { ...tr, icon: e.target.value })
+                            }
+                            sx={{ minWidth: 70 }}
+                          >
+                            <MenuItem value="">
+                              {t.groupTypes.wfIconNone}
+                            </MenuItem>
+                            {Object.entries(WF_FN_DICT).map(([fn, d]) => (
+                              <MenuItem key={fn} value={d.icon}>
+                                {d.icon}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                          <IconButton
+                            size="small"
+                            aria-label={t.groupTypes.deleteBtn}
+                            onClick={() => delEdge(si, ti)}
+                          >
+                            <DeleteOutlineIcon fontSize="small" />
+                          </IconButton>
+                        </Stack>
+                      ))}
+                      <Button size="small" onClick={() => addEdge(si)}>
+                        {t.groupTypes.wfAddEdge}
+                      </Button>
+                    </Box>
+                  ))}
+                  {wfError && (
+                    <Alert severity="error" sx={{ mt: 1 }}>
+                      {wfError}
+                    </Alert>
                   )}
                 </Box>
               )}
@@ -281,9 +553,6 @@ export function GroupTypesPanel({
           </Alert>
         )}
       </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose}>{t.groupTypes.close}</Button>
-      </DialogActions>
     </Dialog>
   );
 }

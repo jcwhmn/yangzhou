@@ -51,8 +51,8 @@ import type { Signal } from "@/components/Verdict";
 import { WorkflowEditor } from "@/components/WorkflowEditor";
 import { ProjectMembersPanel } from "@/components/ProjectMembersPanel";
 import { GithubSettingsPanel } from "@/components/GithubSettingsPanel";
-import { GroupTypesPanel } from "@/components/GroupTypesPanel";
 import { ProjectSettingsPanel } from "@/components/ProjectSettingsPanel";
+import { GroupTypesPanel } from "@/components/GroupTypesPanel";
 import { DateInput } from "@/components/DateInput";
 
 type Sprint = { sprintId: string; name: string; status: string };
@@ -99,8 +99,8 @@ export default function ProjectLayout({
   const [wfOpen, setWfOpen] = useState(false);
   const [membersOpen, setMembersOpen] = useState(false);
   const [ghOpen, setGhOpen] = useState(false);
-  const [gtypeOpen, setGtypeOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [gtypeOpen, setGtypeOpen] = useState(false);
   // YPJ-151:release/milestone 启停(null=加载中按 true 渲染防闪;失败 fail-open)
   const [flags, setFlags] = useState<{
     release: boolean;

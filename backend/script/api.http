@@ -1898,3 +1898,103 @@ Authorization: Bearer {{token}}
 ### [预期 409] 删中层类型 feat163——上层 epic163 仍存在(中间链 guard)
 DELETE {{host}}/api/projects/{{pkey163}}/group-types/feat163
 Authorization: Bearer {{token}}
+
+### ---------- spec 0115(YPJ-164):workflow 可编辑(本节自含:自带项目/类型;先跑「登录」即可单跑本节;重跑本节前先重跑「登录」刷新 run 后缀) ----------
+
+### 0115 专用项目(变量全带 164 后缀,不与上文串台)
+POST {{host}}/api/projects
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+ "key": "P164{{run}}",
+ "name": "workflow 可编辑手测 {{run}}"
+}
+
+> {%
+ client.global.set("pkey164", response.body.key);
+%}
+
+### 建自定义类型(默认三态 switch 循环;handler 存 wtypeKey164)
+POST {{host}}/api/projects/{{pkey164}}/group-types
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+ "typeKey": "month164",
+ "name": "月"
+}
+
+> {%
+ client.global.set("wtypeKey164", response.body.typeKey);
+%}
+
+### 回读默认 workflow(三态,出边无 label/icon)
+GET {{host}}/api/projects/{{pkey164}}/group-types/{{wtypeKey164}}/workflow
+Authorization: Bearer {{token}}
+
+### PUT 全量替换:label/icon 覆写 + planned 加 complete 边(200,响应即更新后 workflow)
+PUT {{host}}/api/projects/{{pkey164}}/group-types/{{wtypeKey164}}/workflow
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+[
+ {"name":"planned","transitions":[{"function":"switch","target":"active","label":"启动","icon":"▶"},{"function":"complete","target":"completed"}]},
+ {"name":"active","transitions":[{"function":"switch","target":"completed"}]},
+ {"name":"completed","transitions":[]}
+]
+
+### [预期 409] 状态集少一个(状态集锁死,不可增删)
+PUT {{host}}/api/projects/{{pkey164}}/group-types/{{wtypeKey164}}/workflow
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+[
+ {"name":"planned","transitions":[{"function":"switch","target":"active"}]},
+ {"name":"active","transitions":[]}
+]
+
+### [预期 409] 出边目标越界(target 不在本类型状态集)
+PUT {{host}}/api/projects/{{pkey164}}/group-types/{{wtypeKey164}}/workflow
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+[
+ {"name":"planned","transitions":[{"function":"switch","target":"nowhere"}]},
+ {"name":"active","transitions":[]},
+ {"name":"completed","transitions":[]}
+]
+
+### [预期 409] 未注册动作函数(注册表外 function 不放行)
+PUT {{host}}/api/projects/{{pkey164}}/group-types/{{wtypeKey164}}/workflow
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+[
+ {"name":"planned","transitions":[{"function":"deploy","target":"active"}]},
+ {"name":"active","transitions":[]},
+ {"name":"completed","transitions":[]}
+]
+
+### [预期 409] 意图违规(complete 边目标必须是 FINAL 态,指向 planned 被静态预检拦下)
+PUT {{host}}/api/projects/{{pkey164}}/group-types/{{wtypeKey164}}/workflow
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+[
+ {"name":"planned","transitions":[{"function":"complete","target":"planned"}]},
+ {"name":"active","transitions":[]},
+ {"name":"completed","transitions":[]}
+]
+
+### [预期 400] label 超长(21 字 > 20 上限)
+PUT {{host}}/api/projects/{{pkey164}}/group-types/{{wtypeKey164}}/workflow
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+[
+ {"name":"planned","transitions":[{"function":"switch","target":"active","label":"一二三四五六七八九十一二三四五六七八九十一"}]},
+ {"name":"active","transitions":[]},
+ {"name":"completed","transitions":[]}
+]
+
