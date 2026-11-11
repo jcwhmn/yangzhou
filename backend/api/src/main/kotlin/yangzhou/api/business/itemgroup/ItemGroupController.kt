@@ -55,6 +55,13 @@ class ItemGroupController(
         @PathVariable typeKey: String,
     ): List<GroupWorkflowService.GroupStatusDto> = service.workflow(key, typeKey)
 
+    @PutMapping("/projects/{key}/group-types/{typeKey}/workflow")
+    fun updateWorkflow(
+        @PathVariable key: String,
+        @PathVariable typeKey: String,
+        @RequestBody requests: List<GroupWorkflowService.StatusTransitionsRequest>,
+    ): List<GroupWorkflowService.GroupStatusDto> = service.updateWorkflow(key, typeKey, requests)
+
     // ---------- 组 ----------
 
     @GetMapping("/projects/{key}/groups")

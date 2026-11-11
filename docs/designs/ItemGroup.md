@@ -65,20 +65,34 @@ Transition - WorkflowStatu: target
 hide empty members
 
 class Item
-class ItemGroup
+class ItemGroup{
+  isLeaf
+  level
+}
 class GroupWorkflow
 class ItemWorkflow
 class Workflow
+class Project
+object Sprint
+object TimeLine
 
+
+Project "1" -- "0..1" ItemGroup
 ItemGroup "1" o- "0..*" Item
-ItemGroup "0..1" --> "0..*" ItemGroup : parent（固定两层：level-2 父层 / level-1 叶层）
 ItemGroup "1" --> "1" GroupWorkflow
 Item "1" -->  "1" ItemWorkflow
 ItemWorkflow --> Workflow
 GroupWorkflow --> Workflow
+Item "0" o- "0..*" Item 
+Sprint "instance of" -> ItemGroup
+TimeLine "instance of" --> ItemGroup
+TimeLine o-- Sprint
 
 @enduml
 ```
+
+here, TimeLine, and Sprint are instance object of ItemGroup, are user custom defined. also, User may define Phase, Peroid as their own item groups used in their project
+
 
 # description
 
@@ -100,35 +114,43 @@ so, we have a list of predefined actions. action in transition must choose from 
 
 ## item group
 
-assume we have 2 level of item groups, level 1 is the level which is nearest items, it means it contains items.level2 is the parent of level1, and so on. for example: sprint is level1, epic is level2.
+assume we have 2 level of item groups, level 1 is the level which is nearest items, it means it contains items.level2 is the parent of level1, and so on. for example: sprint is level1, Timeline is level2.
 
 3 cases:
 ### 2 levels
 
-we have 2 levels item groups, like Epic -> Sprint, or 期 -> 主题, 
+we have 2 levels item groups, like Timeline -> Sprint, or 期 -> 主题, 
 for example for we a demo data:
 level2 item groups:
 ```
-Epic 26-2
-Epic 26-3
-Epic 26-4
+Timeline 26-2
+Timeline 26-3
+Timeline 26-4
 ```
 
-now, epic 26-3 is an active epic, means it's neither isStart now isFinal, but isActive. and Epic 26-2 is Done, Epic 26-4 is Todo
+now, Timeline 26-3 is an active Timeline, means it's neither isStart now isFinal, but isActive. and Timeline 26-2 is Done, Timeline 26-4 is Todo
 
-I'd like to show Epic 26-2, 26-3 and 26-4 in Side directly
+#### display
+I'd like to show Timeline 26-2, 26-3 and 26-4 in Side directly, and show sprints which belongs to Timeline 26-3 in side bar, but hide other sprints. meantime, we should have a + before Timeline 26-2, Timeline 26-4 like:
+```
++ Timeline 26-2
+- Timeline 26-3
+  Sprint 3-1
+  Sprint 3-2
+  Sprint 3-3
++ Timeline 26-4  
+```
+click + before Timeline, shall unfold Timeline, show list of sprints belongs to the Timeline
 
-> 落地（2026-11，YPJ-111/112，spec 0111/0112）：已实现。level 实际方向：level-1=叶层（挂 item，sprint）、level-2=父层（哑容器：不挂 item、不开放手动动作、状态由子组联动推导）；建类型自底向上分配 level。两层项目不变量：新建叶层组必挂父；侧栏两级树（active 展开/其余折叠）；「当前 epic」三入口单源（syncCurrentParent）。跨 epic 移动 sprint（组改父）未做——YPJ-160。
+#### operation
 
+we may not deal with Timeline directly, instead, we handle sprint - which is the leaf item group of item. when we open, or close sprint, Timeline status should be updated accordingly.
 
 ### 1 levels
 
-just like current situation: we have sprint level only. the difference is: currently sprint is hardcoded, and we have SprintService and SprintController, which I said we should remove before.
 Now, all business logical will be at ItemGroupService/ItemGroupController, but 'Sprint' is the name of ItemGroup, 'Start Sprint' and 'Complete Sprint' are name of action, they're configured, not hardcoded.
 
-in sidebar, Epic block will be removed. 
-
-> 落地（2026-11，spec 0100 切片B）：SprintService/SprintController 已删，全归 ItemGroupService；平面模式（无 level-2 类型）侧栏即平面列表，Epic 块不存在。
+in sidebar, Timeline block will be removed. 
 
 ### no itemGroup
 

@@ -246,7 +246,7 @@ export const t = {
   },
   groupTypes: {
     title: "分组类型管理",
-    hint: "项目分组的类型;level-1(时间盒)即 Sprint 语义——backlog/board/图表数据源,恰一个;release 为内建类型不可删除。",
+    hint: "项目分组的类型;level-1(时间盒)即 Sprint 语义——backlog/board/图表数据源,恰一个。",
     typeKey: "typeKey(小写字母开头)",
     name: "名称",
     create: "新增",
@@ -254,10 +254,17 @@ export const t = {
     deleteBtn: "删除类型",
     empty: "暂无类型。",
     failed: "操作失败",
-    close: "关闭",
     workflow: "Workflow",
     wfEmpty: "(无状态)",
     timed: "时间盒",
+    wfEdit: "编辑工作流",
+    wfSave: "保存",
+    wfCancel: "取消",
+    wfAddEdge: "加出边",
+    wfLabelPh: "显示名(可选)",
+    wfIconNone: "(无)",
+    wfFailed: "工作流保存失败",
+    wfLoadFail: "workflow 加载失败",
   },
   sprints: {
     noLevel1:
