@@ -9,27 +9,34 @@ import org.junit.jupiter.api.Nested
 import yangzhou.api.error.BadRequestException
 import yangzhou.api.error.ConflictException
 import yangzhou.api.error.NotFoundException
+import yangzhou.persistence.Member
 import yangzhou.persistence.Milestone
 import yangzhou.persistence.Project
+import yangzhou.persistence.repository.MemberRepository
 import yangzhou.persistence.repository.MilestoneRepository
 import yangzhou.persistence.repository.ProjectRepository
+import java.time.Clock
+import java.time.Instant
+import java.time.ZoneOffset
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
-/** YPJ-89 单测补齐:MilestoneService(状态机:单 in_progress/终态不可变)。 */
+/** YPJ-89 单测补齐:MilestoneService(状态机:单 in_progress/终态不可变);YPJ-170 徽标/描述/负责人/终态删除守卫。 */
 class MilestoneServiceUnitTest {
     private val projects = mockk<ProjectRepository>(relaxed = true)
     private val milestones = mockk<MilestoneRepository>(relaxed = true)
-    private val service = MilestoneService(projects, milestones)
+    private val members = mockk<MemberRepository>(relaxed = true)
+    private val clock = Clock.fixed(Instant.parse("2026-11-12T00:00:00Z"), ZoneOffset.UTC)
+    private val service = MilestoneService(projects, milestones, members, clock)
 
     private val project = Project(id = 1L, objectId = UUID(0, 1), workspaceObjectId = UUID(0, 9), key = "CHE", name = "CHE")
     private val m = Milestone(id = 1L, objectId = UUID(0, 1), projectObjectId = UUID(0, 1), name = "M1")
 
     @BeforeEach
     fun setup() {
-        clearMocks(projects, milestones)
+        clearMocks(projects, milestones, members)
         every { projects.findByKey("CHE") } returns project
         every { milestones.findByProjectObjectIdAndObjectId(UUID(0, 1), m.objectId) } returns m
     }
@@ -46,6 +53,64 @@ class MilestoneServiceUnitTest {
             assertFailsWith<BadRequestException> {
                 service.create("CHE", CreateMilestoneRequest("M2", targetDate = "2026/01/01"))
             }
+        }
+
+        @Test
+        fun descriptionAndOwnerSaved() {
+            every { milestones.save(any()) } answers { firstArg<Milestone>() }
+            val ownerId = UUID(0, 7)
+            every { members.findByObjectId(ownerId) } returns Member(id = 7L, objectId = ownerId, workspaceObjectId = UUID(0, 9), username = "amy", passwordHash = null, displayName = "Amy")
+            val dto = service.create("CHE", CreateMilestoneRequest("M2", targetDate = "2026-12-01", description = "验收", owner = ownerId.toString()))
+            assertEquals("验收", dto.description)
+            assertEquals(ownerId, dto.owner)
+        }
+
+        @Test
+        fun unknownOwnerRejected() {
+            val oid = UUID(0, 8)
+            every { members.findByObjectId(oid) } returns null
+            assertFailsWith<NotFoundException> { service.create("CHE", CreateMilestoneRequest("M2", owner = oid.toString())) }
+        }
+    }
+
+    @Nested
+    inner class Badges {
+        /** 固定时钟 today=2026-11-12;overdue=红(due<today 且未终态),dueSoon=黄([today, today+3)),互斥。 */
+        private fun dtoFor(
+            targetDate: String?,
+            status: String = "planned",
+        ): MilestoneService.MilestoneDto {
+            every { milestones.findByProjectObjectIdOrderByCreatedAt(UUID(0, 1)) } returns
+                listOf(m.copy(targetDate = targetDate?.let(java.time.LocalDate::parse), status = status))
+            return service.list("CHE").single()
+        }
+
+        @Test
+        fun overdueForPastNonTerminal() {
+            assertEquals(true, dtoFor("2026-11-11").overdue)
+            assertEquals(true, dtoFor("2026-11-11", status = "in_progress").overdue)
+        }
+
+        @Test
+        fun noOverdueForTerminalNullFuture() {
+            assertEquals(false, dtoFor("2026-11-11", status = "completed").overdue)
+            assertEquals(false, dtoFor(null).overdue)
+            assertEquals(false, dtoFor("2026-11-13").overdue)
+        }
+
+        @Test
+        fun dueSoonWindow() {
+            assertEquals(true, dtoFor("2026-11-12").dueSoon)
+            assertEquals(true, dtoFor("2026-11-14").dueSoon)
+            assertEquals(false, dtoFor("2026-11-15").dueSoon)
+            assertEquals(false, dtoFor("2026-11-12", status = "completed").dueSoon)
+        }
+
+        @Test
+        fun badgesMutuallyExclusive() {
+            val d = dtoFor("2026-11-11")
+            assertEquals(true, d.overdue)
+            assertEquals(false, d.dueSoon)
         }
     }
 
@@ -76,6 +141,38 @@ class MilestoneServiceUnitTest {
             assertFailsWith<ConflictException> {
                 service.update("CHE", doneM.objectId, UpdateMilestoneRequest(targetDate = "2026-11-01"))
             }
+            assertFailsWith<ConflictException> {
+                service.update("CHE", doneM.objectId, UpdateMilestoneRequest(description = "x"))
+            }
+            assertFailsWith<ConflictException> {
+                service.update("CHE", doneM.objectId, UpdateMilestoneRequest(owner = UUID(0, 7).toString()))
+            }
+        }
+
+        @Test
+        fun descriptionNullKeepsEmptyClears() {
+            val withDesc = m.copy(description = "旧描述")
+            every { milestones.findByProjectObjectIdAndObjectId(UUID(0, 1), withDesc.objectId) } returns withDesc
+            every { milestones.save(any()) } answers { firstArg<Milestone>() }
+
+            // null = 不动
+            assertEquals("旧描述", service.update("CHE", withDesc.objectId, UpdateMilestoneRequest(name = "M1")).description)
+            // 空串 = 清空
+            assertEquals(null, service.update("CHE", withDesc.objectId, UpdateMilestoneRequest(description = "")).description)
+        }
+
+        @Test
+        fun ownerNullKeepsEmptyClears() {
+            val ownerId = UUID(0, 7)
+            val withOwner = m.copy(ownerObjectId = ownerId)
+            every { members.findByObjectId(ownerId) } returns Member(id = 7L, objectId = ownerId, workspaceObjectId = UUID(0, 9), username = "amy", passwordHash = null, displayName = "Amy")
+            every { milestones.findByProjectObjectIdAndObjectId(UUID(0, 1), withOwner.objectId) } returns withOwner
+            every { milestones.save(any()) } answers { firstArg<Milestone>() }
+
+            // null = 不动
+            assertEquals(ownerId, service.update("CHE", withOwner.objectId, UpdateMilestoneRequest(name = "M1")).owner)
+            // 空串 = 清空
+            assertEquals(null, service.update("CHE", withOwner.objectId, UpdateMilestoneRequest(owner = "")).owner)
         }
 
         @Test
@@ -94,6 +191,22 @@ class MilestoneServiceUnitTest {
             val dto = service.update("CHE", m.objectId, UpdateMilestoneRequest(status = "in_progress"))
             assertEquals("in_progress", dto.status)
             verify { milestones.save(withArg<Milestone> { assertEquals("in_progress", it.status) }) }
+        }
+    }
+
+    @Nested
+    inner class DeleteMilestone {
+        @Test
+        fun terminalDeleteRejected() {
+            val doneM = m.copy(status = "completed")
+            every { milestones.findByProjectObjectIdAndObjectId(UUID(0, 1), doneM.objectId) } returns doneM
+            assertFailsWith<ConflictException> { service.delete("CHE", doneM.objectId) }
+        }
+
+        @Test
+        fun nonTerminalDeleted() {
+            service.delete("CHE", m.objectId)
+            verify { milestones.delete(m) }
         }
     }
 

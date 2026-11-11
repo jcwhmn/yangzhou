@@ -520,6 +520,8 @@ data class Milestone(
     val name: String,
     val status: String = "planned",
     val targetDate: LocalDate? = null,
+    val description: String? = null,
+    val ownerObjectId: UUID? = null,
     @CreatedDate
     var createdAt: Instant = Instant.now(),
     @LastModifiedDate

@@ -209,4 +209,60 @@ class MilestoneApiTest : AbstractApiTest() {
             .expectStatus()
             .isNotFound()
     }
+
+    /** 票 1(YPJ-170,spec 0116 §四.6):description/owner 读写一致 + 徽标字段出网 + 终态删除 409。 */
+    @Test
+    fun `描述与负责人回读 徽标字段 终态删除守卫`() {
+        val authed = bootstrapAndAuth()
+        createProject(authed, "DO")
+        val ownerId =
+            json
+                .readTree(
+                    authed
+                        .get()
+                        .uri("/api/members")
+                        .exchange()
+                        .expectBody(String::class.java)
+                        .returnResult()
+                        .responseBody!!,
+                )[0]["memberId"]
+                .asText()
+
+        // create 带描述+负责人;昨天 targetDate → overdue=true(集成库时钟 = 当天,昨日必红)
+        val created =
+            createMilestone(
+                authed,
+                "DO",
+                mapOf("name" to "带描述", "targetDate" to java.time.LocalDate.now().minusDays(1).toString(), "description" to "验收口径", "owner" to ownerId),
+            )
+        assertEquals("验收口径", created["description"].asText())
+        assertEquals(ownerId, created["owner"].asText())
+        assertEquals(true, created["overdue"].asBoolean())
+        assertEquals(false, created["dueSoon"].asBoolean())
+
+        // patch 回读一致:null=不动 / 空串=清空
+        val mid = created["milestoneId"].asText()
+        val unchanged = json.readTree(patch(authed, "DO", mid, mapOf("name" to "带描述改")).responseBody!!)
+        assertEquals("验收口径", unchanged["description"].asText())
+        assertEquals(ownerId, unchanged["owner"].asText())
+        val cleared = json.readTree(patch(authed, "DO", mid, mapOf("description" to "", "owner" to "")).responseBody!!)
+        assertTrue(cleared["description"].isNull)
+        assertTrue(cleared["owner"].isNull)
+
+        // 终态后删除 409(§6 #1 拍板);非终态删除仍 204
+        assertEquals(200, patch(authed, "DO", mid, mapOf("status" to "completed")).status.value())
+        authed
+            .delete()
+            .uri("/api/projects/DO/milestones/$mid")
+            .exchange()
+            .expectStatus()
+            .isConflict()
+        val plain = createMilestone(authed, "DO", mapOf("name" to "可删"))["milestoneId"].asText()
+        authed
+            .delete()
+            .uri("/api/projects/DO/milestones/$plain")
+            .exchange()
+            .expectStatus()
+            .isNoContent()
+    }
 }

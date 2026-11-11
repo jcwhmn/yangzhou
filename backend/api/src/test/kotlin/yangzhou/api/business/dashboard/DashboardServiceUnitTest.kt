@@ -61,8 +61,8 @@ class DashboardServiceUnitTest {
         every { groups.listLevel1Groups(any()) } returns emptyList()
         every { milestoneService.list("CHE") } returns
             listOf(
-                MilestoneService.MilestoneDto(UUID.randomUUID(), "M1", "in_progress", "2026-11-01"),
-                MilestoneService.MilestoneDto(UUID.randomUUID(), "M0", "completed", null),
+                MilestoneService.MilestoneDto(milestoneId = UUID.randomUUID(), name = "M1", status = "in_progress", targetDate = "2026-11-01"),
+                MilestoneService.MilestoneDto(milestoneId = UUID.randomUUID(), name = "M0", status = "completed", targetDate = null),
             )
         every { milestoneService.list("OLD") } returns emptyList()
         val dto = service.dashboard()
