@@ -28,7 +28,9 @@ test("GroupTypesPanel——打开面板零点击见出边 4 槽展示行(W-RO,�
   // W-RO:每条出边四槽齐全(fn/target/label/icon,缺省按字典回退),无需任何点击;
   // 三态循环三条出边 fn 同为 switch,label/icon 同为字典回退值 → 用 first()
   const phase = panel.locator("li").filter({ hasText: "阶段" });
-  await expect(phase.getByText("switch", { exact: true }).first()).toBeVisible();
+  await expect(
+    phase.getByText("switch", { exact: true }).first(),
+  ).toBeVisible();
   await expect(phase.getByText("active", { exact: true })).toBeVisible();
   await expect(phase.getByText("切换", { exact: true }).first()).toBeVisible();
   await expect(phase.getByText("↔", { exact: true }).first()).toBeVisible();
