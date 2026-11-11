@@ -205,3 +205,13 @@ transitions 建类型时由后端种子固化(`group_status.transitions` JSON �
 4. 编辑中取消 → 回 W-RO 库值;
 5. 面板开着时用 api.http 对同类型 PUT 一次,再点面板保存 → 409 错误条、停留编辑态;
 6. 面板内新建 timed 类型 → 关面板 → 侧栏 Sprint 段出现(关面板刷新);release 不入面板。
+
+## 五、As-built(#197 合并,2026-11-11)
+
+设计兑现:后端 PUT 契约、W-RO/W-EDIT 同骨架两态、字典预填、错误条/草稿语义均按 §四落地;e2e 回面板流 3 例 + 全量 92/92 绿;CI build/e2e 双绿。用户 dev 复验通过(三轮校准终版:只读 detail 行 + 笔进编辑模式)。
+
+设计外记录:
+
+- **e2e strict-mode 修正**:三态循环类型三条出边 fn 同为 switch,`getByText` 断言需 `.first()`(断言问题非产品缺陷,error-context 实锤)
+- **CI 格式门禁教训**:strict-mode 断言修正落在本地 prettier 之后未重跑 → CI `prettier --check` 红;修 commit 32a084a,零逻辑变化。规矩:任何编辑后重跑 `npm run format` 再交 CI
+- **归因教训**:「transitions 要进 edit 才能看到」实为只读小字 caption 太弱(感知问题)+ 用户在 prod 旧构建(3000,无新入口)看侧栏无项(环境混淆)叠加;多环境排查先核「端口/构建/数据」三角,SSR 抓取+路由探针可免登录定性
