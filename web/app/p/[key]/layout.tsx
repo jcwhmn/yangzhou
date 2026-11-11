@@ -32,10 +32,7 @@ import {
   type GroupTree,
   type GroupNode,
 } from "@/lib/sprints";
-import {
-  MilestoneManager,
-  type Milestone,
-} from "@/components/MilestoneManager";
+import type { Milestone } from "@/components/MilestonePage";
 import { ReleaseManager, type Release } from "@/components/ReleaseManager";
 import {
   Category as CategoryIcon,
@@ -83,7 +80,6 @@ export default function ProjectLayout({
   const [l1, setL1] = useState<{ name: string } | null>(null);
   const [items, setItems] = useState<NavItem[]>([]);
   const [milestones, setMilestones] = useState<Milestone[]>([]);
-  const [msOpen, setMsOpen] = useState(false);
   const [releases, setReleases] = useState<Release[]>([]);
   const [relOpen, setRelOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
@@ -493,27 +489,64 @@ export default function ProjectLayout({
           {flags?.milestone !== false && (
             <>
               <Divider sx={{ my: 1 }} />
+              {/* 票 1 真值表:段头常驻可点进页;行只显当前(0..1 in_progress);空态提示;双徽标上色 */}
               <ListSubheader
                 disableSticky
+                component={Link}
+                href={`/p/${key}/milestones`}
                 sx={{
                   bgcolor: "transparent",
                   display: "flex",
                   alignItems: "center",
+                  textDecoration: "none",
+                  color: "inherit",
                 }}
               >
                 <span style={{ flex: 1 }}>{t.projectNav.milestones}</span>
-                <IconButton
-                  size="small"
-                  aria-label={t.projectNav.manage}
-                  onClick={() => setMsOpen(true)}
-                >
-                  <TuneIcon fontSize="small" />
-                </IconButton>
               </ListSubheader>
-              {milestones.length === 0 && (
-                <ListItemButton disabled sx={{ py: 0.25 }}>
+              {milestones
+                .filter((m) => m.status === "in_progress")
+                .map((m) => (
+                  <ListItemButton
+                    key={m.milestoneId}
+                    component={Link}
+                    href={`/p/${key}/milestones`}
+                    sx={{ py: 0.25 }}
+                  >
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography variant="body2" noWrap>
+                        {`▶ ${m.name}`}
+                        {m.targetDate ? ` · ${m.targetDate}` : ""}
+                      </Typography>
+                    </Box>
+                    {m.overdue && (
+                      <Typography
+                        variant="caption"
+                        color="error"
+                        data-testid="milestone-nav-badge"
+                      >
+                        ⚠ {t.milestone.overdue}
+                      </Typography>
+                    )}
+                    {m.dueSoon && (
+                      <Typography
+                        variant="caption"
+                        color="warning.main"
+                        data-testid="milestone-nav-badge"
+                      >
+                        ⚠ {t.milestone.dueSoon}
+                      </Typography>
+                    )}
+                  </ListItemButton>
+                ))}
+              {milestones.every((m) => m.status !== "in_progress") && (
+                <ListItemButton
+                  disabled
+                  sx={{ py: 0.25 }}
+                  data-testid="milestone-nav-empty"
+                >
                   <ListItemText
-                    primary={t.projectNav.noMilestones}
+                    primary={t.milestone.noCurrent}
                     primaryTypographyProps={{
                       variant: "caption",
                       color: "text.secondary",
@@ -521,21 +554,6 @@ export default function ProjectLayout({
                   />
                 </ListItemButton>
               )}
-              {milestones.map((m) => (
-                <ListItemButton key={m.milestoneId} disabled sx={{ py: 0.25 }}>
-                  <ListItemText
-                    primary={m.name}
-                    secondary={[
-                      t.milestone.status[
-                        m.status as keyof typeof t.milestone.status
-                      ],
-                      m.targetDate,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  />
-                </ListItemButton>
-              ))}
             </>
           )}
           {flags?.release !== false && (
@@ -660,13 +678,6 @@ export default function ProjectLayout({
           </Button>
         </DialogActions>
       </Dialog>
-      <MilestoneManager
-        open={msOpen}
-        onClose={() => setMsOpen(false)}
-        projectKey={String(key)}
-        milestones={milestones}
-        onChanged={loadSide}
-      />
       <ReleaseManager
         open={relOpen}
         onClose={() => setRelOpen(false)}
