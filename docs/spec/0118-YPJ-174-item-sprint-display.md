@@ -1,6 +1,7 @@
 # 0118 — Item sprint 显示:completed sprint 成员不消失(YPJ-62 案例)
 
 > 日期:2026-11-13。用户报:item detail 页有 sprint 的 item 不显示所在 sprint(YPJ-62)。
+> 状态:已完成 · 2026-11-13——YPJ-174 落地(#203 squash = 9d1a383),实现与设计一致,As-built 附后。
 
 ## ① 需求
 
@@ -33,3 +34,11 @@
 1. YPJ-62 详情 → 显示「V21 架构收敛」;表格视图 sprint 列同显;`yz items show YPJ-62` sprintName 非空
 2. 活 sprint item(如 YPJ-166/168)→ 显示不变(回归)
 3. 集成:item 挂 sprint → 完成该 sprint → item 详情仍返 sprintName;item 同挂两 sprint(active+completed)→ 显示 active
+
+## ④ As-built(2026-11-13)
+
+- 落地与 ② 一致,1:1:`ItemService.kt` ItemCtx 加 `latestSprint`(全部 L1 行按 item 分组,`firstOrNull { 非 completed } ?: maxBy { createdAt }`);toDto sprint 两字段换源;`currentSprint` 未动(backlog 谓词 line 198 原样)
+- 测试:`ItemsApiTest` +2 例(完成后仍显示且回 backlog / 活行优先于历史行),新增 `detail`/`assignSprint` 私有 helper;`gradle build` / `integrationTest` / e2e 全量绿(用户跑)
+- 手工验收:YPJ-62 详情显示「V21 架构收敛」✓
+- 偏差:无。搭车修 milestone.spec 票2(me[0]→apiAssignMe,台账 #10)与本 spec 无关,同分支搭车(#9 先例)
+- api.http:无涉(无端点/参数变更,仅 DTO 取值源变化)
