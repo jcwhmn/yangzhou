@@ -27,7 +27,7 @@ import {
 } from "@mui/material";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { t } from "@/lib/texts";
 import { WF_FN_DICT, wfFnIcon, wfFnLabel } from "@/lib/groupWorkflow";
@@ -127,6 +127,9 @@ export function GroupTypesPanel({
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState<WfStatus[]>([]);
   const [wfError, setWfError] = useState("");
+  // 新建成功后焦点回 typeKey:重置会 disable 聚焦中的新增按钮,焦点掉到 body,
+  // Esc(打在 body 上不进弹层子树)就关不掉面板(问题处理记录 #5,2026-11-13 实锤)
+  const typeKeyRef = useRef<HTMLInputElement>(null);
 
   const load = () => {
     api<GroupType[]>(`/api/projects/${projectKey}/group-types`)
@@ -175,6 +178,7 @@ export function GroupTypesPanel({
       setTypeKey("");
       setName("");
       setError("");
+      typeKeyRef.current?.focus();
       load();
     } catch (e) {
       setError(e instanceof Error ? e.message : t.groupTypes.failed);
@@ -519,6 +523,7 @@ export function GroupTypesPanel({
             size="small"
             label={t.groupTypes.typeKey}
             value={typeKey}
+            inputRef={typeKeyRef}
             onChange={(e) => setTypeKey(e.target.value)}
             sx={{ width: 150 }}
           />

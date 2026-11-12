@@ -163,26 +163,47 @@ test("票2 item 详情挂两站 → 页内依据清单可见", async ({ page, pr
     `/api/projects/${projectKey}/items`,
     { title: "支付联调" },
   );
-  await apiCall("POST", `/api/projects/${projectKey}/milestones`, {
-    name: "MVP 里程碑",
-  });
-  await apiCall("POST", `/api/projects/${projectKey}/milestones`, {
-    name: "GA 里程碑",
-  });
+  const mvpId = (
+    await apiCall<{ milestoneId: string }>(
+      "POST",
+      `/api/projects/${projectKey}/milestones`,
+      { name: "MVP 里程碑" },
+    )
+  ).milestoneId;
+  const gaId = (
+    await apiCall<{ milestoneId: string }>(
+      "POST",
+      `/api/projects/${projectKey}/milestones`,
+      { name: "GA 里程碑" },
+    )
+  ).milestoneId;
 
-  // item 详情:chips 挂两站
+  // item 详情:chips 挂两站。挂接是异步 GET→PUT;goto 会措断在途请求
+  // (trace 实锤 status -1,GA 未挂上,问题处理记录 #6)→ 等两个 PUT 落库再走
+  const putDone = (id: string) =>
+    page.waitForResponse(
+      (r) =>
+        r.url().endsWith(`/milestones/${id}/items`) &&
+        r.request().method() === "PUT",
+    );
   await page.goto(`/p/${projectKey}/i/${item.itemId}`);
   await expect(
     page.getByTestId("item-milestone-chip").filter({ hasText: "MVP 里程碑" }),
   ).toBeVisible();
-  await page
-    .getByTestId("item-milestone-chip")
-    .filter({ hasText: "MVP 里程碑" })
-    .click();
-  await page
-    .getByTestId("item-milestone-chip")
-    .filter({ hasText: "GA 里程碑" })
-    .click();
+  await Promise.all([
+    putDone(mvpId),
+    page
+      .getByTestId("item-milestone-chip")
+      .filter({ hasText: "MVP 里程碑" })
+      .click(),
+  ]);
+  await Promise.all([
+    putDone(gaId),
+    page
+      .getByTestId("item-milestone-chip")
+      .filter({ hasText: "GA 里程碑" })
+      .click(),
+  ]);
 
   // 页内:MVP 行展开依据 → 清单含 item,就绪度 1/1
   await page.goto(`/p/${projectKey}/milestones`);
