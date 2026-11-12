@@ -164,7 +164,7 @@ class BoardMembershipApiTest : AbstractApiTest() {
             .body(mapOf("onBoard" to true))
             .exchange()
             .expectStatus()
-            .isConflict()
+            .isEqualTo(409)
         assertEquals(1, get(authed, "/api/projects/GRP/backlog").size())
     }
 
