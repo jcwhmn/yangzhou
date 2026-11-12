@@ -41,9 +41,20 @@ export type Milestone = {
   gateTotal: number | null;
 };
 
-type GateItem = { itemId: string; number: string; title: string; status: string; final: boolean };
+type GateItem = {
+  itemId: string;
+  number: string;
+  title: string;
+  status: string;
+  final: boolean;
+};
 
-type ItemLite = { itemId: string; number: string; title: string; status: string };
+type ItemLite = {
+  itemId: string;
+  number: string;
+  title: string;
+  status: string;
+};
 
 type PoolMember = { memberId: string; displayName: string; virtual: boolean };
 
@@ -240,113 +251,113 @@ export function MilestonePage() {
             py: 0.5,
           }}
         >
-        <Typography variant="body2" sx={{ width: 16, textAlign: "center" }}>
-          {statusIcon[m.status as keyof typeof statusIcon]}
-        </Typography>
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography
-            variant="body2"
-            sx={{
-              textDecoration:
-                m.status === "cancelled" ? "line-through" : "none",
-            }}
-          >
-            {m.name}
+          <Typography variant="body2" sx={{ width: 16, textAlign: "center" }}>
+            {statusIcon[m.status as keyof typeof statusIcon]}
           </Typography>
-          <Typography variant="caption" color="text.secondary">
-            {t.milestone.status[m.status as keyof typeof t.milestone.status]}
-            {m.targetDate ? ` · ${m.targetDate}` : ""}
-          </Typography>
-        </Box>
-        {m.overdue && (
-          <Typography
-            variant="caption"
-            color="error"
-            data-testid="milestone-badge"
-          >
-            ⚠ {t.milestone.overdue}
-          </Typography>
-        )}
-        {m.dueSoon && (
-          <Typography
-            variant="caption"
-            color="warning.main"
-            data-testid="milestone-badge"
-          >
-            ⚠ {t.milestone.dueSoon}
-          </Typography>
-        )}
-        <Button
-          size="small"
-          data-testid="milestone-gates"
-          onClick={() => toggleGates(m)}
-        >
-          {t.milestone.gates}
-          {m.gateTotal ? ` ${m.gateDone}/${m.gateTotal}` : ""}
-        </Button>
-        {m.status === "planned" && (
-          <>
-            <Button size="small" onClick={() => transition(m, "in_progress")}>
-              ▶ {t.milestone.start}
-            </Button>
-            <Button
-              size="small"
-              color="inherit"
-              onClick={() => transition(m, "cancelled")}
-            >
-              ✗ {t.milestone.cancelMs}
-            </Button>
-          </>
-        )}
-        {m.status === "in_progress" && (
-          <>
-            <Button size="small" onClick={() => transition(m, "completed")}>
-              ✓ {t.milestone.complete}
-            </Button>
-            <Button
-              size="small"
-              color="inherit"
-              onClick={() => transition(m, "cancelled")}
-            >
-              ✗ {t.milestone.cancelMs}
-            </Button>
-          </>
-        )}
-        {!isTerminal && (
-          <Tooltip title={t.milestone.edit}>
-            <IconButton
-              size="small"
-              aria-label={t.milestone.edit}
-              onClick={() => {
-                setEditingId(m.milestoneId);
-                setName(m.name);
-                setOwner(m.owner ?? "");
-                setTargetDate(m.targetDate ?? "");
-                setDescription(m.description ?? "");
-                setError("");
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography
+              variant="body2"
+              sx={{
+                textDecoration:
+                  m.status === "cancelled" ? "line-through" : "none",
               }}
             >
-              <EditIcon fontSize="small" />
+              {m.name}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              {t.milestone.status[m.status as keyof typeof t.milestone.status]}
+              {m.targetDate ? ` · ${m.targetDate}` : ""}
+            </Typography>
+          </Box>
+          {m.overdue && (
+            <Typography
+              variant="caption"
+              color="error"
+              data-testid="milestone-badge"
+            >
+              ⚠ {t.milestone.overdue}
+            </Typography>
+          )}
+          {m.dueSoon && (
+            <Typography
+              variant="caption"
+              color="warning.main"
+              data-testid="milestone-badge"
+            >
+              ⚠ {t.milestone.dueSoon}
+            </Typography>
+          )}
+          <Button
+            size="small"
+            data-testid="milestone-gates"
+            onClick={() => toggleGates(m)}
+          >
+            {t.milestone.gates}
+            {m.gateTotal ? ` ${m.gateDone}/${m.gateTotal}` : ""}
+          </Button>
+          {m.status === "planned" && (
+            <>
+              <Button size="small" onClick={() => transition(m, "in_progress")}>
+                ▶ {t.milestone.start}
+              </Button>
+              <Button
+                size="small"
+                color="inherit"
+                onClick={() => transition(m, "cancelled")}
+              >
+                ✗ {t.milestone.cancelMs}
+              </Button>
+            </>
+          )}
+          {m.status === "in_progress" && (
+            <>
+              <Button size="small" onClick={() => transition(m, "completed")}>
+                ✓ {t.milestone.complete}
+              </Button>
+              <Button
+                size="small"
+                color="inherit"
+                onClick={() => transition(m, "cancelled")}
+              >
+                ✗ {t.milestone.cancelMs}
+              </Button>
+            </>
+          )}
+          {!isTerminal && (
+            <Tooltip title={t.milestone.edit}>
+              <IconButton
+                size="small"
+                aria-label={t.milestone.edit}
+                onClick={() => {
+                  setEditingId(m.milestoneId);
+                  setName(m.name);
+                  setOwner(m.owner ?? "");
+                  setTargetDate(m.targetDate ?? "");
+                  setDescription(m.description ?? "");
+                  setError("");
+                }}
+              >
+                <EditIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
+          <Tooltip title={t.milestone.delete}>
+            <IconButton
+              size="small"
+              aria-label={t.milestone.delete}
+              disabled={isTerminal}
+              color={confirmingId === m.milestoneId ? "error" : "default"}
+              onClick={() => remove(m)}
+            >
+              {confirmingId === m.milestoneId ? (
+                <Typography variant="caption" color="error">
+                  {t.milestone.confirmDelete}
+                </Typography>
+              ) : (
+                <DeleteIcon fontSize="small" />
+              )}
             </IconButton>
           </Tooltip>
-        )}
-        <Tooltip title={t.milestone.delete}>
-          <IconButton
-            size="small"
-            aria-label={t.milestone.delete}
-            disabled={isTerminal}
-            color={confirmingId === m.milestoneId ? "error" : "default"}
-            onClick={() => remove(m)}
-          >
-            {confirmingId === m.milestoneId ? (
-              <Typography variant="caption" color="error">
-                {t.milestone.confirmDelete}
-              </Typography>
-            ) : (
-              <DeleteIcon fontSize="small" />
-            )}
-          </IconButton>
-        </Tooltip>
         </Box>
         {gateOpenId === m.milestoneId && (
           <Box sx={{ px: 4, py: 0.5 }} data-testid="gate-panel">

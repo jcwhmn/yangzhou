@@ -410,37 +410,39 @@ export default function ItemDetailPage() {
   const load = useCallback(async () => {
     if (!itemId) return;
 
-    const [it, project, attrs, feas, acts, spr, rel, msLit] = await Promise.all([
-      api<Item>(`/api/items/${itemId}`),
+    const [it, project, attrs, feas, acts, spr, rel, msLit] = await Promise.all(
+      [
+        api<Item>(`/api/items/${itemId}`),
 
-      api<{ statuses: Status[] }>(`/api/projects/${key}`),
+        api<{ statuses: Status[] }>(`/api/projects/${key}`),
 
-      api<Attribute[]>("/api/attributes"),
+        api<Attribute[]>("/api/attributes"),
 
-      api<Feasibility>(`/api/items/${itemId}/feasibility`),
+        api<Feasibility>(`/api/items/${itemId}/feasibility`),
 
-      api<Activity[]>(`/api/items/${itemId}/activity`),
+        api<Activity[]>(`/api/items/${itemId}/activity`),
 
-      // sprints 并入首屏:选项一次性到位,避免下拉打开后 children 变化把 MUI 菜单关掉
+        // sprints 并入首屏:选项一次性到位,避免下拉打开后 children 变化把 MUI 菜单关掉
 
-      listSprints(key)
-        .catch(
-          () =>
-            new Promise<SprintLite[]>((res) =>
-              setTimeout(() => res(listSprints(key)), 1000),
-            ),
-        ) // CI 冷 JVM 偶发连接重置(status -1),延迟重试,否则静默成空选项
+        listSprints(key)
+          .catch(
+            () =>
+              new Promise<SprintLite[]>((res) =>
+                setTimeout(() => res(listSprints(key)), 1000),
+              ),
+          ) // CI 冷 JVM 偶发连接重置(status -1),延迟重试,否则静默成空选项
 
-        .catch(() => [] as SprintLite[]),
+          .catch(() => [] as SprintLite[]),
 
-      api<ReleaseLite[]>(`/api/projects/${key}/releases`).catch(
-        () => [] as ReleaseLite[],
-      ),
+        api<ReleaseLite[]>(`/api/projects/${key}/releases`).catch(
+          () => [] as ReleaseLite[],
+        ),
 
-      api<MilestoneLite[]>(`/api/projects/${key}/milestones`).catch(
-        () => [] as MilestoneLite[],
-      ),
-    ]);
+        api<MilestoneLite[]>(`/api/projects/${key}/milestones`).catch(
+          () => [] as MilestoneLite[],
+        ),
+      ],
+    );
 
     setReleases(rel);
 
@@ -1120,7 +1122,13 @@ export default function ItemDetailPage() {
             </Stack>
 
             {milestones.length > 0 && (
-              <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap>
+              <Stack
+                direction="row"
+                spacing={0.5}
+                alignItems="center"
+                flexWrap="wrap"
+                useFlexGap
+              >
                 <Typography variant="caption" color="text.secondary">
                   {t.item.milestones}
                 </Typography>
