@@ -4,6 +4,11 @@ import {
   Alert,
   Box,
   Button,
+  Checkbox,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   IconButton,
   MenuItem,
   Stack,
@@ -11,6 +16,7 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
+import CloseIcon from "@mui/icons-material/Close";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import { useCallback, useEffect, useState } from "react";
@@ -30,6 +36,24 @@ export type Milestone = {
   overdue: boolean;
   dueSoon: boolean;
   updatedAt: string | null;
+  /** 票 2(US-M9):零 gate 站双 null(不显)。 */
+  gateDone: number | null;
+  gateTotal: number | null;
+};
+
+type GateItem = {
+  itemId: string;
+  number: string;
+  title: string;
+  status: string;
+  final: boolean;
+};
+
+type ItemLite = {
+  itemId: string;
+  number: string;
+  title: string;
+  status: string;
 };
 
 type PoolMember = { memberId: string; displayName: string; virtual: boolean };
@@ -58,6 +82,12 @@ export function MilestonePage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [error, setError] = useState("");
+  // 票 2(US-M7/M9):站行「依据」展开区 + 挂接选择器;数据同源 PUT 全量替换
+  const [gateOpenId, setGateOpenId] = useState<string | null>(null);
+  const [gates, setGates] = useState<Record<string, GateItem[]>>({});
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerItems, setPickerItems] = useState<ItemLite[]>([]);
+  const [picked, setPicked] = useState<string[]>([]);
 
   const load = useCallback(async () => {
     try {
@@ -142,6 +172,58 @@ export function MilestonePage() {
     }
   }
 
+  async function toggleGates(m: Milestone) {
+    if (gateOpenId === m.milestoneId) {
+      setGateOpenId(null);
+      return;
+    }
+    setGateOpenId(m.milestoneId);
+    try {
+      const g = await api<GateItem[]>(
+        `/api/projects/${key}/milestones/${m.milestoneId}/items`,
+      );
+      setGates((prev) => ({ ...prev, [m.milestoneId]: g }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t.milestone.failed);
+    }
+  }
+
+  // 摘除/挂接后全量替换;load() 同步行上就绪度徽标
+  async function saveGates(msId: string, ids: string[]) {
+    try {
+      const g = await api<GateItem[]>(
+        `/api/projects/${key}/milestones/${msId}/items`,
+        { method: "PUT", body: JSON.stringify({ itemIds: ids }) },
+      );
+      setGates((prev) => ({ ...prev, [msId]: g }));
+      setError("");
+      load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t.milestone.failed);
+    }
+  }
+
+  async function removeGate(msId: string, itemId: string) {
+    await saveGates(
+      msId,
+      (gates[msId] ?? []).map((g) => g.itemId).filter((id) => id !== itemId),
+    );
+  }
+
+  async function openPicker(msId: string) {
+    try {
+      const [items, cur] = await Promise.all([
+        api<ItemLite[]>(`/api/projects/${key}/items`),
+        api<GateItem[]>(`/api/projects/${key}/milestones/${msId}/items`),
+      ]);
+      setPickerItems(items);
+      setPicked(cur.map((g) => g.itemId));
+      setPickerOpen(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t.milestone.failed);
+    }
+  }
+
   const current = milestones.filter((m) => m.status === "in_progress");
   const future = milestones
     .filter((m) => m.status === "planned")
@@ -157,115 +239,169 @@ export function MilestonePage() {
     return (
       <Box
         key={m.milestoneId}
-        data-testid="milestone-row"
-        sx={{
-          display: "flex",
-          alignItems: "center",
-          gap: 1,
-          py: 0.5,
-          borderBottom: "1px solid",
-          borderColor: "grey.100",
-        }}
+        data-testid="milestone-item"
+        sx={{ borderBottom: "1px solid", borderColor: "grey.100" }}
       >
-        <Typography variant="body2" sx={{ width: 16, textAlign: "center" }}>
-          {statusIcon[m.status as keyof typeof statusIcon]}
-        </Typography>
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography
-            variant="body2"
-            sx={{
-              textDecoration:
-                m.status === "cancelled" ? "line-through" : "none",
-            }}
-          >
-            {m.name}
+        <Box
+          data-testid="milestone-row"
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+            py: 0.5,
+          }}
+        >
+          <Typography variant="body2" sx={{ width: 16, textAlign: "center" }}>
+            {statusIcon[m.status as keyof typeof statusIcon]}
           </Typography>
-          <Typography variant="caption" color="text.secondary">
-            {t.milestone.status[m.status as keyof typeof t.milestone.status]}
-            {m.targetDate ? ` · ${m.targetDate}` : ""}
-          </Typography>
-        </Box>
-        {m.overdue && (
-          <Typography
-            variant="caption"
-            color="error"
-            data-testid="milestone-badge"
-          >
-            ⚠ {t.milestone.overdue}
-          </Typography>
-        )}
-        {m.dueSoon && (
-          <Typography
-            variant="caption"
-            color="warning.main"
-            data-testid="milestone-badge"
-          >
-            ⚠ {t.milestone.dueSoon}
-          </Typography>
-        )}
-        {m.status === "planned" && (
-          <>
-            <Button size="small" onClick={() => transition(m, "in_progress")}>
-              ▶ {t.milestone.start}
-            </Button>
-            <Button
-              size="small"
-              color="inherit"
-              onClick={() => transition(m, "cancelled")}
-            >
-              ✗ {t.milestone.cancelMs}
-            </Button>
-          </>
-        )}
-        {m.status === "in_progress" && (
-          <>
-            <Button size="small" onClick={() => transition(m, "completed")}>
-              ✓ {t.milestone.complete}
-            </Button>
-            <Button
-              size="small"
-              color="inherit"
-              onClick={() => transition(m, "cancelled")}
-            >
-              ✗ {t.milestone.cancelMs}
-            </Button>
-          </>
-        )}
-        {!isTerminal && (
-          <Tooltip title={t.milestone.edit}>
-            <IconButton
-              size="small"
-              aria-label={t.milestone.edit}
-              onClick={() => {
-                setEditingId(m.milestoneId);
-                setName(m.name);
-                setOwner(m.owner ?? "");
-                setTargetDate(m.targetDate ?? "");
-                setDescription(m.description ?? "");
-                setError("");
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography
+              variant="body2"
+              sx={{
+                textDecoration:
+                  m.status === "cancelled" ? "line-through" : "none",
               }}
             >
-              <EditIcon fontSize="small" />
+              {m.name}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              {t.milestone.status[m.status as keyof typeof t.milestone.status]}
+              {m.targetDate ? ` · ${m.targetDate}` : ""}
+            </Typography>
+          </Box>
+          {m.overdue && (
+            <Typography
+              variant="caption"
+              color="error"
+              data-testid="milestone-badge"
+            >
+              ⚠ {t.milestone.overdue}
+            </Typography>
+          )}
+          {m.dueSoon && (
+            <Typography
+              variant="caption"
+              color="warning.main"
+              data-testid="milestone-badge"
+            >
+              ⚠ {t.milestone.dueSoon}
+            </Typography>
+          )}
+          <Button
+            size="small"
+            data-testid="milestone-gates"
+            onClick={() => toggleGates(m)}
+          >
+            {t.milestone.gates}
+            {m.gateTotal ? ` ${m.gateDone}/${m.gateTotal}` : ""}
+          </Button>
+          {m.status === "planned" && (
+            <>
+              <Button size="small" onClick={() => transition(m, "in_progress")}>
+                ▶ {t.milestone.start}
+              </Button>
+              <Button
+                size="small"
+                color="inherit"
+                onClick={() => transition(m, "cancelled")}
+              >
+                ✗ {t.milestone.cancelMs}
+              </Button>
+            </>
+          )}
+          {m.status === "in_progress" && (
+            <>
+              <Button size="small" onClick={() => transition(m, "completed")}>
+                ✓ {t.milestone.complete}
+              </Button>
+              <Button
+                size="small"
+                color="inherit"
+                onClick={() => transition(m, "cancelled")}
+              >
+                ✗ {t.milestone.cancelMs}
+              </Button>
+            </>
+          )}
+          {!isTerminal && (
+            <Tooltip title={t.milestone.edit}>
+              <IconButton
+                size="small"
+                aria-label={t.milestone.edit}
+                onClick={() => {
+                  setEditingId(m.milestoneId);
+                  setName(m.name);
+                  setOwner(m.owner ?? "");
+                  setTargetDate(m.targetDate ?? "");
+                  setDescription(m.description ?? "");
+                  setError("");
+                }}
+              >
+                <EditIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
+          <Tooltip title={t.milestone.delete}>
+            <IconButton
+              size="small"
+              aria-label={t.milestone.delete}
+              disabled={isTerminal}
+              color={confirmingId === m.milestoneId ? "error" : "default"}
+              onClick={() => remove(m)}
+            >
+              {confirmingId === m.milestoneId ? (
+                <Typography variant="caption" color="error">
+                  {t.milestone.confirmDelete}
+                </Typography>
+              ) : (
+                <DeleteIcon fontSize="small" />
+              )}
             </IconButton>
           </Tooltip>
+        </Box>
+        {gateOpenId === m.milestoneId && (
+          <Box sx={{ px: 4, py: 0.5 }} data-testid="gate-panel">
+            {(gates[m.milestoneId] ?? []).map((g) => (
+              <Stack
+                key={g.itemId}
+                direction="row"
+                spacing={1}
+                alignItems="center"
+                data-testid="gate-row"
+                sx={{ py: 0.25 }}
+              >
+                <Typography variant="caption" sx={{ minWidth: 72 }}>
+                  {g.number}
+                </Typography>
+                <Typography variant="body2" sx={{ flex: 1, minWidth: 0 }}>
+                  {g.title}
+                </Typography>
+                <Typography
+                  variant="caption"
+                  color={g.final ? "success.main" : "text.secondary"}
+                >
+                  {g.final ? `✓ ${t.milestone.gateFinal}` : g.status}
+                </Typography>
+                <Tooltip title={t.milestone.attach}>
+                  <IconButton
+                    size="small"
+                    aria-label={t.milestone.attach}
+                    onClick={() => removeGate(m.milestoneId, g.itemId)}
+                  >
+                    <CloseIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              </Stack>
+            ))}
+            <Button
+              size="small"
+              data-testid="gate-attach"
+              onClick={() => openPicker(m.milestoneId)}
+            >
+              + {t.milestone.attach}
+            </Button>
+          </Box>
         )}
-        <Tooltip title={t.milestone.delete}>
-          <IconButton
-            size="small"
-            aria-label={t.milestone.delete}
-            disabled={isTerminal}
-            color={confirmingId === m.milestoneId ? "error" : "default"}
-            onClick={() => remove(m)}
-          >
-            {confirmingId === m.milestoneId ? (
-              <Typography variant="caption" color="error">
-                {t.milestone.confirmDelete}
-              </Typography>
-            ) : (
-              <DeleteIcon fontSize="small" />
-            )}
-          </IconButton>
-        </Tooltip>
       </Box>
     );
   };
@@ -355,6 +491,62 @@ export function MilestonePage() {
         {milestones.length > 0 && groupHeader("", t.milestone.history)}
         {terminal.map(row)}
       </Stack>
+      <Dialog
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        maxWidth="xs"
+        fullWidth
+        data-testid="gate-picker"
+      >
+        <DialogTitle>{t.milestone.pickerTitle}</DialogTitle>
+        <DialogContent dividers>
+          {pickerItems.map((it) => (
+            <Stack
+              key={it.itemId}
+              direction="row"
+              spacing={1}
+              alignItems="center"
+            >
+              <Checkbox
+                checked={picked.includes(it.itemId)}
+                onChange={(e) =>
+                  setPicked((prev) =>
+                    e.target.checked
+                      ? [...prev, it.itemId]
+                      : prev.filter((id) => id !== it.itemId),
+                  )
+                }
+              />
+              <Typography variant="body2" sx={{ flex: 1, minWidth: 0 }}>
+                {it.number} {it.title}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {it.status}
+              </Typography>
+            </Stack>
+          ))}
+          {pickerItems.length === 0 && (
+            <Typography variant="body2" color="text.secondary">
+              {t.milestone.empty}
+            </Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPickerOpen(false)}>
+            {t.milestone.cancelMs}
+          </Button>
+          <Button
+            variant="contained"
+            data-testid="gate-picker-save"
+            onClick={() => {
+              if (gateOpenId) saveGates(gateOpenId, picked);
+              setPickerOpen(false);
+            }}
+          >
+            {t.milestone.save}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </PageShell>
   );
 }

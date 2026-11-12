@@ -86,6 +86,7 @@ abstract class AbstractApiTest {
             "item_group_member",
             "item_group",
             "milestone",
+            "milestone_item",
             "item_dependency",
             "item_activity",
             "item_status_history",

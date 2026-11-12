@@ -25,6 +25,10 @@ data class LiveMilestoneDto(
     val milestoneId: UUID,
     val name: String,
     val targetDate: String?,
+    /** 北极星卡(US-M10):读同一 MilestoneDto,零新口径。 */
+    val daysToTarget: Int? = null,
+    val gateDone: Int? = null,
+    val gateTotal: Int? = null,
 )
 
 data class DashboardDto(
@@ -56,7 +60,16 @@ class DashboardService(
                         milestoneService
                             .list(p.key)
                             .filter { it.status == "in_progress" }
-                            .map { LiveMilestoneDto(it.milestoneId, it.name, it.targetDate) },
+                            .map {
+                                LiveMilestoneDto(
+                                    it.milestoneId,
+                                    it.name,
+                                    it.targetDate,
+                                    it.daysToTarget,
+                                    it.gateDone,
+                                    it.gateTotal,
+                                )
+                            },
                     )
                 }.filter { it.sprints.isNotEmpty() || it.milestones.isNotEmpty() }
         return DashboardDto(standup = standupService.standup(null), live = live)

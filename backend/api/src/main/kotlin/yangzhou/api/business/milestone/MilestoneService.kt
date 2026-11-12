@@ -8,13 +8,20 @@ import yangzhou.api.business.item.isOverdue
 import yangzhou.api.error.BadRequestException
 import yangzhou.api.error.ConflictException
 import yangzhou.api.error.NotFoundException
+import yangzhou.persistence.Item
 import yangzhou.persistence.Milestone
+import yangzhou.persistence.MilestoneItem
+import yangzhou.persistence.StatusType
+import yangzhou.persistence.repository.ItemRepository
 import yangzhou.persistence.repository.MemberRepository
+import yangzhou.persistence.repository.MilestoneItemRepository
 import yangzhou.persistence.repository.MilestoneRepository
 import yangzhou.persistence.repository.ProjectRepository
+import yangzhou.persistence.repository.StatusRepository
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
+import java.time.temporal.ChronoUnit
 import java.util.UUID
 
 data class CreateMilestoneRequest(
@@ -40,6 +47,9 @@ class MilestoneService(
     private val projects: ProjectRepository,
     private val milestones: MilestoneRepository,
     private val members: MemberRepository,
+    private val milestoneItems: MilestoneItemRepository,
+    private val items: ItemRepository,
+    private val statuses: StatusRepository,
     private val clock: Clock,
 ) {
     data class MilestoneDto(
@@ -51,7 +61,23 @@ class MilestoneService(
         val targetDate: String? = null,
         val overdue: Boolean = false,
         val dueSoon: Boolean = false,
+        /** 北极星卡(US-M10):剩/超 N 天(负=已超);targetDate 空为 null。与徽标同一 Clock 口径。 */
+        val daysToTarget: Int? = null,
+        /** 关口就绪度(US-M9):零 gate 站双 null(不显示)。 */
+        val gateDone: Int? = null,
+        val gateTotal: Int? = null,
     )
+
+    /** gate 依据行(US-M7):number = 项目 key-item number;final = workflow FINAL(与看板/逾期同源)。 */
+    data class GateItemDto(
+        val itemId: UUID,
+        val number: String,
+        val title: String,
+        val status: String,
+        val final: Boolean,
+    )
+
+    data class SetMilestoneItemsRequest(val itemIds: List<UUID> = emptyList())
 
     private val transitions =
         mapOf(
@@ -88,6 +114,7 @@ class MilestoneService(
         overdue = isOverdue(targetDate, today, status in terminalStatuses),
         // 纯函数 isDueSoon 无终态参数(与 item 同口径);终态不显黄标由服务层门控(spec 0116 §四.2)
         dueSoon = status !in terminalStatuses && isDueSoon(targetDate, today),
+        daysToTarget = targetDate?.let { ChronoUnit.DAYS.between(today, it).toInt() },
     )
 
     /** owner 文本 → 校验存在的成员 objectId;格式坏 400,成员不存在 404。 */
@@ -112,7 +139,13 @@ class MilestoneService(
                 compareBy<Milestone> { rank.getValue(it.status) }
                     .thenBy { it.targetDate ?: LocalDate.MAX }
                     .thenBy { it.objectId },
-            ).map { it.toDto(today) }
+            ).map { m ->
+                val rows = gateRows(m.objectId)
+                m.toDto(today).copy(
+                    gateDone = rows.takeIf { it.isNotEmpty() }?.count { it.final },
+                    gateTotal = rows.takeIf { it.isNotEmpty() }?.size,
+                )
+            }
     }
 
     @Transactional
@@ -162,6 +195,13 @@ class MilestoneService(
             val currents = milestones.findByProjectObjectIdAndStatus(m.projectObjectId, "in_progress")
             if (currents.any { it.objectId != m.objectId }) throw ConflictException("已有进行中的 milestone(当前节点至多一个,先完成或取消)")
         }
+        // 关口硬门禁(US-M8):迁往 completed 时 gate 有未终态 → 409;零 gate/全终态/软删放行
+        if (request.status == "completed" && m.status != "completed") {
+            val notReady = gateRows(m.objectId).filter { !it.final }
+            if (notReady.isNotEmpty()) {
+                throw ConflictException("关口未就绪:" + notReady.joinToString(", ") { "$key-${it.item.number} ${it.item.title}" })
+            }
+        }
         val saved =
             milestones.save(
                 m.copy(
@@ -188,7 +228,14 @@ class MilestoneService(
                     updatedAt = Instant.now(clock),
                 ),
             )
-        return saved.toDto(today())
+        // 就绪度随 DTO 回传(与 list() 同口径;完成后前端可就地刷新徽标)
+        val rows = gateRows(m.objectId)
+        return saved
+            .toDto(today())
+            .copy(
+                gateDone = rows.takeIf { it.isNotEmpty() }?.count { it.final },
+                gateTotal = rows.takeIf { it.isNotEmpty() }?.size,
+            )
     }
 
     @Transactional
@@ -209,5 +256,55 @@ class MilestoneService(
         } catch (_: Exception) {
             throw BadRequestException("targetDate 格式应为 yyyy-MM-dd")
         }
+    }
+
+    private data class GateRow(val item: Item, val statusName: String, val final: Boolean)
+
+    /** 挂接依据(US-M7):软删 item 滤除(回收站语义,与看板同源);按 item number 升序。 */
+    private fun gateRows(milestoneObjectId: UUID): List<GateRow> {
+        val rows = milestoneItems.findByMilestoneObjectId(milestoneObjectId)
+        if (rows.isEmpty()) return emptyList()
+        val itemMap =
+            items.findAllByObjectIdIn(rows.map { it.itemObjectId }.toSet())
+                .filter { it.deletedAt == null }
+                .associateBy { it.objectId }
+        val statusMap =
+            statuses.findAllByObjectIdIn(itemMap.values.map { it.statusObjectId }.toSet())
+                .associateBy { it.objectId }
+        return rows.mapNotNull { itemMap[it.itemObjectId] }
+            .sortedBy { it.number }
+            .map {
+                val s = statusMap[it.statusObjectId]
+                GateRow(it, s?.name ?: "?", s?.statusType == StatusType.FINAL)
+            }
+    }
+
+    /** 依据清单(US-M7)。 */
+    fun gateItems(
+        key: String,
+        milestoneId: UUID,
+    ): List<GateItemDto> {
+        find(key, milestoneId)
+        return gateRows(milestoneId).map { GateItemDto(it.item.objectId, "$key-${it.item.number}", it.item.title, it.statusName, it.final) }
+    }
+
+    /** 全量替换挂接(US-M7);item 存在且属本项目校验,返回替换后的清单。 */
+    @Transactional
+    fun setGateItems(
+        key: String,
+        milestoneId: UUID,
+        request: SetMilestoneItemsRequest,
+    ): List<GateItemDto> {
+        val p = project(key)
+        val m = milestones.findByProjectObjectIdAndObjectId(p.objectId!!, milestoneId) ?: throw NotFoundException("milestone 不存在")
+        val ids = request.itemIds.distinct()
+        if (ids.isNotEmpty()) {
+            val found = items.findAllByObjectIdIn(ids.toSet()).filter { it.deletedAt == null }
+            if (found.size != ids.size) throw BadRequestException("item 不存在或已删除")
+            if (found.any { it.projectObjectId != p.objectId }) throw BadRequestException("item 不属于该项目")
+        }
+        milestoneItems.deleteByMilestoneObjectId(m.objectId)
+        ids.forEach { milestoneItems.save(MilestoneItem(milestoneObjectId = m.objectId, itemObjectId = it)) }
+        return gateItems(key, milestoneId)
     }
 }

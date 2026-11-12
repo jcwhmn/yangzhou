@@ -322,6 +322,28 @@ create table milestone_item (
 
 **页面增量**:站详情依据清单区(挂/摘/看状态)+ item 详情多选字段。
 
+**挂接区交互真值表**(站行「依据」展开;与 item 详情多选字段双入口,数据同源 PUT 全量替换):
+
+| 行状态 | 就绪度徽标 | 依据区展开 | 挂接(+) | 摘除(×) |
+|---|---|---|---|---|
+| planned | gateTotal>0:x/y;零 gate 不显 | ✓ | ✓ | ✓ |
+| in_progress | 同上 | ✓ | ✓ | ✓ |
+| completed/cancelled | 同上 | ✓(终态后补录证据语义,不回溯门禁 ⚠ spec 沉默待复核) | ✓ | ✓ |
+
+✓完成(in_progress 行):零 gate / 全终态 → 成功;有未终态 → 409 错误条列出 `编号 标题` 清单,行不消失。软删 item 不入清单、不拦门禁(回收站语义,与看板同源)。
+
+**站行 + 依据区示意(ASCII)**:
+
+```text
+┌─ ▶ MVP 验收   进行中 · 12-01  ⚠已逾期 · 依据 1/3 [✎][🗑] ┐
+│   ├ DO-12 支付联调    进行中                     [×]      │
+│   ├ DO-7  回归通过    ✓终态                      [×]      │
+│   └ [+ 挂接 item]  → Dialog:项目 item 复选(已挂置顶✓)  │
+└──────────────────────────────────────────────────────┘
+```
+
+item 详情:Milestones 一行 chips(全部站,选中=挂接中,点击切换即 PUT),与 sprint/release 字段同区。
+
 ### 3.3 票 3:时间线区块(US-M11)
 
 页面顶部横向时间轴,有 target_date 的站按日期落位(节点图标 = 状态图标,overdue 红描边),无日期入「未排期」;轴自绘不引依赖。
@@ -404,3 +426,16 @@ create table milestone_item (
 既有漂移(发现未动,已记问题处理记录 #3):api.http 负例区两个 milestone 409 用例因前置 milestoneId 已删实际 404(V14 时代即有);本轮新增负例均自含。
 
 验证:`gradle test` 全绿;`gradle integrationTest` 绿;e2e 压测 12×2 + 全量 93 passed 绿(用户 build/debug 轮);bootRun/容器启动由 e2e test 容器实测覆盖。
+
+### 票 2(YPJ-171,2026-11-12)
+
+设计兑现:V55 `milestone_item` 表(uk 双约束,无 FK,SQL 按 spec 原样);MilestoneService `gateRows()`(软删滤除/按 number 升序/终态 = StatusType.FINAL 与看板同源)+ `list()`/`update()` 双路径填 `gateDone/gateTotal`;GET/PUT `/milestones/{id}/items` 两端点(全量替换,item 存在且属本项目校验);item 详情 `milestoneIds` 回显;Dashboard `LiveMilestoneDto` 扩展 `daysToTarget/gateDone/gateTotal`(读同一 DTO,零新口径);前端:MilestonePage 行徽标+依据区展开(挂/摘/看状态)+挂接 Dialog,item 详情 chips 多选,北极星卡剩/超 N 天+就绪度;entities.puml 同步。
+
+设计外偏差:
+
+- gate 行排序取 number 升序、软删滤除(spec 沉默,取看板同源口径)
+- `update()` 返回 DTO 也填就绪度(与 list() 同口径,完成后前端就地刷新;增量非破坏)
+- 终态站允许挂/摘 gate(终态不可编辑守卫只限 name/targetDate/description/owner 四字段;补录证据语义)⚠ 待复核
+- `daysToTarget` 为北极星卡新增字段(剩/超 N 天,同一 Clock 口径,增量非破坏)
+
+验证:单测(milestone/item/dashboard)绿;集成 MilestoneApiTest 8 例绿;api.http 票 2 复刻脚本 `.scratch/replay-ypj171.mjs` 全绿(test 8082,覆盖挂接/回读/多归属/回显/门禁 409 体/就绪度 0→1/北极星卡字段/零 gate 站);e2e milestone 5 例绿(用户跑;含就绪度口径修正 5c39961)。全量单测/集成/next build/全量 e2e 归用户验证轮(分工 2026-11-12 起)。

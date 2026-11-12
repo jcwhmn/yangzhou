@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
@@ -48,4 +49,17 @@ class MilestoneController(
         @PathVariable key: String,
         @PathVariable milestoneId: UUID,
     ) = service.delete(key, milestoneId)
+
+    @GetMapping("/projects/{key}/milestones/{milestoneId}/items")
+    fun gateItems(
+        @PathVariable key: String,
+        @PathVariable milestoneId: UUID,
+    ): List<MilestoneService.GateItemDto> = service.gateItems(key, milestoneId)
+
+    @PutMapping("/projects/{key}/milestones/{milestoneId}/items")
+    fun setGateItems(
+        @PathVariable key: String,
+        @PathVariable milestoneId: UUID,
+        @RequestBody request: MilestoneService.SetMilestoneItemsRequest,
+    ): List<MilestoneService.GateItemDto> = service.setGateItems(key, milestoneId, request)
 }

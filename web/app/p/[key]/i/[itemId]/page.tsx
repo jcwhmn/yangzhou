@@ -102,6 +102,10 @@ type Item = {
 
   releaseName: string | null;
 
+  /** 票 2(US-M7):gate 多归属回显。 */
+
+  milestoneIds: string[];
+
   overdue: boolean;
 
   dueSoon: boolean;
@@ -114,6 +118,8 @@ type Item = {
 type SprintLite = { sprintId: string; name: string; status: string };
 
 type ReleaseLite = { releaseId: string; name: string; status: string };
+
+type MilestoneLite = { milestoneId: string; name: string; status: string };
 
 type Repo = { repoId: string; repo: string };
 
@@ -335,6 +341,8 @@ export default function ItemDetailPage() {
 
   const [releases, setReleases] = useState<ReleaseLite[]>([]);
 
+  const [milestones, setMilestones] = useState<MilestoneLite[]>([]);
+
   const [saved, setSaved] = useState(false);
 
   const [sprintHint, setSprintHint] = useState(""); // YPJ-120:开始动作自动入 sprint 的轻提示
@@ -402,35 +410,43 @@ export default function ItemDetailPage() {
   const load = useCallback(async () => {
     if (!itemId) return;
 
-    const [it, project, attrs, feas, acts, spr, rel] = await Promise.all([
-      api<Item>(`/api/items/${itemId}`),
+    const [it, project, attrs, feas, acts, spr, rel, msLit] = await Promise.all(
+      [
+        api<Item>(`/api/items/${itemId}`),
 
-      api<{ statuses: Status[] }>(`/api/projects/${key}`),
+        api<{ statuses: Status[] }>(`/api/projects/${key}`),
 
-      api<Attribute[]>("/api/attributes"),
+        api<Attribute[]>("/api/attributes"),
 
-      api<Feasibility>(`/api/items/${itemId}/feasibility`),
+        api<Feasibility>(`/api/items/${itemId}/feasibility`),
 
-      api<Activity[]>(`/api/items/${itemId}/activity`),
+        api<Activity[]>(`/api/items/${itemId}/activity`),
 
-      // sprints 并入首屏:选项一次性到位,避免下拉打开后 children 变化把 MUI 菜单关掉
+        // sprints 并入首屏:选项一次性到位,避免下拉打开后 children 变化把 MUI 菜单关掉
 
-      listSprints(key)
-        .catch(
-          () =>
-            new Promise<SprintLite[]>((res) =>
-              setTimeout(() => res(listSprints(key)), 1000),
-            ),
-        ) // CI 冷 JVM 偶发连接重置(status -1),延迟重试,否则静默成空选项
+        listSprints(key)
+          .catch(
+            () =>
+              new Promise<SprintLite[]>((res) =>
+                setTimeout(() => res(listSprints(key)), 1000),
+              ),
+          ) // CI 冷 JVM 偶发连接重置(status -1),延迟重试,否则静默成空选项
 
-        .catch(() => [] as SprintLite[]),
+          .catch(() => [] as SprintLite[]),
 
-      api<ReleaseLite[]>(`/api/projects/${key}/releases`).catch(
-        () => [] as ReleaseLite[],
-      ),
-    ]);
+        api<ReleaseLite[]>(`/api/projects/${key}/releases`).catch(
+          () => [] as ReleaseLite[],
+        ),
+
+        api<MilestoneLite[]>(`/api/projects/${key}/milestones`).catch(
+          () => [] as MilestoneLite[],
+        ),
+      ],
+    );
 
     setReleases(rel);
+
+    setMilestones(msLit);
 
     setItem(it);
     setTitle(it.title);
@@ -578,6 +594,26 @@ export default function ItemDetailPage() {
   }
 
   // V15:拉入/移出 release(值 = 指派,null = 移出;released 也可补录,spec 0012)
+
+  // 票 2(US-M7):挂/摘 gate——切该站的依据全量(PUT),回刷详情
+  async function toggleMilestone(msId: string) {
+    try {
+      const gates = await api<{ itemId: string }[]>(
+        `/api/projects/${key}/milestones/${msId}/items`,
+      );
+      const ids = gates.map((g) => g.itemId);
+      const next = ids.includes(itemId)
+        ? ids.filter((id) => id !== itemId)
+        : [...ids, itemId];
+      await api(`/api/projects/${key}/milestones/${msId}/items`, {
+        method: "PUT",
+        body: JSON.stringify({ itemIds: next }),
+      });
+      setItem(await api<Item>(`/api/items/${itemId}`));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "挂接失败");
+    }
+  }
 
   async function assignRelease(releaseId: string | null) {
     try {
@@ -1084,6 +1120,39 @@ export default function ItemDetailPage() {
                 }))}
               />
             </Stack>
+
+            {milestones.length > 0 && (
+              <Stack
+                direction="row"
+                spacing={0.5}
+                alignItems="center"
+                flexWrap="wrap"
+                useFlexGap
+              >
+                <Typography variant="caption" color="text.secondary">
+                  {t.item.milestones}
+                </Typography>
+                {milestones.map((ms) => (
+                  <Chip
+                    key={ms.milestoneId}
+                    data-testid="item-milestone-chip"
+                    label={ms.name}
+                    size="small"
+                    color={
+                      item?.milestoneIds?.includes(ms.milestoneId)
+                        ? "primary"
+                        : "default"
+                    }
+                    variant={
+                      item?.milestoneIds?.includes(ms.milestoneId)
+                        ? "filled"
+                        : "outlined"
+                    }
+                    onClick={() => toggleMilestone(ms.milestoneId)}
+                  />
+                ))}
+              </Stack>
+            )}
 
             <Dropdown
               label={t.item.type}

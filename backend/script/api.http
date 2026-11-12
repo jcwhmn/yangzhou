@@ -864,6 +864,30 @@ Content-Type: application/json
   "description": "新描述"
 }
 
+### 建 gate item(spec 0116 票 2,US-M7;自含,存 gateItemId)
+POST {{host}}/api/projects/{{pkey}}/items
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "支付联调"
+}
+
+> {% client.global.set("gateItemId", response.body.itemId); %}
+
+### 挂接 gate items(全量替换;响应 = 替换后清单,含 number/title/status/final)
+PUT {{host}}/api/projects/{{pkey}}/milestones/{{milestoneId}}/items
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "itemIds": ["{{gateItemId}}"]
+}
+
+### gate 依据清单(含每项编号/标题/状态/是否终态)
+GET {{host}}/api/projects/{{pkey}}/milestones/{{milestoneId}}/items
+Authorization: Bearer {{token}}
+
 ### 删除 Milestone
 DELETE {{host}}/api/projects/{{pkey}}/milestones/{{milestoneId}}
 Authorization: Bearer {{token}}
@@ -2035,4 +2059,53 @@ Content-Type: application/json
  {"name":"active","transitions":[]},
  {"name":"completed","transitions":[]}
 ]
+
+### [预期 409] 关口硬门禁——gate 有未终态禁完成(自含:建 item→建站→推进→挂接→完成)
+POST {{host}}/api/projects/{{pkey}}/items
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "未终态验收项"
+}
+
+> {% client.global.set("gateNegItemId", response.body.itemId); %}
+
+###
+POST {{host}}/api/projects/{{pkey}}/milestones
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "门禁负例站"
+}
+
+> {% client.global.set("gateNegMsId", response.body.milestoneId); %}
+
+###
+PATCH {{host}}/api/projects/{{pkey}}/milestones/{{gateNegMsId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "status": "in_progress"
+}
+
+###
+PUT {{host}}/api/projects/{{pkey}}/milestones/{{gateNegMsId}}/items
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "itemIds": ["{{gateNegItemId}}"]
+}
+
+### [预期 409] 完成被门禁拦下(响应含「关口未就绪:{{pkey}}-N 未终态验收项」)
+PATCH {{host}}/api/projects/{{pkey}}/milestones/{{gateNegMsId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "status": "completed"
+}
 

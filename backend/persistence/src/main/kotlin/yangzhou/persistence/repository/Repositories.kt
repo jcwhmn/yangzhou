@@ -23,6 +23,7 @@ import yangzhou.persistence.ItemGroupType
 import yangzhou.persistence.ItemStatusHistory
 import yangzhou.persistence.Member
 import yangzhou.persistence.Milestone
+import yangzhou.persistence.MilestoneItem
 import yangzhou.persistence.Notification
 import yangzhou.persistence.Project
 import yangzhou.persistence.ProjectMember
@@ -437,6 +438,19 @@ interface ItemGroupMemberHistoryRepository : CrudRepository<ItemGroupMemberHisto
     ) {
         findFirstByGroupObjectIdAndItemObjectIdAndRemovedAtIsNull(groupObjectId, itemObjectId)?.let { save(it.copy(removedAt = at)) }
     }
+}
+
+/** YPJ-171(spec 0116 §3.2):gate 挂接存取;全量替换删除走 @Modifying(ADR-0004 唯一授权扩展点)。 */
+interface MilestoneItemRepository : CrudRepository<MilestoneItem, Long> {
+    fun findByItemObjectId(itemObjectId: UUID): List<MilestoneItem>
+
+    fun findByMilestoneObjectId(milestoneObjectId: UUID): List<MilestoneItem>
+
+    fun findByMilestoneObjectIdIn(milestoneObjectIds: Collection<UUID>): List<MilestoneItem>
+
+    @Modifying
+    @Query("DELETE FROM milestone_item WHERE milestone_object_id = :milestoneObjectId")
+    fun deleteByMilestoneObjectId(milestoneObjectId: UUID): Int
 }
 
 interface MilestoneRepository : CrudRepository<Milestone, Long> {
