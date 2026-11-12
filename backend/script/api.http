@@ -2109,3 +2109,48 @@ Content-Type: application/json
   "status": "completed"
 }
 
+
+### ============ 负例:看板拉入(YPJ-173,spec 0117) ============
+
+### [自含前置] 新项目(仅 builtin release → 真 S0)→ 补种 sprint 类型(得 level-1,进有组世界)
+POST {{host}}/api/projects
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "key": "BOARDNEG",
+  "name": "看板拉入负例"
+}
+
+###
+POST {{host}}/api/projects/BOARDNEG/group-types
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "typeKey": "sprint",
+  "name": "Sprint",
+  "timed": true
+}
+
+###
+POST {{host}}/api/projects/BOARDNEG/items
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "零 sprint 拉入负例 {{run}}"
+}
+
+> {%
+    client.global.set("boardNegItemId", response.body.itemId);
+ %}
+
+### [预期 409] 有组零 sprint 拉入(spec 0117:有组拉入须挂 active/planned sprint,零 sprint 拒;S0 才允许纯标记)
+PUT {{host}}/api/items/{{boardNegItemId}}/board-membership
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "onBoard": true
+}

@@ -191,6 +191,8 @@ class ItemGroupService(
                 throw ConflictException("group 类型层级并发冲突,请重试:$typeKey")
             }
         workflow.seedFor(saved)
+        // spec 0117(YPJ-173):S0→有组转换点(首个用户类型必得 level-1)——同事务清全项目标记,票落 backlog(排期归人)
+        if (used.isEmpty()) itemRepo.clearOnBoard(pid)
         return saved.toDto()
     }
 
@@ -556,7 +558,8 @@ class ItemGroupService(
         val rows = active.flatMap { memberships.findByGroupObjectId(it.objectId!!) }
         if (rows.isEmpty()) return BoardDto(activeDto, emptyList())
         val objectIds = itemRepo.findAllByObjectIdIn(rows.map { it.itemObjectId }.toSet()).map { it.objectId }.toSet()
-        return BoardDto(activeDto, itemService.list(key).filter { it.itemId in objectIds || it.onBoard })
+        // spec 0117:onBoard 收窄至 S0——有组看板=纯 active sprint 成员,标记不参与(active 分支只可达于有组项目)
+        return BoardDto(activeDto, itemService.list(key).filter { it.itemId in objectIds })
     }
 
     /**
@@ -623,29 +626,41 @@ class ItemGroupService(
         return itemService.get(itemObjectId)
     }
 
-    /** spec 0099:看板拉入/退回。拉入 = 置标记 + 同时挂最早 active sprint(若有,幂等);退回 = 清标记 + 移出全部非 completed sprint 成员行(复用归属移出,历史不可变)。 */
+    /** spec 0099 起步,0117 收窄:拉入=S0 置标记 / 有组挂 sprint(最早 active → 无则最早 planned **并激活**,零 sprint 409);退回 = 清标记 + 移出全部非 completed sprint 成员行(复用归属移出,历史不可变)。 */
     @Transactional
     fun boardMembership(
         itemObjectId: UUID,
         request: BoardMembershipRequest,
     ): ItemService.ItemDto {
         val item = itemRepo.findByObjectId(itemObjectId) ?: throw NotFoundException("item 不存在")
-        itemRepo.save(item.copy(onBoard = request.onBoard))
+        val l1 = level1Key(item.projectObjectId)
         if (request.onBoard) {
-            val active =
-                groups.findByProjectObjectIdOrderByCreatedAt(item.projectObjectId)
-                    .firstOrNull { it.type == level1Key(item.projectObjectId) && it.status == "active" }
-            if (active != null) {
+            if (l1 == null) {
+                // S0(无组项目):标记即进板唯一通道(现状)
+                itemRepo.save(item.copy(onBoard = true))
+            } else {
+                // 有组:二元模型,不置标记;挂最早 active,无则挂最早 planned 并激活(构造性消灭空窗)
+                val l1Groups = groups.findByProjectObjectIdOrderByCreatedAt(item.projectObjectId).filter { it.type == l1 }
+                val target =
+                    l1Groups.firstOrNull { it.status == "active" }
+                        ?: l1Groups.firstOrNull { it.status == "planned" }?.let { startGroup(it) }
+                        ?: throw ConflictException("无 active/planned sprint 可挂,请先创建 sprint")
                 val rows = memberships.findByItemObjectIdIn(listOf(item.objectId!!))
-                if (rows.none { it.groupObjectId == active.objectId }) {
-                    memberships.save(ItemGroupMember(groupObjectId = active.objectId!!, itemObjectId = item.objectId!!))
-                    memberHistory.recordAdd(active.objectId!!, item.objectId!!, clock.instant())
+                if (rows.none { it.groupObjectId == target.objectId }) {
+                    memberships.save(ItemGroupMember(groupObjectId = target.objectId!!, itemObjectId = item.objectId!!))
+                    memberHistory.recordAdd(target.objectId!!, item.objectId!!, clock.instant())
                 }
             }
         } else {
-            val l1 = level1Key(item.projectObjectId) ?: return itemService.get(itemObjectId)
-            replaceMembership(itemObjectId, MembershipRequest(groupId = null, groupType = l1))
+            itemRepo.save(item.copy(onBoard = false))
+            if (l1 != null) replaceMembership(itemObjectId, MembershipRequest(groupId = null, groupType = l1))
         }
         return itemService.get(itemObjectId)
+    }
+
+    /** spec 0117:拉入自动开 sprint——planned 经 START 出边迁至 active(复用 workflow 白名单,同事务;无 start 出边的自定义拓扑 409,拉入拒)。 */
+    private fun startGroup(g: ItemGroup): ItemGroup {
+        val target = workflow.applyAction(typeOfPid(g.projectObjectId, g.type), g.status, "start")
+        return groups.save(g.copy(status = target, updatedAt = Instant.now()))
     }
 }

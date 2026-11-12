@@ -206,6 +206,11 @@ interface ItemRepository : CrudRepository<Item, Long> {
 
     fun findByDeletedAtIsNotNullOrderByDeletedAtDesc(): List<Item>
 
+    /** spec 0117(YPJ-173):S0→有组转换清标记(有组项目二元模型：sprint ∨ backlog，标记仅存于无组项目）。 */
+    @Modifying
+    @Query("UPDATE item SET on_board = false WHERE project_object_id = :pid AND on_board = true")
+    fun clearOnBoard(pid: UUID): Int
+
     fun findByProjectObjectIdAndNumber(
         projectObjectId: UUID,
         number: Int,

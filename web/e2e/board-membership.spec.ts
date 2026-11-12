@@ -1,43 +1,48 @@
-// YPJ-144(spec 0099):看板拉入/退回——backlog 行拉入 / 看板对话框拉入 / 卡片退回 / 有 active sprint 同时挂
+// YPJ-144(spec 0099)起步,0117 收窄:无组(S0)用例需真 S0 项目(无 level-1 类型)——拉入=置标记;
+// 有组用例:拉入=挂 active/planned+激活(见有 active 例)。fixture 默认补种 sprint 类型,故 S0 用例走 test.use
 import { expect, test } from "./support/fixtures";
 import { apiCall, apiCreateItem, apiCreateSprint } from "./support/helpers";
 
-test("无组——backlog 行拉入入板_看板路由可见_卡片退回复原", async ({
-  page,
-  projectKey,
-}) => {
-  await apiCreateItem(projectKey, "BM 拉入 item");
-  await page.goto(`/p/${projectKey}/backlog`);
-  await page.getByRole("button", { name: "拉入看板" }).first().click();
-  // 离开 backlog(工作集)
-  await expect(page.getByText("BM 拉入 item")).toHaveCount(0);
-  // 看板独立路由可见(方案A 下无组项目根页落 backlog,执行面在 /board)
-  await page.goto(`/p/${projectKey}/board`);
-  await expect(page.getByText("BM 拉入 item")).toBeVisible();
-  // 卡片退回 → 回 backlog
-  const put1 = page.waitForResponse(
-    (r) =>
-      r.url().includes("/board-membership") && r.request().method() === "PUT",
-  );
-  await page.getByRole("button", { name: "退回 Backlog" }).click();
-  await put1; // 点击后立即 goto 会中止在途 PUT(handler 是 fire-and-forget),先等落库
-  await page.goto(`/p/${projectKey}/backlog`);
-  await expect(page.getByText("BM 拉入 item")).toBeVisible();
-});
+test.describe("无组S0——拉入置标记语义", () => {
+  test.use({ s0: true });
 
-test("看板页拉入对话框——多选拉入", async ({ page, projectKey }) => {
-  await apiCreateItem(projectKey, "BM 对话框 item");
-  await page.goto(`/p/${projectKey}/board`);
-  await page.getByRole("button", { name: "拉入看板" }).click();
-  // sprint 同款对话框(List+Checkbox):勾选候选行
-  await page
-    .locator("li", { hasText: "BM 对话框 item" })
-    .getByRole("checkbox")
-    .click();
-  await page.getByRole("button", { name: "完成" }).click();
-  const dialog = page.getByRole("dialog");
-  await expect(dialog).toBeHidden(); // MUI 淡出期吞点击,先等关
-  await expect(page.getByText("BM 对话框 item")).toBeVisible();
+  test("backlog 行拉入入板_看板路由可见_卡片退回复原", async ({
+    page,
+    projectKey,
+  }) => {
+    await apiCreateItem(projectKey, "BM 拉入 item");
+    await page.goto(`/p/${projectKey}/backlog`);
+    await page.getByRole("button", { name: "拉入看板" }).first().click();
+    // 离开 backlog(工作集)
+    await expect(page.getByText("BM 拉入 item")).toHaveCount(0);
+    // 看板独立路由可见(方案A 下无组项目根页落 backlog,执行面在 /board)
+    await page.goto(`/p/${projectKey}/board`);
+    await expect(page.getByText("BM 拉入 item")).toBeVisible();
+    // 卡片退回 → 回 backlog
+    const put1 = page.waitForResponse(
+      (r) =>
+        r.url().includes("/board-membership") && r.request().method() === "PUT",
+    );
+    await page.getByRole("button", { name: "退回 Backlog" }).click();
+    await put1; // 点击后立即 goto 会中止在途 PUT(handler 是 fire-and-forget),先等落库
+    await page.goto(`/p/${projectKey}/backlog`);
+    await expect(page.getByText("BM 拉入 item")).toBeVisible();
+  });
+
+  test("看板页拉入对话框——多选拉入", async ({ page, projectKey }) => {
+    await apiCreateItem(projectKey, "BM 对话框 item");
+    await page.goto(`/p/${projectKey}/board`);
+    await page.getByRole("button", { name: "拉入看板" }).click();
+    // sprint 同款对话框(List+Checkbox):勾选候选行
+    await page
+      .locator("li", { hasText: "BM 对话框 item" })
+      .getByRole("checkbox")
+      .click();
+    await page.getByRole("button", { name: "完成" }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeHidden(); // MUI 淡出期吞点击,先等关
+    await expect(page.getByText("BM 对话框 item")).toBeVisible();
+  });
 });
 
 test("有 active sprint——拉入同时挂 sprint_退回清成员", async ({

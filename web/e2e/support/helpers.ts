@@ -72,7 +72,10 @@ export function uniqueKey(): string {
   ).slice(0, 9);
 }
 
-export async function apiCreateProject(key: string): Promise<void> {
+export async function apiCreateProject(
+  key: string,
+  opts?: { s0?: boolean },
+): Promise<void> {
   const res = await fetch(`${config.apiURL}/api/projects`, {
     method: "POST",
     headers: {
@@ -84,7 +87,8 @@ export async function apiCreateProject(key: string): Promise<void> {
   // 409 = 并行下同名 key 已存在(理论不发生),容忍
   if (!res.ok && res.status !== 409) await assertOk(res, `创建项目 ${key}`);
   // spec 0100 切片B:新项目不再种子 sprint;按 V48 存量形状补种 timed level-1 类型
-  await ensureSprintType(key);
+  // spec 0117:拉入语义按有无 L1 类型分流——S0 用例传 s0:true 不补种(真无组项目仅 builtin release)
+  if (!opts?.s0) await ensureSprintType(key);
 }
 
 /** sprint 类型不存在则补种(409=已有,容忍);UI/接口建 sprint 依赖它。 */
