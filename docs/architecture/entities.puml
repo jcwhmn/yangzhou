@@ -117,6 +117,8 @@ class Milestone {
   name: String
   status: String
   targetDate: LocalDate?
+  description: String?
+  ownerObjectId: UUID?
 }
 class Requirement {
   minLevel: Int?

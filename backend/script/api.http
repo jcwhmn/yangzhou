@@ -824,14 +824,16 @@ Authorization: Bearer {{token}}
 DELETE {{host}}/api/projects/{{pkey}}/group-types/{{l1Key}}
 Authorization: Bearer {{token}}
 
-### 建 Milestone(handler 存变量 milestoneId;targetDate 可选,格式 yyyy-MM-dd)
+### 建 Milestone(handler 存变量 milestoneId;targetDate 可选,格式 yyyy-MM-dd;description/owner 可选,owner = 成员 uuid)
 POST {{host}}/api/projects/{{pkey}}/milestones
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
   "name": "MVP",
-  "targetDate": "2026-12-01"
+  "targetDate": "2026-12-01",
+  "description": "验收口径",
+  "owner": "{{memberId1}}"
 }
 
 > {%
@@ -851,14 +853,15 @@ Content-Type: application/json
   "status": "in_progress"
 }
 
-### 改 Milestone(名称/目标日期;日期传空串 = 清除)
+### 改 Milestone(名称/目标日期/描述/负责人;日期传空串 = 清除,description/owner 传空串 = 清空,null = 不动)
 PATCH {{host}}/api/projects/{{pkey}}/milestones/{{milestoneId}}
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
   "name": "MVP 改",
-  "targetDate": "2026-12-15"
+  "targetDate": "2026-12-15",
+  "description": "新描述"
 }
 
 ### 删除 Milestone
@@ -1272,6 +1275,41 @@ Content-Type: application/json
 {
   "name": "改历史"
 }
+
+### [预期 409] 删终态 Milestone(spec 0116 §6 #1:终态守卫,自含建站→完成→删)
+POST {{host}}/api/projects/{{pkey}}/milestones
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "终态守卫站"
+}
+
+> {%
+    client.global.set("msGuardId", response.body.milestoneId);
+ %}
+
+###
+PATCH {{host}}/api/projects/{{pkey}}/milestones/{{msGuardId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "status": "in_progress"
+}
+
+###
+PATCH {{host}}/api/projects/{{pkey}}/milestones/{{msGuardId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "status": "completed"
+}
+
+###
+DELETE {{host}}/api/projects/{{pkey}}/milestones/{{msGuardId}}
+Authorization: Bearer {{token}}
 
 ### [预期 409] released 后再变更(历史保留)
 PATCH {{host}}/api/projects/{{pkey}}/releases/{{releaseId}}

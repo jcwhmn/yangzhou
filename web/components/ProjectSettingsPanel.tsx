@@ -11,8 +11,9 @@ import {
   Button,
   Stack,
   Switch,
+  Typography,
 } from "@mui/material";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { t } from "@/lib/texts";
 
@@ -29,24 +30,38 @@ export function ProjectSettingsPanel({
 }) {
   const [release, setRelease] = useState(true);
   const [milestone, setMilestone] = useState(true);
-  const [error, setError] = useState("");
-  // 加载完成前禁用开关/保存:初始拉取落地前用户切换会被响应覆盖(YPJ-151 e2e 实锤:check 后被 setMilestone(false) 冲掉,PATCH 存回旧值)
   const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState("");
+  // 同轮 open 去重 + 首响落定:负载下 effect 可能重入,后到的重复响应不得冲值
+  const lastRound = useRef("");
+  const settled = useRef(false);
 
   useEffect(() => {
-    if (!open) return;
-    setError("");
+    if (!open) {
+      // 关闭即复位:重开首帧控件不渲染,防残留旧值
+      lastRound.current = "";
+      setLoaded(false);
+      return;
+    }
+    if (lastRound.current === projectKey) return; // 同轮重复触发
+    lastRound.current = projectKey;
+    settled.current = false;
     setLoaded(false);
+    setError("");
     api<{
       releaseEnabled: boolean;
       milestoneEnabled: boolean;
     }>(`/api/projects/${projectKey}`)
       .then((p) => {
+        if (settled.current) return;
+        settled.current = true;
         setRelease(p.releaseEnabled);
         setMilestone(p.milestoneEnabled);
         setLoaded(true);
       })
       .catch(() => {
+        if (settled.current) return;
+        settled.current = true;
         setError(t.settings.loadFailed);
         setLoaded(true);
       });
@@ -74,32 +89,39 @@ export function ProjectSettingsPanel({
     <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
       <DialogTitle>{t.settings.title}</DialogTitle>
       <DialogContent>
-        <Stack spacing={1} sx={{ mt: 1 }}>
-          <FormControlLabel
-            control={
-              <Switch
-                checked={release}
-                disabled={!loaded}
-                onChange={(e) => setRelease(e.target.checked)}
-              />
-            }
-            label={t.settings.release}
-          />
-          <FormControlLabel
-            control={
-              <Switch
-                checked={milestone}
-                disabled={!loaded}
-                onChange={(e) => setMilestone(e.target.checked)}
-              />
-            }
-            label={t.settings.milestone}
-          />
-          <Alert severity="info" variant="outlined" sx={{ py: 0.5 }}>
-            {t.settings.hint}
-          </Alert>
-          {error && <Alert severity="error">{error}</Alert>}
-        </Stack>
+        {/* 加载完成才渲染开关:控件在 settle 帧前不存在,点击意图不会被
+            响应落地前后的再渲染吞掉(e2e 全量负载实锤:先渲染+disabled 门禁
+            两轮补丁仍有窗口,2026-11-12 根治) */}
+        {!loaded ? (
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            {t.settings.loading}
+          </Typography>
+        ) : (
+          <Stack spacing={1} sx={{ mt: 1 }}>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={release}
+                  onChange={(e) => setRelease(e.target.checked)}
+                />
+              }
+              label={t.settings.release}
+            />
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={milestone}
+                  onChange={(e) => setMilestone(e.target.checked)}
+                />
+              }
+              label={t.settings.milestone}
+            />
+            <Alert severity="info" variant="outlined" sx={{ py: 0.5 }}>
+              {t.settings.hint}
+            </Alert>
+          </Stack>
+        )}
+        {error && <Alert severity="error">{error}</Alert>}
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>{t.settings.cancel}</Button>
