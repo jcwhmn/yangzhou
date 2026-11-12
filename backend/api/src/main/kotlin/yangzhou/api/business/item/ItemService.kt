@@ -625,13 +625,20 @@ class ItemService(
                 .mapNotNull { m ->
                     groupById[m.groupObjectId]?.takeIf { it.status != "completed" && it.type == level1Key(projectObjectId) }?.let { m.itemObjectId to it }
                 }.toMap()
+        // YPJ-174(spec 0118):显示用 sprint 归属——活行优先，否则最近历史行（YPJ-62：completed 成员不消失）；currentSprint 保留给 backlog 谓词
+        val latestSprint =
+            ms
+                .mapNotNull { m ->
+                    groupById[m.groupObjectId]?.takeIf { it.type == level1Key(projectObjectId) }?.let { m.itemObjectId to it }
+                }.groupBy({ it.first }) { it.second }
+                .mapValues { (_, gs) -> gs.firstOrNull { it.status != "completed" } ?: gs.maxBy { it.createdAt } }
         // V15:release 归属(单选,spec 0012)
         val currentRelease =
             ms
                 .mapNotNull { m ->
                     groupById[m.groupObjectId]?.takeIf { it.type == "release" }?.let { m.itemObjectId to it }
                 }.toMap()
-        return ItemCtx(project, statusById, blockedIds, attrNames, memberMap, reqs, currentSprint, currentRelease)
+        return ItemCtx(project, statusById, blockedIds, attrNames, memberMap, reqs, currentSprint, latestSprint, currentRelease)
     }
 
     private inner class ItemCtx(
@@ -642,6 +649,7 @@ class ItemService(
         val memberMap: Map<UUID, yangzhou.persistence.Member>,
         val reqs: List<Requirement>,
         val currentSprint: Map<UUID, yangzhou.persistence.ItemGroup>,
+        val latestSprint: Map<UUID, yangzhou.persistence.ItemGroup>,
         val currentRelease: Map<UUID, yangzhou.persistence.ItemGroup>,
     ) {
         val finalIds: Set<UUID> = statusById.filterValues { it.statusType == StatusType.FINAL }.keys
@@ -665,8 +673,8 @@ class ItemService(
             assigneeColor = item.assigneeObjectId?.let { memberMap[it]?.color },
             dueSoon = isDueSoon(item.dueDate, LocalDate.now(clock)),
             createdAt = item.createdAt.toString(),
-            sprintId = currentSprint[item.objectId]?.objectId,
-            sprintName = currentSprint[item.objectId]?.name,
+            sprintId = latestSprint[item.objectId]?.objectId,
+            sprintName = latestSprint[item.objectId]?.name,
             onBoard = item.onBoard,
             releaseId = currentRelease[item.objectId]?.objectId,
             releaseName = currentRelease[item.objectId]?.name,

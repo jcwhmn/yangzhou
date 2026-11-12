@@ -599,4 +599,78 @@ class ItemsApiTest : AbstractApiTest() {
                 .responseBody!!
         assertEquals("PRE-1", json.readTree(gotBody)["parentNumber"].asText())
     }
+
+    private fun detail(
+        authed: RestTestClient,
+        itemId: String,
+    ): JsonNode =
+        json.readTree(
+            authed
+                .get()
+                .uri("/api/items/$itemId")
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(String::class.java)
+                .returnResult()
+                .responseBody!!,
+        )
+
+    private fun assignSprint(
+        authed: RestTestClient,
+        itemId: String,
+        sprintId: String,
+    ) {
+        authed
+            .put()
+            .uri("/api/items/$itemId/group-membership")
+            .body(mapOf("groupId" to sprintId, "groupType" to "sprint"))
+            .exchange()
+            .expectStatus()
+            .isOk()
+    }
+
+    @Test
+    fun `sprint 完成后详情仍显示归属，且 item 回 backlog（YPJ-62）`() {
+        val authed = bootstrapAndAuth()
+        createProject(authed, "HIS")
+        val itemId = createItem(authed, "HIS", "ypj62")["itemId"].asText()
+        val gid = createSprint56(authed, "HIS", "S1")["groupId"].asText()
+        assignSprint(authed, itemId, gid)
+        setSprintStatus56(authed, "HIS", gid, "active")
+        setSprintStatus56(authed, "HIS", gid, "completed")
+
+        // 成员行已 completed:详情不丢 sprint(spec 0118 真值表第二行)
+        val d = detail(authed, itemId)
+        assertEquals(gid, d["sprintId"].asText())
+        assertEquals("S1", d["sprintName"].asText())
+
+        // backlog 谓词零改动:完成后 item 回 backlog
+        assertEquals(1, countItems56(authed, "HIS"))
+        assertEquals(
+            1,
+            json.readTree(
+                authed.get().uri("/api/projects/HIS/backlog").exchange()
+                    .expectStatus().isOk().expectBody(String::class.java).returnResult().responseBody!!,
+            ).size(),
+        )
+    }
+
+    @Test
+    fun `活 sprint 优先于历史 completed 行（YPJ-62）`() {
+        val authed = bootstrapAndAuth()
+        createProject(authed, "PRI")
+        val itemId = createItem(authed, "PRI", "x")["itemId"].asText()
+        val s1 = createSprint56(authed, "PRI", "S1")["groupId"].asText()
+        val s2 = createSprint56(authed, "PRI", "S2")["groupId"].asText()
+        assignSprint(authed, itemId, s1)
+        setSprintStatus56(authed, "PRI", s1, "active")
+        setSprintStatus56(authed, "PRI", s1, "completed")
+        // S1 完成后再挂 S2(planned,非 completed)→ 显示 S2,不是历史 S1
+        assignSprint(authed, itemId, s2)
+
+        val d = detail(authed, itemId)
+        assertEquals(s2, d["sprintId"].asText())
+        assertEquals("S2", d["sprintName"].asText())
+    }
 }
