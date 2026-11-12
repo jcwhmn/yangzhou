@@ -501,3 +501,14 @@ item 详情:Milestones 一行 chips(全部站,选中=挂接中,点击切换即 P
 - `daysToTarget` 为北极星卡新增字段(剩/超 N 天,同一 Clock 口径,增量非破坏)
 
 验证:单测(milestone/item/dashboard)绿;集成 MilestoneApiTest 8 例绿;api.http 票 2 复刻脚本 `.scratch/replay-ypj171.mjs` 全绿(test 8082,覆盖挂接/回读/多归属/回显/门禁 409 体/就绪度 0→1/北极星卡字段/零 gate 站);e2e milestone 5 例绿(用户跑;含就绪度口径修正 5c39961)。全量单测/集成/next build/全量 e2e 归用户验证轮(分工 2026-11-12 起)。
+
+### 票 3(YPJ-172,2026-11-13)
+
+设计兑现:§3.3 逐项落地——`MilestonePage` 同文件 `Timeline` 组件(自绘轴,纯 Box/Typography 零依赖);日期落位 4%~92%(首尾留 4% 防贴边,ISO 日期→epoch 天纯算术);防重叠贪心分层(pct 差 <8 换行,上限 3 行,深层节点带竖向连线);节点四态配色按真值表,overdue 红描边+⚠;无日期站入轴右侧「未排期」区(虚线左边框,竖排);数据形态真值表兑现(0 站不渲染/仅无日期只渲染未排期区);texts 删 `timelinePlaceholder` 增 `timeline.unscheduled`;e2e 票 3 一例(节点数=有日期站/落位顺序/红描边 tokens.error/未排期区);后端零改动。
+
+设计外新增(全量 e2e 两红例实锤修复,台账 #5/#6):
+
+- **GroupTypesPanel create() 后焦点回 typeKey(产品修复,spec 外)**:全量 e2e 红「Esc 关不掉面板」——新增成功表单重置→新增按钮 disable→焦点掉 body,Esc 打在 body 上不进弹层子树,MUI 合成 onKeyDown 收不到(trace + document 捕获级 keylog 实锤:红轮 target=BODY,绿轮 target=MuiDialog-container;error-context 空列表快照系陈旧帧)。人工同踩,是真 UX bug
+- **票 2 e2e 等 chip 挂接两 PUT 落库再 goto(测试修复)**:连点两 chip 后立刻 goto,第二个挂接在途 GET 被导航中止(status -1,trace network 实锤),PUT 未发出→GA 未挂上;产品侧逐站独立无竞态
+
+验证:全量 e2e 绿(用户轮:next build + 单元/集成 + 全量 e2e);group-types 6 passed ×3、milestone 9 passed ×3(workers=1,修复后);prettier/tsc 绿。
