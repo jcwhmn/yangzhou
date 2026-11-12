@@ -1,7 +1,7 @@
 // Milestone 页(spec 0116 票 1,YPJ-170):弹窗退役 → /p/[key]/milestones 页面承载建/推进/编辑/删除;
 // 侧栏收敛(只显当前 in_progress)+ 双徽标(后端算 overdue 红/dueSoon 黄)+ 段头常驻可点进页。
 import { expect, test } from "./support/fixtures";
-import { apiCall, fillDate } from "./support/helpers";
+import { apiAssignMe, apiCall, fillDate } from "./support/helpers";
 
 /** UTC 口径的昨日(后端 Clock=UTC;本地时区翻边时仍严格 < UTC 今天,徽标必红) */
 function utcYesterday(): string {
@@ -267,11 +267,8 @@ test("票2 关口硬门禁:未终态 gate 拦完成,终态后放行", async ({
   await expect(page.getByText(/关口未就绪/)).toBeVisible();
   await expect(row.getByRole("button", { name: /完成/ })).toBeVisible();
 
-  // gate 终态化(开工须有主 → 先指派再推 Done)后放行
-  const me = await apiCall<{ memberId: string }[]>("GET", "/api/members");
-  await apiCall("PUT", `/api/items/${item.itemId}/assignee`, {
-    assigneeItemId: me[0].memberId,
-  });
+  // gate 终态化(开工须有主 → 先指派再推 Done)后放行;me 自动入池(建项目 lead),虚拟成员不在池——勿取 me[0]
+  await apiAssignMe(item.itemId);
   const proj = await apiCall<{
     statuses: { statusId: string; name: string }[];
   }>("GET", `/api/projects/${projectKey}`);

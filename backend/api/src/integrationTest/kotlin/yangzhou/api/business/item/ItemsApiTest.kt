@@ -603,18 +603,17 @@ class ItemsApiTest : AbstractApiTest() {
     private fun detail(
         authed: RestTestClient,
         itemId: String,
-    ): JsonNode =
-        json.readTree(
-            authed
-                .get()
-                .uri("/api/items/$itemId")
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody(String::class.java)
-                .returnResult()
-                .responseBody!!,
-        )
+    ): JsonNode = json.readTree(
+        authed
+            .get()
+            .uri("/api/items/$itemId")
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody(String::class.java)
+            .returnResult()
+            .responseBody!!,
+    )
 
     private fun assignSprint(
         authed: RestTestClient,
