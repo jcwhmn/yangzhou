@@ -10,6 +10,7 @@ import yangzhou.persistence.Item
 import yangzhou.persistence.ItemActivity
 import yangzhou.persistence.ItemGroupMember
 import yangzhou.persistence.ItemStatusHistory
+import yangzhou.persistence.MilestoneItem
 import yangzhou.persistence.Requirement
 import yangzhou.persistence.StatusType
 import yangzhou.persistence.repository.AttributeDefinitionRepository
@@ -21,6 +22,7 @@ import yangzhou.persistence.repository.ItemGroupTypeRepository
 import yangzhou.persistence.repository.ItemNumberRepository
 import yangzhou.persistence.repository.ItemRepository
 import yangzhou.persistence.repository.ItemTreeRepository
+import yangzhou.persistence.repository.MilestoneItemRepository
 import yangzhou.persistence.repository.ProjectRepository
 import yangzhou.persistence.repository.RequirementRepository
 import yangzhou.persistence.repository.StatusRepository
@@ -54,6 +56,7 @@ class ItemService(
     private val memberships: ItemGroupMemberRepository,
     private val notificationService: yangzhou.api.business.notification.NotificationService,
     private val memberHistory: yangzhou.persistence.repository.ItemGroupMemberHistoryRepository,
+    private val milestoneItems: MilestoneItemRepository,
     private val clock: Clock,
 ) {
     data class RequirementDto(
@@ -103,6 +106,8 @@ class ItemService(
         val autoAssignedSprintName: String? = null, // YPJ-120 仅 PATCH 触发自动挂载时非空
         val releaseId: UUID? = null,
         val releaseName: String? = null,
+        /** 票 2(US-M7):gate 多归属回显,仅详情回填(列表批量代价高)。 */
+        val milestoneIds: List<UUID> = emptyList(),
     )
 
     @Transactional
@@ -228,6 +233,7 @@ class ItemService(
                 GitRefDto(it.kind, it.repo, it.ref, it.url, it.state)
             },
             attributes = toAttrDtos(itemAttributes.findByItemObjectId(item.objectId!!)),
+            milestoneIds = milestoneItems.findByItemObjectId(item.objectId!!).map { it.milestoneObjectId },
         )
     }
 

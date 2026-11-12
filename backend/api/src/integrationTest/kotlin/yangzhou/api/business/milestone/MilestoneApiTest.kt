@@ -271,4 +271,144 @@ class MilestoneApiTest : AbstractApiTest() {
             .expectStatus()
             .isNoContent()
     }
+
+    @Test
+    fun `票2 gate 挂接 回读 多归属 门禁`() {
+        val authed = bootstrapAndAuth()
+        createProject(authed, "GATE")
+        val g1 = createItem(authed, "GATE", "支付联调")
+        val g2 = createItem(authed, "GATE", "回归通过")
+        val mid = createMilestone(authed, "GATE", mapOf("name" to "MVP"))["milestoneId"].asText()
+
+        // PUT 全量替换 → 清单回读(number 按序,status/final 齐全)
+        val put =
+            authed
+                .put()
+                .uri("/api/projects/GATE/milestones/$mid/items")
+                .body(mapOf("itemIds" to listOf(g1["itemId"].asText(), g2["itemId"].asText())))
+                .exchange()
+                .expectBody(String::class.java)
+                .returnResult()
+        assertEquals(200, put.status.value(), put.responseBody)
+        val gates = json.readTree(put.responseBody!!)
+        assertEquals(2, gates.size())
+        assertEquals("GATE-1", gates[0]["number"].asText())
+        assertEquals("支付联调", gates[0]["title"].asText())
+        assertEquals(false, gates[0]["final"].asBoolean())
+
+        // GET 清单一致
+        val got =
+            json.readTree(
+                authed
+                    .get()
+                    .uri("/api/projects/GATE/milestones/$mid/items")
+                    .exchange()
+                    .expectBody(String::class.java)
+                    .returnResult()
+                    .responseBody!!,
+            )
+        assertEquals(2, got.size())
+
+        // 多归属:同 item 挂两站;item 详情 milestoneIds 回显
+        val mid2 = createMilestone(authed, "GATE", mapOf("name" to "GA"))["milestoneId"].asText()
+        authed
+            .put()
+            .uri("/api/projects/GATE/milestones/$mid2/items")
+            .body(mapOf("itemIds" to listOf(g1["itemId"].asText())))
+            .exchange()
+            .expectStatus()
+            .isOk()
+        val detail =
+            json.readTree(
+                authed
+                    .get()
+                    .uri("/api/items/${g1["itemId"].asText()}")
+                    .exchange()
+                    .expectBody(String::class.java)
+                    .returnResult()
+                    .responseBody!!,
+            )
+        assertEquals(2, detail["milestoneIds"].size())
+
+        // 门禁:gates 未终态 → completed 409 + 未终态清单提示
+        assertEquals(200, patch(authed, "GATE", mid, mapOf("status" to "in_progress")).status.value())
+        val blocked = patch(authed, "GATE", mid, mapOf("status" to "completed"))
+        assertEquals(409, blocked.status.value())
+        assertTrue(blocked.responseBody!!.contains("GATE-1"))
+
+        // 全终态后放行;就绪度随 DTO 回传
+        val proj =
+            json.readTree(
+                authed
+                    .get()
+                    .uri("/api/projects/GATE")
+                    .exchange()
+                    .expectBody(String::class.java)
+                    .returnResult()
+                    .responseBody!!,
+            )
+        val done = proj["statuses"].first { it["name"].asText() == "Done" }["statusId"].asText()
+        val memberId =
+            json.readTree(
+                authed
+                    .get()
+                    .uri("/api/members")
+                    .exchange()
+                    .expectBody(String::class.java)
+                    .returnResult()
+                    .responseBody!!,
+            )[0]["memberId"].asText()
+        listOf(g1, g2).forEach {
+            // 开工须有主(V4-S3):先指派再推终态
+            authed
+                .put()
+                .uri("/api/items/${it["itemId"].asText()}/assignee")
+                .body(mapOf("assigneeItemId" to memberId))
+                .exchange()
+                .expectStatus()
+                .isOk()
+            authed
+                .patch()
+                .uri("/api/items/${it["itemId"].asText()}")
+                .body(mapOf("statusItemId" to done))
+                .exchange()
+                .expectStatus()
+                .isOk()
+        }
+        val completed = json.readTree(patch(authed, "GATE", mid, mapOf("status" to "completed")).responseBody!!)
+        assertEquals("completed", completed["status"].asText())
+        assertEquals(2, completed["gateDone"].asInt())
+        assertEquals(2, completed["gateTotal"].asInt())
+    }
+
+    @Test
+    fun `票2 零 gate 站直接完成 软删 gate 不拦`() {
+        val authed = bootstrapAndAuth()
+        createProject(authed, "ZG")
+        val mid = createMilestone(authed, "ZG", mapOf("name" to "MVP"))["milestoneId"].asText()
+        // 零 gate:直接完成(完成 = 人确认)
+        assertEquals(200, patch(authed, "ZG", mid, mapOf("status" to "in_progress")).status.value())
+        assertEquals(200, patch(authed, "ZG", mid, mapOf("status" to "completed")).status.value())
+
+        // 软删 gate 不拦门禁(回收站语义,与看板同源)
+        createProject(authed, "ZG2")
+        val g = createItem(authed, "ZG2", "验收项")
+        val mid2 = createMilestone(authed, "ZG2", mapOf("name" to "GA"))["milestoneId"].asText()
+        authed
+            .put()
+            .uri("/api/projects/ZG2/milestones/$mid2/items")
+            .body(mapOf("itemIds" to listOf(g["itemId"].asText())))
+            .exchange()
+            .expectStatus()
+            .isOk()
+        assertEquals(200, patch(authed, "ZG2", mid2, mapOf("status" to "in_progress")).status.value())
+        assertEquals(409, patch(authed, "ZG2", mid2, mapOf("status" to "completed")).status.value())
+        authed
+            .delete()
+            .uri("/api/items/${g["itemId"].asText()}")
+            .exchange()
+            .expectStatus()
+            .isNoContent()
+        assertEquals(200, patch(authed, "ZG2", mid2, mapOf("status" to "completed")).status.value())
+    }
 }

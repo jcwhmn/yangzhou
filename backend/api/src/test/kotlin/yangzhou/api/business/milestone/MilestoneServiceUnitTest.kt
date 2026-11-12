@@ -9,12 +9,19 @@ import org.junit.jupiter.api.Nested
 import yangzhou.api.error.BadRequestException
 import yangzhou.api.error.ConflictException
 import yangzhou.api.error.NotFoundException
+import yangzhou.persistence.Item
 import yangzhou.persistence.Member
 import yangzhou.persistence.Milestone
+import yangzhou.persistence.MilestoneItem
 import yangzhou.persistence.Project
+import yangzhou.persistence.Status
+import yangzhou.persistence.StatusType
+import yangzhou.persistence.repository.ItemRepository
 import yangzhou.persistence.repository.MemberRepository
+import yangzhou.persistence.repository.MilestoneItemRepository
 import yangzhou.persistence.repository.MilestoneRepository
 import yangzhou.persistence.repository.ProjectRepository
+import yangzhou.persistence.repository.StatusRepository
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
@@ -28,15 +35,18 @@ class MilestoneServiceUnitTest {
     private val projects = mockk<ProjectRepository>(relaxed = true)
     private val milestones = mockk<MilestoneRepository>(relaxed = true)
     private val members = mockk<MemberRepository>(relaxed = true)
+    private val milestoneItems = mockk<MilestoneItemRepository>(relaxed = true)
+    private val items = mockk<ItemRepository>(relaxed = true)
+    private val statuses = mockk<StatusRepository>(relaxed = true)
     private val clock = Clock.fixed(Instant.parse("2026-11-12T00:00:00Z"), ZoneOffset.UTC)
-    private val service = MilestoneService(projects, milestones, members, clock)
+    private val service = MilestoneService(projects, milestones, members, milestoneItems, items, statuses, clock)
 
     private val project = Project(id = 1L, objectId = UUID(0, 1), workspaceObjectId = UUID(0, 9), key = "CHE", name = "CHE")
     private val m = Milestone(id = 1L, objectId = UUID(0, 1), projectObjectId = UUID(0, 1), name = "M1")
 
     @BeforeEach
     fun setup() {
-        clearMocks(projects, milestones, members)
+        clearMocks(projects, milestones, members, milestoneItems, items, statuses)
         every { projects.findByKey("CHE") } returns project
         every { milestones.findByProjectObjectIdAndObjectId(UUID(0, 1), m.objectId) } returns m
     }
@@ -216,6 +226,71 @@ class MilestoneServiceUnitTest {
         fun missingRejected() {
             every { milestones.findByProjectObjectIdAndObjectId(UUID(0, 1), any()) } returns null
             assertFailsWith<NotFoundException> { service.update("CHE", UUID.randomUUID(), UpdateMilestoneRequest(name = "x")) }
+        }
+    }
+
+    @Nested
+    inner class GateGuard {
+        private val activeStatus = Status(id = 1, projectObjectId = UUID(0, 1), name = "进行中", statusType = StatusType.ACTIVE)
+        private val finalStatus = Status(id = 2, projectObjectId = UUID(0, 1), name = "完成", statusType = StatusType.FINAL)
+
+        private fun gateM() = m.copy(status = "in_progress")
+
+        private fun stubGate(
+            item: Item,
+            status: Status,
+        ) {
+            every { milestones.findByProjectObjectIdAndObjectId(UUID(0, 1), gateM().objectId) } returns gateM()
+            every { milestones.save(any<Milestone>()) } answers { firstArg<Milestone>() }
+            every { milestoneItems.findByMilestoneObjectId(gateM().objectId) } returns
+                listOf(MilestoneItem(milestoneObjectId = gateM().objectId, itemObjectId = item.objectId))
+            every { items.findAllByObjectIdIn(any()) } returns listOf(item)
+            every { statuses.findAllByObjectIdIn(any()) } returns listOf(status)
+        }
+
+        @Test
+        fun notFinalGateBlocksCompletion() {
+            val item = Item(id = 1, objectId = UUID(0, 2), projectObjectId = UUID(0, 1), number = 12, title = "支付联调", statusObjectId = activeStatus.objectId)
+            stubGate(item, activeStatus)
+            val e = assertFailsWith<ConflictException> { service.update("CHE", gateM().objectId, UpdateMilestoneRequest(status = "completed")) }
+            kotlin.test.assertTrue(e.message!!.contains("CHE-12 支付联调"), e.message)
+        }
+
+        @Test
+        fun allFinalGatesPass() {
+            val item = Item(id = 1, objectId = UUID(0, 2), projectObjectId = UUID(0, 1), number = 12, title = "回归通过", statusObjectId = finalStatus.objectId)
+            stubGate(item, finalStatus)
+            val dto = service.update("CHE", gateM().objectId, UpdateMilestoneRequest(status = "completed"))
+            assertEquals("completed", dto.status)
+        }
+
+        @Test
+        fun zeroGatePasses() {
+            every { milestones.findByProjectObjectIdAndObjectId(UUID(0, 1), gateM().objectId) } returns gateM()
+            every { milestones.save(any<Milestone>()) } answers { firstArg<Milestone>() }
+            every { milestoneItems.findByMilestoneObjectId(gateM().objectId) } returns emptyList()
+            assertEquals("completed", service.update("CHE", gateM().objectId, UpdateMilestoneRequest(status = "completed")).status)
+        }
+
+        @Test
+        fun readinessOnList() {
+            val m2 = Milestone(id = 2, objectId = UUID(0, 3), projectObjectId = UUID(0, 1), name = "M2")
+            val active = Item(id = 1, objectId = UUID(0, 2), projectObjectId = UUID(0, 1), number = 12, title = "A", statusObjectId = activeStatus.objectId)
+            val done = Item(id = 2, objectId = UUID(0, 4), projectObjectId = UUID(0, 1), number = 13, title = "B", statusObjectId = finalStatus.objectId)
+            every { milestones.findByProjectObjectIdOrderByCreatedAt(UUID(0, 1)) } returns listOf(gateM(), m2)
+            every { milestoneItems.findByMilestoneObjectId(gateM().objectId) } returns
+                listOf(
+                    MilestoneItem(milestoneObjectId = gateM().objectId, itemObjectId = active.objectId),
+                    MilestoneItem(milestoneObjectId = gateM().objectId, itemObjectId = done.objectId),
+                )
+            every { milestoneItems.findByMilestoneObjectId(m2.objectId) } returns emptyList()
+            every { items.findAllByObjectIdIn(any()) } returns listOf(active, done)
+            every { statuses.findAllByObjectIdIn(any()) } returns listOf(activeStatus, finalStatus)
+            val dtos = service.list("CHE")
+            assertEquals(1, dtos[0].gateDone)
+            assertEquals(2, dtos[0].gateTotal)
+            assertEquals(null, dtos[1].gateDone)
+            assertEquals(null, dtos[1].gateTotal)
         }
     }
 }

@@ -532,6 +532,17 @@ data class Milestone(
     var updatedByObjectId: UUID? = null,
 )
 
+/** YPJ-171(spec 0116 §3.2):milestone gate 挂接——tracks 引用非归属,可多站共用。 */
+@Table("milestone_item")
+data class MilestoneItem(
+    @Id val id: Long? = null,
+    val objectId: UUID = UUID.randomUUID(),
+    val milestoneObjectId: UUID,
+    val itemObjectId: UUID,
+    @CreatedDate
+    var createdAt: Instant = Instant.now(),
+)
+
 /** YPJ-47 视图配置:表格筛选/列配置按 用户×项目 私有保存(spec 0045)。filters/columns 为小 JSON 串(TEXT 列)。 */
 @Table("project_view")
 data class ProjectView(
