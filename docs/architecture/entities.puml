@@ -120,6 +120,11 @@ class Milestone {
   description: String?
   ownerObjectId: UUID?
 }
+class MilestoneItem {
+  objectId: UUID
+  milestoneObjectId: UUID
+  itemObjectId: UUID
+}
 class Requirement {
   minLevel: Int?
 }
@@ -171,6 +176,8 @@ Project "1" *-- "*" ItemGroupType : group 类型运行时定义(V35)
 ItemGroup "*" --> "1" ItemGroupType : type 命中项目类型(Phase 1)
 Project "1" *-- "*" Milestone : 时间轴节点(V14;0..1 in_progress)
 ItemGroup "*" --> "0..1" Milestone : release 关联(可空 N:1)
+Milestone "1" *-- "*" MilestoneItem : gate 挂接(V55,tracks 引用非归属)
+Item "1" *-- "*" MilestoneItem : 可多站共用(GA ⊇ MVP)
 ItemGroup "1" *-- "*" ItemGroupMember
 ItemGroup "1" *-- "*" ItemGroupMemberHistory
 ProjectWorkflowRule "*" --> "1" Status : 目标列
