@@ -277,6 +277,7 @@ export const t = {
     hint: "关闭后侧栏不再显示对应段(数据不删除,重开即恢复)。",
     cancel: "取消",
     save: "保存",
+    loading: "加载中…",
     loadFailed: "加载设置失败",
     saveFailed: "保存失败",
   },
