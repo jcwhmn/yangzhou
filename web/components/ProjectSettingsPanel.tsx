@@ -34,9 +34,11 @@ export function ProjectSettingsPanel({
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
+    // loaded 无条件先复位:关开重入时残留 true 会让重开首帧可点,
+    // 随后 GET 回调用库值冲掉已点状态(重开竞态,trace 实锤 2026-11-12)
+    setLoaded(false);
     if (!open) return;
     setError("");
-    setLoaded(false);
     api<{
       releaseEnabled: boolean;
       milestoneEnabled: boolean;
