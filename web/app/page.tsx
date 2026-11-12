@@ -72,6 +72,9 @@ type LiveMilestone = {
   milestoneId: string;
   name: string;
   targetDate: string | null;
+  daysToTarget: number | null;
+  gateDone: number | null;
+  gateTotal: number | null;
 };
 type LiveGroup = {
   projectKey: string;
@@ -249,6 +252,8 @@ export default function ProjectsPage() {
                   label: t.dashboard.sprint,
                   name: s.name,
                   date: s.endDate,
+                  days: null,
+                  gates: null,
                 })),
                 ...g.milestones.map((m) => ({
                   id: `m-${g.projectKey}-${m.milestoneId}`,
@@ -256,6 +261,11 @@ export default function ProjectsPage() {
                   label: t.dashboard.milestone,
                   name: m.name,
                   date: m.targetDate,
+                  days: m.daysToTarget,
+                  gates:
+                    m.gateDone !== null && m.gateTotal !== null
+                      ? `${t.dashboard.gateReady} ${m.gateDone}/${m.gateTotal}`
+                      : null,
                 })),
               ])
               .map((x) => (
@@ -267,6 +277,26 @@ export default function ProjectsPage() {
                     {x.date && (
                       <Typography variant="caption" color="text.secondary">
                         {x.date}
+                      </Typography>
+                    )}
+                    {x.days !== null && x.days !== undefined && (
+                      <Typography
+                        variant="caption"
+                        color={x.days < 0 ? "error" : "text.secondary"}
+                        data-testid="milestone-days"
+                      >
+                        {x.days < 0
+                          ? t.dashboard.daysOver(-x.days)
+                          : t.dashboard.daysLeft(x.days)}
+                      </Typography>
+                    )}
+                    {x.gates && (
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        data-testid="milestone-gates"
+                      >
+                        {x.gates}
                       </Typography>
                     )}
                   </Stack>

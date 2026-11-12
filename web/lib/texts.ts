@@ -58,6 +58,9 @@ export const t = {
     inProgress: "进行中",
     sprint: "冲刺",
     milestone: "里程碑",
+    daysLeft: (n: number) => `剩 ${n} 天`,
+    daysOver: (n: number) => `超 ${n} 天`,
+    gateReady: "关口就绪",
     recent: "最近动态",
     viewAll: "全部",
   },
@@ -116,6 +119,7 @@ export const t = {
     priority: "优先级",
     sprint: "Sprint",
     release: "Release",
+    milestones: "Milestones",
     back: "← 返回看板",
     backTo: {
       backlog: "← 返回 Backlog",
@@ -413,6 +417,10 @@ export const t = {
     empty: "暂无 Milestone",
     timelinePlaceholder: "时间线(后续版本提供)",
     failed: "操作失败",
+    gates: "依据",
+    attach: "挂接 item",
+    pickerTitle: "挂接验收依据",
+    gateFinal: "终态",
   },
   release: {
     create: "新建",
