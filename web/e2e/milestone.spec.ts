@@ -263,3 +263,40 @@ test("票2 关口硬门禁:未终态 gate 拦完成,终态后放行", async ({
     0,
   );
 });
+
+test("票3 时间线:日期落位与 overdue 红描边", async ({ page, projectKey }) => {
+  // 预置:昨日(planned → overdue)+ 远期 + 无日期
+  await apiCall("POST", `/api/projects/${projectKey}/milestones`, {
+    name: "线昨日",
+    targetDate: utcYesterday(),
+  });
+  await apiCall("POST", `/api/projects/${projectKey}/milestones`, {
+    name: "线远期",
+    targetDate: "2027-06-01",
+  });
+  await apiCall("POST", `/api/projects/${projectKey}/milestones`, {
+    name: "线无期",
+  });
+
+  await page.goto(`/p/${projectKey}/milestones`);
+  const nodes = page.getByTestId("timeline-node");
+  await expect(nodes).toHaveCount(2); // 无日期不入轴,入「未排期」
+  const yest = nodes.filter({ hasText: "线昨日" });
+  const far = nodes.filter({ hasText: "线远期" });
+  // 按日期落位:昨日 x < 远期 x
+  const yx = (await yest.boundingBox())!.x;
+  const fx = (await far.boundingBox())!.x;
+  expect(yx).toBeLessThan(fx);
+  // overdue:红描边 + ⚠;远期无徽标
+  await expect(yest).toContainText("⚠");
+  await expect(far).not.toContainText("⚠");
+  const border = await yest
+    .locator("p")
+    .first()
+    .evaluate((el) => getComputedStyle(el).borderColor);
+  expect(border).toBe("rgb(198, 40, 40)"); // tokens.error #c62828
+  // 无日期站入「未排期」区
+  await expect(page.getByTestId("timeline-unscheduled")).toContainText(
+    "线无期",
+  );
+});

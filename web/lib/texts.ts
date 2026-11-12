@@ -415,7 +415,9 @@ export const t = {
     history: "历史",
     noCurrent: "无进行中里程碑",
     empty: "暂无 Milestone",
-    timelinePlaceholder: "时间线(后续版本提供)",
+    timeline: {
+      unscheduled: "未排期",
+    },
     failed: "操作失败",
     gates: "依据",
     attach: "挂接 item",

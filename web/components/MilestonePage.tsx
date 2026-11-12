@@ -65,6 +65,160 @@ const statusIcon = {
   cancelled: "✗",
 } as const;
 
+const timelineColor = {
+  planned: "text.secondary",
+  in_progress: "primary.main",
+  completed: "success.main",
+  cancelled: "grey.400",
+} as const;
+
+/**
+ * 票 3(US-M11,spec 0116 §3.3):自绘横向时间线——有 targetDate 站按日期落位,
+ * 无日期入右侧「未排期」区;纯展示零依赖。
+ * 落位纯算术(ISO 日期→epoch 天,首尾各留 4%);防重叠贪心分层:pct 差 < 8 换下一行,上限 3 行。
+ */
+function Timeline({ milestones }: { milestones: Milestone[] }) {
+  if (milestones.length === 0) return null;
+  const dated = milestones
+    .filter((m) => m.targetDate)
+    .sort((a, b) => a.targetDate!.localeCompare(b.targetDate!));
+  const undated = milestones.filter((m) => !m.targetDate);
+  const day = (s: string) => new Date(`${s}T00:00:00Z`).getTime() / 86400000;
+  const start = dated.length ? day(dated[0].targetDate!) : 0;
+  const end = dated.length ? day(dated[dated.length - 1].targetDate!) : 0;
+  const STEP = 60;
+  const rowLast: number[] = [];
+  const nodes = dated.map((m) => {
+    const d = day(m.targetDate!);
+    const pct = start === end ? 50 : 4 + (92 * (d - start)) / (end - start);
+    let lane = rowLast.findIndex((last) => pct - last >= 8);
+    if (lane === -1) lane = Math.min(rowLast.length, 2);
+    rowLast[lane] = pct;
+    return { m, pct, lane };
+  });
+  return (
+    <Box data-testid="milestone-timeline" sx={{ display: "flex", my: 2 }}>
+      {dated.length > 0 && (
+        <Box
+          sx={{
+            flex: 1,
+            position: "relative",
+            minWidth: 0,
+            mr: 1,
+            height: (Math.max(...nodes.map((n) => n.lane)) + 1) * STEP + 10,
+          }}
+        >
+          <Box
+            sx={{
+              position: "absolute",
+              left: 0,
+              right: 0,
+              top: 19,
+              borderTop: "2px solid",
+              borderColor: "grey.300",
+            }}
+          />
+          {nodes.map(({ m, pct, lane }) => (
+            <Box key={m.milestoneId}>
+              {lane > 0 && (
+                <Box
+                  sx={{
+                    position: "absolute",
+                    left: `${pct}%`,
+                    top: 21,
+                    height: lane * STEP - 11,
+                    borderLeft: "1px solid",
+                    borderColor: "grey.200",
+                  }}
+                />
+              )}
+              <Box
+                data-testid="timeline-node"
+                sx={{
+                  position: "absolute",
+                  left: `${pct}%`,
+                  top: lane * STEP + 10,
+                  transform: "translateX(-50%)",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  maxWidth: 96,
+                }}
+              >
+                <Box sx={{ display: "flex", alignItems: "center" }}>
+                  <Typography
+                    sx={{
+                      width: 20,
+                      height: 20,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      borderRadius: "50%",
+                      fontSize: 12,
+                      lineHeight: 1,
+                      color:
+                        timelineColor[m.status as keyof typeof timelineColor],
+                      border: m.overdue ? "1px solid" : "none",
+                      borderColor: "error.main",
+                    }}
+                  >
+                    {statusIcon[m.status as keyof typeof statusIcon]}
+                  </Typography>
+                  {m.overdue && (
+                    <Typography variant="caption" color="error">
+                      ⚠
+                    </Typography>
+                  )}
+                </Box>
+                <Typography variant="caption" noWrap sx={{ maxWidth: 96 }}>
+                  {m.name}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {m.targetDate}
+                </Typography>
+              </Box>
+            </Box>
+          ))}
+        </Box>
+      )}
+      {undated.length > 0 && (
+        <Box
+          data-testid="timeline-unscheduled"
+          sx={{
+            width: 130,
+            flexShrink: 0,
+            borderLeft: "1px dashed",
+            borderColor: "grey.300",
+            pl: 1,
+          }}
+        >
+          <Typography variant="caption" color="text.secondary">
+            {t.milestone.timeline.unscheduled}({undated.length})
+          </Typography>
+          {undated.map((m) => (
+            <Box
+              key={m.milestoneId}
+              sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
+            >
+              <Typography
+                sx={{
+                  fontSize: 12,
+                  color: timelineColor[m.status as keyof typeof timelineColor],
+                }}
+              >
+                {statusIcon[m.status as keyof typeof statusIcon]}
+              </Typography>
+              <Typography variant="caption" noWrap>
+                {m.name}
+              </Typography>
+            </Box>
+          ))}
+        </Box>
+      )}
+    </Box>
+  );
+}
+
 /**
  * Milestone 页(spec 0116 票 1 / US-M6):管理弹窗退役,三组列表(当前=0..1 in_progress /
  * 未来=planned targetDate 升序 nulls last / 历史=终态按 updatedAt 降序)+ 新建/行内编辑表单
@@ -419,9 +573,7 @@ export function MilestonePage() {
       <Typography variant="h6" sx={{ mb: 2 }}>
         {t.projectNav.milestones}
       </Typography>
-      <Typography variant="caption" color="text.secondary">
-        ◆ {t.milestone.timelinePlaceholder}
-      </Typography>
+      <Timeline milestones={milestones} />
       <Box
         component="form"
         onSubmit={submit}
