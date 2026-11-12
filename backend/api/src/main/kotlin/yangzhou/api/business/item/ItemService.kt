@@ -10,7 +10,6 @@ import yangzhou.persistence.Item
 import yangzhou.persistence.ItemActivity
 import yangzhou.persistence.ItemGroupMember
 import yangzhou.persistence.ItemStatusHistory
-import yangzhou.persistence.MilestoneItem
 import yangzhou.persistence.Requirement
 import yangzhou.persistence.StatusType
 import yangzhou.persistence.repository.AttributeDefinitionRepository
