@@ -392,6 +392,15 @@ create table milestone_item (
 5. ~~切片~~ 已定:三票(2026-11-12 grill)。
 6. **通知(US-M10)时机**:本轮不做(§1.2 理由);何时立票由你定(需 @Scheduled 定时任务 + 非 item 收件人语义)。
 
-## 七、As-built
+## 七、As-built(票1 YPJ-170,2026-11-12;票2/3 完工后各自补节)
 
-(完工后补:实际改点、偏差、验证结果。)
+设计兑现:§3.1 改点逐项落地——V54 迁移(description/owner 列+FK);MilestoneService 注 Clock、双徽标同 item 纯函数、dueSoon 服务层门控、终态删除守卫 409(§六#1 已拍板并补);前端 MilestonePage 三组列表+表单(描述/负责人)+行内状态按钮+双徽标(弹窗退役)、侧栏只显当前+徽标+段头常驻、新路由 `/p/[key]/milestones`;e2e 改写为页面用例 3 例;api.http Milestone 节自含负例。
+
+设计外偏差:
+
+- **DTO 加 `updatedAt`**:历史组「按 updatedAt 降序」需要,增量非破坏
+- **owner 校验取最小实现** = 成员存在性 404,未做池外 409(spec 沉默;item assignee 是池校验,是否同口径 ⚠ 待用户复核)
+
+既有漂移(发现未动,已记问题处理记录 #3):api.http 负例区两个 milestone 409 用例因前置 milestoneId 已删实际 404(V14 时代即有);本轮新增负例均自含。
+
+验证:`gradle test` 全绿;`gradle integrationTest` 绿;e2e 压测 12×2 + 全量 93 passed 绿(用户 build/debug 轮);bootRun/容器启动由 e2e test 容器实测覆盖。
