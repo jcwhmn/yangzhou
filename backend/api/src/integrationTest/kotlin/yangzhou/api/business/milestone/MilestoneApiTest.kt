@@ -228,12 +228,13 @@ class MilestoneApiTest : AbstractApiTest() {
                 )[0]["memberId"]
                 .asText()
 
-        // create 带描述+负责人;昨天 targetDate → overdue=true(集成库时钟 = 当天,昨日必红)
+        // create 带描述+负责人;昨天 targetDate → overdue=true(昨日必红)
+        // 台账 #9:服务 Clock=UTC(ClockConfig),测试日期必须同钟——本地 now 在 00:00–08:00(UTC+8)与 UTC 差一天,overdue 断言时段敏感
         val created =
             createMilestone(
                 authed,
                 "DO",
-                mapOf("name" to "带描述", "targetDate" to java.time.LocalDate.now().minusDays(1).toString(), "description" to "验收口径", "owner" to ownerId),
+                mapOf("name" to "带描述", "targetDate" to java.time.LocalDate.now(java.time.Clock.systemUTC()).minusDays(1).toString(), "description" to "验收口径", "owner" to ownerId),
             )
         assertEquals("验收口径", created["description"].asText())
         assertEquals(ownerId, created["owner"].asText())

@@ -6,13 +6,16 @@ import { apiCreateProject, injectToken, uniqueKey } from "./helpers";
 type Fixtures = {
   /** 独享项目 key */
   projectKey: string;
+  /** 真 S0(无 level-1 类型)项目;默认 false=补种 sprint 类型(spec 0117 后拉入按有无 L1 类型分流) */
+  s0: boolean;
 };
 
 export const test = base.extend<Fixtures>({
-  projectKey: async ({ page }, use) => {
+  s0: [false, { option: true }],
+  projectKey: async ({ page, s0 }, use) => {
     await injectToken(page);
     const key = uniqueKey();
-    await apiCreateProject(key);
+    await apiCreateProject(key, { s0 });
     await use(key);
   },
 });
