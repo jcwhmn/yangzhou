@@ -172,6 +172,7 @@ abstract class AbstractApiTest {
         authed: RestTestClient,
         key: String,
         name: String = key,
+        seedSprint: Boolean = true,
     ): JsonNode {
         val project =
             authed
@@ -186,13 +187,16 @@ abstract class AbstractApiTest {
                 .responseBody!!
                 .let { json.readTree(it) }
         // spec 0100 切片B:新项目不再种子 sprint;测试按 V48 存量形状补种 timed level-1 类型
-        authed
-            .post()
-            .uri("/api/projects/$key/group-types")
-            .body(mapOf("typeKey" to "sprint", "name" to "Sprint", "timed" to true))
-            .exchange()
-            .expectStatus()
-            .isCreated()
+        // spec 0117:S0(无组)用例传 seedSprint=false(真无组项目仅 builtin release,level=NULL 不参与)
+        if (seedSprint) {
+            authed
+                .post()
+                .uri("/api/projects/$key/group-types")
+                .body(mapOf("typeKey" to "sprint", "name" to "Sprint", "timed" to true))
+                .exchange()
+                .expectStatus()
+                .isCreated()
+        }
         return project
     }
 

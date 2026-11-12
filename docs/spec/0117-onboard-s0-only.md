@@ -21,7 +21,7 @@
 
 ### 1.2 范围
 
-1. **拉入分流**:`PUT /items/{id}/board-membership {onBoard:true}` 按项目是否已有 level-1 组类型分流——S0=置标记(现状零改动);有组=**不置标记**,挂最早 active sprint,无 active 挂最早 planned,两者皆无 409 拒拉
+1. **拉入分流**:`PUT /items/{id}/board-membership {onBoard:true}` 按项目是否已有 level-1 组类型分流——S0=置标记(现状零改动);有组=**不置标记**,挂最早 active sprint;无 active 则挂最早 planned sprint **并同事务激活它**(planned→active,复用 workflow `start` 出边);零 sprint 409 拒拉(2026-11-13 用户拍板:自动挂 planned 同时激活,构造性消灭空窗)
 2. **转换触发**:项目创建**首个**组类型(获得 L1,即 S0→有组)的事务里,清该项目全部 `on_board` 标记——票落 backlog,排期归人
 3. **看板取数**:有组(active 分支)去掉 `|| it.onBoard` 并集;降级分支(无 active)与 backlog 谓词**不动**(S0 仍依赖;有组项目标记恒 false 后自然空转)
 4. **存量迁移 V56**:清所有「有 L1 组类型的项目」的标记(实际命中 prod 的 109/156)
@@ -45,19 +45,21 @@ if (request.onBoard) {
     if (l1 == null) {                       // S0:现状,置标记,无组可挂
         itemRepo.save(item.copy(onBoard = true))
     } else {                                // 有组:不置标记,挂 sprint
-        val target = groups.findByProjectObjectIdOrderByCreatedAt(item.projectObjectId)
-            .firstOrNull { it.type == l1 && it.status == "active" }
-            ?: groups.findByProjectObjectIdOrderByCreatedAt(item.projectObjectId)
-                .firstOrNull { it.type == l1 && it.status == "planned" }
-            ?: throw ConflictException("无 active/planned sprint 可挂,请先创建或开始 sprint")
+        val l1Groups = groups.findByProjectObjectIdOrderByCreatedAt(item.projectObjectId)
+            .filter { it.type == l1 }
+        val target = l1Groups.firstOrNull { it.status == "active" }
+            ?: l1Groups.firstOrNull { it.status == "planned" }?.let { startGroup(it) }
+            ?: throw ConflictException("无 active/planned sprint 可挂,请先创建 sprint")
         // 挂成员行(幂等,复用现有 rows.none 判断)+ memberHistory.recordAdd
     }
 } else { /* 退回分支不动:清标记 + replaceMembership(groupId=null, groupType=l1) */ }
 ```
 
-**createType(转换触发)**:`used.isEmpty()`(此前无任何用户类型,首类型必得 level=1)时,保存类型后同事务内批量清标记——`ItemRepository` 新增 `@Modifying @Query("update Item i set i.onBoard = false where i.projectObjectId = :pid and i.onBoard = true")`(repository 批量 = ADR-0004 授权扩展点,禁 JDBC client)。
+**startGroup(新增私有辅助)**:`workflow.applyAction(typeOfPid(pid, g.type), g.status, "start")` + `groups.save(g.copy(status = target))`——复用 sprint(timed)模板 planned→active 的 START 出边与白名单意图校验,同事务;不加 leader 门(拉入本身无门,现状语义;若要收紧另票)。自定义非 timed L1 工作流若无 `start` 出边 → applyAction 409,拉入拒(可接受:自定义拓扑的开关语义人定)。
 
 **board()**:active 分支 filter 改 `itemService.list(key).filter { it.itemId in objectIds }`(去 `|| it.onBoard`);降级分支/backlogOnly 谓词零改动。
+
+**createType(转换触发)**:`used.isEmpty()`(此前无任何用户类型,首类型必得 level=1)时,保存类型后同事务内批量清标记——`ItemRepository` 新增 `@Modifying @Query`(原生 SQL,同 0444 房风):`UPDATE item SET on_board = false WHERE project_object_id = :pid AND on_board = true`。
 
 ### 2.2 迁移 V56(`V56__onboard_s0_only.sql`)
 
@@ -75,7 +77,8 @@ WHERE project_id IN (SELECT project_id FROM item_group_type WHERE level = 1);
 
 ### 2.4 测试
 
-- **集成 `BoardMembershipApiTest` 扩展**(双轨纪律:extends AbstractApiTest,黑盒走 REST):①有组+active 拉入=成员行+`onBoard=false` ②有组无 active 有 planned 拉入=挂 planned ③有组无任何 sprint 拉入=409 ④S0 拉入=纯标记(回归) ⑤S0 建首个组类型 → 该项目标记全清、票回 backlog ⑥已有组的项目再建类型(非首个)→ 不清(防误伤)
+- **集成 `BoardMembershipApiTest` 扩展**(双轨纪律:extends AbstractApiTest,黑盒走 REST):①有组+active 拉入=成员行+`onBoard=false` ②有组无 active 有 planned 拉入=挂 planned **且 sprint 变 active** ③有组零 sprint 拉入=409 ④S0 拉入=纯标记(回归;需真 S0 项目——测试基建 `createProject` 默认补种 sprint 类型,须加参数跳过) ⑤S0 建首个组类型 → 该项目标记全清、票回 backlog ⑥转换清标记幂等安全(无标记项目建类型不炸)
+- **实现级发现(编码时实锤)**:`AbstractApiTest.createProject` 恒补种 timed level-1 sprint 类型(spec 0100 切片B 后的测试形状)→ 既有测试项目全是有组项目;S0 用例需 `createProject` 加 `seedSprint: Boolean = true` 参数(默认不变,不影响其它测试)
 - **单元**:无新纯函数,不加
 - **e2e**:既有 board-membership 用例回归即可,行为不变(S0 项目用例)
 
@@ -94,12 +97,13 @@ PUT `/items/{id}/board-membership` 节补负例:有组项目无 sprint 拉入 �
 
 1. **S0 项目**(新建无组项目):backlog 拉入 → 看板见票;退回 → 回 backlog(回归,行为应与现状全同)
 2. **有组+active**:backlog 拉入 → 票进 sprint 成员列表、看板见(因成员非标记);`GET item` 核对 `onBoard:false`
-3. **有组+空窗**(全部 sprint completed,有 planned):拉入 → 挂最早 planned;开 sprint 后上看板
+3. **有组+空窗**(全部 sprint completed,有 planned):拉入 → 挂最早 planned **且该 sprint 自动激活(planned→active)**;看板立即见票
 4. **有组+零 sprint**:拉入 → 409,前端显示「无 active/planned sprint 可挂…」
 5. **转换**:S0 项目拉两票上板 → 创建首个组类型 → 两票出现在 backlog、看板标记消失;再建第二个类型 → 无变化
 6. **迁移**:rebuild 后 YPJ 项目看板只剩 sprint 成员(2 张 To Do),109/156 出现在 backlog
 7. api.http 负例区新例跑绿
 
-## 四、待拍板(评审时定,不阻塞 spec 定稿)
+## 四、拍板记录(2026-11-13 用户定)
 
-- **拉入挂 planned vs 拒拉**:§2.1 当前按「active → planned → 409」链写(构造性消灭空窗,票有家但不上看板直到 sprint 开始);备选「无 active 直接 409,强制先开 sprint」。两案皆满足二元模型,差别只在空窗期拉入的体验。
+- **拉入无 active 有 planned → 自动挂 planned 并激活该 sprint**(原两案「仅挂 planned」/「409 拒拉」均否;理由:拉入=「现在就要做」,顺手把下个 sprint 开起来,空窗态在系统里不再存在)
+- 附加决策:激活不加 leader 门(拉入本身无门);自定义非 timed L1 无 `start` 出边 → 拉入 409
