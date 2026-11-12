@@ -249,7 +249,8 @@ class MilestoneApiTest : AbstractApiTest() {
         assertTrue(cleared["description"].isNull)
         assertTrue(cleared["owner"].isNull)
 
-        // 终态后删除 409(§6 #1 拍板);非终态删除仍 204
+        // 终态后删除 409(§6 #1 拍板);非终态删除仍 204。完成需按状态机走:planned→in_progress→completed
+        assertEquals(200, patch(authed, "DO", mid, mapOf("status" to "in_progress")).status.value())
         assertEquals(200, patch(authed, "DO", mid, mapOf("status" to "completed")).status.value())
         assertEquals(
             409,
