@@ -155,3 +155,111 @@ test("侧栏空态与段头入口", async ({ page, projectKey }) => {
     await expect(page.getByText("暂无 Milestone")).toBeVisible();
   }).toPass({ timeout: 10_000 });
 });
+
+// 票 2(spec 0116 §3.2):gate 挂接(tracks 多归属)+ 关口硬门禁(US-M8)
+test("票2 item 详情挂两站 → 页内依据清单可见", async ({ page, projectKey }) => {
+  const item = await apiCall<{ itemId: string }>(
+    "POST",
+    `/api/projects/${projectKey}/items`,
+    { title: "支付联调" },
+  );
+  await apiCall("POST", `/api/projects/${projectKey}/milestones`, {
+    name: "MVP 里程碑",
+  });
+  await apiCall("POST", `/api/projects/${projectKey}/milestones`, {
+    name: "GA 里程碑",
+  });
+
+  // item 详情:chips 挂两站
+  await page.goto(`/p/${projectKey}/i/${item.itemId}`);
+  await expect(
+    page.getByTestId("item-milestone-chip").filter({ hasText: "MVP 里程碑" }),
+  ).toBeVisible();
+  await page
+    .getByTestId("item-milestone-chip")
+    .filter({ hasText: "MVP 里程碑" })
+    .click();
+  await page
+    .getByTestId("item-milestone-chip")
+    .filter({ hasText: "GA 里程碑" })
+    .click();
+
+  // 页内:MVP 行展开依据 → 清单含 item,就绪度 1/1
+  await page.goto(`/p/${projectKey}/milestones`);
+  const mvpItem = page
+    .getByTestId("milestone-item")
+    .filter({ hasText: "MVP 里程碑" });
+  await mvpItem.getByTestId("milestone-gates").click();
+  await expect(
+    mvpItem
+      .getByTestId("gate-panel")
+      .getByTestId("gate-row")
+      .filter({ hasText: "支付联调" }),
+  ).toBeVisible();
+  // 就绪度 = gateDone/gateTotal(终态比例,US-M9);item 在 To Do 非终态 → 0/1,非挂接数
+  await expect(mvpItem.getByTestId("milestone-gates")).toHaveText(/0\/1/);
+  // 多归属:GA 行同 item
+  const gaItem = page
+    .getByTestId("milestone-item")
+    .filter({ hasText: "GA 里程碑" });
+  await gaItem.getByTestId("milestone-gates").click();
+  await expect(
+    gaItem
+      .getByTestId("gate-panel")
+      .getByTestId("gate-row")
+      .filter({ hasText: "支付联调" }),
+  ).toBeVisible();
+});
+
+test("票2 关口硬门禁:未终态 gate 拦完成,终态后放行", async ({
+  page,
+  projectKey,
+}) => {
+  const item = await apiCall<{ itemId: string }>(
+    "POST",
+    `/api/projects/${projectKey}/items`,
+    { title: "未终态验收项" },
+  );
+  const ms = (
+    await apiCall<{ milestoneId: string }>(
+      "POST",
+      `/api/projects/${projectKey}/milestones`,
+      { name: "MVP 里程碑" },
+    )
+  ).milestoneId;
+  await apiCall("PATCH", `/api/projects/${projectKey}/milestones/${ms}`, {
+    status: "in_progress",
+  });
+  await apiCall("PUT", `/api/projects/${projectKey}/milestones/${ms}/items`, {
+    itemIds: [item.itemId],
+  });
+
+  await page.goto(`/p/${projectKey}/milestones`);
+  const row = page
+    .getByTestId("milestone-row")
+    .filter({ hasText: "MVP 里程碑" });
+  await expect(row).toBeVisible();
+  await expect(row.getByTestId("milestone-gates")).toHaveText(/0\/1/);
+
+  // 完成被拦:409 错误条 + 行仍在进行中
+  await row.getByRole("button", { name: /完成/ }).click();
+  await expect(page.getByText(/关口未就绪/)).toBeVisible();
+  await expect(row.getByRole("button", { name: /完成/ })).toBeVisible();
+
+  // gate 终态化(开工须有主 → 先指派再推 Done)后放行
+  const me = await apiCall<{ memberId: string }[]>("GET", "/api/members");
+  await apiCall("PUT", `/api/items/${item.itemId}/assignee`, {
+    assigneeItemId: me[0].memberId,
+  });
+  const proj = await apiCall<{
+    statuses: { statusId: string; name: string }[];
+  }>("GET", `/api/projects/${projectKey}`);
+  const done = proj.statuses.find((s) => s.name === "Done")!.statusId;
+  await apiCall("PATCH", `/api/items/${item.itemId}`, {
+    statusItemId: done,
+  });
+  await row.getByRole("button", { name: /完成/ }).click();
+  await expect(row.getByRole("button", { name: /开始|完成|取消/ })).toHaveCount(
+    0,
+  );
+});
