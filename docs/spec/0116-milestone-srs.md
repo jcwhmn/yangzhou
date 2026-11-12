@@ -352,10 +352,72 @@ item 详情:Milestones 一行 chips(全部站,选中=挂接中,点击切换即 P
 
 | 状态 | 图标 | 颜色 | overdue 时 |
 |---|---|---|---|
-| planned | ○ | 中性 | 红描边 + ⚠ |
-| in_progress | ▶ | 强调 | 红描边 + ⚠ |
-| completed | ✓ | 成功绿 | 无(后端已 false) |
-| cancelled | ✗ | 弱化灰 | 无 |
+| planned | ○ | 中性(text.secondary) | 红描边 + ⚠ |
+| in_progress | ▶ | 强调(primary.main) | 红描边 + ⚠ |
+| completed | ✓ | 成功绿(success.main) | 无(后端已 false) |
+| cancelled | ✗ | 弱化灰(grey.400) | 无 |
+
+#### 三件套(开工前补,2026-11-13)
+
+**① 需求**
+
+- Milestone 页顶部新增时间线区块,替换现有占位文案 `timelinePlaceholder`。
+- 有 targetDate 的站(全部状态,含终态)按日期水平落位;节点下方显示名称 + 日期。
+- 无 targetDate 的站进轴右侧「未排期」区,竖排。
+- 纯展示区块:节点不可点击、无 tooltip、无「今天」参照线(非目标,后加另议);改日期仍走行内编辑表单,改后时间线随 load() 重渲染。
+- 轴自绘(纯 Box/Typography),不引任何时间线依赖。
+- 范围:仅 Milestone 页;Dashboard/侧栏不动。
+
+**② 详细设计**
+
+改 2 个文件:`web/components/MilestonePage.tsx`(新增同文件内部组件 `Timeline` + 页面挂载)、`web/lib/texts.ts`(删 `timelinePlaceholder`,增 `timeline: { unscheduled }`)。后端零改动(数据用现有 Milestone DTO:targetDate/overdue/status 均已具备)。
+
+落位算法(纯算术,无 DOM 测量):
+
+- `dated = milestones.filter(targetDate).sort(by targetDate)`;`undated` 为其余。
+- 轴范围 `[min(dated.targetDate), max(dated.targetDate)]`;pct = 4 + 92 × (d−start)/(end−start)(首尾各留 4% 防贴边);单站或全同日(end===start)时 pct = 50。
+- **防重叠贪心分层**:按日期序遍历,每站优先放第 1 行,与该行上一站 pct 差 < 8 则试下一行(上限 3 行,超出全部挤第 3 行)。同日多站自然分层。
+
+数据形态×渲染真值表:
+
+| 数据形态 | 渲染 |
+|---|---|
+| 0 站 | 整块不渲染(列表区空态兜底) |
+| 有日期站 ≥1 | 轴 + 节点落位(分层) |
+| 仅无日期站 | 只渲染「未排期」区,轴不画 |
+| 无日期站 + 有日期站 | 轴右侧「未排期」区(虚线左边框,竖排 图标+名) |
+| overdue 非终态 | 节点红描边(border error.main)+ ⚠ |
+| 终态 overdue | 不存在(后端 false) |
+| PATCH 改日期 | load() 重渲染,节点移动 |
+
+页面示意图(ASCII,贴合实况;表单与三组列表不变):
+
+```
+┌ Milestones 页 ──────────────────────────────────────────────┐
+│ Milestones                                                   │
+│ ┌ 时间线(新)───────────────────────────────┬────────┐    │
+│ │      ○ ───────▶ ───────○ ───────✓         │未排期   │    │
+│ │    MVP·11/13  Beta·11/20  GA·12/01 v1.0   │ ·整理    │    │
+│ │    ⚠红描边(overdue)                        │ ·回归    │    │
+│ └───────────────────────────────────────────┴────────┘    │
+│ [新建/编辑表单(不变)]                                       │
+│ ▶ 当前(不变)  ○ 未来(不变)  历史(不变)                    │
+└──────────────────────────────────────────────────────────────┘
+```
+
+否决的备选:MUI X / 第三方时间线库(违「自绘不引依赖」);DOM 测宽防重叠(复杂);奇偶固定交错(相邻同日站同行仍重叠);节点点击跳转/tooltip(spec 未要求)。
+
+**③ 手工测试用例**(用例 12 细化,用户 build/debug 执行)
+
+| # | 步骤 | 预期 |
+|---|---|---|
+| 12a | 建 2 站(targetDate=昨天/明天) | 两节点落位,昨天在明天左;昨天节点红描边+⚠ |
+| 12b | 建 1 站无日期 | 入「未排期」区;轴只画有日期站 |
+| 12c | 编辑站日期 | 节点移动到新位置 |
+| 12d | ▶完成有日期站 | 节点变 ✓ 绿,位置不变 |
+| 12e | 同日建 2 站 | 两站分层堆叠不重叠 |
+| 12f | 全部站无日期 | 只显示「未排期」区,无轴线 |
+| 12g | 全站删除 | 时间线整块消失,列表区空态 |
 
 ### 3.4 API 变化汇总
 
@@ -439,3 +501,14 @@ item 详情:Milestones 一行 chips(全部站,选中=挂接中,点击切换即 P
 - `daysToTarget` 为北极星卡新增字段(剩/超 N 天,同一 Clock 口径,增量非破坏)
 
 验证:单测(milestone/item/dashboard)绿;集成 MilestoneApiTest 8 例绿;api.http 票 2 复刻脚本 `.scratch/replay-ypj171.mjs` 全绿(test 8082,覆盖挂接/回读/多归属/回显/门禁 409 体/就绪度 0→1/北极星卡字段/零 gate 站);e2e milestone 5 例绿(用户跑;含就绪度口径修正 5c39961)。全量单测/集成/next build/全量 e2e 归用户验证轮(分工 2026-11-12 起)。
+
+### 票 3(YPJ-172,2026-11-13)
+
+设计兑现:§3.3 逐项落地——`MilestonePage` 同文件 `Timeline` 组件(自绘轴,纯 Box/Typography 零依赖);日期落位 4%~92%(首尾留 4% 防贴边,ISO 日期→epoch 天纯算术);防重叠贪心分层(pct 差 <8 换行,上限 3 行,深层节点带竖向连线);节点四态配色按真值表,overdue 红描边+⚠;无日期站入轴右侧「未排期」区(虚线左边框,竖排);数据形态真值表兑现(0 站不渲染/仅无日期只渲染未排期区);texts 删 `timelinePlaceholder` 增 `timeline.unscheduled`;e2e 票 3 一例(节点数=有日期站/落位顺序/红描边 tokens.error/未排期区);后端零改动。
+
+设计外新增(全量 e2e 两红例实锤修复,台账 #5/#6):
+
+- **GroupTypesPanel create() 后焦点回 typeKey(产品修复,spec 外)**:全量 e2e 红「Esc 关不掉面板」——新增成功表单重置→新增按钮 disable→焦点掉 body,Esc 打在 body 上不进弹层子树,MUI 合成 onKeyDown 收不到(trace + document 捕获级 keylog 实锤:红轮 target=BODY,绿轮 target=MuiDialog-container;error-context 空列表快照系陈旧帧)。人工同踩,是真 UX bug
+- **票 2 e2e 等 chip 挂接两 PUT 落库再 goto(测试修复)**:连点两 chip 后立刻 goto,第二个挂接在途 GET 被导航中止(status -1,trace network 实锤),PUT 未发出→GA 未挂上;产品侧逐站独立无竞态
+
+验证:全量 e2e 绿(用户轮:next build + 单元/集成 + 全量 e2e);group-types 6 passed ×3、milestone 9 passed ×3(workers=1,修复后);prettier/tsc 绿。

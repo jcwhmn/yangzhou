@@ -163,26 +163,47 @@ test("票2 item 详情挂两站 → 页内依据清单可见", async ({ page, pr
     `/api/projects/${projectKey}/items`,
     { title: "支付联调" },
   );
-  await apiCall("POST", `/api/projects/${projectKey}/milestones`, {
-    name: "MVP 里程碑",
-  });
-  await apiCall("POST", `/api/projects/${projectKey}/milestones`, {
-    name: "GA 里程碑",
-  });
+  const mvpId = (
+    await apiCall<{ milestoneId: string }>(
+      "POST",
+      `/api/projects/${projectKey}/milestones`,
+      { name: "MVP 里程碑" },
+    )
+  ).milestoneId;
+  const gaId = (
+    await apiCall<{ milestoneId: string }>(
+      "POST",
+      `/api/projects/${projectKey}/milestones`,
+      { name: "GA 里程碑" },
+    )
+  ).milestoneId;
 
-  // item 详情:chips 挂两站
+  // item 详情:chips 挂两站。挂接是异步 GET→PUT;goto 会措断在途请求
+  // (trace 实锤 status -1,GA 未挂上,问题处理记录 #6)→ 等两个 PUT 落库再走
+  const putDone = (id: string) =>
+    page.waitForResponse(
+      (r) =>
+        r.url().endsWith(`/milestones/${id}/items`) &&
+        r.request().method() === "PUT",
+    );
   await page.goto(`/p/${projectKey}/i/${item.itemId}`);
   await expect(
     page.getByTestId("item-milestone-chip").filter({ hasText: "MVP 里程碑" }),
   ).toBeVisible();
-  await page
-    .getByTestId("item-milestone-chip")
-    .filter({ hasText: "MVP 里程碑" })
-    .click();
-  await page
-    .getByTestId("item-milestone-chip")
-    .filter({ hasText: "GA 里程碑" })
-    .click();
+  await Promise.all([
+    putDone(mvpId),
+    page
+      .getByTestId("item-milestone-chip")
+      .filter({ hasText: "MVP 里程碑" })
+      .click(),
+  ]);
+  await Promise.all([
+    putDone(gaId),
+    page
+      .getByTestId("item-milestone-chip")
+      .filter({ hasText: "GA 里程碑" })
+      .click(),
+  ]);
 
   // 页内:MVP 行展开依据 → 清单含 item,就绪度 1/1
   await page.goto(`/p/${projectKey}/milestones`);
@@ -261,5 +282,42 @@ test("票2 关口硬门禁:未终态 gate 拦完成,终态后放行", async ({
   await row.getByRole("button", { name: /完成/ }).click();
   await expect(row.getByRole("button", { name: /开始|完成|取消/ })).toHaveCount(
     0,
+  );
+});
+
+test("票3 时间线:日期落位与 overdue 红描边", async ({ page, projectKey }) => {
+  // 预置:昨日(planned → overdue)+ 远期 + 无日期
+  await apiCall("POST", `/api/projects/${projectKey}/milestones`, {
+    name: "线昨日",
+    targetDate: utcYesterday(),
+  });
+  await apiCall("POST", `/api/projects/${projectKey}/milestones`, {
+    name: "线远期",
+    targetDate: "2027-06-01",
+  });
+  await apiCall("POST", `/api/projects/${projectKey}/milestones`, {
+    name: "线无期",
+  });
+
+  await page.goto(`/p/${projectKey}/milestones`);
+  const nodes = page.getByTestId("timeline-node");
+  await expect(nodes).toHaveCount(2); // 无日期不入轴,入「未排期」
+  const yest = nodes.filter({ hasText: "线昨日" });
+  const far = nodes.filter({ hasText: "线远期" });
+  // 按日期落位:昨日 x < 远期 x
+  const yx = (await yest.boundingBox())!.x;
+  const fx = (await far.boundingBox())!.x;
+  expect(yx).toBeLessThan(fx);
+  // overdue:红描边 + ⚠;远期无徽标
+  await expect(yest).toContainText("⚠");
+  await expect(far).not.toContainText("⚠");
+  const border = await yest
+    .locator("p")
+    .first()
+    .evaluate((el) => getComputedStyle(el).borderColor);
+  expect(border).toBe("rgb(198, 40, 40)"); // tokens.error #c62828
+  // 无日期站入「未排期」区
+  await expect(page.getByTestId("timeline-unscheduled")).toContainText(
+    "线无期",
   );
 });
