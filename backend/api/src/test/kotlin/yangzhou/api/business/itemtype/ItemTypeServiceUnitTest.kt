@@ -113,7 +113,7 @@ class ItemTypeServiceUnitTest {
         @Test
         fun inUseRejected() {
             every { itemTypes.findByProjectObjectIdAndTypeKey(pid, "feat") } returns t("feat")
-            every { items.countByProjectObjectIdAndTypeKey(pid, "feat") } returns 3
+            every { items.countByProjectObjectIdAndType(pid, "feat") } returns 3
             val e = assertFailsWith<ConflictException> { service.delete("CHE", "feat") }
             assertEquals("类型下仍有 3 个 item,请先迁移:feat", e.message)
         }
@@ -122,7 +122,7 @@ class ItemTypeServiceUnitTest {
         fun emptyDeleted() {
             val del = t("feat")
             every { itemTypes.findByProjectObjectIdAndTypeKey(pid, "feat") } returns del
-            every { items.countByProjectObjectIdAndTypeKey(pid, "feat") } returns 0
+            every { items.countByProjectObjectIdAndType(pid, "feat") } returns 0
             service.delete("CHE", "feat")
             verify { itemTypes.delete(del) }
         }

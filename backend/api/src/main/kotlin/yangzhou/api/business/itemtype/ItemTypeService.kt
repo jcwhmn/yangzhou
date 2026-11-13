@@ -90,7 +90,7 @@ class ItemTypeService(
             itemTypes.findByProjectObjectIdAndTypeKey(pid, typeKey)
                 ?: throw NotFoundException("item 类型不存在:$typeKey")
         if (t.builtin) throw ConflictException("内建类型不可删除:$typeKey")
-        val inUse = items.countByProjectObjectIdAndTypeKey(pid, typeKey)
+        val inUse = items.countByProjectObjectIdAndType(pid, typeKey)
         if (inUse > 0) throw ConflictException("类型下仍有 $inUse 个 item,请先迁移:$typeKey")
         itemTypes.delete(t)
     }
