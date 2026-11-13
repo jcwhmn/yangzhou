@@ -28,6 +28,10 @@ test("建项目表单——创建并进入看板(根页=看板) @smoke", async (
     0,
   );
   await expect(page.getByText("Sprint")).toHaveCount(0);
+  // YPJ-168(spec 0119):侧栏顶部显示项目名
+  await expect(page.getByTestId("sidebar-project-name")).toHaveText(
+    "E2E UI 建的项目",
+  );
 });
 
 test("V11-S3 项目列表搜索/排序/显示已归档", async ({ page, projectKey }) => {
