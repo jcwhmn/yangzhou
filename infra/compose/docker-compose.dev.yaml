@@ -11,6 +11,7 @@ services:
       SPRING_PROFILES_ACTIVE: dev
       SPRING_DATASOURCE_URL: jdbc:postgresql://host.docker.internal:5432/yangzhou_dev
       YANGZHOU_ATTACHMENT_ENDPOINT: http://host.docker.internal:9000
+      TZ: ${TZ:-Asia/Shanghai} # YPJ-175:徽标日界本地历(时钟 bean=systemDefaultZone,容器须显式注入)
     ports:
       - "8081:8080"
     extra_hosts:
