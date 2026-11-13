@@ -171,6 +171,10 @@ export function ItemTypePanel({
                       >
                         <CheckIcon fontSize="small" />
                       </IconButton>
+                      {/* 改名态保留 typeKey 文案:行在两种态下都可被定位(e2e/人工) */}
+                      <Typography variant="caption" color="text.secondary">
+                        {tp.typeKey}
+                      </Typography>
                     </Stack>
                   ) : (
                     <Typography variant="body2">
