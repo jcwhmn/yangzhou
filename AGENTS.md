@@ -46,7 +46,7 @@ docs/      adr/ · spec/ · architecture/(puml 类图) · requirement/(PRD) · p
 
 ## Issue 工作流(PR 模式;票在 YPJ 项目,2026-10-06 起 Linear 冻结只读)
 
-1. 开工:`git checkout main && git pull --ff-only`(分支经 yz 创建,见下);同时 `yz assign YPJ-{N} me && yz items move YPJ-{N} "In Progress"`(开工须有主,未 assign 会被 move 409 拒);开工票须挂当前 sprint(`items create` 建 子票带 `--sprint`,漏挂会被看板/sprint 漏看;有意不挂除外——2026-10-24 用户定,不自动挂);**分支经 yz 创建并关联 item**(2026-10-12 定,YPJ-27 起 CLI 直建:`yz items branch YPJ-{N} <type>/YPJ-{N}[-依赖票号][-英文slug] --base main`,命名=spec 0036 v2(`cwjiang/` 前缀规则已废弃,2026-10-16 用户纠正);`yz log` 依赖该关联;本地对应 `git fetch && git switch` 跟踪远端新分支)
+1. 开工:`git checkout main && git pull --ff-only`(分支经 yz 创建,见下);同时 `yz assign YPJ-{N} me && yz items move YPJ-{N} "In Progress"`(开工须有主,未 assign 会被 move 409 拒);开工票**必须挂当前 sprint**(`yz items assign YPJ-{N} <当前sprint>`;立票可不挂留 backlog,但开工动作必须含挂 sprint——不允许悬空票:sprint 过程零痕迹=回顾漏计,YPJ-174 裸闭案例,2026-11-13 用户定,废除 10-24「不自动挂」口径);**分支经 yz 创建并关联 item**(2026-10-12 定,YPJ-27 起 CLI 直建:`yz items branch YPJ-{N} <type>/YPJ-{N}[-依赖票号][-英文slug] --base main`,命名=spec 0036 v2(`cwjiang/` 前缀规则已废弃,2026-10-16 用户纠正);`yz log` 依赖该关联;本地对应 `git fetch && git switch` 跟踪远端新分支)
 2. 实现带测试,跑全相关验证
 3. PR:`gh pr create --base main --title "YPJ-{N}: ..."`;开出后 `yz items move YPJ-{N} "In Review"`
 4. **停**,等用户审阅合并
