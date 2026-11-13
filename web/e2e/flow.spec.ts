@@ -95,5 +95,6 @@ test("byType 图:双 type 计数入图(YPJ-178/spec 0122)", async ({
   // 数据真入图:卡内 x 轴出现 type 名 + 图 svg(标题断言拦不住 400/空数据,与首例同口径)
   await expect(card.getByText("bug")).toBeVisible();
   await expect(card.getByText("task")).toBeVisible();
-  await expect(card.locator("svg")).toBeVisible();
+  // 卡内有两个 svg(图例标记+图层);取首个=BarChart 已挂载(空态走 Empty,无 svg)
+  await expect(card.locator("svg").first()).toBeVisible();
 });
