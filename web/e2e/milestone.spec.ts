@@ -3,13 +3,11 @@
 import { expect, test } from "./support/fixtures";
 import { apiAssignMe, apiCall, fillDate } from "./support/helpers";
 
-/** UTC 口径的昨日(后端 Clock=UTC;本地时区翻边时仍严格 < UTC 今天,徽标必红) */
-function utcYesterday(): string {
-  const now = new Date();
-  const d = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 1),
-  );
-  return d.toISOString().slice(0, 10);
+/** 上海历的昨日(YPJ-175 方案 A:后端徽标=Asia/Shanghai 日界,容器 TZ 注入;昨日严格 < 服务今天,任何时刻必红) */
+function shanghaiYesterday(): string {
+  return new Date(Date.now() + 8 * 3_600_000 - 86_400_000)
+    .toISOString()
+    .slice(0, 10);
 }
 
 test("Milestone 页——建/推进/编辑/删除 @smoke", async ({ page, projectKey }) => {
@@ -101,7 +99,7 @@ test("侧栏收敛 双徽标 与段头入口", async ({ page, projectKey }) => {
       `/api/projects/${projectKey}/milestones`,
       {
         name: "昨日站",
-        targetDate: utcYesterday(),
+        targetDate: shanghaiYesterday(),
       },
     )
   ).milestoneId;
@@ -286,7 +284,7 @@ test("票3 时间线:日期落位与 overdue 红描边", async ({ page, projectK
   // 预置:昨日(planned → overdue)+ 远期 + 无日期
   await apiCall("POST", `/api/projects/${projectKey}/milestones`, {
     name: "线昨日",
-    targetDate: utcYesterday(),
+    targetDate: shanghaiYesterday(),
   });
   await apiCall("POST", `/api/projects/${projectKey}/milestones`, {
     name: "线远期",
