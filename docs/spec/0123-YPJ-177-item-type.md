@@ -124,3 +124,17 @@ item 表单 Type 下拉(动态):
 用户手工测试反馈:不应有 builtin type。拍板:种子=初始化占位(无特权),所有 type 可增删改;在用守卫(有 item 引用 409 先迁移)保留。落地:V58 摘 builtin 列(entity/DTO/守卫/UI Chip·置灰全退);种子删除走在用守卫(空即可删);e2e/集成/api.http 同步修订。typeKey 仍不可变(标识符,item.type 引用它;"改"=改显示名——若要改 key 需同事务迁移 item.type,未在需求内,另议)。
 
 **开放项(另票/另议,不阻塞本票)**:FK 策略反思——用户倾向「约束在应用端而非数据库端硬约束」(FK 带来的清库链/删改摩擦);现状 104 个 FK 是历史主链形态,如何收敛待用户定。
+
+## 七、As-built(2026-11-14)
+
+**落地对照**:spec ①② + 修订一(值语义)+ 修订二(builtin 移除)1:1;偏差无。
+
+- 迁移 V57(建表+四种种子+放 CHECK)+ V58(摘 builtin 列;V57 不可改,追加合规)
+- `business/itemtype` 切片:CRUD 四端点 + slug 校验 + 在用守卫(带计数)+ leaderGuard;ItemService create/update 校验改查项目定义;MetricsService byType +name(缺失回退 key);ProjectService 四种占位;delete 链补 purgeItemTypes
+- web:ItemTypePanel(增/行内改名含 typeKey caption/两段确认删;无 builtin 特权)+ 图标行 Label 按钮;item 表单动态下拉(历史值兜底回显);Flow byType 轴显示名
+- 测试:单测(ItemTypeService 10 案 + ItemService/Project 适配)+ 集成(ItemTypeApiTest 2 例:种子/CRUD/动态建件/在用删/空占位删/metrics 注入)+ e2e(item-type.spec 2 例)
+- 过程账:台账 #15(派生查询 typeKey→type.key 路径炸 context;**compileKotlin/单测不报,集成 context 期才爆**)、#16(删项目漏 purge=产品 bug;排序 fixture 与级联潜伏冲突=**#206 跳过 integrationTest 全量的欠账**;接棒级联测试期望序写反)
+
+**验证**:ktlintFormat/prettier/tsc ✓;api+persistence 全量单元 ✓;**全量 integrationTest ✓(5m15s,含三红修复后)**;用户手工 ✓(含修订二)+ e2e 全量 ✓;api.http 全过。
+
+**遗留**:typeKey 改名(需同事务迁移 item.type)未做,需求未确认;FK 策略收敛为开放项(用户倾向应用端约束,方案另票)。
