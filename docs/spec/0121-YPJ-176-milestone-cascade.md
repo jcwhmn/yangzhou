@@ -63,3 +63,23 @@
 **真值表「侧栏/列表 current 自动切换」行的假设不成立**:侧栏 milestones 仅在 layout mount 时拉取一次(MilestonePage 变更后只刷页内 state),不刷新则持续陈旧——用户 dev 完成 TZM-1(级联启动 TZM-2,查库实锤)后侧栏仍显 TZM-1。此为存量缺口:手动 start/complete 同样滞后,非级联引入;YPJ-74 已为 sprint 段用广播解决同型问题,milestone 段漏了同款。
 
 **补齐**:前端加 `milestones-changed` 广播(YPJ-74 同型;真值表该行修正为「广播补齐后成立」)——MilestonePage 三处变更成功后(submit/transition/remove)dispatch,layout 监听重拉 `loadMilestones`;gate 挂接不影响侧栏显示,不播。e2e 新例「接棒级联 完成后侧栏即时切换」。
+
+## 五、As-built(2026-11-13)
+
+**落地与设计对照**:
+
+- `nextPlannedOf`:file-level `internal` 纯函数,签名/哨兵(LocalDate.MAX)与设计 1:1(MilestoneService.kt 末尾)
+- 级联点:`update()` 在 `milestones.save(...)` 之后,`newStatus == "completed" && m.status == "in_progress"` 才播;同事务原子由 `@Transactional` 保证;single-current 检查不拦截接棒 save(设计预判成立)
+- **偏差一处**:前端非零改动——`milestones-changed` 广播补齐侧栏刷新(§④;存量缺口,非级联引入)
+
+**测试矩阵**:
+
+| 层 | 内容 |
+|---|---|
+| 单测(nextPlannedOf 直测) | 排序/null 垫底/并列取早建/空表,4 案 |
+| 集成(MilestoneApiTest) | spec 案 1–6 全覆盖,含 gate 409 原子性证、cancelled 不级联锁拍板 |
+| e2e(milestone.spec.ts) | 「接棒级联 完成后侧栏即时切换」——页内完成甲 → 侧栏乙接棒、甲行消失,免刷新 |
+
+**验证**:ktlintFormat ✓ / tsc --noEmit ✓ / prettier ✓ / milestone 单测 ✓ / compileIntegrationTestKotlin ✓;用户 dev 实证:完成 TZM-1 → TZM-2 级联启动(查库实锤)+ 侧栏切换复验过。集成全量与 e2e 全量按分工由用户跑,CI(e2e.yml/nightly)兜底。
+
+**过程记录**:台账 #13(测试函数漏 `()` → ktlint parse 红;compileTestKotlin 假绿教训)、#14(侧栏广播缺口根因)。
