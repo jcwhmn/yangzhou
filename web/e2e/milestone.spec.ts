@@ -141,6 +141,38 @@ test("侧栏收敛 双徽标 与段头入口", async ({ page, projectKey }) => {
   ).toHaveCount(0);
 });
 
+test("接棒级联 完成后侧栏即时切换(spec 0121)", async ({ page, projectKey }) => {
+  // 预置:M1 进行中 + M2 规划中;页内完成 M1 → 级联启动 M2,侧栏行应即时切换(广播 milestones-changed,无需刷新)
+  const m1 = (
+    await apiCall<{ milestoneId: string }>(
+      "POST",
+      `/api/projects/${projectKey}/milestones`,
+      { name: "接棒甲", targetDate: "2027-03-01" },
+    )
+  ).milestoneId;
+  await apiCall("PATCH", `/api/projects/${projectKey}/milestones/${m1}`, {
+    status: "in_progress",
+  });
+  await apiCall("POST", `/api/projects/${projectKey}/milestones`, {
+    name: "接棒乙",
+    targetDate: "2027-03-02",
+  });
+
+  await page.goto(`/p/${projectKey}/milestones`);
+  await expect(page.getByText(/▶ 接棒甲/)).toBeVisible();
+
+  const row = page.getByTestId("milestone-row").filter({ hasText: "接棒甲" });
+  await expect(row).toBeVisible();
+  await row.getByRole("button", { name: /完成/ }).click();
+
+  // 页内:甲退场(无动作钮);侧栏:乙接棒,甲行消失
+  await expect(row.getByRole("button", { name: /开始|完成|取消/ })).toHaveCount(
+    0,
+  );
+  await expect(page.getByText(/▶ 接棒乙/)).toBeVisible();
+  await expect(page.getByText(/▶ 接棒甲/)).toHaveCount(0);
+});
+
 test("侧栏空态与段头入口", async ({ page, projectKey }) => {
   await page.goto(`/p/${projectKey}`);
   // 无 in_progress → 段头常驻 + 空态提示

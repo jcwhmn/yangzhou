@@ -269,6 +269,13 @@ export function MilestonePage() {
     setError("");
   };
 
+  // YPJ-176:变更后广播,侧栏即时重拉(sprints-changed 同型;gate 挂接不影响侧栏显示,不播)
+  const notify = () => {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("milestones-changed"));
+    }
+  };
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) return;
@@ -291,6 +298,7 @@ export function MilestonePage() {
         });
       }
       reset();
+      notify();
       load();
     } catch (err) {
       setError(err instanceof Error ? err.message : t.milestone.failed);
@@ -304,6 +312,7 @@ export function MilestonePage() {
         body: JSON.stringify({ status }),
       });
       setError("");
+      notify();
       load();
     } catch (err) {
       setError(err instanceof Error ? err.message : t.milestone.failed);
@@ -320,6 +329,7 @@ export function MilestonePage() {
         method: "DELETE",
       });
       setConfirmingId(null);
+      notify();
       load();
     } catch (err) {
       setError(err instanceof Error ? err.message : t.milestone.failed);
