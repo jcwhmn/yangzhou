@@ -39,14 +39,13 @@ class ItemTypeApiTest : AbstractApiTest() {
         val authed = bootstrapAndAuth()
         createProject(authed, "ITY")
 
-        // 建项目即四种 builtin(spec 0123:白名单平移)
+        // 建项目即四种占位(spec 0123 修订:builtin 概念移除,种子可增删改)
         val seeds = list(authed, "ITY")
         assertEquals(4, seeds.size())
         assertEquals(
             listOf("task", "bug", "story", "goal"),
             seeds.map { it["typeKey"].asText() },
         )
-        assertTrue(seeds.all { it["builtin"].asBoolean() })
 
         // 新增自定义 → 列表 +1;重复 409;坏 slug 400
         assertEquals(201, createItemType(authed, "ITY", mapOf("typeKey" to "feat", "name" to "Feature")).status.value())
@@ -107,12 +106,9 @@ class ItemTypeApiTest : AbstractApiTest() {
             .expectStatus()
             .isOk()
         authed.delete().uri("/api/projects/ITD/item-types/feat").exchange().expectStatus().isNoContent()
-        authed
-            .delete()
-            .uri("/api/projects/ITD/item-types/task")
-            .exchange()
-            .expectStatus()
-            .is4xxClientError()
+
+        // 修订:种子也是占位,空即可删(goal 无引用)
+        authed.delete().uri("/api/projects/ITD/item-types/goal").exchange().expectStatus().isNoContent()
 
         // metrics byType 显示名注入(定义缺失回退 key)
         authed

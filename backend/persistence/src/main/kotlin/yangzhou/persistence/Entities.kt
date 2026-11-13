@@ -490,7 +490,8 @@ data class ItemGroupType(
     var updatedByObjectId: UUID? = null,
 )
 
-/** YPJ-177(spec 0123):item type 项目级运行时定义——镜像 ItemGroupType(无 level/timed,type 非嵌套非时间盒)。 */
+/** YPJ-177(spec 0123):item type 项目级运行时定义——镜像 ItemGroupType(无 level/timed,type 非嵌套非时间盒)。
+ * 修订(spec 0123,2026-11-14):builtin 概念移除,种子只是初始化占位,所有 type 可增删改(V58 摘列)。 */
 @Table("item_type")
 data class ItemType(
     @Id val id: Long? = null,
@@ -498,7 +499,6 @@ data class ItemType(
     val projectObjectId: UUID,
     val typeKey: String,
     val name: String,
-    val builtin: Boolean = false,
     @CreatedDate
     var createdAt: Instant = Instant.now(),
     @LastModifiedDate

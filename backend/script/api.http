@@ -944,8 +944,12 @@ Content-Type: application/json
 DELETE {{host}}/api/projects/{{pkey}}/item-types/feat
 Authorization: Bearer {{token}}
 
-### [预期 409] 删 builtin item type(task 不可删)
+### [预期 409] 删在用 item type(修订:种子无特权;task 在用——item 已迁移回 task)
 DELETE {{host}}/api/projects/{{pkey}}/item-types/task
+Authorization: Bearer {{token}}
+
+### [预期 204] 删空占位 type(goal 无引用;种子=初始化占位皆可删)
+DELETE {{host}}/api/projects/{{pkey}}/item-types/goal
 Authorization: Bearer {{token}}
 
 ### 移出 item 的 Sprint(groupId=null + groupType = 移出,item 回 backlog)

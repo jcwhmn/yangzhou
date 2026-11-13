@@ -491,8 +491,7 @@ export const t = {
     key: "key(slug)",
     nameLabel: "显示名",
     add: "新增",
-    builtin: "内建",
-    hint: "story=主线单元 / task=插入小活 / bug=缺陷 / goal=树根容器(spec 0123);内建不可删,在用须先迁移。",
+    hint: "story=主线单元 / task=插入小活 / bug=缺陷 / goal=树根容器(spec 0123);种子=初始化占位,皆可增删改;在用须先迁移。",
     failed: "操作失败",
   },
   flow: {

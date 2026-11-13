@@ -12,7 +12,8 @@ import yangzhou.persistence.repository.ItemTypeRepository
 import yangzhou.persistence.repository.ProjectRepository
 
 /** YPJ-177(spec 0123):item type 项目级运行时定义——镜像 ItemGroupService 类型 CRUD。
- * 值语义:story=主线单元/task=插入小活/bug=缺陷/goal=树根容器(判据=计划来源,详见 spec ①)。 */
+ * 值语义:story=主线单元/task=插入小活/bug=缺陷/goal=树根容器(判据=计划来源,详见 spec ①)。
+ * 修订(2026-11-14 用户定):builtin 概念移除,种子=初始化占位,所有 type 可增删改;在用守卫保留(数据保护非类型特权)。 */
 @Service
 class ItemTypeService(
     private val projects: ProjectRepository,
@@ -23,7 +24,6 @@ class ItemTypeService(
     data class ItemTypeDto(
         val typeKey: String,
         val name: String,
-        val builtin: Boolean,
     )
 
     data class CreateItemTypeRequest(
@@ -37,7 +37,7 @@ class ItemTypeService(
 
     private fun project(key: String) = projects.findByKey(key) ?: throw NotFoundException("项目不存在:$key")
 
-    private fun ItemType.toDto() = ItemTypeDto(typeKey, name, builtin)
+    private fun ItemType.toDto() = ItemTypeDto(typeKey, name)
 
     fun list(key: String): List<ItemTypeDto> = itemTypes.findByProjectObjectIdOrderByCreatedAt(project(key).objectId!!).map { it.toDto() }
 
@@ -78,7 +78,7 @@ class ItemTypeService(
         return itemTypes.save(t.copy(name = name)).toDto()
     }
 
-    /** 镜像 spec 0114 拍板:builtin 不可删;类型在用(有 item 引用)409 先迁移;空即可删。 */
+    /** 在用守卫(数据保护):类型在用(有 item 引用)409 先迁移;空即可删——含种子(占位无特权)。 */
     @Transactional
     fun delete(
         key: String,
@@ -89,7 +89,6 @@ class ItemTypeService(
         val t =
             itemTypes.findByProjectObjectIdAndTypeKey(pid, typeKey)
                 ?: throw NotFoundException("item 类型不存在:$typeKey")
-        if (t.builtin) throw ConflictException("内建类型不可删除:$typeKey")
         val inUse = items.countByProjectObjectIdAndType(pid, typeKey)
         if (inUse > 0) throw ConflictException("类型下仍有 $inUse 个 item,请先迁移:$typeKey")
         itemTypes.delete(t)

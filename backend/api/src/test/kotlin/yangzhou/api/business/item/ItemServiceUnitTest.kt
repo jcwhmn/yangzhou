@@ -204,7 +204,7 @@ class ItemServiceUnitTest {
         every { itemTypes.findByProjectObjectIdAndTypeKey(any(), any()) } returns null
         listOf("task" to "Task", "bug" to "Bug", "story" to "Story", "goal" to "Goal").forEach { (k, n) ->
             every { itemTypes.findByProjectObjectIdAndTypeKey(projectObjectId, k) } returns
-                yangzhou.persistence.ItemType(projectObjectId = projectObjectId, typeKey = k, name = n, builtin = true)
+                yangzhou.persistence.ItemType(projectObjectId = projectObjectId, typeKey = k, name = n)
         }
 
         every { itemRepo.findByObjectId(itemOid) } answers { row }

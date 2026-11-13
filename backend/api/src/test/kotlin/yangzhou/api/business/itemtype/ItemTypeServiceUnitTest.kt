@@ -36,10 +36,7 @@ class ItemTypeServiceUnitTest {
         every { projects.findByKey("CHE") } returns project
     }
 
-    private fun t(
-        key: String,
-        builtin: Boolean = false,
-    ) = ItemType(id = null, objectId = UUID(0, 2), projectObjectId = pid, typeKey = key, name = key, builtin = builtin)
+    private fun t(key: String) = ItemType(id = null, objectId = UUID(0, 2), projectObjectId = pid, typeKey = key, name = key)
 
     @Nested
     inner class CreateItemType {
@@ -73,7 +70,6 @@ class ItemTypeServiceUnitTest {
             val dto = service.create("CHE", ItemTypeService.CreateItemTypeRequest("feat", " Feature "))
             assertEquals("feat", dto.typeKey)
             assertEquals("Feature", dto.name)
-            assertEquals(false, dto.builtin)
         }
 
         @Test
@@ -104,13 +100,6 @@ class ItemTypeServiceUnitTest {
     @Nested
     inner class DeleteItemType {
         @Test
-        fun builtinRejected() {
-            every { itemTypes.findByProjectObjectIdAndTypeKey(pid, "task") } returns t("task", builtin = true)
-            val e = assertFailsWith<ConflictException> { service.delete("CHE", "task") }
-            assertEquals("内建类型不可删除:task", e.message)
-        }
-
-        @Test
         fun inUseRejected() {
             every { itemTypes.findByProjectObjectIdAndTypeKey(pid, "feat") } returns t("feat")
             every { items.countByProjectObjectIdAndType(pid, "feat") } returns 3
@@ -119,11 +108,12 @@ class ItemTypeServiceUnitTest {
         }
 
         @Test
-        fun emptyDeleted() {
-            val del = t("feat")
-            every { itemTypes.findByProjectObjectIdAndTypeKey(pid, "feat") } returns del
-            every { items.countByProjectObjectIdAndType(pid, "feat") } returns 0
-            service.delete("CHE", "feat")
+        fun emptyDeleted_includingSeedPlaceholder() {
+            // 修订(2026-11-14):builtin 概念移除——种子只是初始化占位,空即可删
+            val del = t("goal")
+            every { itemTypes.findByProjectObjectIdAndTypeKey(pid, "goal") } returns del
+            every { items.countByProjectObjectIdAndType(pid, "goal") } returns 0
+            service.delete("CHE", "goal")
             verify { itemTypes.delete(del) }
         }
     }

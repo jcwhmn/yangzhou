@@ -10,26 +10,20 @@ async function openPanel(page: import("@playwright/test").Page) {
   return panel;
 }
 
-test("种子四种 builtin + 面板增/改名/builtin 删钮置灰", async ({
+test("种子四种占位 + 面板增/改名(修订:无 builtin 概念,皆可删改)", async ({
   page,
   projectKey,
 }) => {
   await page.goto(`/p/${projectKey}`);
   const panel = await openPanel(page);
 
-  // 建项目即四种 builtin(spec 0123 白名单平移):内建 Chip + 删钮 disabled
-  for (const [key, name] of [
-    ["task", "Task"],
-    ["bug", "Bug"],
-    ["story", "Story"],
-    ["goal", "Goal"],
-  ] as const) {
+  // 建项目即四种初始化占位(spec 0123 修订:无 builtin 特权,改名/删除钮对种子可用)
+  for (const name of ["Task", "Bug", "Story", "Goal"]) {
     const row = panel.getByTestId("item-type-row").filter({ hasText: name });
     await expect(row).toBeVisible();
-    await expect(row.getByText("内建")).toBeVisible();
     await expect(
-      row.getByRole("button", { name: `删除 ${key}` }),
-    ).toBeDisabled();
+      row.getByRole("button", { name: "删除" }).first(),
+    ).toBeEnabled();
   }
 
   // 新增自定义 + 改名(两段确认删除不放本例——在用守卫单独例);行定位用 typeKey(两种态下都是稳定文本)

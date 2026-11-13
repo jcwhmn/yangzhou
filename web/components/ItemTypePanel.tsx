@@ -1,12 +1,11 @@
 "use client";
 
-// YPJ-177(spec 0123):项目页图标行弹出的 item 类型管理面板(增/改名/删;builtin 删钮置灰)。
+// YPJ-177(spec 0123 修订):项目页图标行弹出的 item 类型管理面板(增/改名/删;种子=占位,无特权,在用守卫服务端拦)。
 // 壳镜像 GroupTypesPanel;typeKey slug 约束由服务端校验,前端不重做;改 typeKey 不提供(标识符不可变)。
 import {
   Alert,
   Box,
   Button,
-  Chip,
   Dialog,
   DialogContent,
   DialogTitle,
@@ -28,7 +27,6 @@ import { t } from "@/lib/texts";
 type ItemType = {
   typeKey: string;
   name: string;
-  builtin: boolean;
 };
 
 export function ItemTypePanel({
@@ -129,22 +127,19 @@ export function ItemTypePanel({
               disablePadding
               secondaryAction={
                 <Stack direction="row" spacing={0.5}>
-                  {!tp.builtin && (
-                    <IconButton
-                      size="small"
-                      aria-label={`改名 ${tp.typeKey}`}
-                      onClick={() => {
-                        setRenaming(tp.typeKey);
-                        setDraftName(tp.name);
-                      }}
-                    >
-                      <EditOutlinedIcon fontSize="small" />
-                    </IconButton>
-                  )}
+                  <IconButton
+                    size="small"
+                    aria-label={`改名 ${tp.typeKey}`}
+                    onClick={() => {
+                      setRenaming(tp.typeKey);
+                      setDraftName(tp.name);
+                    }}
+                  >
+                    <EditOutlinedIcon fontSize="small" />
+                  </IconButton>
                   <IconButton
                     size="small"
                     aria-label={`删除 ${tp.typeKey}`}
-                    disabled={tp.builtin}
                     color={confirmingKey === tp.typeKey ? "error" : "default"}
                     onClick={() => remove(tp.typeKey)}
                   >
@@ -191,7 +186,6 @@ export function ItemTypePanel({
                   )
                 }
               />
-              {tp.builtin && <Chip size="small" label={t.itemTypes.builtin} />}
             </ListItem>
           ))}
         </List>
