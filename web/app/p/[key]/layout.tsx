@@ -149,9 +149,7 @@ export default function ProjectLayout({
       name: string;
       releaseEnabled: boolean;
       milestoneEnabled: boolean;
-    }>(
-      `/api/projects/${key}`,
-    )
+    }>(`/api/projects/${key}`)
       .then((p) => {
         setProjName(p.name ?? null);
         setFlags({ release: p.releaseEnabled, milestone: p.milestoneEnabled });
