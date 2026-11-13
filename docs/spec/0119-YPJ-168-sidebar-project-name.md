@@ -1,6 +1,7 @@
 # 0119 — 项目空间侧栏顶部显示项目名(YPJ-168)
 
 > 日期:2026-11-13。票面:项目空间不渲染项目名——layout 拉 `/api/projects/{key}` 只取 release/milestone 开关位丢弃 name;侧栏顶部只有 KEY,用户靠 URL 识别项目(YPJ-163 三层手测时提出)。
+> 状态:已完成 · 2026-11-13——YPJ-168 落地(#204 squash = 466c68f),实现与设计一致,As-built 附后。
 
 ## ① 需求
 
@@ -65,3 +66,10 @@
 4. 回归:收藏星标、工作流/成员/组类型/设置/GitHub/导出七个图标功能不受损
 
 **e2e**:`projects.spec` 建项目用例尾部加断言——侧栏顶部 `[data-testid=sidebar-project-name]` 文本 = 所建项目名(轻量,不新开用例,保单跑性)。
+
+## ④ As-built(2026-11-13)
+
+- 落地与 ② 一致,1:1:projName state + loadFlags 存 name(catch 退 null)+ 条染名行(testid=sidebar-project-name);KEY+7 图标行包进内层 Box,零逻辑改动(diff 的 81 行删除多为图标块整体缩进 +2,机械位移)
+- 测试:projects.spec 建项目例尾断言;e2e 全量绿(用户跑);手工验收「侧栏两行 + 长名省略」✓
+- 插曲:首轮 CI「格式检查」红——手工缩进与 prettier 差一处(api 泛型换行),单文件 --write 收编即绿(台账 #11;教训:前端交付前先 npm run format)
+- 偏差:无。api.http/后端:无涉(纯前端展示)
