@@ -72,3 +72,28 @@ test("Sprint 详情 burndown——active sprint 出现剩余/理想线图例", a
   await expect(page.getByText("剩余")).toBeVisible();
   await expect(page.getByText("理想线")).toBeVisible();
 });
+
+test("byType 图:双 type 计数入图(YPJ-178/spec 0122)", async ({
+  page,
+  projectKey,
+}) => {
+  // 预置 bug+task 各一(type 入参建 item;workload byType 已在后端,本例拦前端渲染)
+  await apiCall("POST", `/api/projects/${projectKey}/items`, {
+    title: "TY bug item",
+    type: "bug",
+  });
+  await apiCall("POST", `/api/projects/${projectKey}/items`, {
+    title: "TY task item",
+    type: "task",
+  });
+
+  await page.goto(`/p/${projectKey}/flow`);
+  const card = page
+    .locator(".MuiCard-root")
+    .filter({ hasText: "按 Type(数量)" });
+  await expect(card).toBeVisible();
+  // 数据真入图:卡内 x 轴出现 type 名 + 图 svg(标题断言拦不住 400/空数据,与首例同口径)
+  await expect(card.getByText("bug")).toBeVisible();
+  await expect(card.getByText("task")).toBeVisible();
+  await expect(card.locator("svg")).toBeVisible();
+});
