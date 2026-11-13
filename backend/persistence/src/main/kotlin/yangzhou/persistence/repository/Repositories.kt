@@ -21,6 +21,7 @@ import yangzhou.persistence.ItemGroupMember
 import yangzhou.persistence.ItemGroupMemberHistory
 import yangzhou.persistence.ItemGroupType
 import yangzhou.persistence.ItemStatusHistory
+import yangzhou.persistence.ItemType
 import yangzhou.persistence.Member
 import yangzhou.persistence.Milestone
 import yangzhou.persistence.MilestoneItem
@@ -226,6 +227,27 @@ interface ItemRepository : CrudRepository<Item, Long> {
     fun existsByParentObjectId(parentObjectId: UUID): Boolean
 
     fun findByObjectIdIn(objectIds: Collection<UUID>): List<Item>
+
+    /** YPJ-177(spec 0123):item type 删除守卫——类型在用计数。注意方法名用实体真实属性 type(非 typeKey,派生查询按属性路径解析)。 */
+    fun countByProjectObjectIdAndType(
+        projectObjectId: UUID,
+        type: String,
+    ): Long
+}
+
+/** YPJ-177(spec 0123):item type 项目级运行时定义——镜像 ItemGroupTypeRepository 用法。 */
+interface ItemTypeRepository : CrudRepository<ItemType, Long> {
+    fun findByProjectObjectIdOrderByCreatedAt(projectObjectId: UUID): List<ItemType>
+
+    fun findByProjectObjectIdAndTypeKey(
+        projectObjectId: UUID,
+        typeKey: String,
+    ): ItemType?
+
+    fun existsByProjectObjectIdAndTypeKey(
+        projectObjectId: UUID,
+        typeKey: String,
+    ): Boolean
 }
 
 interface ProjectRepoRepository : CrudRepository<ProjectRepo, Long> {
@@ -674,6 +696,11 @@ interface ProjectDeletionRepository : Repository<Project, Long> {
     @Modifying
     @Query("DELETE FROM item_group_type WHERE project_object_id = :pid")
     fun purgeItemGroupTypes(pid: UUID): Int
+
+    /** YPJ-177(spec 0123):item_type 随项目清(FK 到 project,不清会挡 deleteProject)。 */
+    @Modifying
+    @Query("DELETE FROM item_type WHERE project_object_id = :pid")
+    fun purgeItemTypes(pid: UUID): Int
 
     @Modifying
     @Query("DELETE FROM milestone WHERE project_object_id = :pid")

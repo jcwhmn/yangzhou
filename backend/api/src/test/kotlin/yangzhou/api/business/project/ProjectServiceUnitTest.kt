@@ -37,6 +37,7 @@ class ProjectServiceUnitTest {
     private val members = mockk<MemberService>(relaxed = true)
     private val projectMembers = mockk<ProjectMemberRepository>(relaxed = true)
     private val groupTypes = mockk<ItemGroupTypeRepository>(relaxed = true)
+    private val itemTypes = mockk<yangzhou.persistence.repository.ItemTypeRepository>(relaxed = true)
     private val groupWorkflow = mockk<yangzhou.api.business.itemgroup.GroupWorkflowService>(relaxed = true)
     private val leaderGuard = mockk<yangzhou.api.guard.LeaderGuard>(relaxed = true)
     private val service =
@@ -51,6 +52,7 @@ class ProjectServiceUnitTest {
             members,
             projectMembers,
             groupTypes,
+            itemTypes,
             groupWorkflow,
         )
 
@@ -61,10 +63,11 @@ class ProjectServiceUnitTest {
 
     @BeforeEach
     fun setup() {
-        clearMocks(projects, statuses, workflowRules, items, workspaceService, deletions, members, projectMembers, groupTypes)
+        clearMocks(projects, statuses, workflowRules, items, workspaceService, deletions, members, projectMembers, groupTypes, itemTypes)
         every { workspaceService.required() } returns Workspace(id = 1L, objectId = wsId)
         every { members.current() } returns me
         every { projects.findByKey("CHE") } returns che
+        every { itemTypes.save(any<yangzhou.persistence.ItemType>()) } answers { firstArg() }
     }
 
     @Nested
@@ -90,6 +93,7 @@ class ProjectServiceUnitTest {
             assertEquals("CHE", saved.key)
             verify(exactly = 5) { statuses.save(any()) } // V7 五列
             verify(exactly = 1) { groupTypes.save(any()) } // spec 0100 切片B:只种 release(sprint 不再种子)
+            verify(exactly = 4) { itemTypes.save(any()) } // YPJ-177:item type 四值全种 builtin
             verify { projectMembers.save(any()) } // 0047 创建者入池
         }
     }

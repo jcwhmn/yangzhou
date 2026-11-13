@@ -43,6 +43,7 @@ import {
   StarBorder as StarBorderIcon,
   Settings as SettingsIcon,
   Tune as TuneIcon,
+  Label as LabelIcon,
 } from "@mui/icons-material";
 import type { Signal } from "@/components/Verdict";
 import { WorkflowEditor } from "@/components/WorkflowEditor";
@@ -50,6 +51,7 @@ import { ProjectMembersPanel } from "@/components/ProjectMembersPanel";
 import { GithubSettingsPanel } from "@/components/GithubSettingsPanel";
 import { ProjectSettingsPanel } from "@/components/ProjectSettingsPanel";
 import { GroupTypesPanel } from "@/components/GroupTypesPanel";
+import { ItemTypePanel } from "@/components/ItemTypePanel";
 import { DateInput } from "@/components/DateInput";
 
 type Sprint = { sprintId: string; name: string; status: string };
@@ -97,6 +99,8 @@ export default function ProjectLayout({
   const [ghOpen, setGhOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [gtypeOpen, setGtypeOpen] = useState(false);
+  // YPJ-177(spec 0123):item 类型管理面板;变更后重拉 flags(面板自身不影响 flags,但保持壳一致性)
+  const [itypeOpen, setItypeOpen] = useState(false);
   // YPJ-151:release/milestone 启停(null=加载中按 true 渲染防闪;失败 fail-open)
   const [flags, setFlags] = useState<{
     release: boolean;
@@ -393,6 +397,13 @@ export default function ProjectLayout({
               onClick={() => setGtypeOpen(true)}
             >
               <CategoryIcon fontSize="small" />
+            </IconButton>
+            <IconButton
+              size="small"
+              aria-label={t.itemTypes.title}
+              onClick={() => setItypeOpen(true)}
+            >
+              <LabelIcon fontSize="small" />
             </IconButton>
             <IconButton
               size="small"
@@ -744,6 +755,11 @@ export default function ProjectLayout({
           setGtypeOpen(false);
           loadSprints(); // YPJ-150:类型管理可能新建 level-1 → 重判 Sprint 段显隐
         }}
+      />
+      <ItemTypePanel
+        projectKey={String(key)}
+        open={itypeOpen}
+        onClose={() => setItypeOpen(false)}
       />
     </Box>
   );

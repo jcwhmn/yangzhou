@@ -38,7 +38,7 @@ type Workload = {
     count: number;
   }[];
   byAssignee: AssigneeCount[];
-  byType: { type: string; count: number }[];
+  byType: { type: string; name: string; count: number }[];
 };
 type Throughput = { buckets: { start: string; completed: number }[] };
 type FlowTimes = {
@@ -217,7 +217,8 @@ export default function FlowPage() {
       xAxis: [
         {
           scaleType: "band" as const,
-          data: (data.workload?.byType ?? []).map((x) => x.type),
+          // YPJ-177:定义显示名(定义缺失回退 type_key,与后端 name 字段同口径)
+          data: (data.workload?.byType ?? []).map((x) => x.name || x.type),
         },
       ],
       series: [

@@ -892,6 +892,66 @@ Authorization: Bearer {{token}}
 DELETE {{host}}/api/projects/{{pkey}}/milestones/{{milestoneId}}
 Authorization: Bearer {{token}}
 
+### item-types 清单(YPJ-177;建项目即四种 builtin)
+GET {{host}}/api/projects/{{pkey}}/item-types
+Authorization: Bearer {{token}}
+
+### 建 item type(slug 约束 [a-z][a-z0-9-]{1,19};重复 409)
+POST {{host}}/api/projects/{{pkey}}/item-types
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "typeKey": "feat",
+  "name": "Feature"
+}
+
+### 改 item type 名(仅 name;typeKey 不可变)
+PATCH {{host}}/api/projects/{{pkey}}/item-types/feat
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "特性"
+}
+
+### 动态 type 建 item(用刚建的 feat;存 itemFeatId)
+POST {{host}}/api/projects/{{pkey}}/items
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "动态类型件",
+  "type": "feat"
+}
+
+> {% client.global.set("itemFeatId", response.body.itemId); %}
+
+### [预期 409] 删在用 item type(有 item 引用须先迁移)
+DELETE {{host}}/api/projects/{{pkey}}/item-types/feat
+Authorization: Bearer {{token}}
+
+### 迁移后删 item type(把 feat 件改回 task)
+PATCH {{host}}/api/items/{{itemFeatId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "type": "task"
+}
+
+###
+DELETE {{host}}/api/projects/{{pkey}}/item-types/feat
+Authorization: Bearer {{token}}
+
+### [预期 409] 删在用 item type(修订:种子无特权;task 在用——item 已迁移回 task)
+DELETE {{host}}/api/projects/{{pkey}}/item-types/task
+Authorization: Bearer {{token}}
+
+### [预期 204] 删空占位 type(goal 无引用;种子=初始化占位皆可删)
+DELETE {{host}}/api/projects/{{pkey}}/item-types/goal
+Authorization: Bearer {{token}}
+
 ### 移出 item 的 Sprint(groupId=null + groupType = 移出,item 回 backlog)
 PUT {{host}}/api/items/{{itemId}}/group-membership
 Authorization: Bearer {{token}}

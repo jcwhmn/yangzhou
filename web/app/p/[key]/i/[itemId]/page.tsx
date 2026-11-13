@@ -28,7 +28,7 @@ import Link from "next/link";
 
 import { useParams, useRouter } from "next/navigation";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { api } from "@/lib/api";
 
@@ -53,6 +53,13 @@ type Status = {
   name: string;
   statusType: string;
   position: number;
+};
+
+/** YPJ-177(spec 0123):item type 定义(动态下拉)。 */
+type ItemTypeLite = {
+  typeKey: string;
+  name: string;
+  builtin: boolean;
 };
 
 type Item = {
@@ -337,6 +344,8 @@ export default function ItemDetailPage() {
 
   const [type, setType] = useState("task");
 
+  const [typeOptions, setTypeOptions] = useState<ItemTypeLite[]>([]);
+
   const [sprints, setSprints] = useState<SprintLite[]>([]);
 
   const [releases, setReleases] = useState<ReleaseLite[]>([]);
@@ -410,8 +419,8 @@ export default function ItemDetailPage() {
   const load = useCallback(async () => {
     if (!itemId) return;
 
-    const [it, project, attrs, feas, acts, spr, rel, msLit] = await Promise.all(
-      [
+    const [it, project, attrs, feas, acts, spr, rel, msLit, tps] =
+      await Promise.all([
         api<Item>(`/api/items/${itemId}`),
 
         api<{ statuses: Status[] }>(`/api/projects/${key}`),
@@ -441,12 +450,17 @@ export default function ItemDetailPage() {
         api<MilestoneLite[]>(`/api/projects/${key}/milestones`).catch(
           () => [] as MilestoneLite[],
         ),
-      ],
-    );
+
+        api<ItemTypeLite[]>(`/api/projects/${key}/item-types`).catch(
+          () => [] as ItemTypeLite[],
+        ),
+      ]);
 
     setReleases(rel);
 
     setMilestones(msLit);
+
+    setTypeOptions(tps);
 
     setItem(it);
     setTitle(it.title);
@@ -1163,10 +1177,18 @@ export default function ItemDetailPage() {
 
               sx={{ width: 200 }}
 
-              options={["task", "bug", "goal", "story"].map((tp) => ({
-                value: tp,
-                label: tp,
-              }))}
+              options={
+                // YPJ-177:动态定义(name 显示);历史值不在定义内时兜底回显
+                [
+                  ...typeOptions.map((tp) => ({
+                    value: tp.typeKey,
+                    label: tp.name,
+                  })),
+                  ...(type && !typeOptions.some((tp) => tp.typeKey === type)
+                    ? [{ value: type, label: type }]
+                    : []),
+                ]
+              }
             />
 
             <Stack direction="row" spacing={1} alignItems="center">

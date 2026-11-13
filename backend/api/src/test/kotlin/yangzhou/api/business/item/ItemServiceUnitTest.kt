@@ -88,6 +88,8 @@ class ItemServiceUnitTest {
     private val memberships = mockk<ItemGroupMemberRepository>(relaxed = true)
     private val groupTypes = mockk<yangzhou.persistence.repository.ItemGroupTypeRepository>(relaxed = true)
 
+    private val itemTypes = mockk<yangzhou.persistence.repository.ItemTypeRepository>(relaxed = true)
+
     private val allMocks =
         arrayOf(
             projects,
@@ -118,6 +120,7 @@ class ItemServiceUnitTest {
             itemAttributes = itemAttributes,
             numbering = numbering,
             itemTree = itemTree,
+            itemTypes = itemTypes,
             workflow = workflow,
             members = membersRepo,
             memberService = memberService,
@@ -195,6 +198,13 @@ class ItemServiceUnitTest {
             row = arg.copy(id = row.id ?: 999, objectId = row.objectId) // 保留行身份:objectId/id 由「库」持有,不随 save 实参变
 
             row
+        }
+
+        // YPJ-177(spec 0123):type 校验改查项目级定义——先全 null 兜底(relaxed 对可空返回也给实例,须显式),再种白名单四值
+        every { itemTypes.findByProjectObjectIdAndTypeKey(any(), any()) } returns null
+        listOf("task" to "Task", "bug" to "Bug", "story" to "Story", "goal" to "Goal").forEach { (k, n) ->
+            every { itemTypes.findByProjectObjectIdAndTypeKey(projectObjectId, k) } returns
+                yangzhou.persistence.ItemType(projectObjectId = projectObjectId, typeKey = k, name = n)
         }
 
         every { itemRepo.findByObjectId(itemOid) } answers { row }

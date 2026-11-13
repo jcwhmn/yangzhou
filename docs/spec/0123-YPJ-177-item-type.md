@@ -15,9 +15,20 @@
 
 **非目标**:type 维度工作流(type 不带 workflow,是纯标签——拍板见下)、按 type 的权限差异、历史 type 值改写工具(改 type 走 item update 即可)。
 
-**语义拍板点**(开工前需用户确认,附推荐):
+**值语义定义**(2026-11-14 用户定稿;判据=**计划来源**,大小不进判据):
 
-1. **初始种子**:推荐 4 个白名单值全种 builtin(task/bug/goal/story)——白名单平移,存量零孤儿;镜像 V35「sprint 全种」
+| type_key | 语义 | 判别一句话 | prod 范例 |
+|---|---|---|---|
+| **story** | 主线单元——立票时就在计划里(sprint/milestone/路线图) | 「立票时它在计划里吗?」 | YPJ-62/63/64(根件无子树);YPJ-105 的 8 子件 |
+| **task** | 插入小活——干着干着冒出来的顺手修/清理/小改进 | 「是冒出来的吗?」 | YPJ-108 空行清理、59 库清理、152 数据清理、37 分支命名 |
+| **bug** | 缺陷——修复性问题,横切任何层 | 「是缺陷吗?」 | YPJ-10/128 并发死锁、123 显示修复 |
+| **goal** | 树根容器——要拆子树的大件(词汇表 Epic 载体) | 「要看子树才算完吗?」 | YPJ-105(挂 8 子件) |
+
+阶梯:goal(容器)> story(单元)> task(小步);bug 横切。不违背词汇表「避免 Epic/Story 类型化分层」——禁止的是实体/硬层,这里只是同质树(ADR-0002)上的 type 值。历史 task 不批量清洗(主线统计走 milestone),从今往后立票选对。
+
+**语义拍板点**(2026-11-14 已定,开工前确认过):
+
+1. **初始种子**:~~4 个白名单值全种 builtin~~ → **修订(2026-11-14 用户手工测试反馈):builtin 概念整体移除**——种子只是初始化占位,所有 type 可增删改;在用守卫保留(数据保护非类型特权)。V58 摘列,V57 不可改已按迁移纪律追加
 2. **type_key 约束**:推荐 slug(小写字母/数字/`-`,≤20,唯一 per 项目)——标识符不进 UI 文案,name 承载中文显示(镜像 group typeKey)
 3. **type 无工作流**:推荐维持纯标签(与 status 解耦)——type 是分类不是状态机,加工作流=新域语义,另票再议
 4. **删除语义**:推荐镜像 spec 0114——builtin 不可删 409;自定义**非空**(有 item 引用)409「N 个 item 在用,先迁移」;空即可删。不做级联改 type(不可逆数据变更)
@@ -107,3 +118,23 @@ item 表单 Type 下拉(动态):
 4. 删 task(builtin):按钮置灰 + API 409
 5. 改名 Feature→特性:下拉/Flow 图即时新名
 6. 回归:存量 item 的 type 显示正常;metrics/dashboard/Excel 导出 type 列不受影响
+
+## ⑥ 修订二(2026-11-14,builtin 概念移除)
+
+用户手工测试反馈:不应有 builtin type。拍板:种子=初始化占位(无特权),所有 type 可增删改;在用守卫(有 item 引用 409 先迁移)保留。落地:V58 摘 builtin 列(entity/DTO/守卫/UI Chip·置灰全退);种子删除走在用守卫(空即可删);e2e/集成/api.http 同步修订。typeKey 仍不可变(标识符,item.type 引用它;"改"=改显示名——若要改 key 需同事务迁移 item.type,未在需求内,另议)。
+
+**开放项(另票/另议,不阻塞本票)**:FK 策略反思——用户倾向「约束在应用端而非数据库端硬约束」(FK 带来的清库链/删改摩擦);现状 104 个 FK 是历史主链形态,如何收敛待用户定。
+
+## 七、As-built(2026-11-14)
+
+**落地对照**:spec ①② + 修订一(值语义)+ 修订二(builtin 移除)1:1;偏差无。
+
+- 迁移 V57(建表+四种种子+放 CHECK)+ V58(摘 builtin 列;V57 不可改,追加合规)
+- `business/itemtype` 切片:CRUD 四端点 + slug 校验 + 在用守卫(带计数)+ leaderGuard;ItemService create/update 校验改查项目定义;MetricsService byType +name(缺失回退 key);ProjectService 四种占位;delete 链补 purgeItemTypes
+- web:ItemTypePanel(增/行内改名含 typeKey caption/两段确认删;无 builtin 特权)+ 图标行 Label 按钮;item 表单动态下拉(历史值兜底回显);Flow byType 轴显示名
+- 测试:单测(ItemTypeService 10 案 + ItemService/Project 适配)+ 集成(ItemTypeApiTest 2 例:种子/CRUD/动态建件/在用删/空占位删/metrics 注入)+ e2e(item-type.spec 2 例)
+- 过程账:台账 #15(派生查询 typeKey→type.key 路径炸 context;**compileKotlin/单测不报,集成 context 期才爆**)、#16(删项目漏 purge=产品 bug;排序 fixture 与级联潜伏冲突=**#206 跳过 integrationTest 全量的欠账**;接棒级联测试期望序写反)
+
+**验证**:ktlintFormat/prettier/tsc ✓;api+persistence 全量单元 ✓;**全量 integrationTest ✓(5m15s,含三红修复后)**;用户手工 ✓(含修订二)+ e2e 全量 ✓;api.http 全过。
+
+**遗留**:typeKey 改名(需同事务迁移 item.type)未做,需求未确认;FK 策略收敛为开放项(用户倾向应用端约束,方案另票)。

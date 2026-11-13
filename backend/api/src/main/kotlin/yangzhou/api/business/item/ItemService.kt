@@ -21,6 +21,7 @@ import yangzhou.persistence.repository.ItemGroupTypeRepository
 import yangzhou.persistence.repository.ItemNumberRepository
 import yangzhou.persistence.repository.ItemRepository
 import yangzhou.persistence.repository.ItemTreeRepository
+import yangzhou.persistence.repository.ItemTypeRepository
 import yangzhou.persistence.repository.MilestoneItemRepository
 import yangzhou.persistence.repository.ProjectRepository
 import yangzhou.persistence.repository.RequirementRepository
@@ -41,6 +42,7 @@ class ItemService(
     private val definitions: AttributeDefinitionRepository,
     private val numbering: ItemNumberRepository,
     private val itemTree: ItemTreeRepository,
+    private val itemTypes: ItemTypeRepository,
     private val workflow: yangzhou.api.business.workflow.WorkflowService,
     private val members: yangzhou.persistence.repository.MemberRepository,
     private val memberService: yangzhou.api.business.member.MemberService,
@@ -122,7 +124,10 @@ class ItemService(
         sprintId: UUID? = null,
     ): ItemDto {
         val project = projects.findByKey(projectKey) ?: throw NotFoundException("项目不存在:$projectKey")
-        if (type !in setOf("task", "bug", "goal", "story")) throw BadRequestException("type 非法:$type")
+        // YPJ-177(spec 0123):type 校验改查项目级定义(白名单退役,CK 已放开)
+        if (itemTypes.findByProjectObjectIdAndTypeKey(project.objectId!!, type) == null) {
+            throw BadRequestException("type 非法:$type")
+        }
         val projectObjectId = project.objectId!!
 
         // YPJ-128:nextNumber 的 UPDATE project 即本事务第一把锁——锁序统一 project→item(spec 0096)
@@ -321,7 +326,10 @@ class ItemService(
         }
 
         if (type != null && type != current.type) {
-            if (type !in setOf("task", "bug", "goal", "story")) throw BadRequestException("type 非法:$type")
+            // YPJ-177(spec 0123):同值跳过不变;异值查项目级定义
+            if (itemTypes.findByProjectObjectIdAndTypeKey(current.projectObjectId, type) == null) {
+                throw BadRequestException("type 非法:$type")
+            }
             current = itemRepo.save(current.copy(type = type))
         }
         if (title != null && title != current.title) {
