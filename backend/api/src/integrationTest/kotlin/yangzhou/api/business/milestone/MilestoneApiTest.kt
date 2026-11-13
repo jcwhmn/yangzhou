@@ -162,12 +162,13 @@ class MilestoneApiTest : AbstractApiTest() {
         val authed = bootstrapAndAuth()
         createProject(authed, "SORT")
         val done = createMilestone(authed, "SORT", mapOf("name" to "已完", "targetDate" to "2026-01-01"))["milestoneId"].asText()
+        // 先走完终态再建其余:YPJ-176 级联会自动启动排序第一的 planned,fixture 若先建后完成会挤占 single-current
+        patch(authed, "SORT", done, mapOf("status" to "in_progress")).status.value()
+        assertEquals(200, patch(authed, "SORT", done, mapOf("status" to "completed")).status.value())
         val futureFar = createMilestone(authed, "SORT", mapOf("name" to "远期", "targetDate" to "2027-06-01"))["milestoneId"].asText()
         val futureNear = createMilestone(authed, "SORT", mapOf("name" to "近期", "targetDate" to "2026-06-01"))["milestoneId"].asText()
         val noDate = createMilestone(authed, "SORT", mapOf("name" to "无日期"))["milestoneId"].asText()
 
-        patch(authed, "SORT", done, mapOf("status" to "in_progress")).status.value()
-        assertEquals(200, patch(authed, "SORT", done, mapOf("status" to "completed")).status.value())
         val started = createMilestone(authed, "SORT", mapOf("name" to "进行中"))["milestoneId"].asText()
         assertEquals(200, patch(authed, "SORT", started, mapOf("status" to "in_progress")).status.value())
 
@@ -433,26 +434,27 @@ class MilestoneApiTest : AbstractApiTest() {
         assertEquals("in_progress", rows.first { it["name"].asText() == "M2" }["status"].asText())
         assertEquals("planned", rows.first { it["name"].asText() == "M3" }["status"].asText())
 
-        // 依次完成 → 派生排序逐个接棒;null targetDate 垫底
+        // 依次完成 → 派生排序逐个接棒:null targetDate 垫底(完成 M3 后 planned={M4(null),M5,M6} → 启动 M5 非 M4)
         assertEquals(200, patch(authed, "CSC", m2, mapOf("status" to "completed")).status.value())
         rows = list(authed, "CSC")
         assertEquals("in_progress", rows.first { it["name"].asText() == "M3" }["status"].asText())
         assertEquals("planned", rows.first { it["name"].asText() == "M4" }["status"].asText())
         assertEquals(200, patch(authed, "CSC", m3, mapOf("status" to "completed")).status.value())
         rows = list(authed, "CSC")
-        assertEquals("in_progress", rows.first { it["name"].asText() == "M4" }["status"].asText())
-
-        // 同 targetDate 并列 → 先建者(M5)接棒
-        assertEquals(200, patch(authed, "CSC", m4, mapOf("status" to "completed")).status.value())
-        rows = list(authed, "CSC")
+        // 同 targetDate 并列 → 先建者(M5)接棒;null 垫底(M4 仍 planned)
         assertEquals("in_progress", rows.first { it["name"].asText() == "M5" }["status"].asText())
         assertEquals("planned", rows.first { it["name"].asText() == "M6" }["status"].asText())
+        assertEquals("planned", rows.first { it["name"].asText() == "M4" }["status"].asText())
 
-        // 完成最后一个 → 无 planned,静默成功无 current
         assertEquals(200, patch(authed, "CSC", m5, mapOf("status" to "completed")).status.value())
         rows = list(authed, "CSC")
         assertEquals("in_progress", rows.first { it["name"].asText() == "M6" }["status"].asText())
+
+        // null 垫底最后被启动;完成后无 planned,静默成功无 current
         assertEquals(200, patch(authed, "CSC", m6, mapOf("status" to "completed")).status.value())
+        rows = list(authed, "CSC")
+        assertEquals("in_progress", rows.first { it["name"].asText() == "M4" }["status"].asText())
+        assertEquals(200, patch(authed, "CSC", m4, mapOf("status" to "completed")).status.value())
         rows = list(authed, "CSC")
         assertTrue(rows.none { it["status"].asText() == "in_progress" })
     }

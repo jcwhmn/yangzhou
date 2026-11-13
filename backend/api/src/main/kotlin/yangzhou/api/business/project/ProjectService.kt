@@ -157,6 +157,7 @@ class ProjectService(
         // 先于 milestone:release/sprint 同表,item_group.milestone_id restrict
         deletions.purgeItemGroups(pid)
         deletions.purgeItemGroupTypes(pid)
+        deletions.purgeItemTypes(pid) // YPJ-177:item_type 随项目清(不清则 FK 违例 409)
         deletions.purgeMilestones(pid)
         deletions.purgeStatuses(pid) // transition/workflow_rule 级联
         deletions.purgeProjectViews(pid)

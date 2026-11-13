@@ -228,10 +228,10 @@ interface ItemRepository : CrudRepository<Item, Long> {
 
     fun findByObjectIdIn(objectIds: Collection<UUID>): List<Item>
 
-    /** YPJ-177(spec 0123):item type 删除守卫——类型在用计数。 */
-    fun countByProjectObjectIdAndTypeKey(
+    /** YPJ-177(spec 0123):item type 删除守卫——类型在用计数。注意方法名用实体真实属性 type(非 typeKey,派生查询按属性路径解析)。 */
+    fun countByProjectObjectIdAndType(
         projectObjectId: UUID,
-        typeKey: String,
+        type: String,
     ): Long
 }
 
@@ -696,6 +696,11 @@ interface ProjectDeletionRepository : Repository<Project, Long> {
     @Modifying
     @Query("DELETE FROM item_group_type WHERE project_object_id = :pid")
     fun purgeItemGroupTypes(pid: UUID): Int
+
+    /** YPJ-177(spec 0123):item_type 随项目清(FK 到 project,不清会挡 deleteProject)。 */
+    @Modifying
+    @Query("DELETE FROM item_type WHERE project_object_id = :pid")
+    fun purgeItemTypes(pid: UUID): Int
 
     @Modifying
     @Query("DELETE FROM milestone WHERE project_object_id = :pid")
