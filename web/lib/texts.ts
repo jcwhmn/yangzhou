@@ -488,6 +488,8 @@ export const t = {
   },
   flow: {
     wip: "WIP(按负责人、状态堆叠)",
+    byType: "按 Type(数量)",
+    typeCount: "数量",
     throughput: "吞吐(每日完成)",
     scatter: "Cycle / Lead 散点",
     cfd: "累积流(CFD)",

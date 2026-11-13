@@ -38,6 +38,7 @@ type Workload = {
     count: number;
   }[];
   byAssignee: AssigneeCount[];
+  byType: { type: string; count: number }[];
 };
 type Throughput = { buckets: { start: string; completed: number }[] };
 type FlowTimes = {
@@ -211,6 +212,24 @@ export default function FlowPage() {
     };
   }, [data.workload]);
 
+  const typeSeries = useMemo(
+    () => ({
+      xAxis: [
+        {
+          scaleType: "band" as const,
+          data: (data.workload?.byType ?? []).map((x) => x.type),
+        },
+      ],
+      series: [
+        {
+          label: t.flow.typeCount,
+          data: (data.workload?.byType ?? []).map((x) => x.count),
+        },
+      ],
+    }),
+    [data.workload],
+  );
+
   const scatterData = useMemo(() => {
     const items = data.flowTimes?.items ?? [];
     const pt = (cycle: boolean) =>
@@ -284,6 +303,13 @@ export default function FlowPage() {
           <Empty text={t.flow.empty} />
         ) : (
           <BarChart height={280} {...wipSeries} />
+        )}
+      </Card2>
+      <Card2 title={t.flow.byType}>
+        {(data.workload?.byType ?? []).length === 0 ? (
+          <Empty text={t.flow.empty} />
+        ) : (
+          <BarChart height={280} {...typeSeries} />
         )}
       </Card2>
       <Card2 title={t.flow.throughput}>

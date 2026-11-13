@@ -58,3 +58,10 @@
 1. 项目建 ≥3 种 type 的 item(task/bug/story 各若干)→ Flow 页:出现「按 Type」卡,柱数=type 数,高度=计数;与 WIP 卡同宽列
 2. 只有一种 type:单柱;新建空项目(0 item):显示空态文案,无图
 3. type 动态化联动预演:改 item type 后刷新 Flow,计数随迁
+
+## 四、As-built(2026-11-14)
+
+- 落地与设计 1:1:`Workload.byType` 类型补齐、`typeSeries` useMemo、WIP 卡后追加「按 Type(数量)」Card2(空态 Empty / BarChart 280);texts 两键;否决项维持(饼图/新端点未做)
+- e2e 新例一役一修:首跑 strict mode 红于 svg 断言(卡内天然双 svg=图例标记+图层,报错内容即证明图已渲染)——取 `.first()` 并注释缘由;非产品 bug
+- 验证:prettier ✓ / tsc ✓;**用户全量 e2e + 手工 3 例全过**(dev 3001)
+- 过程无台账条目(唯一红为例内断言修正,见上)
