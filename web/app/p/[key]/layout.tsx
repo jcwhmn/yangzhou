@@ -102,6 +102,8 @@ export default function ProjectLayout({
     release: boolean;
     milestone: boolean;
   } | null>(null);
+  // YPJ-168(spec 0119):项目名(null=未加载/失败,不渲染名行防闪)
+  const [projName, setProjName] = useState<string | null>(null);
   const [fav, setFav] = useState<boolean | null>(null);
 
   const loadSprints = () => {
@@ -143,13 +145,19 @@ export default function ProjectLayout({
   };
 
   const loadFlags = () => {
-    api<{ releaseEnabled: boolean; milestoneEnabled: boolean }>(
-      `/api/projects/${key}`,
-    )
-      .then((p) =>
-        setFlags({ release: p.releaseEnabled, milestone: p.milestoneEnabled }),
-      )
-      .catch(() => setFlags({ release: true, milestone: true }));
+    api<{
+      name: string;
+      releaseEnabled: boolean;
+      milestoneEnabled: boolean;
+    }>(`/api/projects/${key}`)
+      .then((p) => {
+        setProjName(p.name ?? null);
+        setFlags({ release: p.releaseEnabled, milestone: p.milestoneEnabled });
+      })
+      .catch(() => {
+        setProjName(null);
+        setFlags({ release: true, milestone: true });
+      });
   };
 
   const loadSide = () => {
@@ -311,82 +319,90 @@ export default function ProjectLayout({
         component="nav"
         sx={{ width: 210, flexShrink: 0, bgcolor: "grey.50" }}
       >
-        <Box
-          sx={{
-            px: 1.5,
-            pt: 1.5,
-            pb: 0.5,
-            display: "flex",
-            alignItems: "center",
-            gap: 0.25,
-          }}
-        >
-          <Typography
-            variant="subtitle2"
-            sx={{
-              fontWeight: 700,
-              flex: 1,
-              minWidth: 0,
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-          >
-            {String(key).toUpperCase()}
-          </Typography>
-          <IconButton
-            size="small"
-            aria-label="favorite"
-            disabled={fav === null}
-            onClick={toggleFav}
-          >
-            {fav ? (
-              <StarIcon fontSize="small" />
-            ) : (
-              <StarBorderIcon fontSize="small" />
-            )}
-          </IconButton>
-          <IconButton
-            size="small"
-            aria-label={t.wf.button}
-            onClick={() => setWfOpen(true)}
-          >
-            <TuneIcon fontSize="small" />
-          </IconButton>
-          <IconButton
-            size="small"
-            aria-label={t.membersPanel.button}
-            onClick={() => setMembersOpen(true)}
-          >
-            <GroupIcon fontSize="small" />
-          </IconButton>
-          <IconButton
-            size="small"
-            aria-label={t.groupTypes.title}
-            onClick={() => setGtypeOpen(true)}
-          >
-            <CategoryIcon fontSize="small" />
-          </IconButton>
-          <IconButton
-            size="small"
-            aria-label={t.settings.title}
-            onClick={() => setSettingsOpen(true)}
-          >
-            <SettingsIcon fontSize="small" />
-          </IconButton>
-          <IconButton
-            size="small"
-            aria-label={t.gh.button}
-            onClick={() => setGhOpen(true)}
-          >
-            <GitHubIcon fontSize="small" />
-          </IconButton>
-          <IconButton
-            size="small"
-            aria-label="导出"
-            onClick={() => exportXlsx(String(key))}
-          >
-            <DownloadIcon fontSize="small" />
-          </IconButton>
+        <Box sx={{ px: 1.5, pt: 1.5, pb: 0.5 }}>
+          {projName && (
+            <Typography
+              variant="subtitle2"
+              data-testid="sidebar-project-name"
+              sx={{
+                fontWeight: 700,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                mb: 0.5,
+              }}
+            >
+              {projName}
+            </Typography>
+          )}
+          <Box sx={{ display: "flex", alignItems: "center", gap: 0.25 }}>
+            <Typography
+              variant="subtitle2"
+              sx={{
+                fontWeight: 700,
+                flex: 1,
+                minWidth: 0,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {String(key).toUpperCase()}
+            </Typography>
+            <IconButton
+              size="small"
+              aria-label="favorite"
+              disabled={fav === null}
+              onClick={toggleFav}
+            >
+              {fav ? (
+                <StarIcon fontSize="small" />
+              ) : (
+                <StarBorderIcon fontSize="small" />
+              )}
+            </IconButton>
+            <IconButton
+              size="small"
+              aria-label={t.wf.button}
+              onClick={() => setWfOpen(true)}
+            >
+              <TuneIcon fontSize="small" />
+            </IconButton>
+            <IconButton
+              size="small"
+              aria-label={t.membersPanel.button}
+              onClick={() => setMembersOpen(true)}
+            >
+              <GroupIcon fontSize="small" />
+            </IconButton>
+            <IconButton
+              size="small"
+              aria-label={t.groupTypes.title}
+              onClick={() => setGtypeOpen(true)}
+            >
+              <CategoryIcon fontSize="small" />
+            </IconButton>
+            <IconButton
+              size="small"
+              aria-label={t.settings.title}
+              onClick={() => setSettingsOpen(true)}
+            >
+              <SettingsIcon fontSize="small" />
+            </IconButton>
+            <IconButton
+              size="small"
+              aria-label={t.gh.button}
+              onClick={() => setGhOpen(true)}
+            >
+              <GitHubIcon fontSize="small" />
+            </IconButton>
+            <IconButton
+              size="small"
+              aria-label="导出"
+              onClick={() => exportXlsx(String(key))}
+            >
+              <DownloadIcon fontSize="small" />
+            </IconButton>
+          </Box>
         </Box>
         <List dense disablePadding sx={{ py: 2 }}>
           <ListItemButton
