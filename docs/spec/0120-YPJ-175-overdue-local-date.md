@@ -70,3 +70,11 @@ dueSoon 同理(黄标窗口随 today 平移)。
 
 - 2026-11-13 用户立项「全做」。
 - 2026-11-13 用户拍板:**方案 A**(全局 Clock = 本地历 + 容器显式 TZ)。理由:单一时间概念,TZ 显式注入消除环境漂移;B 的多 zone 灵活性无需求。
+
+## ⑤ As-built(2026-11-13)
+
+- 落地与 ② 方案 A 一致,1:1:ClockConfig `systemDefaultZone` + 三 compose 注 `TZ: ${TZ:-Asia/Shanghai}` + MilestoneApiTest 回 `LocalDate.now()`(同 JVM 同 zone,台账 #9 结构性解法)+ e2e `shanghaiYesterday`(+8h 口径,红断言恒红保持)
+- 测试:gradle test / integrationTest / e2e 全量绿(用户跑);dev 实例 API 真值表 6 行全对(TZV 项目,数据留档)+ 容器 `date`=CST 结构实锤
+- 深夜 0–8 点窗口验收级证据:可选,数据留在 dev 供随时复验(TZV-1 今天到期应不红)
+- 偏差:无。api.http 无涉(无端点变更)。插曲:spec 0121(属 YPJ-176)误提交本分支后搬家(台账 #12),与本票内容无关
+- prod 容器重建(使 TZ 生效于 PM 日常)由用户择机执行,未纳入本票验证
