@@ -24,11 +24,13 @@ import yangzhou.persistence.repository.ProjectRepository
 import yangzhou.persistence.repository.StatusRepository
 import java.time.Clock
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneOffset
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 
 /** YPJ-89 单测补齐:MilestoneService(状态机:单 in_progress/终态不可变);YPJ-170 徽标/描述/负责人/终态删除守卫。 */
 class MilestoneServiceUnitTest {
@@ -291,6 +293,42 @@ class MilestoneServiceUnitTest {
             assertEquals(2, dtos[0].gateTotal)
             assertEquals(null, dtos[1].gateDone)
             assertEquals(null, dtos[1].gateTotal)
+        }
+    }
+
+    @Nested
+    inner class NextPlannedOf {
+        private fun ms(
+            name: String,
+            targetDate: LocalDate?,
+            createdAt: Instant,
+        ) = Milestone(id = null, objectId = UUID.randomUUID(), projectObjectId = UUID(0, 1), name = name, targetDate = targetDate, createdAt = createdAt)
+
+        @Test
+        fun earliestTargetDateWins() {
+            val a = ms("A", LocalDate.parse("2026-03-02"), Instant.parse("2026-01-01T00:00:00Z"))
+            val b = ms("B", LocalDate.parse("2026-03-01"), Instant.parse("2026-01-02T00:00:00Z"))
+            assertEquals("B", nextPlannedOf(listOf(a, b))?.name)
+        }
+
+        @Test
+        fun nullDateRanksLast() {
+            val a = ms("A", null, Instant.parse("2026-01-01T00:00:00Z"))
+            val b = ms("B", LocalDate.parse("2026-03-01"), Instant.parse("2026-01-02T00:00:00Z"))
+            assertEquals("B", nextPlannedOf(listOf(a, b))?.name)
+            assertEquals("A", nextPlannedOf(listOf(a))?.name)
+        }
+
+        @Test
+        fun tieTakesEarlierCreatedAt() {
+            val a = ms("A", LocalDate.parse("2026-03-01"), Instant.parse("2026-01-01T00:00:00Z"))
+            val b = ms("B", LocalDate.parse("2026-03-01"), Instant.parse("2026-01-02T00:00:00Z"))
+            assertEquals("A", nextPlannedOf(listOf(b, a))?.name)
+        }
+
+        @Test
+        fun emptyListNull() {
+            assertNull(nextPlannedOf(emptyList()))
         }
     }
 }

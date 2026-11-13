@@ -228,6 +228,12 @@ class MilestoneService(
                     updatedAt = Instant.now(clock),
                 ),
             )
+        // 接棒级联(YPJ-176/spec 0121):完成当前后同事务自动开始排序第一的 planned;cancelled 不级联,无 planned 静默
+        if (newStatus == "completed" && m.status == "in_progress") {
+            nextPlannedOf(milestones.findByProjectObjectIdAndStatus(m.projectObjectId, "planned"))?.let {
+                milestones.save(it.copy(status = "in_progress", updatedAt = Instant.now(clock)))
+            }
+        }
         // 就绪度随 DTO 回传(与 list() 同口径;完成后前端可就地刷新徽标)
         val rows = gateRows(m.objectId)
         return saved
@@ -308,3 +314,6 @@ class MilestoneService(
         return gateItems(key, milestoneId)
     }
 }
+
+/** 接棒选择(YPJ-176/spec 0121):targetDate 最早的 planned(nulls last),并列取创建早者;不新增序列字段。 */
+internal fun nextPlannedOf(planned: List<Milestone>): Milestone? = planned.minWithOrNull(compareBy({ it.targetDate ?: LocalDate.MAX }, { it.createdAt }))

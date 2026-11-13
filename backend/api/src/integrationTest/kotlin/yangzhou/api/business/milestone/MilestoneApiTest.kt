@@ -413,4 +413,88 @@ class MilestoneApiTest : AbstractApiTest() {
             .isNoContent()
         assertEquals(200, patch(authed, "ZG2", mid2, mapOf("status" to "completed")).status.value())
     }
+
+    // spec 0121 案 1-4
+    @Test
+    fun `接棒级联 排序 null 垫底 并列取早建 无 planned 静默`() {
+        val authed = bootstrapAndAuth()
+        createProject(authed, "CSC")
+        val m1 = createMilestone(authed, "CSC", mapOf("name" to "M1", "targetDate" to "2026-03-02"))["milestoneId"].asText()
+        val m2 = createMilestone(authed, "CSC", mapOf("name" to "M2", "targetDate" to "2026-03-01"))["milestoneId"].asText()
+        val m3 = createMilestone(authed, "CSC", mapOf("name" to "M3", "targetDate" to "2026-03-03"))["milestoneId"].asText()
+        val m4 = createMilestone(authed, "CSC", mapOf("name" to "M4"))["milestoneId"].asText() // null targetDate 垫底
+        val m5 = createMilestone(authed, "CSC", mapOf("name" to "M5", "targetDate" to "2026-03-05"))["milestoneId"].asText()
+        val m6 = createMilestone(authed, "CSC", mapOf("name" to "M6", "targetDate" to "2026-03-05"))["milestoneId"].asText()
+
+        // 完成 M1 → 最早 planned(M2)自动接棒,其余仍 planned
+        assertEquals(200, patch(authed, "CSC", m1, mapOf("status" to "in_progress")).status.value())
+        assertEquals(200, patch(authed, "CSC", m1, mapOf("status" to "completed")).status.value())
+        var rows = list(authed, "CSC")
+        assertEquals("in_progress", rows.first { it["name"].asText() == "M2" }["status"].asText())
+        assertEquals("planned", rows.first { it["name"].asText() == "M3" }["status"].asText())
+
+        // 依次完成 → 派生排序逐个接棒;null targetDate 垫底
+        assertEquals(200, patch(authed, "CSC", m2, mapOf("status" to "completed")).status.value())
+        rows = list(authed, "CSC")
+        assertEquals("in_progress", rows.first { it["name"].asText() == "M3" }["status"].asText())
+        assertEquals("planned", rows.first { it["name"].asText() == "M4" }["status"].asText())
+        assertEquals(200, patch(authed, "CSC", m3, mapOf("status" to "completed")).status.value())
+        rows = list(authed, "CSC")
+        assertEquals("in_progress", rows.first { it["name"].asText() == "M4" }["status"].asText())
+
+        // 同 targetDate 并列 → 先建者(M5)接棒
+        assertEquals(200, patch(authed, "CSC", m4, mapOf("status" to "completed")).status.value())
+        rows = list(authed, "CSC")
+        assertEquals("in_progress", rows.first { it["name"].asText() == "M5" }["status"].asText())
+        assertEquals("planned", rows.first { it["name"].asText() == "M6" }["status"].asText())
+
+        // 完成最后一个 → 无 planned,静默成功无 current
+        assertEquals(200, patch(authed, "CSC", m5, mapOf("status" to "completed")).status.value())
+        rows = list(authed, "CSC")
+        assertEquals("in_progress", rows.first { it["name"].asText() == "M6" }["status"].asText())
+        assertEquals(200, patch(authed, "CSC", m6, mapOf("status" to "completed")).status.value())
+        rows = list(authed, "CSC")
+        assertTrue(rows.none { it["status"].asText() == "in_progress" })
+    }
+
+    // spec 0121 案 5,原子性关键证
+    @Test
+    fun `接棒级联 gate 未就绪 409 不级联`() {
+        val authed = bootstrapAndAuth()
+        createProject(authed, "CGB")
+        val gate = createItem(authed, "CGB", "验收项")
+        val m1 = createMilestone(authed, "CGB", mapOf("name" to "M1"))["milestoneId"].asText()
+        val m2 = createMilestone(authed, "CGB", mapOf("name" to "M2", "targetDate" to "2026-03-01"))["milestoneId"].asText()
+        authed
+            .put()
+            .uri("/api/projects/CGB/milestones/$m1/items")
+            .body(mapOf("itemIds" to listOf(gate["itemId"].asText())))
+            .exchange()
+            .expectStatus()
+            .isOk()
+        assertEquals(200, patch(authed, "CGB", m1, mapOf("status" to "in_progress")).status.value())
+
+        // gate 未就绪 → 409,无级联:事务回滚,M1 仍 in_progress,M2 仍 planned
+        assertEquals(409, patch(authed, "CGB", m1, mapOf("status" to "completed")).status.value())
+        val rows = list(authed, "CGB")
+        assertEquals("in_progress", rows.first { it["name"].asText() == "M1" }["status"].asText())
+        assertEquals("planned", rows.first { it["name"].asText() == "M2" }["status"].asText())
+    }
+
+    // spec 0121 案 6,锁默认拍板
+    @Test
+    fun `cancelled 不级联`() {
+        val authed = bootstrapAndAuth()
+        createProject(authed, "CCN")
+        val m1 = createMilestone(authed, "CCN", mapOf("name" to "M1"))["milestoneId"].asText()
+        val m2 = createMilestone(authed, "CCN", mapOf("name" to "M2", "targetDate" to "2026-03-01"))["milestoneId"].asText()
+        assertEquals(200, patch(authed, "CCN", m1, mapOf("status" to "in_progress")).status.value())
+
+        // in_progress → cancelled:仅 cancelled,下一个 planned 不被启动,current 空缺
+        assertEquals(200, patch(authed, "CCN", m1, mapOf("status" to "cancelled")).status.value())
+        val rows = list(authed, "CCN")
+        assertEquals("cancelled", rows.first { it["name"].asText() == "M1" }["status"].asText())
+        assertEquals("planned", rows.first { it["name"].asText() == "M2" }["status"].asText())
+        assertTrue(rows.none { it["status"].asText() == "in_progress" })
+    }
 }
