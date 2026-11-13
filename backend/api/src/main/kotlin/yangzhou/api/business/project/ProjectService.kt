@@ -34,6 +34,7 @@ class ProjectService(
     private val members: yangzhou.api.business.member.MemberService,
     private val projectMembers: yangzhou.persistence.repository.ProjectMemberRepository,
     private val groupTypes: yangzhou.persistence.repository.ItemGroupTypeRepository,
+    private val itemTypes: yangzhou.persistence.repository.ItemTypeRepository,
     private val groupWorkflow: yangzhou.api.business.itemgroup.GroupWorkflowService,
 ) {
 
@@ -69,6 +70,10 @@ class ProjectService(
         // spec 0100 切片B:新项目只种 release(builtin);组结构由用户「加 level」自配,sprint 不再种子
         val t = groupTypes.save(yangzhou.persistence.ItemGroupType(projectObjectId = project.objectId!!, typeKey = "release", name = "Release", builtin = true, level = null, timed = false))
         groupWorkflow.seedFor(t) // spec 0097 S2:类型落库同步种默认状态机
+        // YPJ-177(spec 0123):item type 四值全种 builtin(白名单平移;值语义见 spec ①)
+        listOf("task" to "Task", "bug" to "Bug", "story" to "Story", "goal" to "Goal").forEach { (k, n) ->
+            itemTypes.save(yangzhou.persistence.ItemType(projectObjectId = project.objectId!!, typeKey = k, name = n, builtin = true))
+        }
         return get(key)
     }
 

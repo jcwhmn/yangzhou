@@ -5,6 +5,7 @@ import yangzhou.api.error.BadRequestException
 import yangzhou.api.error.NotFoundException
 import yangzhou.persistence.ItemGroupMemberHistory
 import yangzhou.persistence.repository.ItemGroupMemberHistoryRepository
+import yangzhou.persistence.repository.ItemTypeRepository
 import yangzhou.persistence.repository.MetricsGroupRow
 import yangzhou.persistence.repository.MetricsHistoryRow
 import yangzhou.persistence.repository.MetricsRepository
@@ -100,6 +101,8 @@ data class AssigneeCountDto(
 
 data class TypeCountDto(
     val type: String,
+    /** YPJ-177(spec 0123):定义显示名;定义缺失(历史值防御)回退 type_key。 */
+    val name: String,
     val count: Int,
 )
 
@@ -258,6 +261,7 @@ class MetricsService(
     private val repo: MetricsRepository,
     private val projects: ProjectRepository,
     private val memberHistory: ItemGroupMemberHistoryRepository,
+    private val itemTypes: ItemTypeRepository,
     private val clock: Clock,
 ) {
     fun workload(key: String): WorkloadResponse {
@@ -294,11 +298,14 @@ class MetricsService(
                         AssigneeCountDto(oid, members[oid]?.displayName, its.size, wipByStatus)
                     }
                 }.sortedWith(compareBy(nullsLast<String>()) { it.displayName })
+        // YPJ-177(spec 0123):定义显示名注入(key→name),定义缺失回退 key(历史值防御)
+        val typeNames = projects.findByKey(key)?.let { itemTypes.findByProjectObjectIdOrderByCreatedAt(it.objectId!!) }
+            ?.associateBy({ it.typeKey }, { it.name }) ?: emptyMap()
         val byType =
             items
                 .groupingBy { it.type }
                 .eachCount()
-                .map { TypeCountDto(it.key, it.value) }
+                .map { TypeCountDto(it.key, typeNames[it.key] ?: it.key, it.value) }
                 .sortedBy { it.type }
         val backlogSize = statuses.filter { it.statusType == "START" }.sumOf { countByStatusId[it.statusObjectId] ?: 0 }
         val done = statuses.filter { it.statusType == "FINAL" }.sumOf { countByStatusId[it.statusObjectId] ?: 0 }

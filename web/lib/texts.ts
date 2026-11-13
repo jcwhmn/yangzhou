@@ -486,6 +486,15 @@ export const t = {
     viewName: "视图名",
     retry: "重试",
   },
+  itemTypes: {
+    title: "Item 类型",
+    key: "key(slug)",
+    nameLabel: "显示名",
+    add: "新增",
+    builtin: "内建",
+    hint: "story=主线单元 / task=插入小活 / bug=缺陷 / goal=树根容器(spec 0123);内建不可删,在用须先迁移。",
+    failed: "操作失败",
+  },
   flow: {
     wip: "WIP(按负责人、状态堆叠)",
     byType: "按 Type(数量)",

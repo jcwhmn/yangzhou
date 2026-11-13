@@ -21,6 +21,7 @@ import yangzhou.persistence.ItemGroupMember
 import yangzhou.persistence.ItemGroupMemberHistory
 import yangzhou.persistence.ItemGroupType
 import yangzhou.persistence.ItemStatusHistory
+import yangzhou.persistence.ItemType
 import yangzhou.persistence.Member
 import yangzhou.persistence.Milestone
 import yangzhou.persistence.MilestoneItem
@@ -226,6 +227,27 @@ interface ItemRepository : CrudRepository<Item, Long> {
     fun existsByParentObjectId(parentObjectId: UUID): Boolean
 
     fun findByObjectIdIn(objectIds: Collection<UUID>): List<Item>
+
+    /** YPJ-177(spec 0123):item type 删除守卫——类型在用计数。 */
+    fun countByProjectObjectIdAndTypeKey(
+        projectObjectId: UUID,
+        typeKey: String,
+    ): Long
+}
+
+/** YPJ-177(spec 0123):item type 项目级运行时定义——镜像 ItemGroupTypeRepository 用法。 */
+interface ItemTypeRepository : CrudRepository<ItemType, Long> {
+    fun findByProjectObjectIdOrderByCreatedAt(projectObjectId: UUID): List<ItemType>
+
+    fun findByProjectObjectIdAndTypeKey(
+        projectObjectId: UUID,
+        typeKey: String,
+    ): ItemType?
+
+    fun existsByProjectObjectIdAndTypeKey(
+        projectObjectId: UUID,
+        typeKey: String,
+    ): Boolean
 }
 
 interface ProjectRepoRepository : CrudRepository<ProjectRepo, Long> {

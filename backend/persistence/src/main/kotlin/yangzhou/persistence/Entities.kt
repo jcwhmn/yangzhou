@@ -490,6 +490,25 @@ data class ItemGroupType(
     var updatedByObjectId: UUID? = null,
 )
 
+/** YPJ-177(spec 0123):item type 项目级运行时定义——镜像 ItemGroupType(无 level/timed,type 非嵌套非时间盒)。 */
+@Table("item_type")
+data class ItemType(
+    @Id val id: Long? = null,
+    val objectId: UUID = UUID.randomUUID(),
+    val projectObjectId: UUID,
+    val typeKey: String,
+    val name: String,
+    val builtin: Boolean = false,
+    @CreatedDate
+    var createdAt: Instant = Instant.now(),
+    @LastModifiedDate
+    var updatedAt: Instant = Instant.now(),
+    @CreatedBy
+    var createdByObjectId: UUID? = null,
+    @LastModifiedBy
+    var updatedByObjectId: UUID? = null,
+)
+
 /** item × group 多对多;不变量「至多一个 planned/active sprint」在 SprintService 保证(见 spec 0010 裁决 2);release 归属同理单选(release 端点语义,spec 0012)。 */
 @Table("item_group_member")
 data class ItemGroupMember(
