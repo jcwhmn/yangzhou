@@ -160,14 +160,18 @@ export default function ProjectLayout({
       });
   };
 
+  const loadMilestones = () => {
+    api<Milestone[]>(`/api/projects/${key}/milestones`)
+      .then(setMilestones)
+      .catch(() => setMilestones([]));
+  };
+
   const loadSide = () => {
     loadFlags();
     api<NavItem[]>(`/api/projects/${key}/items`)
       .then(setItems)
       .catch(() => setItems([]));
-    api<Milestone[]>(`/api/projects/${key}/milestones`)
-      .then(setMilestones)
-      .catch(() => setMilestones([]));
+    loadMilestones();
     api<Release[]>(`/api/projects/${key}/releases`)
       .then(setReleases)
       .catch(() => setReleases([]));
@@ -209,6 +213,15 @@ export default function ProjectLayout({
     window.addEventListener("sprints-changed", onSprintsChanged);
     return () =>
       window.removeEventListener("sprints-changed", onSprintsChanged);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+
+  // YPJ-176:milestone 页建/改/删(含完成接棒级联)后广播 milestones-changed,sidebar 即时重拉(YPJ-74 同型)
+  useEffect(() => {
+    const onMilestonesChanged = () => loadMilestones();
+    window.addEventListener("milestones-changed", onMilestonesChanged);
+    return () =>
+      window.removeEventListener("milestones-changed", onMilestonesChanged);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
 

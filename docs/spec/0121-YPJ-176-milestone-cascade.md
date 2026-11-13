@@ -57,3 +57,9 @@
 2. 依次完成到最后一个:完成后无 current,静默成功(无报错)
 3. 给第二个挂一个未终态 gate item → 完成第二个 → 409「关口未就绪」且**第三个未被启动**(刷新确认仍 planned)
 4. 回归:双徽标/时间线/就绪度不受影响;TZV 项目(0/1 gate)完成动作正常
+
+## ④ 偏差与补遗(2026-11-13,dev 实证)
+
+**真值表「侧栏/列表 current 自动切换」行的假设不成立**:侧栏 milestones 仅在 layout mount 时拉取一次(MilestonePage 变更后只刷页内 state),不刷新则持续陈旧——用户 dev 完成 TZM-1(级联启动 TZM-2,查库实锤)后侧栏仍显 TZM-1。此为存量缺口:手动 start/complete 同样滞后,非级联引入;YPJ-74 已为 sprint 段用广播解决同型问题,milestone 段漏了同款。
+
+**补齐**:前端加 `milestones-changed` 广播(YPJ-74 同型;真值表该行修正为「广播补齐后成立」)——MilestonePage 三处变更成功后(submit/transition/remove)dispatch,layout 监听重拉 `loadMilestones`;gate 挂接不影响侧栏显示,不播。e2e 新例「接棒级联 完成后侧栏即时切换」。
