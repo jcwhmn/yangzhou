@@ -14,6 +14,7 @@ import yangzhou.persistence.GroupStatus
 import yangzhou.persistence.Item
 import yangzhou.persistence.ItemActivity
 import yangzhou.persistence.ItemAttribute
+import yangzhou.persistence.ItemCommitSnapshot
 import yangzhou.persistence.ItemDependency
 import yangzhou.persistence.ItemGitRef
 import yangzhou.persistence.ItemGroup
@@ -284,6 +285,17 @@ interface ItemGitRefRepository : CrudRepository<ItemGitRef, Long> {
         id: Long,
         createdAt: java.time.Instant,
     ): Int
+}
+
+/** YPJ-184(spec 0125):快照行整 ref 消费;upsert 判存按 (item, repo, ref)。 */
+interface ItemCommitSnapshotRepository : CrudRepository<ItemCommitSnapshot, Long> {
+    fun findByItemObjectId(itemObjectId: UUID): List<ItemCommitSnapshot>
+
+    fun findByItemObjectIdAndRepoAndRef(
+        itemObjectId: UUID,
+        repo: String,
+        ref: String,
+    ): ItemCommitSnapshot?
 }
 
 /** YPJ-50:附件元数据;objectKey 唯一,行随 item 硬删级联。 */

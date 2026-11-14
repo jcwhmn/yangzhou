@@ -58,6 +58,7 @@ class ItemService(
     private val notificationService: yangzhou.api.business.notification.NotificationService,
     private val memberHistory: yangzhou.persistence.repository.ItemGroupMemberHistoryRepository,
     private val milestoneItems: MilestoneItemRepository,
+    private val itemFinalize: ItemFinalizeService,
     private val clock: Clock,
 ) {
     data class RequirementDto(
@@ -315,6 +316,11 @@ class ItemService(
                         autoSprintName = first.name
                     }
                 }
+            }
+            // YPJ-184(spec 0125):首次进 FINAL 触发统一后置动作(快照等;best-effort 不阻塞);
+            // 重开再完成会再次快照(upsert 幂等,以最后一次 Done 为准)
+            if (status.statusType == StatusType.FINAL && oldStatus?.statusType != StatusType.FINAL) {
+                itemFinalize.onFinalized(current.objectId!!)
             }
         }
 

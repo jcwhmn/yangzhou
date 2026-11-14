@@ -3,6 +3,7 @@ package yangzhou.api.business.time
 import jakarta.validation.constraints.NotNull
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import tools.jackson.databind.ObjectMapper
 import yangzhou.api.business.github.GithubCommitService
 import yangzhou.api.business.member.MemberService
 import yangzhou.api.business.projectmember.ProjectMemberService
@@ -10,6 +11,7 @@ import yangzhou.api.error.BadRequestException
 import yangzhou.api.error.ConflictException
 import yangzhou.api.error.NotFoundException
 import yangzhou.persistence.TimeEntry
+import yangzhou.persistence.repository.ItemCommitSnapshotRepository
 import yangzhou.persistence.repository.ItemGroupMemberRepository
 import yangzhou.persistence.repository.ItemGroupRepository
 import yangzhou.persistence.repository.ItemRepository
@@ -37,6 +39,8 @@ class TimeEntryService(
     private val memberService: MemberService,
     private val projectMembers: ProjectMemberService,
     private val githubCommits: GithubCommitService,
+    private val commitSnapshots: ItemCommitSnapshotRepository,
+    private val objectMapper: ObjectMapper,
     private val groups: ItemGroupRepository,
     private val groupMembers: ItemGroupMemberRepository,
     private val itemTypes: ItemTypeRepository,
@@ -200,8 +204,42 @@ class TimeEntryService(
         val note: String,
     )
 
+    /** 快照行解码后的整 ref 视图(编排层解 JSON,companion 纯函数消费)。 */
+    data class SnapshotRef(
+        val repo: String,
+        val ref: String,
+        val capturedAt: Instant,
+        val capturedBy: String,
+        val commits: List<GithubCommitService.CommitDto>,
+    )
+
     /** V16-3 工时建议:分支 commit 时间轴 ≈ 工作记录(首 commit ≈ 开工,末 commit ≈ 收工);只出草稿,不落账。 */
-    fun suggest(itemId: UUID): List<SuggestedEntry> = buildSuggestions(githubCommits.commitsForItem(itemId))
+    fun suggest(itemId: UUID): List<SuggestedEntry> {
+        val live = githubCommits.commitsForItem(itemId) // 副作用:读时缓存快照(YPJ-184)
+        val segments = buildSuggestions(live)
+        val doneRefs = segments.map { it.repo to it.ref }.toSet()
+        val snapshots =
+            commitSnapshots.findByItemObjectId(itemId).mapNotNull { row ->
+                runCatching {
+                    SnapshotRef(
+                        repo = row.repo,
+                        ref = row.ref,
+                        capturedAt = row.capturedAt,
+                        capturedBy = row.capturedBy,
+                        commits = objectMapper.readTree(row.commitsJson).map { n ->
+                            GithubCommitService.CommitDto(
+                                sha = n.get("sha").asText(),
+                                message = n.get("message").asText(),
+                                author = n.get("author")?.takeIf { !it.isNull }?.asText(),
+                                date = n.get("date")?.takeIf { !it.isNull }?.asText(),
+                                url = n.get("url")?.takeIf { !it.isNull }?.asText(),
+                            )
+                        },
+                    )
+                }.getOrNull() // 快照行损坏不炸建议
+            }
+        return segments + buildSuggestionsFromSnapshots(doneRefs, snapshots)
+    }
 
     private fun parseInstant(text: String): Instant? = runCatching { Instant.parse(text) }.getOrNull()
 
@@ -260,6 +298,43 @@ class TimeEntryService(
                 endedAt = dates.last().toString(),
                 note = "分支 ${ref.ref} · ${ref.commits.size} commits",
             )
+        }
+
+        /**
+         * YPJ-184(spec 0125)快照回退段:live 不足的 ref 查快照补段。
+         * per ref——live 已出段的跳过;快照 ≥2 dated 同现有口径;恰 1 dated 且 capturedBy=finalize
+         * (FINAL 锚,终止时间 = Done 时刻)→ 单提交段;0 dated / 无 FINAL 锚 → 不出。
+         */
+        fun buildSuggestionsFromSnapshots(
+            doneRefs: Set<Pair<String, String>>,
+            snapshots: List<SnapshotRef>,
+        ): List<SuggestedEntry> = snapshots.mapNotNull { s ->
+            if (s.repo to s.ref in doneRefs) return@mapNotNull null
+            val dates =
+                s.commits
+                    .mapNotNull { c -> c.date?.let { d -> runCatching { Instant.parse(d) }.getOrNull() } }
+                    .sorted()
+            when {
+                dates.size >= 2 ->
+                    SuggestedEntry(
+                        repo = s.repo,
+                        ref = s.ref,
+                        commitCount = s.commits.size,
+                        startedAt = dates.first().toString(),
+                        endedAt = dates.last().toString(),
+                        note = "分支 ${s.ref} · ${s.commits.size} commits",
+                    )
+                dates.size == 1 && s.capturedBy == "finalize" ->
+                    SuggestedEntry(
+                        repo = s.repo,
+                        ref = s.ref,
+                        commitCount = 1,
+                        startedAt = dates.first().toString(),
+                        endedAt = s.capturedAt.toString(),
+                        note = "分支 ${s.ref} · 单提交(commit→完成时刻)",
+                    )
+                else -> null
+            }
         }
     }
 

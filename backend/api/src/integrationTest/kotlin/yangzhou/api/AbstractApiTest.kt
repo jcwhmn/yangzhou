@@ -80,6 +80,7 @@ abstract class AbstractApiTest {
             "project_workflow_rule",
             "project_view",
             "item_git_ref",
+            "item_commit_snapshot",
             "project_repo",
             "time_entry",
             "item_type",
