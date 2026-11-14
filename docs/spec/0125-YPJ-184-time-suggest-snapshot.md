@@ -155,6 +155,32 @@ fun buildSuggestionsFromSnapshots(
 5. **幂等**:Done → 重开回 ACTIVE → 再 Done → 无重复快照行(可经建议区不重复出段佐证)。
 6. **既有回归**:≥2 commit 分支的建议段与改造前一致(first→last 不变)。
 
-## 四、As-built
+## 四、As-built(2026-11-14 交付,PR 待开)
 
-(完工后补)
+### 与 §二设计的偏差(均收窄,无范围膨胀)
+
+| 项 | 设计 | 实落 | 说明 |
+|----|------|------|------|
+| commits_json 列型 | jsonb | **text 存 JSON 数组** | 消费方永远整 ref 时间轴读取(无 SQL 级 commit 查询);Spring Data JDBC 仓内无 jsonb 实体先例,引入 Converter 属投机基建;将来要 commit 级查询再迁 jsonb(text→jsonb 迁移零损) |
+| 快照覆盖规则 | upsert 覆盖旧行 | **FINAL 锚保护** | 集成测试抓实锤(台账 #20):读时缓存无条件覆盖会把 finalize 锚冲掉,单提交段永久消失。实落:existing=finalize 且本次=read → 只刷新提交数据,保留 capturedAt/capturedBy;其余全覆盖(finalize>read、重开再 Done 刷锚) |
+| 审计人列 | (未定) | **无 created_by/updated_by** | 快照是系统动作(钩子/读缓存)无 actor 语义;cleanDatabase 两段清单仅第二段(FK delete 序)需挂 |
+
+### 落点清单
+
+- 持久层:`V59__item_commit_snapshot.sql`(枚举列 VARCHAR+CHECK 仓纪律);`ItemCommitSnapshot` 实体(Entities.kt);`ItemCommitSnapshotRepository`(findByItemObjectId / findByItemObjectIdAndRepoAndRef);entities.puml 同步(V59 实体+note;注:ItemType 为 YPJ-177 欠账另行补)
+- github 切片:`GithubCommitService` 注入 +4(snapshots/clock/objectMapper/tools.jackson);`fetchRefCommits` 合并双路(分支→PR 降级链原语义不变);`commitsForItem` 成功非空即 upsert(capturedBy=read);新增 `snapshotForItem(itemObjectId, capturedBy)`(best-effort,单 ref 失败 warn 不中断,无挂载/无 PAT 早退);`upsertSnapshot` 含 FINAL 锚保护
+- item 切片:新 `ItemFinalizeService.onFinalized`(runCatching 包裹,不阻塞状态迁移);`ItemService` 构造注入 + 首次进 FINAL 触发(`statusType==FINAL && oldStatus!=FINAL`)
+- time 切片:`TimeEntryService` 注入 +2(commitSnapshots/objectMapper);`SnapshotRef`(解码视图)+ companion 纯函数 `buildSuggestionsFromSnapshots`(live 已出段跳过;快照 ≥2 dated 同口径;恰 1 dated + finalize → commit→captured_at,note「单提交(commit→完成时刻)」);`suggest()` 编排:live → 段;live 不足 ref 查快照补;readTree 手解 JSON(仓内 Jackson 3 惯例,无 data class 反序列化依赖)
+- 测试:单测 +8(TimeEntryServiceUnitTest Snapshots 节 4 / ItemFinalizeServiceUnitTest 2 / GithubCommitServiceUnitTest 2);集成 `FinalizeSnapshotApiTest` 5 例(Done 联动删分支仍出段 / 单 commit 出段+锚不被冲 / 读时缓存不经 Done 删分支仍出 / 无 PAT best-effort / 幂等重开);FakeFinalizeGateway 同款 Fake 惯例
+- api.http:不动(无新端点,契约零变化,经 GET suggestions 验证)
+- 台账 #19(Jackson 3 包名)/#20(读缓存冲 FINAL 锚设计缺陷)/#21(mockk infix 左结合)
+
+### 验证
+
+- 编译三路绿;全量单测绿;全量 integrationTest 绿(agent 自查,5m17s 41 例);entities.puml 同步
+- 手工:待用户 build/debug(spec §三 6 例)
+
+### 遗留(均设计内非目标,勿当欠账)
+
+- branch-finish 系统化(用户已降级为将来加分票)
+- YPJ-181 停表接入同一 FINAL 钩子(实现共享、验收各归各票)

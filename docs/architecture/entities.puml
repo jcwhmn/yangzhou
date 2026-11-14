@@ -48,6 +48,15 @@ class ItemGitRef {
   url: String?
   state: String?
 }
+class ItemCommitSnapshot {
+  repo: String
+  ref: String
+  via: String
+  commitsJson: String
+  commitCount: Int
+  capturedAt: Instant
+  capturedBy: String
+}
 class Attachment {
   filename: String
   contentType: String
@@ -182,6 +191,7 @@ ItemGroup "1" *-- "*" ItemGroupMember
 ItemGroup "1" *-- "*" ItemGroupMemberHistory
 ProjectWorkflowRule "*" --> "1" Status : 目标列
 Item "1" *-- "*" ItemGitRef : 分支/PR 链接
+Item "1" *-- "*" ItemCommitSnapshot : commits 快照(V59)
 Item "1" *-- "*" Attachment : 附件
 Item "1" *-- "*" ItemStatusHistory : 状态流水
 ItemStatusHistory "*" --> "0..1" Status : from
@@ -232,6 +242,12 @@ end note
 note right of ItemGitRef
   uk(item, repo, kind, ref) 每票唯一
   是轮询幂等锚点(YPJ-39/V37 起,分支可挂多票)。
+end note
+note right of ItemCommitSnapshot
+  YPJ-184/V59:数据自持(离分支离 GitHub 均可得)。
+  双写:Done 联动(captured_by=finalize,锚=Done 时刻)
+  + 读时缓存(read,不冲 FINAL 锚);
+  upsert 幂等 uk(item, repo, ref),重开再 Done 刷锚。
 end note
 note bottom of StatusTransition
   迁移表无行 = 自由迁移(V1 默认);
