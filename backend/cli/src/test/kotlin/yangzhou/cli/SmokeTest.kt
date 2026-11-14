@@ -33,7 +33,7 @@ class SmokeTest {
         assertEquals(0, code, "--help 应退出 0")
         // usage 完整性锚点:主干命令集;新命令合并时同步追加(YPJ-115: sprints move / items assign)
         for (anchor in listOf(
-            "login", "attrs create", "members add", "teams add", "projects create", "projects delete",
+            "login", "use", "attrs create", "members add", "teams add", "projects create", "projects delete",
             "items create", "items list", "items show", "items comments", "items move", "items comment", "items branch", "sprints create", "sprints list",
             "caps set", "caps rm", "caps list", "feasibility", "candidates", "assign", "log", "export", "import",
         )) {

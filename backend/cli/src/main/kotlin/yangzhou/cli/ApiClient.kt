@@ -9,12 +9,7 @@ import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 
-/** 会话:server + token,存 ~/.yangzhou/session.json;login 后免登。 */
-data class Session(
-    val server: String,
-    val token: String,
-)
-
+/** 会话存取(每 server 一份);Session 数据类在同包 SessionStore.kt。 */
 class ApiClient private constructor(
     private val http: HttpClient,
     private val mapper: ObjectMapper,
@@ -22,13 +17,12 @@ class ApiClient private constructor(
 ) {
     companion object {
         private val mapper = jacksonObjectMapper()
+        private val store = SessionStore.default()
 
-        fun sessionFile(): File = File(System.getProperty("user.home"), ".yangzhou/session.json")
+        /** 会话目录(help 显示用):每 server 一份。 */
+        fun sessionsDir(): File = File(File(System.getProperty("user.home")), ".yangzhou/sessions")
 
-        fun loadSession(): Session? = runCatching {
-            val node = mapper.readTree(sessionFile())
-            Session(node["server"].asString(), node["token"].asString())
-        }.getOrNull()
+        fun loadSession(): Session? = store.loadCurrent()
 
         fun create(): ApiClient = ApiClient(HttpClient.newHttpClient(), mapper, loadSession())
 
@@ -73,8 +67,7 @@ class ApiClient private constructor(
             }
             val token = mapper.readTree(response.body())["token"].asString()
             val session = Session(normalized, token)
-            sessionFile().parentFile.mkdirs()
-            sessionFile().writeText(mapper.writeValueAsString(session))
+            store.save(session)
             return ApiClient(http, mapper, session)
         }
     }
