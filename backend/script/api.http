@@ -1188,6 +1188,30 @@ Authorization: Bearer {{token}}
 GET {{host}}/api/projects/{{pkey}}/time-summary
 Authorization: Bearer {{token}}
 
+### 项目工时报表(YPJ-179:byMember/byType/byDay;from/to 为 ISO-8601 闭区间,锚=startedAt)
+GET {{host}}/api/projects/{{pkey}}/time-report
+Authorization: Bearer {{token}}
+
+### 项目工时报表——sprint 组过滤(groupId 取 §11 的 sprintId)
+GET {{host}}/api/projects/{{pkey}}/time-report?groupId={{sprintId}}
+Authorization: Bearer {{token}}
+
+### 项目工时报表——窗口过滤(只含固定日)
+GET {{host}}/api/projects/{{pkey}}/time-report?from=2026-11-06T00:00:00Z&to=2026-11-06T23:59:59Z
+Authorization: Bearer {{token}}
+
+### [预期 400] from 晚于 to
+GET {{host}}/api/projects/{{pkey}}/time-report?from=2026-11-14T00:00:00Z&to=2026-11-01T00:00:00Z
+Authorization: Bearer {{token}}
+
+### [预期 400] 非法时间格式(须完整 ISO-8601 时刻)
+GET {{host}}/api/projects/{{pkey}}/time-report?from=2026-11-14
+Authorization: Bearer {{token}}
+
+### [预期 404] 未知项目
+GET {{host}}/api/projects/NOPE/time-report
+Authorization: Bearer {{token}}
+
 ### 工时建议(V16-3:分支 commit 时间轴 → 草稿;人确认后走上方起止补录)
 GET {{host}}/api/items/{{itemId}}/time-entry-suggestions
 Authorization: Bearer {{token}}

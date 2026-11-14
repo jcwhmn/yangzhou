@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 import java.util.UUID
@@ -36,6 +37,15 @@ class TimeEntryController(
     fun summary(
         @PathVariable key: String,
     ): List<TimeEntryService.MemberSummary> = service.summary(key)
+
+    /** YPJ-179(spec 0124):项目工时报表(byMember/byType/byDay;from/to ISO-8601 闭区间,groupId 限组成员 item)。 */
+    @GetMapping("/projects/{key}/time-report")
+    fun report(
+        @PathVariable key: String,
+        @RequestParam from: String?,
+        @RequestParam to: String?,
+        @RequestParam groupId: UUID?,
+    ): TimeReportDto = service.report(key, from, to, groupId)
 
     @GetMapping("/items/{itemId}/time-entry-suggestions")
     fun suggestions(

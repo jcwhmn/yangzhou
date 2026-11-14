@@ -243,4 +243,148 @@ class TimeEntryApiTest : AbstractApiTest() {
         ).expectStatus().isBadRequest()
         assertEquals(0, log(authed, i1)["entries"].size())
     }
+
+    // ---------- YPJ-179(spec 0124)time-report ----------
+
+    private fun reportJson(
+        authed: org.springframework.test.web.servlet.client.RestTestClient,
+        key: String,
+        query: String,
+    ) = json.readTree(
+        authed
+            .get()
+            .uri("/api/projects/$key/time-report$query")
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody(String::class.java)
+            .returnResult()
+            .responseBody!!,
+    )
+
+    @Test
+    fun `报表——补录与起止计入——byType 显示名——byDay 含固定日——窗口过滤——空项目三空数组`() {
+        val authed = bootstrapAndAuth()
+        createProject(authed, "CHE")
+        val i1 = createItem(authed, "CHE", "x")["itemId"].asText()
+        val i2 = createItem(authed, "CHE", "y")["itemId"].asText()
+        // 类型定义改名(byType 显示名 join 定义表)
+        authed
+            .patch()
+            .uri("/api/projects/CHE/item-types/task")
+            .body(mapOf("name" to "杂活"))
+            .exchange()
+            .expectStatus()
+            .isOk()
+        authed
+            .post()
+            .uri("/api/items/$i1/time-entries")
+            .body(mapOf("minutes" to 60))
+            .exchange()
+            .expectStatus()
+            .isCreated()
+        authed
+            .post()
+            .uri("/api/items/$i2/time-entries")
+            .body(
+                mapOf<String, Any?>(
+                    "minutes" to null,
+                    "startedAt" to "2026-11-06T01:00:00Z",
+                    "endedAt" to "2026-11-06T03:00:00Z",
+                ),
+            ).exchange()
+            .expectStatus()
+            .isCreated()
+
+        val rep = reportJson(authed, "CHE", "")
+        assertEquals(180, rep["byMember"][0]["totalMinutes"].asLong())
+        assertEquals(2, rep["byMember"][0]["entryCount"].asInt())
+        assertEquals(1, rep["byType"].size()) // 两 item 同为 task → 单桶
+        assertEquals("task", rep["byType"][0]["typeKey"].asText())
+        assertEquals("杂活", rep["byType"][0]["typeName"].asText())
+        assertEquals(180, rep["byType"][0]["minutes"].asLong())
+        assertEquals(180, rep["byDay"].toList().sumOf { it["minutes"].asLong() })
+        assertEquals(120, rep["byDay"].first { it["date"].asText() == "2026-11-06" }["minutes"].asLong())
+
+        // 窗口过滤:只含固定日
+        val win = reportJson(authed, "CHE", "?from=2026-11-06T00:00:00Z&to=2026-11-06T23:59:59Z")
+        assertEquals(120, win["byMember"][0]["totalMinutes"].asLong())
+        assertEquals(1, win["byDay"].size())
+
+        // 空项目:三空数组
+        createProject(authed, "CHE2")
+        val empty = reportJson(authed, "CHE2", "")
+        assertEquals(0, empty["byMember"].size())
+        assertEquals(0, empty["byType"].size())
+        assertEquals(0, empty["byDay"].size())
+    }
+
+    @Test
+    fun `报表——groupId 过滤——未知组 404——窗口负例 400——未知项目 404`() {
+        val authed = bootstrapAndAuth()
+        createProject(authed, "CHE")
+        val i1 = createItem(authed, "CHE", "in-sprint")["itemId"].asText()
+        val i2 = createItem(authed, "CHE", "out")["itemId"].asText()
+        val gid =
+            json.readTree(
+                authed
+                    .post()
+                    .uri("/api/projects/CHE/groups")
+                    .body(mapOf("typeKey" to "sprint", "name" to "S1"))
+                    .exchange()
+                    .expectStatus()
+                    .isCreated()
+                    .expectBody(String::class.java)
+                    .returnResult()
+                    .responseBody!!,
+            )["groupId"].asText()
+        authed
+            .put()
+            .uri("/api/items/$i1/group-membership")
+            .body(mapOf("groupId" to gid, "groupType" to "sprint"))
+            .exchange()
+        authed
+            .post()
+            .uri("/api/items/$i1/time-entries")
+            .body(mapOf("minutes" to 30))
+            .exchange()
+            .expectStatus()
+            .isCreated()
+        authed
+            .post()
+            .uri("/api/items/$i2/time-entries")
+            .body(mapOf("minutes" to 40))
+            .exchange()
+            .expectStatus()
+            .isCreated()
+
+        val rep = reportJson(authed, "CHE", "?groupId=$gid")
+        assertEquals(30, rep["byMember"][0]["totalMinutes"].asLong())
+        assertEquals(1, rep["byMember"][0]["entryCount"].asInt())
+
+        authed
+            .get()
+            .uri("/api/projects/CHE/time-report?groupId=${java.util.UUID.randomUUID()}")
+            .exchange()
+            .expectStatus()
+            .isNotFound()
+        authed
+            .get()
+            .uri("/api/projects/CHE/time-report?from=2026-11-14T00:00:00Z&to=2026-11-01T00:00:00Z")
+            .exchange()
+            .expectStatus()
+            .isBadRequest()
+        authed
+            .get()
+            .uri("/api/projects/CHE/time-report?from=not-a-time")
+            .exchange()
+            .expectStatus()
+            .isBadRequest()
+        authed
+            .get()
+            .uri("/api/projects/NOPE/time-report")
+            .exchange()
+            .expectStatus()
+            .isNotFound()
+    }
 }

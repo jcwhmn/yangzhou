@@ -14,7 +14,10 @@ import yangzhou.api.error.NotFoundException
 import yangzhou.persistence.Item
 import yangzhou.persistence.Member
 import yangzhou.persistence.TimeEntry
+import yangzhou.persistence.repository.ItemGroupMemberRepository
+import yangzhou.persistence.repository.ItemGroupRepository
 import yangzhou.persistence.repository.ItemRepository
+import yangzhou.persistence.repository.ItemTypeRepository
 import yangzhou.persistence.repository.MemberRepository
 import yangzhou.persistence.repository.ProjectRepository
 import yangzhou.persistence.repository.TimeEntryRepository
@@ -37,6 +40,9 @@ class TimeEntryServiceUnitTest {
     private val memberService = mockk<MemberService>(relaxed = true)
     private val projectMembers = mockk<ProjectMemberService>(relaxed = true)
     private val githubCommits = mockk<GithubCommitService>(relaxed = true)
+    private val groups = mockk<ItemGroupRepository>(relaxed = true)
+    private val groupMembers = mockk<ItemGroupMemberRepository>(relaxed = true)
+    private val itemTypes = mockk<ItemTypeRepository>(relaxed = true)
 
     private val service =
         TimeEntryService(
@@ -47,6 +53,9 @@ class TimeEntryServiceUnitTest {
             memberService,
             projectMembers,
             githubCommits,
+            groups,
+            groupMembers,
+            itemTypes,
         )
 
     private val item =
@@ -238,6 +247,85 @@ class TimeEntryServiceUnitTest {
             assertEquals("2026-10-07T14:00:00Z", s.startedAt)
             assertEquals("2026-10-07T16:00:00Z", s.endedAt)
             assertEquals(4, s.commitCount) // 计数含坏日期(时间轴只取可解析者)
+        }
+    }
+
+    @Nested
+    inner class Report {
+        @Test
+        fun `from 晚于 to 400`() {
+            assertFailsWith<BadRequestException> {
+                service.report("CHE", "2026-11-14T00:00:00Z", "2026-11-01T00:00:00Z", null)
+            }
+        }
+
+        @Test
+        fun `from 非法格式 400`() {
+            assertFailsWith<BadRequestException> { service.report("CHE", "2026-11-14", null, null) }
+            assertFailsWith<BadRequestException> { service.report("CHE", null, "yesterday", null) }
+        }
+
+        @Test
+        fun `项目不存在 404`() {
+            every { projects.findByKey("GHOST") } returns null // relaxed 默认回子 mock 非非 null,必须显式 null
+            assertFailsWith<NotFoundException> { service.report("GHOST", null, null, null) }
+        }
+
+        @Test
+        fun `dayBuckets 首末日之间补零`() {
+            val now = Instant.parse("2026-11-14T10:00:00Z")
+            val rows =
+                listOf(
+                    TimeEntry(id = 1L, objectId = UUID(0, 1), itemObjectId = UUID(0, 9), memberObjectId = UUID(0, 5), startedAt = Instant.parse("2026-11-10T08:00:00Z"), minutes = 90),
+                    TimeEntry(id = 2L, objectId = UUID(0, 2), itemObjectId = UUID(0, 9), memberObjectId = UUID(0, 5), startedAt = Instant.parse("2026-11-12T08:00:00Z"), minutes = 30),
+                )
+
+            val buckets = TimeEntryService.dayBuckets(rows, now)
+
+            assertEquals(3, buckets.size) // 11-10 / 11-11 / 11-12
+            assertEquals("2026-11-10", buckets[0].date)
+            assertEquals(90L, buckets[0].minutes)
+            assertEquals(0L, buckets[1].minutes)
+            assertEquals(30L, buckets[2].minutes)
+            assertEquals(emptyList(), TimeEntryService.dayBuckets(emptyList(), now))
+        }
+
+        @Test
+        fun `dayBuckets 进行中条目折算到 now`() {
+            val now = Instant.parse("2026-11-14T10:00:00Z")
+            val rows =
+                listOf(
+                    TimeEntry(id = 1L, objectId = UUID(0, 1), itemObjectId = UUID(0, 9), memberObjectId = UUID(0, 5), startedAt = Instant.parse("2026-11-14T08:00:00Z")), // 无 minutes 无 endedAt
+                )
+
+            val buckets = TimeEntryService.dayBuckets(rows, now)
+
+            assertEquals(120L, buckets.single().minutes)
+        }
+
+        @Test
+        fun `typeBuckets 聚合与定义名缺失回退 key`() {
+            val now = Instant.parse("2026-11-14T10:00:00Z")
+            val i9 = UUID(0, 9)
+            val i10 = UUID(0, 10)
+            val rows =
+                listOf(
+                    TimeEntry(id = 1L, objectId = UUID(0, 1), itemObjectId = i9, memberObjectId = UUID(0, 5), startedAt = Instant.parse("2026-11-10T08:00:00Z"), minutes = 90),
+                    TimeEntry(id = 2L, objectId = UUID(0, 2), itemObjectId = i9, memberObjectId = UUID(0, 5), startedAt = Instant.parse("2026-11-10T09:00:00Z"), minutes = 30),
+                    TimeEntry(id = 3L, objectId = UUID(0, 3), itemObjectId = i10, memberObjectId = UUID(0, 5), startedAt = Instant.parse("2026-11-12T08:00:00Z"), minutes = 15),
+                )
+            val itemTypes = mapOf(i9 to "task", i10 to "bug")
+
+            val buckets =
+                TimeEntryService.typeBuckets(rows, itemTypes, mapOf("task" to "杂活"), now)
+
+            assertEquals(2, buckets.size)
+            assertEquals("bug", buckets[0].typeKey) // sortedBy typeKey 字典序 bug 在前
+            assertEquals("bug", buckets[0].typeName) // 无定义回退 key
+            assertEquals(15L, buckets[0].minutes)
+            assertEquals("task", buckets[1].typeKey)
+            assertEquals("杂活", buckets[1].typeName)
+            assertEquals(120L, buckets[1].minutes)
         }
     }
 }

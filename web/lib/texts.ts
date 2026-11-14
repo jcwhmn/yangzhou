@@ -348,6 +348,8 @@ export const t = {
     empty: "还没有工时记录——在 item 详情里开始计时或补录。",
     total: "项目合计",
     byMember: "按人聚合",
+    byTypeChart: "按 Type(分钟)",
+    byDayChart: "按天(分钟)",
     member: "成员",
     minutes: "总时长",
     entries: "条目数",
