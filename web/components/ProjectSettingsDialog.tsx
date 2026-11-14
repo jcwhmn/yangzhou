@@ -50,8 +50,17 @@ export function ProjectSettingsDialog({
 }) {
   const [section, setSection] = useState<SectionId>("basic");
 
+  // YPJ-187:Esc 关 hub 时,组类型节需触发 loadSprints(原独立面板关面板刷新语义,YPJ-150)
+  const closeHub = () => {
+    if (section === "groupTypes") {
+      onGroupTypesClosed();
+      return;
+    }
+    onClose();
+  };
+
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+    <Dialog open={open} onClose={closeHub} maxWidth="md" fullWidth>
       <DialogTitle>{t.settings.title}</DialogTitle>
       <DialogContent dividers sx={{ display: "flex", gap: 2, p: 0 }}>
         <List
