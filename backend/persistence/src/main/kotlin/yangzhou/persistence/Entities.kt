@@ -604,3 +604,22 @@ data class Attachment(
     @LastModifiedBy
     var updatedByObjectId: UUID? = null,
 )
+
+/** YPJ-184(spec 0125):item 分支 commits 快照——Done 联动(finalize)+ 读时缓存(read)双写,upsert 幂等按 (item, repo, ref)。 */
+@Table("item_commit_snapshot")
+data class ItemCommitSnapshot(
+    @Id val id: Long? = null,
+    val objectId: UUID = UUID.randomUUID(),
+    val itemObjectId: UUID,
+    val repo: String,
+    val ref: String,
+    val via: String,
+    val commitsJson: String,
+    val commitCount: Int,
+    val capturedAt: Instant,
+    val capturedBy: String,
+    @CreatedDate
+    var createdAt: Instant = Instant.now(),
+    @LastModifiedDate
+    var updatedAt: Instant? = null,
+)

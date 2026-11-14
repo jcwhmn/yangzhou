@@ -5,6 +5,7 @@ import io.mockk.every
 import io.mockk.mockk
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
+import tools.jackson.databind.ObjectMapper
 import yangzhou.api.business.github.GithubCommitService
 import yangzhou.api.business.member.MemberService
 import yangzhou.api.business.projectmember.ProjectMemberService
@@ -14,6 +15,7 @@ import yangzhou.api.error.NotFoundException
 import yangzhou.persistence.Item
 import yangzhou.persistence.Member
 import yangzhou.persistence.TimeEntry
+import yangzhou.persistence.repository.ItemCommitSnapshotRepository
 import yangzhou.persistence.repository.ItemGroupMemberRepository
 import yangzhou.persistence.repository.ItemGroupRepository
 import yangzhou.persistence.repository.ItemRepository
@@ -40,6 +42,8 @@ class TimeEntryServiceUnitTest {
     private val memberService = mockk<MemberService>(relaxed = true)
     private val projectMembers = mockk<ProjectMemberService>(relaxed = true)
     private val githubCommits = mockk<GithubCommitService>(relaxed = true)
+    private val commitSnapshots = mockk<ItemCommitSnapshotRepository>(relaxed = true)
+    private val objectMapper = ObjectMapper()
     private val groups = mockk<ItemGroupRepository>(relaxed = true)
     private val groupMembers = mockk<ItemGroupMemberRepository>(relaxed = true)
     private val itemTypes = mockk<ItemTypeRepository>(relaxed = true)
@@ -53,6 +57,8 @@ class TimeEntryServiceUnitTest {
             memberService,
             projectMembers,
             githubCommits,
+            commitSnapshots,
+            objectMapper,
             groups,
             groupMembers,
             itemTypes,
@@ -326,6 +332,85 @@ class TimeEntryServiceUnitTest {
             assertEquals("task", buckets[1].typeKey)
             assertEquals("杂活", buckets[1].typeName)
             assertEquals(120L, buckets[1].minutes)
+        }
+    }
+
+    @Nested
+    inner class Snapshots {
+        private fun snapshotRef(
+            repo: String = "octo/r",
+            ref: String = "YPJ-7-x",
+            capturedBy: String,
+            dates: List<String?>,
+        ) = TimeEntryService.SnapshotRef(
+            repo = repo,
+            ref = ref,
+            capturedAt = Instant.parse("2026-11-14T12:00:00Z"),
+            capturedBy = capturedBy,
+            commits = dates.map { d -> GithubCommitService.CommitDto("abc", "m", "a", d, null) },
+        )
+
+        @Test
+        fun `单 commit 加 FINAL 锚成段——commit 到 captured_at`() {
+            val out =
+                TimeEntryService.buildSuggestionsFromSnapshots(
+                    emptySet(),
+                    listOf(snapshotRef(capturedBy = "finalize", dates = listOf("2026-11-13T09:00:00Z"))),
+                )
+
+            assertEquals(1, out.size)
+            assertEquals("2026-11-13T09:00:00Z", out[0].startedAt)
+            assertEquals("2026-11-14T12:00:00Z", out[0].endedAt) // = captured_at
+            assertEquals(1, out[0].commitCount)
+            assertEquals("分支 YPJ-7-x · 单提交(commit→完成时刻)", out[0].note)
+        }
+
+        @Test
+        fun `快照两个以上 dated 同现有口径 first last`() {
+            val out =
+                TimeEntryService.buildSuggestionsFromSnapshots(
+                    emptySet(),
+                    listOf(
+                        snapshotRef(
+                            capturedBy = "finalize",
+                            dates = listOf("2026-11-10T09:00:00Z", "2026-11-13T18:00:00Z", null),
+                        ),
+                    ),
+                )
+
+            assertEquals(1, out.size)
+            assertEquals("2026-11-10T09:00:00Z", out[0].startedAt)
+            assertEquals("2026-11-13T18:00:00Z", out[0].endedAt)
+            assertEquals(3, out[0].commitCount) // commitCount 用快照全部 commits 数
+        }
+
+        @Test
+        fun `单 commit 无 FINAL 锚或零 dated 不出`() {
+            val out =
+                TimeEntryService.buildSuggestionsFromSnapshots(
+                    emptySet(),
+                    listOf(
+                        snapshotRef(ref = "r-read", capturedBy = "read", dates = listOf("2026-11-13T09:00:00Z")),
+                        snapshotRef(ref = "r-nodate", capturedBy = "finalize", dates = listOf(null)),
+                    ),
+                )
+
+            assertTrue(out.isEmpty())
+        }
+
+        @Test
+        fun `live 已出段的 ref 跳过,快照补 live 不足的 ref`() {
+            val out =
+                TimeEntryService.buildSuggestionsFromSnapshots(
+                    setOf("octo/r" to "r-done"),
+                    listOf(
+                        snapshotRef(repo = "octo/r", ref = "r-done", capturedBy = "finalize", dates = listOf("2026-11-10T09:00:00Z", "2026-11-11T09:00:00Z")),
+                        snapshotRef(repo = "octo/r", ref = "r-open", capturedBy = "finalize", dates = listOf("2026-11-12T09:00:00Z")),
+                    ),
+                )
+
+            assertEquals(1, out.size)
+            assertEquals("r-open", out[0].ref)
         }
     }
 }
