@@ -286,6 +286,8 @@ export const t = {
       string,
       string
     >,
+    exportTitle: "导出",
+    exportXlsx: "导出 xlsx(全保真)",
     hint: "关闭后侧栏不再显示对应段(数据不删除,重开即恢复)。",
     cancel: "取消",
     save: "保存",
@@ -561,6 +563,7 @@ export const t = {
     parentDangling: "未分组（悬空）",
     reparentFailed: "改挂失败",
   },
+  toolbar: { time: "工时" },
   projectNav: {
     overview: "Overview",
     flow: "Flow",

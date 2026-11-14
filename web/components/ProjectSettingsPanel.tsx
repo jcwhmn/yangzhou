@@ -52,11 +52,13 @@ function rowError(s: EstimateScale, all: EstimateScale[]): string | null {
 }
 
 export function ProjectSettingsPanel({
+  embedded = false,
   projectKey,
   open,
   onClose,
   onChanged,
 }: {
+  embedded?: boolean;
   projectKey: string;
   open: boolean;
   onClose: () => void;
@@ -139,9 +141,9 @@ export function ProjectSettingsPanel({
     }
   }
 
-  return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>{t.settings.title}</DialogTitle>
+  // YPJ-187:embedded=设置中枢内容态(无 Dialog 壳);缺省保留原独立弹层
+  const body = (
+    <>
       <DialogContent>
         {/* 加载完成才渲染控件:控件在 settle 帧前不存在,点击意图不会被
             响应落地前后的再渲染吞掉(e2e 全量负载实锤:先渲染+disabled 门禁
@@ -303,6 +305,14 @@ export function ProjectSettingsPanel({
           {t.settings.save}
         </Button>
       </DialogActions>
+    </>
+  );
+  if (embedded) return body;
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle>{t.settings.title}</DialogTitle>
+      {body}
     </Dialog>
   );
 }

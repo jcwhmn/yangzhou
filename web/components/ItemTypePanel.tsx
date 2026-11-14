@@ -30,11 +30,13 @@ type ItemType = {
 };
 
 export function ItemTypePanel({
+  embedded = false,
   projectKey,
   open,
   onClose,
   onChanged,
 }: {
+  embedded?: boolean;
   projectKey: string;
   open: boolean;
   onClose: () => void;
@@ -110,9 +112,9 @@ export function ItemTypePanel({
     }
   };
 
-  return (
-    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
-      <DialogTitle>{t.itemTypes.title}</DialogTitle>
+  // YPJ-187:embedded=设置中枢内容态(无 Dialog 壳);缺省保留原独立弹层
+  const body = (
+    <>
       <DialogContent>
         {error && (
           <Alert severity="error" sx={{ mb: 1 }}>
@@ -218,6 +220,14 @@ export function ItemTypePanel({
           </Typography>
         </Box>
       </DialogContent>
+    </>
+  );
+  if (embedded) return body;
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
+      <DialogTitle>{t.itemTypes.title}</DialogTitle>
+      {body}
     </Dialog>
   );
 }
