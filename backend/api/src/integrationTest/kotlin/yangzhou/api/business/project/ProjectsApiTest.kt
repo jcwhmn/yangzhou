@@ -82,7 +82,7 @@ class ProjectsApiTest : AbstractApiTest() {
         assertEquals(false, before["estimateRequired"].asBoolean())
 
         // PATCH 整体替换 + required
-        val scales = listOf(mapOf("key" to "h8", "label" to "标准日", "value" to 8.0, "unit" to "小时"))
+        val scales = listOf(mapOf("key" to "h8", "label" to "标准日", "value" to 8.0, "unit" to "hour"))
         val after =
             json.readTree(
                 authed
@@ -98,7 +98,7 @@ class ProjectsApiTest : AbstractApiTest() {
             )
         assertEquals("标准日", after["estimateScales"][0]["label"].asText())
         assertEquals(8.0, after["estimateScales"][0]["value"].asDouble())
-        assertEquals("小时", after["estimateScales"][0]["unit"].asText())
+        assertEquals("hour", after["estimateScales"][0]["unit"].asText())
         assertEquals(true, after["estimateRequired"].asBoolean())
         assertEquals(false, after["estimateScalesIsDefault"].asBoolean())
 
@@ -110,8 +110,8 @@ class ProjectsApiTest : AbstractApiTest() {
                 mapOf(
                     "estimateScales" to
                         listOf(
-                            mapOf("key" to "k", "label" to "一", "value" to 1.0, "unit" to "天"),
-                            mapOf("key" to "k", "label" to "二", "value" to 2.0, "unit" to "天"),
+                            mapOf("key" to "k", "label" to "一", "value" to 1.0, "unit" to "day"),
+                            mapOf("key" to "k", "label" to "二", "value" to 2.0, "unit" to "day"),
                         ),
                 ),
             )
@@ -122,6 +122,13 @@ class ProjectsApiTest : AbstractApiTest() {
             .patch()
             .uri("/api/projects/EST/settings")
             .body(mapOf("estimateScales" to emptyList<Map<String, Any>>()))
+            .exchange()
+            .expectStatus()
+            .isBadRequest()
+        authed
+            .patch()
+            .uri("/api/projects/EST/settings")
+            .body(mapOf("estimateScales" to listOf(mapOf("key" to "k", "label" to "月", "value" to 1.0, "unit" to "month"))))
             .exchange()
             .expectStatus()
             .isBadRequest()

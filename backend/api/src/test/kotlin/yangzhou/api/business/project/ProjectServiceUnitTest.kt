@@ -134,7 +134,7 @@ class ProjectServiceUnitTest {
             assertEquals(EstimateScales.DEFAULT, dto.estimateScales)
             assertEquals(true, dto.estimateScalesIsDefault)
             // PATCH 整体替换 + required 落库(save 回读模拟持久化)
-            val custom = listOf(EstimateScaleDto("h8", "标准日", 8.0, "小时"))
+            val custom = listOf(EstimateScaleDto("h8", "标准日", 8.0, "hour"))
             var saved = che
             every { projects.save(any<Project>()) } answers {
                 saved = firstArg()

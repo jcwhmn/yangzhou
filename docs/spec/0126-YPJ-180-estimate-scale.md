@@ -84,6 +84,11 @@ ALTER TABLE projects ADD COLUMN estimate_required BOOLEAN NOT NULL DEFAULT FALSE
 └──────────────────────────────────────────────────┘
 ```
 
+
+### 单位封闭枚举(2026-11-15 用户拍板方案 B,计算前置)
+
+unit 不是自由文本:封闭枚举 `hour/day/week`(key 稳定,显示名文案外置 小时/天/周),后端 `EstimateScales.UNITS` 校验、web 下拉选择;换算逻辑(如 1 day=?)在 YPJ-186 spec 拍。改动落点:EstimateScales.UNITS+validate、面板下拉、单测/集成负例(非法单位 400)、api.http 示例改 key。
+
 ## 三、手工测试用例(用户 build/debug 阶段执行)
 
 1. 默认:新建项目不配置 → 面板显示默认五档(微2天…超大13天),恢复默认置灰。

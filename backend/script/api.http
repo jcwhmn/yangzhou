@@ -90,11 +90,11 @@ Content-Type: application/json
 
 {
   "estimateScales": [
-    { "key": "xs", "label": "微", "value": 2, "unit": "天" },
-    { "key": "s", "label": "小", "value": 3, "unit": "天" },
-    { "key": "m", "label": "中", "value": 5, "unit": "天" },
-    { "key": "l", "label": "大", "value": 8, "unit": "天" },
-    { "key": "xl", "label": "超大", "value": 13, "unit": "天" }
+    { "key": "xs", "label": "微", "value": 2, "unit": "day" },
+    { "key": "s", "label": "小", "value": 3, "unit": "day" },
+    { "key": "m", "label": "中", "value": 5, "unit": "day" },
+    { "key": "l", "label": "大", "value": 8, "unit": "day" },
+    { "key": "xl", "label": "超大", "value": 13, "unit": "day" }
   ],
   "estimateRequired": false
 }
@@ -2270,8 +2270,8 @@ Content-Type: application/json
 
 {
   "estimateScales": [
-    { "key": "k", "label": "一", "value": 1, "unit": "天" },
-    { "key": "k", "label": "二", "value": 2, "unit": "天" }
+    { "key": "k", "label": "一", "value": 1, "unit": "day" },
+    { "key": "k", "label": "二", "value": 2, "unit": "day" }
   ]
 }
 
@@ -2291,6 +2291,6 @@ Content-Type: application/json
 
 {
   "estimateScales": [
-    { "key": "k", "label": "零", "value": 0, "unit": "天" }
+    { "key": "k", "label": "零", "value": 0, "unit": "day" }
   ]
 }

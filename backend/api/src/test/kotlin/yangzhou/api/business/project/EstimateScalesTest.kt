@@ -26,7 +26,7 @@ class EstimateScalesTest {
 
     @Test
     fun `serialize 再 parse 往返保真`() {
-        val scales = listOf(EstimateScaleDto("h8", "标准日", 8.0, "小时"))
+        val scales = listOf(EstimateScaleDto("h8", "标准日", 8.0, "hour"))
         assertEquals(scales, EstimateScales.parse(mapper, EstimateScales.serialize(mapper, scales)))
     }
 
@@ -34,16 +34,17 @@ class EstimateScalesTest {
     fun `validate 负例集合`() {
         EstimateScales.validate(EstimateScales.DEFAULT) // 基线合法
         assertFailsWith<BadRequestException> { EstimateScales.validate(emptyList()) }
-        assertFailsWith<BadRequestException> { EstimateScales.validate(List(11) { EstimateScaleDto("k$it", "档", 1.0, "天") }) }
-        assertFailsWith<BadRequestException> { EstimateScales.validate(listOf(EstimateScaleDto("BAD KEY", "档", 1.0, "天"))) }
+        assertFailsWith<BadRequestException> { EstimateScales.validate(List(11) { EstimateScaleDto("k$it", "档", 1.0, "day") }) }
+        assertFailsWith<BadRequestException> { EstimateScales.validate(listOf(EstimateScaleDto("BAD KEY", "档", 1.0, "day"))) }
         assertFailsWith<BadRequestException> {
-            EstimateScales.validate(listOf(EstimateScaleDto("k", "档", 1.0, "天"), EstimateScaleDto("k", "档二", 2.0, "天")))
+            EstimateScales.validate(listOf(EstimateScaleDto("k", "档", 1.0, "day"), EstimateScaleDto("k", "档二", 2.0, "day")))
         }
-        assertFailsWith<BadRequestException> { EstimateScales.validate(listOf(EstimateScaleDto("k", " ", 1.0, "天"))) }
-        assertFailsWith<BadRequestException> { EstimateScales.validate(listOf(EstimateScaleDto("k", "长".repeat(17), 1.0, "天"))) }
-        assertFailsWith<BadRequestException> { EstimateScales.validate(listOf(EstimateScaleDto("k", "档", 0.0, "天"))) }
-        assertFailsWith<BadRequestException> { EstimateScales.validate(listOf(EstimateScaleDto("k", "档", 1000.0, "天"))) }
+        assertFailsWith<BadRequestException> { EstimateScales.validate(listOf(EstimateScaleDto("k", " ", 1.0, "day"))) }
+        assertFailsWith<BadRequestException> { EstimateScales.validate(listOf(EstimateScaleDto("k", "长".repeat(17), 1.0, "day"))) }
+        assertFailsWith<BadRequestException> { EstimateScales.validate(listOf(EstimateScaleDto("k", "档", 0.0, "day"))) }
+        assertFailsWith<BadRequestException> { EstimateScales.validate(listOf(EstimateScaleDto("k", "档", 1000.0, "day"))) }
         assertFailsWith<BadRequestException> { EstimateScales.validate(listOf(EstimateScaleDto("k", "档", 1.0, " "))) }
-        assertFailsWith<BadRequestException> { EstimateScales.validate(listOf(EstimateScaleDto("k", "档", 1.0, "一二三四五六七八九"))) }
+        assertFailsWith<BadRequestException> { EstimateScales.validate(listOf(EstimateScaleDto("k", "档", 1.0, "天"))) } // 单位封闭枚举,自由文本拒
+        assertFailsWith<BadRequestException> { EstimateScales.validate(listOf(EstimateScaleDto("k", "档", 1.0, "月"))) }
     }
 }

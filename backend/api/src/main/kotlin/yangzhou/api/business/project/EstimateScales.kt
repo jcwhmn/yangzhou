@@ -20,14 +20,17 @@ object EstimateScales {
     private val log = LoggerFactory.getLogger(EstimateScales::class.java)
     private val KEY_RE = Regex("^[a-z0-9_-]{1,32}$")
 
+    /** 单位封闭枚举(用户拍板方案 B):key 稳定,进计算(YPJ-186 换算);显示名文案外置(hour=小时/day=天/week=周)。 */
+    val UNITS = setOf("hour", "day", "week")
+
     /** 初始占位默认(Fibonacci 从 2 起,单位天);项目可整体替换。 */
     val DEFAULT =
         listOf(
-            EstimateScaleDto("xs", "微", 2.0, "天"),
-            EstimateScaleDto("s", "小", 3.0, "天"),
-            EstimateScaleDto("m", "中", 5.0, "天"),
-            EstimateScaleDto("l", "大", 8.0, "天"),
-            EstimateScaleDto("xl", "超大", 13.0, "天"),
+            EstimateScaleDto("xs", "微", 2.0, "day"),
+            EstimateScaleDto("s", "小", 3.0, "day"),
+            EstimateScaleDto("m", "中", 5.0, "day"),
+            EstimateScaleDto("l", "大", 8.0, "day"),
+            EstimateScaleDto("xl", "超大", 13.0, "day"),
         )
 
     /** 解析存量 JSON;null/损坏降级为默认(warn 不 500)。readTree 手解(仓内 Jackson 3 惯例,不依赖 kotlin module 注册)。 */
@@ -57,6 +60,7 @@ object EstimateScales {
             if (s.label.isBlank() || s.label.length > 16) throw BadRequestException("$at.label 须 1–16 字符")
             if (s.value <= 0 || s.value > 999) throw BadRequestException("$at.value 须 (0,999]")
             if (s.unit.isBlank() || s.unit.length > 8) throw BadRequestException("$at.unit 须 1–8 字符")
+            if (s.unit !in UNITS) throw BadRequestException("$at.unit 须为 ${UNITS.joinToString("/")}")
         }
     }
 }

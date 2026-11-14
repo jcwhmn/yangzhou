@@ -11,6 +11,7 @@ import {
   FormControlLabel,
   Button,
   IconButton,
+  MenuItem,
   Stack,
   Switch,
   TextField,
@@ -30,20 +31,23 @@ type EstimateScale = {
 
 // 与后端 EstimateScales.DEFAULT 同源占位(spec 0126;真源=后端,读时以响应为准)
 const DEFAULT_SCALES: EstimateScale[] = [
-  { key: "xs", label: "微", value: 2, unit: "天" },
-  { key: "s", label: "小", value: 3, unit: "天" },
-  { key: "m", label: "中", value: 5, unit: "天" },
-  { key: "l", label: "大", value: 8, unit: "天" },
-  { key: "xl", label: "超大", value: 13, unit: "天" },
+  { key: "xs", label: "微", value: 2, unit: "day" },
+  { key: "s", label: "小", value: 3, unit: "day" },
+  { key: "m", label: "中", value: 5, unit: "day" },
+  { key: "l", label: "大", value: 8, unit: "day" },
+  { key: "xl", label: "超大", value: 13, unit: "day" },
 ];
 const KEY_RE = /^[a-z0-9_-]{1,32}$/;
+// 单位封闭枚举,与后端 EstimateScales.UNITS 同源(用户拍板方案 B);进计算,显示名文案外置
+const UNITS = ["hour", "day", "week"] as const;
 
 function rowError(s: EstimateScale, all: EstimateScale[]): string | null {
   if (!KEY_RE.test(s.key)) return "key 须 1–32 位小写字母/数字/-/_";
   if (all.filter((x) => x.key === s.key).length > 1) return "key 重复";
   if (!s.label.trim() || s.label.length > 16) return "名称须 1–16 字符";
   if (!(s.value > 0 && s.value <= 999)) return "数值须 (0,999]";
-  if (!s.unit.trim() || s.unit.length > 8) return "单位须 1–8 字符";
+  if (!UNITS.includes(s.unit as (typeof UNITS)[number]))
+    return `单位须为 ${UNITS.join("/")}`;
   return null;
 }
 
@@ -212,6 +216,7 @@ export function ProjectSettingsPanel({
                   inputProps={{ min: 0.5, max: 999, step: "any" }}
                 />
                 <TextField
+                  select
                   size="small"
                   label="单位"
                   value={s.unit}
@@ -220,7 +225,13 @@ export function ProjectSettingsPanel({
                   }
                   onChange={(e) => updateRow(i, { unit: e.target.value })}
                   sx={{ width: 90 }}
-                />
+                >
+                  {UNITS.map((u) => (
+                    <MenuItem key={u} value={u}>
+                      {t.settings.unitNames[u]}
+                    </MenuItem>
+                  ))}
+                </TextField>
                 <IconButton
                   aria-label="删除档位"
                   disabled={scales.length <= 1}
@@ -248,7 +259,7 @@ export function ProjectSettingsPanel({
                       key: `k${Date.now().toString(36).slice(-4)}`,
                       label: "",
                       value: 1,
-                      unit: "天",
+                      unit: "day",
                     },
                   ]);
                   setNewIdx((prev) => [...prev, scales.length]);
