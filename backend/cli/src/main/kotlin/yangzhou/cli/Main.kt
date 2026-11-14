@@ -27,6 +27,7 @@ private fun usage() {
         用法:yz <命令> [参数] [选项]
 
           login [-u 用户名] [-p 密码] [--server URL]      登录(默认 8080;PM 日常实例用 http://localhost:8081)
+          use [<serverURL>]                            切换当前 server(会话分存,免重登;不带参数=列出已存会话)
           attrs create <属性> [--kind skill|label|category|custom] [--leveled] [--parent <分类>]  建词表属性
           members add <显示名>                         建虚拟成员(无凭据,不登录)
           members list [--json]                        成员目录(含我与虚拟)
@@ -58,7 +59,7 @@ private fun usage() {
           export <KEY> [--csv] [--file <路径>]          导出(JSON 全保真/CSV 扁平)
           import <KEY> <文件>                           导入(JSON 按扩展名或 .csv;Linear CSV 可直接灌)
 
-        会话文件:${ApiClient.sessionFile().absolutePath}
+        会话目录:${ApiClient.sessionsDir().absolutePath}(每 server 一份;当前 server 记在 ~/.yangzhou/current)
         """.trimIndent(),
 
     )
@@ -95,6 +96,17 @@ private fun run(args: List<String>) {
     val noun = positional.getOrNull(0)
     val verb = positional.getOrNull(1)
     val rest = positional.drop(2)
+
+    if (noun == "use") {
+        val store = SessionStore.default()
+        val target = positional.getOrNull(1) ?: return run {
+            println("当前:${store.currentServer() ?: "(未登录)"}")
+            println("已存会话:" + store.listServers().joinToString("、").ifEmpty { "(无)" })
+        }
+        val s = store.use(target)
+        println("已切换:${s.server}(token 沿用已存会话,未重新登录)")
+        return
+    }
 
     val api = ApiClient.create()
     if (noun == "feasibility") {
