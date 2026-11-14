@@ -177,8 +177,8 @@ fun buildSuggestionsFromSnapshots(
 
 ### 验证
 
-- 编译三路绿;全量单测绿;全量 integrationTest 绿(agent 自查,5m17s 41 例);entities.puml 同步
-- 手工:待用户 build/debug(spec §三 6 例)
+- 编译三路绿;全量单测绿;全量 integrationTest 绿;entities.puml 同步
+- 自动化全量绿(用户实证:gradle test + integrationTest);手工 §三 6 例**用户拍板豁免**(2026-11-14,数据量起来后再走查;机制等价性已由集成 5 例覆盖:Fake gateway 黑盒链路)
 
 ### 遗留(均设计内非目标,勿当欠账)
 
