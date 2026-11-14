@@ -7,6 +7,7 @@ import io.mockk.mockk
 import io.mockk.verify
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
+import tools.jackson.databind.ObjectMapper
 import yangzhou.api.business.member.MemberService
 import yangzhou.api.business.workspace.WorkspaceService
 import yangzhou.api.error.ConflictException
@@ -21,7 +22,6 @@ import yangzhou.persistence.repository.ProjectMemberRepository
 import yangzhou.persistence.repository.ProjectRepository
 import yangzhou.persistence.repository.ProjectWorkflowRuleRepository
 import yangzhou.persistence.repository.StatusRepository
-import tools.jackson.databind.ObjectMapper
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -136,7 +136,10 @@ class ProjectServiceUnitTest {
             // PATCH 整体替换 + required 落库(save 回读模拟持久化)
             val custom = listOf(EstimateScaleDto("h8", "标准日", 8.0, "小时"))
             var saved = che
-            every { projects.save(any<Project>()) } answers { saved = firstArg(); saved }
+            every { projects.save(any<Project>()) } answers {
+                saved = firstArg()
+                saved
+            }
             every { projects.findByKey("CHE") } answers { saved }
             val after =
                 service.updateSettings(

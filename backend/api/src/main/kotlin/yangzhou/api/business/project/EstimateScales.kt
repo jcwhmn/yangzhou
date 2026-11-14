@@ -1,8 +1,8 @@
 package yangzhou.api.business.project
 
+import org.slf4j.LoggerFactory
 import tools.jackson.databind.ObjectMapper
 import yangzhou.api.error.BadRequestException
-import org.slf4j.LoggerFactory
 
 /** 工作量刻度单档(spec 0126):key 稳定标识,label/value/unit 项目级可配置。 */
 data class EstimateScaleDto(
@@ -43,8 +43,7 @@ object EstimateScales {
         }
     }
 
-    fun serialize(mapper: ObjectMapper, scales: List<EstimateScaleDto>): String =
-        mapper.writeValueAsString(scales.map { mapOf("key" to it.key, "label" to it.label, "value" to it.value, "unit" to it.unit) })
+    fun serialize(mapper: ObjectMapper, scales: List<EstimateScaleDto>): String = mapper.writeValueAsString(scales.map { mapOf("key" to it.key, "label" to it.label, "value" to it.value, "unit" to it.unit) })
 
     /** 写入前校验(spec 0126):1–10 档;key 格式唯一;label/unit 非空限长;value>0≤999。 */
     fun validate(scales: List<EstimateScaleDto>) {

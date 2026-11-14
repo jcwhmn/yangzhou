@@ -68,7 +68,7 @@ class ProjectsApiTest : AbstractApiTest() {
     }
 
     @Test
-    fun `工作量刻度:默认与 PATCH 往返,负例 400(YPJ-180)`() {
+    fun `工作量刻度 默认与 PATCH 往返 负例 400(YPJ-180)`() {
         val authed = bootstrapAndAuth()
         createProject(authed, "EST")
 
