@@ -1,6 +1,6 @@
 # spec 0126 — YPJ-180 工作量预估·项目级刻度配置
 
-> 状态:设计稿 v2(2026-11-14 按用户 4 点拍板收窄),待用户过目后编码。
+> 状态:v2 已编码(spec 随绿点 1 入库;web 面板随绿点 2)。
 > 拆票:本票=项目级配置;item 级设置(选档位/自由输入/展示/CLI)= **YPJ-186**,另立 spec。
 
 ## 一、需求
@@ -92,3 +92,24 @@ ALTER TABLE projects ADD COLUMN estimate_required BOOLEAN NOT NULL DEFAULT FALSE
 4. 负例:key 重复 / value=0 / 清空 label → 保存禁用+行内提示;api.http 直打 → 400。
 5. required 开 → 落库(项目详情/settings 回读 true);item 侧暂无行为(186 接)。
 6. 恢复默认 → 保存 → 存储回默认五档。
+
+## 四、As-built(2026-11-14 编码完成,PR 待开)
+
+### 落点
+
+- V60__project_estimate_scales.sql:projects + estimate_scales TEXT NULL / estimate_required BOOLEAN DEFAULT FALSE(无 CHECK,校验集中 service,spec §二已述)
+- EstimateScales.kt(project slice):EstimateScaleDto + DEFAULT 五档 + parse(readTree 手解,损坏/空降级默认 warn)/serialize(mapOf 数组)/validate(1–10 档、key 正则唯一、label≤16、value(0,999]、unit≤8)
+- ProjectService:ProjectDto + estimateScales/estimateRequired/estimateScalesIsDefault;updateSettings null=不改(首版 `?.let` 会冲存量,单测合并语义例抓出修正);ObjectMapper 构造注入
+- ProjectSettingsPanel:刻度行编辑 + newIdx 标记新档(key 可编辑;已存档与非默认占位锁定)、加一档 ≤10、删保 ≥1、恢复默认、行内校验禁保存;estimateRequired 开关;maxWidth xs→sm
+- 测试:单测 EstimateScalesTest 4 例 + ProjectServiceUnitTest 合并语义 1 例(默认回显/PATCH 替换/null 不改);集成 ProjectsApiTest 1 例(默认五档+isDefault/PATCH 往返/key 重复与零档 400/库不被坏请求污染)
+- api.http:projects 区块 settings 刻度节 + 文尾负例区 3 请求(key 重复/零档/value=0)
+- entities.puml:Project 加两字段
+
+### 验证
+
+- gradle test 全绿(373→380 例);web tsc + next build 绿
+- 集成测试 = merge 前本人跑(工单纪律);手工用例 §三 6 例待用户 build/debug 走查
+
+### 范围外备忘
+
+- item 写入侧(estimate 字段/选档或自由输入/表格列/看板角标/CLI/required 强制)= YPJ-186
