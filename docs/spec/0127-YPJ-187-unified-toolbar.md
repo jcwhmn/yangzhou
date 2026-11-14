@@ -1,6 +1,6 @@
 # spec 0127 — YPJ-187 项目工具栏统一:侧栏图标行移除 + 统一顶栏 + 设置收敛单一入口
 
-> 状态:设计稿,待用户过目后编码。
+> 状态:已编码交付(2026-11-15,PR 待开)。
 > 用户拍板(2026-11-15):①侧栏 7 图标行去掉;②收藏与设置放「工时那一栏」(看板顶栏样式);③「项目栏应该统一的,都使用看板一样的」= 所有项目页共用同一顶栏;④设置收敛单一入口(轻量版:对话框内分节,不新开页面)。
 
 ## 一、需求
@@ -87,3 +87,24 @@
 3. 设置各节逐个打开可用:工作流编辑保存、成员面板、Item/组类型、GitHub PAT、导出 xlsx 下载。
 4. 侧栏:图标行消失,项目 key 标题行干净;Release 段「管理 Release」仍在。
 5. 旧入口回归:组类型/Item 类型 e2e 两文件改入口后跑绿;project-settings.spec 绿。
+
+## 四、As-built(2026-11-15)
+
+### 落点
+
+- 新 `ProjectToolbar.tsx`:右簇 [工时链接][★收藏][⚙设置];左侧快速添加槽 = `slotRef`(RefObject)经 `ProjectToolbarContext` 下发,合格页 createPortal 注入(状态留页内,零语义搬运);layout 渲染一次全页覆盖
+- 新 `ProjectSettingsDialog.tsx`:七节(基本/工作流/成员/Item类型/组类型/GitHub/导出),各节复用既有面板 `embedded` 态;**Esc 关组类型节走 onGroupTypesClosed(关 hub+loadSprints)**——原 YPJ-150「关面板刷新」语义保持,e2e 实锤后补
+- 六面板(ProjectSettings/Members/Github/ItemType/GroupTypes/WorkflowEditor)加 `embedded?: boolean`,embedded 时返回 body 无 Dialog 壳;独立弹层模式保留(缺省 false,仓内其它调用方不受影响)
+- layout:侧栏 7 图标行删除;wfOpen/membersOpen/ghOpen/settingsOpen/gtypeOpen/itypeOpen 六个状态与独立挂载移除;hub 状态 + slotRef 接管
+- page.tsx(看板):快速添加表单 portal 进槽,原行(含工时按钮)删;backlog 同法(直建根 item 语义不变)
+- texts:settings.exportTitle/exportXlsx、toolbar.time 外置
+- e2e:group-types/item-type openPanel 改 ⚙→节;member.spec 成员池改 ⚙→成员节;project-settings 零改(⚙ aria-label 同名)
+
+### 范围备忘
+
+- sprint/[id](level-1 组页)页内本无快速添加,本次未新造(用户语义=快速添加只该在三处;组页若要接入为增量,另说)
+- 设置路由化(/settings/*)留将来;切节丢未保存表单态与原 Dialog 一致(用户已确认接受)
+
+### 验证
+
+- tsc + next build 绿;e2e 全量绿(用户实证 2026-11-15)
