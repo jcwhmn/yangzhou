@@ -10,12 +10,18 @@ import yangzhou.api.error.BadRequestException
 import yangzhou.api.error.ConflictException
 import yangzhou.api.error.NotFoundException
 import yangzhou.persistence.TimeEntry
+import yangzhou.persistence.repository.ItemGroupMemberRepository
+import yangzhou.persistence.repository.ItemGroupRepository
 import yangzhou.persistence.repository.ItemRepository
+import yangzhou.persistence.repository.ItemTypeRepository
 import yangzhou.persistence.repository.MemberRepository
 import yangzhou.persistence.repository.ProjectRepository
 import yangzhou.persistence.repository.TimeEntryRepository
 import java.time.Duration
 import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
+import java.util.TreeMap
 import java.util.UUID
 
 /**
@@ -31,6 +37,9 @@ class TimeEntryService(
     private val memberService: MemberService,
     private val projectMembers: ProjectMemberService,
     private val githubCommits: GithubCommitService,
+    private val groups: ItemGroupRepository,
+    private val groupMembers: ItemGroupMemberRepository,
+    private val itemTypes: ItemTypeRepository,
 ) {
     data class TimeEntryDto(
         val timeEntryId: UUID,
@@ -140,6 +149,48 @@ class TimeEntryService(
             }.sortedByDescending { it.totalMinutes }
     }
 
+    /** YPJ-179(spec 0124)项目工时报表:byMember/byType/byDay 一次返回。from/to 为 ISO-8601 闭区间(锚=startedAt);groupId 限组成员 item。 */
+    fun report(
+        key: String,
+        fromS: String?,
+        toS: String?,
+        groupObjectId: UUID?,
+    ): TimeReportDto {
+        val from = fromS?.let { parseInstant(it) ?: throw BadRequestException("from 应为 ISO-8601(如 2026-11-14T00:00:00Z)") }
+        val to = toS?.let { parseInstant(it) ?: throw BadRequestException("to 应为 ISO-8601") }
+        if (from != null && to != null && from.isAfter(to)) throw BadRequestException("from 必须早于 to")
+        val project = projects.findByKey(key) ?: throw NotFoundException("项目不存在:$key")
+        val projectItems = items.findByProjectObjectIdAndDeletedAtIsNullOrderByNumber(project.objectId!!)
+        val rows =
+            groupObjectId?.let { gid ->
+                val g = groups.findByProjectObjectIdAndObjectId(project.objectId, gid) ?: throw NotFoundException("组不存在:$gid")
+                val memberItemIds = groupMembers.findByGroupObjectId(g.objectId).map { it.itemObjectId }.toSet()
+                projectItems.filter { it.objectId in memberItemIds }
+            } ?: projectItems
+        val entries =
+            timeEntries
+                .findByItemObjectIdIn(rows.mapNotNull { it.objectId })
+                .filter { (from == null || !it.startedAt.isBefore(from)) && (to == null || !it.startedAt.isAfter(to)) }
+        val memberMap = members.findAllByObjectIdIn(entries.map { it.memberObjectId }.toSet()).associateBy { it.objectId }
+        val byMember =
+            entries
+                .groupBy { it.memberObjectId }
+                .map { (memberId, list) ->
+                    MemberSummary(
+                        memberId = memberId,
+                        displayName = memberMap[memberId]?.displayName ?: "?",
+                        totalMinutes = list.sumOf { minutesOf(it) },
+                        entryCount = list.size,
+                    )
+                }.sortedByDescending { it.totalMinutes }
+        val typeNames = itemTypes.findByProjectObjectIdOrderByCreatedAt(project.objectId).associateBy({ it.typeKey }, { it.name })
+        return TimeReportDto(
+            byMember = byMember,
+            byType = typeBuckets(entries, rows.associate { it.objectId!! to it.type }, typeNames, Instant.now()),
+            byDay = dayBuckets(entries, Instant.now()),
+        )
+    }
+
     data class SuggestedEntry(
         val repo: String,
         val ref: String,
@@ -155,6 +206,45 @@ class TimeEntryService(
     private fun parseInstant(text: String): Instant? = runCatching { Instant.parse(text) }.getOrNull()
 
     companion object {
+        /** minutes 落库优先;缺省按起止折算,进行中折到 now(截断到分钟)。 */
+        fun minutesOf(
+            e: TimeEntry,
+            now: Instant,
+        ): Long = e.minutes?.toLong() ?: Duration.between(e.startedAt, e.endedAt ?: now).toMinutes()
+
+        /** 纯映射:按 UTC startedAt 所在天聚合;首末日之间补零桶(图表连线连续)。 */
+        fun dayBuckets(
+            rows: List<TimeEntry>,
+            now: Instant,
+        ): List<DayMinutesDto> {
+            val totals = TreeMap<LocalDate, Long>()
+            for (e in rows) {
+                val day = e.startedAt.atZone(ZoneOffset.UTC).toLocalDate()
+                totals[day] = (totals[day] ?: 0L) + minutesOf(e, now)
+            }
+            if (totals.isEmpty()) return emptyList()
+            val out = mutableListOf<DayMinutesDto>()
+            var d = totals.firstKey()
+            while (!d.isAfter(totals.lastKey())) {
+                out += DayMinutesDto(d.toString(), totals[d] ?: 0L)
+                d = d.plusDays(1)
+            }
+            return out
+        }
+
+        /** 纯映射:按 item.typeKey 聚合;定义名缺失回退 key(YPJ-177 防御);item 类型映射缺失跳过(删档 item 不计)。 */
+        fun typeBuckets(
+            rows: List<TimeEntry>,
+            itemTypeByObjectId: Map<UUID, String>,
+            typeNames: Map<String, String>,
+            now: Instant,
+        ): List<TypeMinutesDto> = rows
+            .mapNotNull { e -> itemTypeByObjectId[e.itemObjectId]?.let { it to e } }
+            .groupBy { it.first }
+            .map { (typeKey, pairs) ->
+                TypeMinutesDto(typeKey, typeNames[typeKey] ?: typeKey, pairs.sumOf { minutesOf(it.second, now) }, pairs.size)
+            }.sortedBy { it.typeKey }
+
         /** 纯映射:≥2 个带时间戳的 commit 才成段(单 commit 无从定义收工);无日期 commit 忽略。 */
         fun buildSuggestions(refs: List<GithubCommitService.RefCommitsDto>): List<SuggestedEntry> = refs.mapNotNull { ref ->
             val dates =
@@ -188,7 +278,7 @@ class TimeEntryService(
         note = e.note,
     )
 
-    private fun minutesOf(e: TimeEntry): Long = e.minutes?.toLong() ?: Duration.between(e.startedAt, e.endedAt ?: Instant.now()).toMinutes()
+    private fun minutesOf(e: TimeEntry): Long = minutesOf(e, Instant.now())
 }
 
 data class CreateTimeEntryRequest(
@@ -196,4 +286,22 @@ data class CreateTimeEntryRequest(
     val startedAt: String?,
     val endedAt: String?,
     val note: String?,
+)
+
+data class TypeMinutesDto(
+    val typeKey: String,
+    val typeName: String,
+    val minutes: Long,
+    val entryCount: Int,
+)
+
+data class DayMinutesDto(
+    val date: String,
+    val minutes: Long,
+)
+
+data class TimeReportDto(
+    val byMember: List<TimeEntryService.MemberSummary>,
+    val byType: List<TypeMinutesDto>,
+    val byDay: List<DayMinutesDto>,
 )
