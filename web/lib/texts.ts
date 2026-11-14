@@ -278,6 +278,14 @@ export const t = {
     title: "项目设置",
     release: "Release 段",
     milestone: "Milestone 段",
+    estimateTitle: "工作量刻度",
+    estimateAdd: "加一档",
+    estimateReset: "恢复默认",
+    estimateRequired: "立票必须填预估(立票强制在 item 级票接入后生效)",
+    unitNames: { hour: "小时", day: "天", week: "周" } as Record<
+      string,
+      string
+    >,
     hint: "关闭后侧栏不再显示对应段(数据不删除,重开即恢复)。",
     cancel: "取消",
     save: "保存",

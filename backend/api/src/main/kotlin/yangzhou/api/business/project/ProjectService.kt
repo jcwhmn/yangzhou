@@ -5,6 +5,7 @@ import jakarta.validation.constraints.Pattern
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import tools.jackson.databind.ObjectMapper
 import yangzhou.api.business.github.VcsEvent
 import yangzhou.api.business.workspace.WorkspaceService
 import yangzhou.api.error.ConflictException
@@ -36,6 +37,7 @@ class ProjectService(
     private val groupTypes: yangzhou.persistence.repository.ItemGroupTypeRepository,
     private val itemTypes: yangzhou.persistence.repository.ItemTypeRepository,
     private val groupWorkflow: yangzhou.api.business.itemgroup.GroupWorkflowService,
+    private val mapper: ObjectMapper,
 ) {
 
     private val log = LoggerFactory.getLogger(ProjectService::class.java)
@@ -49,6 +51,10 @@ class ProjectService(
         val feasSignal: String?,
         val releaseEnabled: Boolean,
         val milestoneEnabled: Boolean,
+        /** YPJ-180:工作量刻度(null 存储=内置默认)。 */
+        val estimateScales: List<EstimateScaleDto>,
+        val estimateRequired: Boolean,
+        val estimateScalesIsDefault: Boolean,
         val statuses: List<StatusDto>,
     )
 
@@ -88,6 +94,7 @@ class ProjectService(
         val statusDtos = statuses.findByProjectObjectIdOrderByPosition(project.objectId!!).map {
             StatusDto(it.objectId, it.name, it.icon, it.statusType, it.position)
         }
+        val scales = EstimateScales.parse(mapper, project.estimateScales)
         return ProjectDto(
             project.objectId,
             project.key,
@@ -96,6 +103,9 @@ class ProjectService(
             project.feasSignal,
             project.releaseEnabled,
             project.milestoneEnabled,
+            scales,
+            project.estimateRequired,
+            project.estimateScales == null,
             statusDtos,
         )
     }
@@ -111,6 +121,13 @@ class ProjectService(
                 project.copy(
                     releaseEnabled = request.releaseEnabled ?: project.releaseEnabled,
                     milestoneEnabled = request.milestoneEnabled ?: project.milestoneEnabled,
+                    estimateScales = if (request.estimateScales != null) {
+                        EstimateScales.validate(request.estimateScales)
+                        EstimateScales.serialize(mapper, request.estimateScales)
+                    } else {
+                        project.estimateScales
+                    },
+                    estimateRequired = request.estimateRequired ?: project.estimateRequired,
                 ),
             )
         return get(saved.key)
@@ -253,4 +270,7 @@ data class CreateProjectRequest(
 data class UpdateProjectSettingsRequest(
     val releaseEnabled: Boolean? = null,
     val milestoneEnabled: Boolean? = null,
+    /** YPJ-180:null=不改;传数组即整体替换(恢复默认=传默认五档)。 */
+    val estimateScales: List<EstimateScaleDto>? = null,
+    val estimateRequired: Boolean? = null,
 )

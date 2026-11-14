@@ -24,6 +24,8 @@ class Capability {
 class Project {
   key: String
   name: String
+  estimateScales: TEXT? = JSON [{key,label,value,unit}] (null=内置默认)
+  estimateRequired: Boolean = false
 }
 class ProjectMember
 class Status {

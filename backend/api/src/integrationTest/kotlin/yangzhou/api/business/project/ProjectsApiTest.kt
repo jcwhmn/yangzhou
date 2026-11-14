@@ -66,4 +66,76 @@ class ProjectsApiTest : AbstractApiTest() {
             .expectStatus()
             .isBadRequest()
     }
+
+    @Test
+    fun `工作量刻度 默认与 PATCH 往返 负例 400(YPJ-180)`() {
+        val authed = bootstrapAndAuth()
+        createProject(authed, "EST")
+
+        // 默认:五档占位 + isDefault
+        val before =
+            json.readTree(
+                authed.get().uri("/api/projects/EST").exchange().expectStatus().isOk().expectBody(String::class.java).returnResult().responseBody!!,
+            )
+        assertEquals(listOf("微", "小", "中", "大", "超大"), before["estimateScales"].map { it["label"].asText() })
+        assertEquals(true, before["estimateScalesIsDefault"].asBoolean())
+        assertEquals(false, before["estimateRequired"].asBoolean())
+
+        // PATCH 整体替换 + required
+        val scales = listOf(mapOf("key" to "h8", "label" to "标准日", "value" to 8.0, "unit" to "hour"))
+        val after =
+            json.readTree(
+                authed
+                    .patch()
+                    .uri("/api/projects/EST/settings")
+                    .body(mapOf("estimateScales" to scales, "estimateRequired" to true))
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody(String::class.java)
+                    .returnResult()
+                    .responseBody!!,
+            )
+        assertEquals("标准日", after["estimateScales"][0]["label"].asText())
+        assertEquals(8.0, after["estimateScales"][0]["value"].asDouble())
+        assertEquals("hour", after["estimateScales"][0]["unit"].asText())
+        assertEquals(true, after["estimateRequired"].asBoolean())
+        assertEquals(false, after["estimateScalesIsDefault"].asBoolean())
+
+        // 负例:key 重复 400;0 档 400;库内未被坏请求污染
+        authed
+            .patch()
+            .uri("/api/projects/EST/settings")
+            .body(
+                mapOf(
+                    "estimateScales" to
+                        listOf(
+                            mapOf("key" to "k", "label" to "一", "value" to 1.0, "unit" to "day"),
+                            mapOf("key" to "k", "label" to "二", "value" to 2.0, "unit" to "day"),
+                        ),
+                ),
+            )
+            .exchange()
+            .expectStatus()
+            .isBadRequest()
+        authed
+            .patch()
+            .uri("/api/projects/EST/settings")
+            .body(mapOf("estimateScales" to emptyList<Map<String, Any>>()))
+            .exchange()
+            .expectStatus()
+            .isBadRequest()
+        authed
+            .patch()
+            .uri("/api/projects/EST/settings")
+            .body(mapOf("estimateScales" to listOf(mapOf("key" to "k", "label" to "月", "value" to 1.0, "unit" to "month"))))
+            .exchange()
+            .expectStatus()
+            .isBadRequest()
+        val intact =
+            json.readTree(
+                authed.get().uri("/api/projects/EST").exchange().expectStatus().isOk().expectBody(String::class.java).returnResult().responseBody!!,
+            )
+        assertEquals("标准日", intact["estimateScales"][0]["label"].asText())
+    }
 }
