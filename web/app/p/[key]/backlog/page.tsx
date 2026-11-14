@@ -14,6 +14,8 @@ import {
   Typography,
 } from "@mui/material";
 import { PageShell } from "@/components/PageShell";
+import { createPortal } from "react-dom";
+import { useProjectToolbarSlot } from "@/components/ProjectToolbar";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -42,6 +44,7 @@ export default function BacklogPage() {
   const [items, setItems] = useState<Item[] | null>(null);
   const [error, setError] = useState("");
   const [newTitle, setNewTitle] = useState("");
+  const { slotRef } = useProjectToolbarSlot();
 
   useEffect(() => {
     api<Item[]>(`/api/projects/${key}/backlog`)
@@ -84,23 +87,27 @@ export default function BacklogPage() {
         {items !== null && (
           <Typography color="text.secondary">{`${items.length} item`}</Typography>
         )}
-        <Stack
-          component="form"
-          direction="row"
-          spacing={1}
-          sx={{ ml: "auto" }}
-          onSubmit={addItem}
-        >
-          <TextField
-            size="small"
-            placeholder={t.board.addItem}
-            value={newTitle}
-            onChange={(e) => setNewTitle(e.target.value)}
-          />
-          <Button type="submit" variant="outlined">
-            {t.board.addItem}
-          </Button>
-        </Stack>
+        {/* YPJ-187:快速添加 portal 进统一顶栏(根 item 直建,语义不变) */}
+        {slotRef.current &&
+          createPortal(
+            <Stack
+              component="form"
+              direction="row"
+              spacing={1}
+              onSubmit={addItem}
+            >
+              <TextField
+                size="small"
+                placeholder={t.board.addItem}
+                value={newTitle}
+                onChange={(e) => setNewTitle(e.target.value)}
+              />
+              <Button type="submit" variant="outlined">
+                {t.board.addItem}
+              </Button>
+            </Stack>,
+            slotRef.current,
+          )}
       </Stack>
       {error && <Typography color="error">{error}</Typography>}
       {items !== null && items.length === 0 && (

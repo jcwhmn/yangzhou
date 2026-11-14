@@ -29,11 +29,13 @@ type ItemLite = { assignee: string | null; status: string };
  * 无行 = 全 workspace 池可用(存量零配置);有行 = 仅池内可指派/进候选(V3.5-B 语义)。
  */
 export function ProjectMembersPanel({
+  embedded = false,
   projectKey,
   open,
   onClose,
   onChanged,
 }: {
+  embedded?: boolean;
   projectKey: string;
   open: boolean;
   onClose: () => void;
@@ -106,9 +108,9 @@ export function ProjectMembersPanel({
   const inPool = new Set(pool.map((p) => p.memberId));
   const candidates = all.filter((m) => !inPool.has(m.memberId));
 
-  return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle>{t.membersPanel.title}</DialogTitle>
+  // YPJ-187:embedded=设置中枢内容态(无 Dialog 壳);缺省保留原独立弹层
+  const body = (
+    <>
       <DialogContent>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
           {pool.length === 0
@@ -179,6 +181,14 @@ export function ProjectMembersPanel({
       <DialogActions>
         <Button onClick={onClose}>关闭</Button>
       </DialogActions>
+    </>
+  );
+  if (embedded) return body;
+
+  return (
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
+      <DialogTitle>{t.membersPanel.title}</DialogTitle>
+      {body}
     </Dialog>
   );
 }

@@ -61,11 +61,13 @@ function fnLabel(fn: string): string {
  * 每次成功变更即回调 onChanged → 看板即时刷新。
  */
 export function WorkflowEditor({
+  embedded = false,
   projectKey,
   open,
   onClose,
   onChanged,
 }: {
+  embedded?: boolean;
   projectKey: string;
   open: boolean;
   onClose: () => void;
@@ -167,9 +169,9 @@ export function WorkflowEditor({
     }
   }
 
-  return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
-      <DialogTitle>{t.wf.title}</DialogTitle>
+  // YPJ-187:embedded=设置中枢内容态(无 Dialog 壳);缺省保留原独立弹层
+  const body = (
+    <>
       <DialogContent>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
           列即状态。迁移表为空 = 自由迁移;配置后仅列出的 from→to
@@ -340,6 +342,14 @@ export function WorkflowEditor({
           {t.attrs.delete === "删除" ? "关闭" : "Close"}
         </Button>
       </DialogActions>
+    </>
+  );
+  if (embedded) return body;
+
+  return (
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
+      <DialogTitle>{t.wf.title}</DialogTitle>
+      {body}
     </Dialog>
   );
 }

@@ -29,6 +29,8 @@ import {
 } from "@mui/material";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import { createPortal } from "react-dom";
+import { useProjectToolbarSlot } from "@/components/ProjectToolbar";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { t } from "@/lib/texts";
@@ -80,6 +82,7 @@ export default function BoardPage() {
   const { key } = useParams<{ key: string }>();
   const router = useRouter();
   const [statuses, setStatuses] = useState<Status[]>([]);
+  const { slotRef } = useProjectToolbarSlot();
   const [items, setItems] = useState<Item[]>([]);
   const [newTitle, setNewTitle] = useState("");
   const [dragOver, setDragOver] = useState<string | null>(null);
@@ -371,22 +374,27 @@ export default function BoardPage() {
         >
           <RefreshIcon fontSize="small" />
         </IconButton>
-        <Stack component="form" direction="row" spacing={1} onSubmit={addItem}>
-          <TextField
-            size="small"
-            placeholder={t.board.addItem}
-            value={newTitle}
-            onChange={(e) => setNewTitle(e.target.value)}
-          />
-          <Button type="submit" variant="outlined" disabled={loading}>
-            {t.board.addItem}
-          </Button>
-        </Stack>
-        <Box sx={{ ml: "auto" }}>
-          <Button size="small" component={Link} href={`/p/${key}/time`}>
-            工时
-          </Button>
-        </Box>
+        {/* YPJ-187:快速添加 portal 进统一顶栏;工时/收藏/设置在顶栏右簇 */}
+        {slotRef.current &&
+          createPortal(
+            <Stack
+              component="form"
+              direction="row"
+              spacing={1}
+              onSubmit={addItem}
+            >
+              <TextField
+                size="small"
+                placeholder={t.board.addItem}
+                value={newTitle}
+                onChange={(e) => setNewTitle(e.target.value)}
+              />
+              <Button type="submit" variant="outlined" disabled={loading}>
+                {t.board.addItem}
+              </Button>
+            </Stack>,
+            slotRef.current,
+          )}
       </Stack>
 
       {error && (

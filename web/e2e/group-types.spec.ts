@@ -3,11 +3,13 @@
 import { expect, test } from "./support/fixtures";
 import { apiCall } from "./support/helpers";
 
-/** 打开分组类型管理面板(图标行分类图标) */
+/** 打开分组类型管理面板(YPJ-187:顶栏 ⚙ → 组类型节) */
 async function openPanel(page: import("@playwright/test").Page) {
-  await page.getByRole("button", { name: "分组类型管理" }).click();
-  const panel = page.getByRole("dialog");
-  await expect(panel).toBeVisible();
+  await page.getByRole("button", { name: "项目设置" }).click();
+  const hub = page.getByRole("dialog");
+  await expect(hub).toBeVisible();
+  await hub.getByRole("button", { name: "分组类型管理" }).click();
+  const panel = hub;
   return panel;
 }
 

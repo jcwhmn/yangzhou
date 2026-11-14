@@ -72,6 +72,7 @@ function EdgeView({
   label,
   icon,
 }: {
+  embedded?: boolean;
   fn: string;
   target: string;
   label: string;
@@ -107,10 +108,12 @@ function EdgeView({
 }
 
 export function GroupTypesPanel({
+  embedded = false,
   projectKey,
   open,
   onClose,
 }: {
+  embedded?: boolean;
   projectKey: string;
   open: boolean;
   onClose: () => void;
@@ -289,9 +292,9 @@ export function GroupTypesPanel({
     );
   }
 
-  return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>{t.groupTypes.title}</DialogTitle>
+  // YPJ-187:embedded=设置中枢内容态(无 Dialog 壳);缺省保留原独立弹层
+  const body = (
+    <>
       <DialogContent>
         <Typography variant="caption" color="text.secondary">
           {t.groupTypes.hint}
@@ -558,6 +561,14 @@ export function GroupTypesPanel({
           </Alert>
         )}
       </DialogContent>
+    </>
+  );
+  if (embedded) return body;
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle>{t.groupTypes.title}</DialogTitle>
+      {body}
     </Dialog>
   );
 }

@@ -41,10 +41,12 @@ const EVENT_ORDER = [
 
 /** 项目级 GitHub 集成设置(V6-S4):仓库挂载 + 事件→状态映射 4 槽。 */
 export function GithubSettingsPanel({
+  embedded = false,
   projectKey,
   open,
   onClose,
 }: {
+  embedded?: boolean;
   projectKey: string;
   open: boolean;
   onClose: () => void;
@@ -123,9 +125,9 @@ export function GithubSettingsPanel({
     }
   }
 
-  return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle>{t.gh.panelTitle}</DialogTitle>
+  // YPJ-187:embedded=设置中枢内容态(无 Dialog 壳);缺省保留原独立弹层
+  const body = (
+    <>
       <DialogContent>
         {error && (
           <Typography color="error" sx={{ mb: 1 }}>
@@ -220,6 +222,14 @@ export function GithubSettingsPanel({
           {t.item.save}
         </Button>
       </DialogActions>
+    </>
+  );
+  if (embedded) return body;
+
+  return (
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
+      <DialogTitle>{t.gh.panelTitle}</DialogTitle>
+      {body}
     </Dialog>
   );
 }

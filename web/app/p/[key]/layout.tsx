@@ -21,7 +21,7 @@ import {
 import AddIcon from "@mui/icons-material/Add";
 import Link from "next/link";
 import { usePathname, useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, API_BASE } from "@/lib/api";
 import { t } from "@/lib/texts";
 import {
@@ -34,6 +34,11 @@ import {
 } from "@/lib/sprints";
 import type { Milestone } from "@/components/MilestonePage";
 import { ReleaseManager, type Release } from "@/components/ReleaseManager";
+import { ProjectSettingsDialog } from "@/components/ProjectSettingsDialog";
+import {
+  ProjectToolbar,
+  ProjectToolbarContext,
+} from "@/components/ProjectToolbar";
 import {
   Category as CategoryIcon,
   Download as DownloadIcon,
@@ -46,12 +51,7 @@ import {
   Label as LabelIcon,
 } from "@mui/icons-material";
 import type { Signal } from "@/components/Verdict";
-import { WorkflowEditor } from "@/components/WorkflowEditor";
-import { ProjectMembersPanel } from "@/components/ProjectMembersPanel";
-import { GithubSettingsPanel } from "@/components/GithubSettingsPanel";
-import { ProjectSettingsPanel } from "@/components/ProjectSettingsPanel";
-import { GroupTypesPanel } from "@/components/GroupTypesPanel";
-import { ItemTypePanel } from "@/components/ItemTypePanel";
+
 import { DateInput } from "@/components/DateInput";
 
 type Sprint = { sprintId: string; name: string; status: string };
@@ -94,13 +94,6 @@ export default function ProjectLayout({
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [error, setError] = useState("");
-  const [wfOpen, setWfOpen] = useState(false);
-  const [membersOpen, setMembersOpen] = useState(false);
-  const [ghOpen, setGhOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [gtypeOpen, setGtypeOpen] = useState(false);
-  // YPJ-177(spec 0123):item 类型管理面板;变更后重拉 flags(面板自身不影响 flags,但保持壳一致性)
-  const [itypeOpen, setItypeOpen] = useState(false);
   // YPJ-151:release/milestone 启停(null=加载中按 true 渲染防闪;失败 fail-open)
   const [flags, setFlags] = useState<{
     release: boolean;
@@ -108,6 +101,10 @@ export default function ProjectLayout({
   } | null>(null);
   // YPJ-168(spec 0119):项目名(null=未加载/失败,不渲染名行防闪)
   const [projName, setProjName] = useState<string | null>(null);
+  // YPJ-187:设置单一入口
+  const [settingsHubOpen, setSettingsHubOpen] = useState(false);
+  const slotRef = useRef<HTMLDivElement | null>(null);
+
   const [fav, setFav] = useState<boolean | null>(null);
 
   const loadSprints = () => {
@@ -331,436 +328,355 @@ export default function ProjectLayout({
   }
 
   return (
-    <Box sx={{ display: "flex", minHeight: "100vh" }}>
-      <Box
-        component="nav"
-        sx={{ width: 210, flexShrink: 0, bgcolor: "grey.50" }}
-      >
-        <Box sx={{ px: 1.5, pt: 1.5, pb: 0.5 }}>
-          {projName && (
-            <Typography
-              variant="subtitle2"
-              data-testid="sidebar-project-name"
-              sx={{
-                fontWeight: 700,
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-                mb: 0.5,
-              }}
-            >
-              {projName}
-            </Typography>
-          )}
-          <Box sx={{ display: "flex", alignItems: "center", gap: 0.25 }}>
-            <Typography
-              variant="subtitle2"
-              sx={{
-                fontWeight: 700,
-                flex: 1,
-                minWidth: 0,
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-              }}
-            >
-              {String(key).toUpperCase()}
-            </Typography>
-            <IconButton
-              size="small"
-              aria-label="favorite"
-              disabled={fav === null}
-              onClick={toggleFav}
-            >
-              {fav ? (
-                <StarIcon fontSize="small" />
-              ) : (
-                <StarBorderIcon fontSize="small" />
-              )}
-            </IconButton>
-            <IconButton
-              size="small"
-              aria-label={t.wf.button}
-              onClick={() => setWfOpen(true)}
-            >
-              <TuneIcon fontSize="small" />
-            </IconButton>
-            <IconButton
-              size="small"
-              aria-label={t.membersPanel.button}
-              onClick={() => setMembersOpen(true)}
-            >
-              <GroupIcon fontSize="small" />
-            </IconButton>
-            <IconButton
-              size="small"
-              aria-label={t.groupTypes.title}
-              onClick={() => setGtypeOpen(true)}
-            >
-              <CategoryIcon fontSize="small" />
-            </IconButton>
-            <IconButton
-              size="small"
-              aria-label={t.itemTypes.title}
-              onClick={() => setItypeOpen(true)}
-            >
-              <LabelIcon fontSize="small" />
-            </IconButton>
-            <IconButton
-              size="small"
-              aria-label={t.settings.title}
-              onClick={() => setSettingsOpen(true)}
-            >
-              <SettingsIcon fontSize="small" />
-            </IconButton>
-            <IconButton
-              size="small"
-              aria-label={t.gh.button}
-              onClick={() => setGhOpen(true)}
-            >
-              <GitHubIcon fontSize="small" />
-            </IconButton>
-            <IconButton
-              size="small"
-              aria-label="导出"
-              onClick={() => exportXlsx(String(key))}
-            >
-              <DownloadIcon fontSize="small" />
-            </IconButton>
-          </Box>
-        </Box>
-        <List dense disablePadding sx={{ py: 2 }}>
-          <ListItemButton
-            component={Link}
-            href={`/p/${key}/overview`}
-            selected={pathname === `/p/${key}/overview`}
-            sx={itemSx}
-          >
-            <ListItemText primary={t.projectNav.overview} />
-          </ListItemButton>
-          <ListItemButton
-            component={Link}
-            href={`/p/${key}/flow`}
-            selected={pathname === `/p/${key}/flow`}
-            sx={itemSx}
-          >
-            <ListItemText primary={t.projectNav.flow} />
-          </ListItemButton>
-          <ListItemButton
-            component={Link}
-            href={`/p/${key}/board`}
-            selected={pathname === `/p/${key}/board`}
-            sx={itemSx}
-          >
-            <ListItemText primary={t.projectNav.board} />
-          </ListItemButton>
-          <ListItemButton
-            component={Link}
-            href={`/p/${key}/gantt`}
-            selected={pathname === `/p/${key}/gantt`}
-            sx={itemSx}
-          >
-            <ListItemText primary={t.projectNav.gantt} />
-          </ListItemButton>
-          <ListItemButton
-            component={Link}
-            href={`/p/${key}/table`}
-            selected={pathname === `/p/${key}/table`}
-            sx={itemSx}
-          >
-            <ListItemText primary={t.projectNav.table} />
-          </ListItemButton>
-          <Divider sx={{ my: 1 }} />
-          <ListItemButton
-            component={Link}
-            href={`/p/${key}/backlog`}
-            selected={pathname === `/p/${key}/backlog`}
-            sx={itemSx}
-          >
-            <ListItemText primary={t.projectNav.backlog} />
-          </ListItemButton>
-          {l1 && (
-            <>
-              <ListSubheader
-                disableSticky
+    <ProjectToolbarContext.Provider value={{ slotRef }}>
+      <Box sx={{ display: "flex", minHeight: "100vh" }}>
+        <Box
+          component="nav"
+          sx={{ width: 210, flexShrink: 0, bgcolor: "grey.50" }}
+        >
+          <Box sx={{ px: 1.5, pt: 1.5, pb: 0.5 }}>
+            {projName && (
+              <Typography
+                variant="subtitle2"
+                data-testid="sidebar-project-name"
                 sx={{
-                  bgcolor: "transparent",
-                  display: "flex",
-                  alignItems: "center",
+                  fontWeight: 700,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                  mb: 0.5,
                 }}
               >
-                <span style={{ flex: 1 }}>{l1.name}</span>
-                <IconButton
-                  size="small"
-                  aria-label={`新建 ${l1.name}`}
-                  onClick={() => {
-                    // spec 0112:默认「当前 epic」;不变量下兜底第一个父层组
-                    setParentPick(
-                      currentParentId ??
-                        tree?.parentCandidates[0]?.sprintId ??
-                        "",
-                    );
-                    setCreateOpen(true);
-                  }}
-                >
-                  <AddIcon fontSize="small" />
-                </IconButton>
-              </ListSubheader>
-              {(sprints ?? []).length === 0 && sprints !== null && (
-                <ListItemButton disabled sx={{ py: 0.25 }}>
-                  <ListItemText
-                    primary={`暂无${l1.name}`}
-                    primaryTypographyProps={{
-                      variant: "caption",
-                      color: "text.secondary",
-                    }}
-                  />
-                </ListItemButton>
-              )}
-              {tree ? (
-                <>
-                  {nodeRows(tree.nodes, 0)}
-                  {tree.orphans.map((s) => sprintRow(s))}
-                </>
-              ) : (
-                sorted.map((s) => sprintRow(s))
-              )}
-            </>
-          )}
-          {flags?.milestone !== false && (
-            <>
-              <Divider sx={{ my: 1 }} />
-              {/* 票 1 真值表:段头常驻可点进页;行只显当前(0..1 in_progress);空态提示;双徽标上色 */}
-              <ListSubheader
-                disableSticky
-                component={Link}
-                href={`/p/${key}/milestones`}
-                sx={{
-                  bgcolor: "transparent",
-                  display: "flex",
-                  alignItems: "center",
-                  textDecoration: "none",
-                  color: "inherit",
-                }}
-              >
-                <span style={{ flex: 1 }}>{t.projectNav.milestones}</span>
-              </ListSubheader>
-              {milestones
-                .filter((m) => m.status === "in_progress")
-                .map((m) => (
-                  <ListItemButton
-                    key={m.milestoneId}
-                    component={Link}
-                    href={`/p/${key}/milestones`}
-                    sx={{ py: 0.25 }}
-                  >
-                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Typography variant="body2" noWrap>
-                        {`▶ ${m.name}`}
-                        {m.targetDate ? ` · ${m.targetDate}` : ""}
-                      </Typography>
-                    </Box>
-                    {m.overdue && (
-                      <Typography
-                        variant="caption"
-                        color="error"
-                        data-testid="milestone-nav-badge"
-                      >
-                        ⚠ {t.milestone.overdue}
-                      </Typography>
-                    )}
-                    {m.dueSoon && (
-                      <Typography
-                        variant="caption"
-                        color="warning.main"
-                        data-testid="milestone-nav-badge"
-                      >
-                        ⚠ {t.milestone.dueSoon}
-                      </Typography>
-                    )}
-                  </ListItemButton>
-                ))}
-              {milestones.every((m) => m.status !== "in_progress") && (
-                <ListItemButton
-                  disabled
-                  sx={{ py: 0.25 }}
-                  data-testid="milestone-nav-empty"
-                >
-                  <ListItemText
-                    primary={t.milestone.noCurrent}
-                    primaryTypographyProps={{
-                      variant: "caption",
-                      color: "text.secondary",
-                    }}
-                  />
-                </ListItemButton>
-              )}
-            </>
-          )}
-          {flags?.release !== false && (
-            <>
-              <Divider sx={{ my: 1 }} />
-              <ListSubheader
-                disableSticky
-                sx={{
-                  bgcolor: "transparent",
-                  display: "flex",
-                  alignItems: "center",
-                }}
-              >
-                <span style={{ flex: 1 }}>{t.projectNav.releases}</span>
-                <IconButton
-                  size="small"
-                  aria-label={t.projectNav.manageRelease}
-                  onClick={() => setRelOpen(true)}
-                >
-                  <TuneIcon fontSize="small" />
-                </IconButton>
-              </ListSubheader>
-              {releases.length === 0 && (
-                <ListItemButton disabled sx={{ py: 0.25 }}>
-                  <ListItemText
-                    primary={t.projectNav.noReleases}
-                    primaryTypographyProps={{
-                      variant: "caption",
-                      color: "text.secondary",
-                    }}
-                  />
-                </ListItemButton>
-              )}
-              {releases.map((r) => (
-                <ListItemButton key={r.releaseId} disabled sx={{ py: 0.25 }}>
-                  <ListItemText
-                    primary={`${r.name} (${r.memberCount})`}
-                    secondary={[
-                      t.release.status[
-                        r.status as keyof typeof t.release.status
-                      ],
-                      r.targetDate
-                        ? `${t.release.targetDate} ${r.targetDate}`
-                        : null,
-                      r.releasedDate
-                        ? `${t.release.releasedDate} ${r.releasedDate}`
-                        : null,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  />
-                </ListItemButton>
-              ))}
-            </>
-          )}
-        </List>
-      </Box>
-      <Box component="main" sx={{ flex: 1, minWidth: 0 }}>
-        {children}
-      </Box>
-      <Dialog
-        open={createOpen}
-        onClose={() => setCreateOpen(false)}
-        maxWidth="xs"
-        fullWidth
-      >
-        <DialogTitle>{`新建${l1?.name ?? ""}`}</DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} sx={{ mt: 1 }}>
-            <TextField
-              label={t.projectNav.createName}
-              size="small"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              autoFocus
-            />
-            <DateInput
-              label="开始日期"
-              size="small"
-              value={startDate}
-              onChange={setStartDate}
-            />
-            <DateInput
-              label="截止日期"
-              size="small"
-              value={endDate}
-              onChange={setEndDate}
-            />
-            {(tree?.parentCandidates.length ?? 0) > 0 && (
-              <TextField
-                select
-                size="small"
-                label={`所属${tree?.parentTypeName ?? ""}`}
-                value={parentPick}
-                onChange={(e) => setParentPick(e.target.value)}
-              >
-                {/* spec 0112/0114 不变量:新建必挂父(level-2),无「无」选项 */}
-                {tree!.parentCandidates.map((p) => (
-                  <MenuItem key={p.sprintId} value={p.sprintId}>
-                    {p.name}
-                  </MenuItem>
-                ))}
-              </TextField>
-            )}
-            {error && (
-              <Typography color="error" variant="body2">
-                {error}
+                {projName}
               </Typography>
             )}
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setCreateOpen(false)}>
-            {t.projectNav.cancel}
-          </Button>
-          <Button
-            variant="contained"
-            onClick={createSprint}
-            disabled={!name.trim()}
-          >
-            {t.projectNav.createOk}
-          </Button>
-        </DialogActions>
-      </Dialog>
-      <ReleaseManager
-        open={relOpen}
-        onClose={() => setRelOpen(false)}
-        projectKey={String(key)}
-        releases={releases}
-        onChanged={loadSide}
-      />
-      <WorkflowEditor
-        projectKey={String(key)}
-        open={wfOpen}
-        onClose={() => setWfOpen(false)}
-        onChanged={() => window.dispatchEvent(new Event("yz:project-changed"))}
-      />
-      <ProjectMembersPanel
-        projectKey={String(key)}
-        open={membersOpen}
-        onClose={() => setMembersOpen(false)}
-        onChanged={() => window.dispatchEvent(new Event("yz:project-changed"))}
-      />
-      <GithubSettingsPanel
-        projectKey={String(key)}
-        open={ghOpen}
-        onClose={() => setGhOpen(false)}
-      />
-      <ProjectSettingsPanel
-        projectKey={String(key)}
-        open={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-        onChanged={loadFlags}
-      />
-      <GroupTypesPanel
-        projectKey={String(key)}
-        open={gtypeOpen}
-        onClose={() => {
-          setGtypeOpen(false);
-          loadSprints(); // YPJ-150:类型管理可能新建 level-1 → 重判 Sprint 段显隐
-        }}
-      />
-      <ItemTypePanel
-        projectKey={String(key)}
-        open={itypeOpen}
-        onClose={() => setItypeOpen(false)}
-      />
-    </Box>
+          </Box>
+          <List dense disablePadding sx={{ py: 2 }}>
+            <ListItemButton
+              component={Link}
+              href={`/p/${key}/overview`}
+              selected={pathname === `/p/${key}/overview`}
+              sx={itemSx}
+            >
+              <ListItemText primary={t.projectNav.overview} />
+            </ListItemButton>
+            <ListItemButton
+              component={Link}
+              href={`/p/${key}/flow`}
+              selected={pathname === `/p/${key}/flow`}
+              sx={itemSx}
+            >
+              <ListItemText primary={t.projectNav.flow} />
+            </ListItemButton>
+            <ListItemButton
+              component={Link}
+              href={`/p/${key}/board`}
+              selected={pathname === `/p/${key}/board`}
+              sx={itemSx}
+            >
+              <ListItemText primary={t.projectNav.board} />
+            </ListItemButton>
+            <ListItemButton
+              component={Link}
+              href={`/p/${key}/gantt`}
+              selected={pathname === `/p/${key}/gantt`}
+              sx={itemSx}
+            >
+              <ListItemText primary={t.projectNav.gantt} />
+            </ListItemButton>
+            <ListItemButton
+              component={Link}
+              href={`/p/${key}/table`}
+              selected={pathname === `/p/${key}/table`}
+              sx={itemSx}
+            >
+              <ListItemText primary={t.projectNav.table} />
+            </ListItemButton>
+            <Divider sx={{ my: 1 }} />
+            <ListItemButton
+              component={Link}
+              href={`/p/${key}/backlog`}
+              selected={pathname === `/p/${key}/backlog`}
+              sx={itemSx}
+            >
+              <ListItemText primary={t.projectNav.backlog} />
+            </ListItemButton>
+            {l1 && (
+              <>
+                <ListSubheader
+                  disableSticky
+                  sx={{
+                    bgcolor: "transparent",
+                    display: "flex",
+                    alignItems: "center",
+                  }}
+                >
+                  <span style={{ flex: 1 }}>{l1.name}</span>
+                  <IconButton
+                    size="small"
+                    aria-label={`新建 ${l1.name}`}
+                    onClick={() => {
+                      // spec 0112:默认「当前 epic」;不变量下兜底第一个父层组
+                      setParentPick(
+                        currentParentId ??
+                          tree?.parentCandidates[0]?.sprintId ??
+                          "",
+                      );
+                      setCreateOpen(true);
+                    }}
+                  >
+                    <AddIcon fontSize="small" />
+                  </IconButton>
+                </ListSubheader>
+                {(sprints ?? []).length === 0 && sprints !== null && (
+                  <ListItemButton disabled sx={{ py: 0.25 }}>
+                    <ListItemText
+                      primary={`暂无${l1.name}`}
+                      primaryTypographyProps={{
+                        variant: "caption",
+                        color: "text.secondary",
+                      }}
+                    />
+                  </ListItemButton>
+                )}
+                {tree ? (
+                  <>
+                    {nodeRows(tree.nodes, 0)}
+                    {tree.orphans.map((s) => sprintRow(s))}
+                  </>
+                ) : (
+                  sorted.map((s) => sprintRow(s))
+                )}
+              </>
+            )}
+            {flags?.milestone !== false && (
+              <>
+                <Divider sx={{ my: 1 }} />
+                {/* 票 1 真值表:段头常驻可点进页;行只显当前(0..1 in_progress);空态提示;双徽标上色 */}
+                <ListSubheader
+                  disableSticky
+                  component={Link}
+                  href={`/p/${key}/milestones`}
+                  sx={{
+                    bgcolor: "transparent",
+                    display: "flex",
+                    alignItems: "center",
+                    textDecoration: "none",
+                    color: "inherit",
+                  }}
+                >
+                  <span style={{ flex: 1 }}>{t.projectNav.milestones}</span>
+                </ListSubheader>
+                {milestones
+                  .filter((m) => m.status === "in_progress")
+                  .map((m) => (
+                    <ListItemButton
+                      key={m.milestoneId}
+                      component={Link}
+                      href={`/p/${key}/milestones`}
+                      sx={{ py: 0.25 }}
+                    >
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography variant="body2" noWrap>
+                          {`▶ ${m.name}`}
+                          {m.targetDate ? ` · ${m.targetDate}` : ""}
+                        </Typography>
+                      </Box>
+                      {m.overdue && (
+                        <Typography
+                          variant="caption"
+                          color="error"
+                          data-testid="milestone-nav-badge"
+                        >
+                          ⚠ {t.milestone.overdue}
+                        </Typography>
+                      )}
+                      {m.dueSoon && (
+                        <Typography
+                          variant="caption"
+                          color="warning.main"
+                          data-testid="milestone-nav-badge"
+                        >
+                          ⚠ {t.milestone.dueSoon}
+                        </Typography>
+                      )}
+                    </ListItemButton>
+                  ))}
+                {milestones.every((m) => m.status !== "in_progress") && (
+                  <ListItemButton
+                    disabled
+                    sx={{ py: 0.25 }}
+                    data-testid="milestone-nav-empty"
+                  >
+                    <ListItemText
+                      primary={t.milestone.noCurrent}
+                      primaryTypographyProps={{
+                        variant: "caption",
+                        color: "text.secondary",
+                      }}
+                    />
+                  </ListItemButton>
+                )}
+              </>
+            )}
+            {flags?.release !== false && (
+              <>
+                <Divider sx={{ my: 1 }} />
+                <ListSubheader
+                  disableSticky
+                  sx={{
+                    bgcolor: "transparent",
+                    display: "flex",
+                    alignItems: "center",
+                  }}
+                >
+                  <span style={{ flex: 1 }}>{t.projectNav.releases}</span>
+                  <IconButton
+                    size="small"
+                    aria-label={t.projectNav.manageRelease}
+                    onClick={() => setRelOpen(true)}
+                  >
+                    <TuneIcon fontSize="small" />
+                  </IconButton>
+                </ListSubheader>
+                {releases.length === 0 && (
+                  <ListItemButton disabled sx={{ py: 0.25 }}>
+                    <ListItemText
+                      primary={t.projectNav.noReleases}
+                      primaryTypographyProps={{
+                        variant: "caption",
+                        color: "text.secondary",
+                      }}
+                    />
+                  </ListItemButton>
+                )}
+                {releases.map((r) => (
+                  <ListItemButton key={r.releaseId} disabled sx={{ py: 0.25 }}>
+                    <ListItemText
+                      primary={`${r.name} (${r.memberCount})`}
+                      secondary={[
+                        t.release.status[
+                          r.status as keyof typeof t.release.status
+                        ],
+                        r.targetDate
+                          ? `${t.release.targetDate} ${r.targetDate}`
+                          : null,
+                        r.releasedDate
+                          ? `${t.release.releasedDate} ${r.releasedDate}`
+                          : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    />
+                  </ListItemButton>
+                ))}
+              </>
+            )}
+          </List>
+        </Box>
+        <Box
+          component="main"
+          sx={{
+            flex: 1,
+            minWidth: 0,
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
+          <ProjectToolbar
+            projectKey={String(key)}
+            fav={fav}
+            onToggleFav={toggleFav}
+            onOpenSettings={() => setSettingsHubOpen(true)}
+          />
+          <Box sx={{ flex: 1, minWidth: 0 }}>{children}</Box>
+        </Box>
+        <Dialog
+          open={createOpen}
+          onClose={() => setCreateOpen(false)}
+          maxWidth="xs"
+          fullWidth
+        >
+          <DialogTitle>{`新建${l1?.name ?? ""}`}</DialogTitle>
+          <DialogContent>
+            <Stack spacing={2} sx={{ mt: 1 }}>
+              <TextField
+                label={t.projectNav.createName}
+                size="small"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                autoFocus
+              />
+              <DateInput
+                label="开始日期"
+                size="small"
+                value={startDate}
+                onChange={setStartDate}
+              />
+              <DateInput
+                label="截止日期"
+                size="small"
+                value={endDate}
+                onChange={setEndDate}
+              />
+              {(tree?.parentCandidates.length ?? 0) > 0 && (
+                <TextField
+                  select
+                  size="small"
+                  label={`所属${tree?.parentTypeName ?? ""}`}
+                  value={parentPick}
+                  onChange={(e) => setParentPick(e.target.value)}
+                >
+                  {/* spec 0112/0114 不变量:新建必挂父(level-2),无「无」选项 */}
+                  {tree!.parentCandidates.map((p) => (
+                    <MenuItem key={p.sprintId} value={p.sprintId}>
+                      {p.name}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              )}
+              {error && (
+                <Typography color="error" variant="body2">
+                  {error}
+                </Typography>
+              )}
+            </Stack>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setCreateOpen(false)}>
+              {t.projectNav.cancel}
+            </Button>
+            <Button
+              variant="contained"
+              onClick={createSprint}
+              disabled={!name.trim()}
+            >
+              {t.projectNav.createOk}
+            </Button>
+          </DialogActions>
+        </Dialog>
+        <ReleaseManager
+          open={relOpen}
+          onClose={() => setRelOpen(false)}
+          projectKey={String(key)}
+          releases={releases}
+          onChanged={loadSide}
+        />
+        <ProjectSettingsDialog
+          projectKey={String(key)}
+          open={settingsHubOpen}
+          onClose={() => setSettingsHubOpen(false)}
+          onExport={() => exportXlsx(String(key))}
+          onFlagsChanged={loadFlags}
+          onProjectChanged={() =>
+            window.dispatchEvent(new Event("yz:project-changed"))
+          }
+          onGroupTypesClosed={() => {
+            setSettingsHubOpen(false);
+            loadSprints(); // YPJ-150:类型管理可能新建 level-1 → 重判 Sprint 段显隐
+          }}
+        />
+      </Box>
+    </ProjectToolbarContext.Provider>
   );
 }

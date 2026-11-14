@@ -13,8 +13,11 @@ test("V11 成员池色点——有非终态 item 🟢,无 ⚪ @smoke", async ({
   const itemId = await apiCreateItem(projectKey, "E2E 池 item");
   await apiAssignMe(itemId);
   await page.goto(`/p/${projectKey}`);
-  await page.getByRole("button", { name: "成员池" }).click();
-  await page.getByText("+ 小王", { exact: true }).click(); // me 已随建项目自动入池(0047),不再手加
+  // YPJ-187:成员池入口 = 顶栏 ⚙ → 成员节
+  await page.getByRole("button", { name: "项目设置" }).click();
+  const hub = page.getByRole("dialog");
+  await hub.getByRole("button", { name: "项目成员池" }).click();
+  await hub.getByText("+ 小王", { exact: true }).click(); // me 已随建项目自动入池(0047),不再手加
   await expect(page.getByLabel("进行中")).toHaveCount(1);
   await expect(page.getByLabel("空闲")).toHaveCount(1);
 });
