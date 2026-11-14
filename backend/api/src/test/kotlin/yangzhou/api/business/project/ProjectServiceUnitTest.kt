@@ -21,6 +21,7 @@ import yangzhou.persistence.repository.ProjectMemberRepository
 import yangzhou.persistence.repository.ProjectRepository
 import yangzhou.persistence.repository.ProjectWorkflowRuleRepository
 import yangzhou.persistence.repository.StatusRepository
+import tools.jackson.databind.ObjectMapper
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -54,6 +55,7 @@ class ProjectServiceUnitTest {
             groupTypes,
             itemTypes,
             groupWorkflow,
+            ObjectMapper(),
         )
 
     private val wsId = UUID(0, 9)
@@ -121,6 +123,33 @@ class ProjectServiceUnitTest {
             every { projects.findAll() } returns listOf(che)
             every { statuses.findByProjectObjectIdOrderByPosition(UUID(0, 1)) } throws RuntimeException("boom")
             assertEquals(emptyList(), service.list()) // 组装失败跳过,不炸整列表
+        }
+
+        @Test
+        fun estimateScalesDefaultWhenNullAndStoredAfterPatch() {
+            val s = Status(id = 1L, objectId = UUID(0, 1), projectObjectId = UUID(0, 1), name = "Done", statusType = yangzhou.persistence.StatusType.FINAL, position = 4)
+            every { statuses.findByProjectObjectIdOrderByPosition(UUID(0, 1)) } returns listOf(s)
+            // 未配置 → 默认五档 + isDefault
+            val dto = service.get("CHE")
+            assertEquals(EstimateScales.DEFAULT, dto.estimateScales)
+            assertEquals(true, dto.estimateScalesIsDefault)
+            // PATCH 整体替换 + required 落库(save 回读模拟持久化)
+            val custom = listOf(EstimateScaleDto("h8", "标准日", 8.0, "小时"))
+            var saved = che
+            every { projects.save(any<Project>()) } answers { saved = firstArg(); saved }
+            every { projects.findByKey("CHE") } answers { saved }
+            val after =
+                service.updateSettings(
+                    "CHE",
+                    UpdateProjectSettingsRequest(estimateScales = custom, estimateRequired = true),
+                )
+            assertEquals(custom, after.estimateScales)
+            assertEquals(true, after.estimateRequired)
+            assertEquals(false, after.estimateScalesIsDefault)
+            // null=不改(save 回读后,空请求再存一次仍保 custom)
+            val untouched = service.updateSettings("CHE", UpdateProjectSettingsRequest())
+            assertEquals(custom, untouched.estimateScales)
+            assertEquals(true, untouched.estimateRequired)
         }
     }
 

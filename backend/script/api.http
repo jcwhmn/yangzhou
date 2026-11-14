@@ -83,6 +83,28 @@ Content-Type: application/json
   "milestoneEnabled": true
 }
 
+### 项目设置——工作量刻度整体替换 + required(YPJ-180)
+PATCH {{host}}/api/projects/{{pkey}}/settings
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "estimateScales": [
+    { "key": "xs", "label": "微", "value": 2, "unit": "天" },
+    { "key": "s", "label": "小", "value": 3, "unit": "天" },
+    { "key": "m", "label": "中", "value": 5, "unit": "天" },
+    { "key": "l", "label": "大", "value": 8, "unit": "天" },
+    { "key": "xl", "label": "超大", "value": 13, "unit": "天" }
+  ],
+  "estimateRequired": false
+}
+
+> {%
+    if (response.body.estimateScales && response.body.estimateScales.length > 0) {
+        client.global.set("estimateLabel", response.body.estimateScales[0].label);
+    }
+ %}
+
 ### 项目列表
 GET {{host}}/api/projects
 Authorization: Bearer {{token}}
@@ -2237,4 +2259,38 @@ Content-Type: application/json
 
 {
   "onBoard": true
+}
+
+### ============ 负例区(YPJ-180 工作量刻度) ============
+
+### [预期 400] 刻度 key 重复
+PATCH {{host}}/api/projects/{{pkey}}/settings
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "estimateScales": [
+    { "key": "k", "label": "一", "value": 1, "unit": "天" },
+    { "key": "k", "label": "二", "value": 2, "unit": "天" }
+  ]
+}
+
+### [预期 400] 零档
+PATCH {{host}}/api/projects/{{pkey}}/settings
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "estimateScales": []
+}
+
+### [预期 400] value=0
+PATCH {{host}}/api/projects/{{pkey}}/settings
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "estimateScales": [
+    { "key": "k", "label": "零", "value": 0, "unit": "天" }
+  ]
 }

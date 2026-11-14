@@ -175,6 +175,10 @@ data class Project(
     val feasSignal: String? = null,
     val releaseEnabled: Boolean = true,
     val milestoneEnabled: Boolean = true,
+    /** V60:工作量刻度(JSON 数组 [{key,label,value,unit}]);null=内置默认。 */
+    val estimateScales: String? = null,
+    /** V60:立票必须填预估(item 写入侧强制在 YPJ-186 接)。 */
+    val estimateRequired: Boolean = false,
     @CreatedDate
     var createdAt: Instant = Instant.now(),
     @LastModifiedDate
