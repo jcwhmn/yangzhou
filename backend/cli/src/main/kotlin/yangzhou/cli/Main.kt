@@ -400,6 +400,7 @@ private fun run(args: List<String>) {
         "items create" -> {
             val key = rest.getOrNull(0) ?: error("缺少项目 KEY")
             val title = rest.getOrNull(1) ?: error("缺少标题")
+            val estimate = flags["estimate"]?.let { resolveEstimate(api, key, it) } // YPJ-186
             val requirements = reqs.map { raw ->
                 val m = Regex("^(.+?)(?:>=(\\d))?$").find(raw.trim()) ?: error("需求格式:属性 或 属性>=N,得到:$raw")
                 val (attr, level) = m.destructured
@@ -416,6 +417,8 @@ private fun run(args: List<String>) {
                     "title" to title,
                     "description" to flags["desc"],
                     "sprintId" to flags["sprint"]?.let { resolveSprintId(api, key, it) },
+                    "estimateValue" to estimate?.first?.toString(),
+                    "estimateUnit" to estimate?.second,
                     "requirements" to requirements,
                 ),
             )
@@ -446,6 +449,8 @@ private fun run(args: List<String>) {
             println("${body["number"].asString()}  ${body["title"].asString()}")
             println("状态:${body["status"].asString()} | 类型:${v("type")} | 指派:${v("assignee").ifEmpty { "未指派" }} | sprint:${v("sprintName").ifEmpty { "-" }}")
             println("priority:${v("priority").ifEmpty { "-" }} | 起止:${v("startDate").ifEmpty { "-" }} ~ ${v("dueDate").ifEmpty { "-" }} | feasSignal:${v("feasSignal").ifEmpty { "-" }} | overdue:${body["overdue"].asBoolean()} | blocked:${body["blocked"].asBoolean()}")
+            val estV = body["estimateValue"]
+            if (!estV.isNull) println("预估:${estimateLabel(estV.asDouble(), body["estimateUnit"].asString())}")
             println("createdAt:${v("createdAt")} | externalRef:${v("externalRef").ifEmpty { "-" }} | parent:${v("parentNumber").ifEmpty { "-" }}")
             val reqs = body["requirements"].joinToString(", ") {
                 val lvl = it["minLevel"]
@@ -614,6 +619,28 @@ private fun memberIdByDisplayName(api: ApiClient, name: String): String? {
     }
     return found
 }
+
+/** YPJ-186(spec 0128):--estimate 解析——5h/2d/1w(数字+单位后缀,大小写不敏感)或项目刻度 key/label。 */
+private fun resolveEstimate(api: ApiClient, key: String, raw: String): Pair<Double, String> {
+    val m = Regex("^([0-9]+(?:\\.[0-9]+)?)([hdw])$", RegexOption.IGNORE_CASE).find(raw.trim())
+    if (m != null) {
+        val unit = when (m.groupValues[2].lowercase()) {
+            "h" -> "hour"
+            "d" -> "day"
+            else -> "week"
+        }
+        return m.groupValues[1].toDouble() to unit
+    }
+    api.json("GET", "/api/projects/$key")["estimateScales"]?.forEach { s ->
+        if (s["key"].asString() == raw || s["label"].asString() == raw) {
+            return s["value"].asDouble() to s["unit"].asString()
+        }
+    }
+    error("无法解析预估:$raw(支持 5h/2d/1w 或项目刻度 key/label)")
+}
+
+/** YPJ-186(spec 0128):预估显示文本(数值去尾零+中文单位)。 */
+private fun estimateLabel(value: Double, unit: String): String = "${if (value == value.toLong().toDouble()) value.toLong() else value}${mapOf("hour" to "小时", "day" to "天", "week" to "周")[unit] ?: unit}"
 
 /** --sprint 引用:UUID 直过;否则按项目 sprint 名称精确匹配(0/多匹配报错列候选)。 */
 private fun resolveSprintId(api: ApiClient, key: String, ref: String): String {

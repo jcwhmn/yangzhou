@@ -47,6 +47,8 @@ import {
 import { AssignPopover } from "@/components/AssignPopover";
 
 import { DateInput } from "@/components/DateInput";
+import { EstimateField } from "@/components/EstimateField";
+import { EstimateScale } from "@/lib/estimate";
 
 type Status = {
   statusId: string;
@@ -100,6 +102,10 @@ type Item = {
   }[];
 
   priority: string | null;
+
+  estimateValue: number | null; // YPJ-186 预估快照
+
+  estimateUnit: string | null;
 
   sprintId: string | null;
 
@@ -342,6 +348,18 @@ export default function ItemDetailPage() {
 
   const [priority, setPriority] = useState("");
 
+  const [estValue, setEstValue] = useState(""); // YPJ-186 预估表单态(成对空串=未填)
+
+  const [estUnit, setEstUnit] = useState("");
+
+  const [estScales, setEstScales] = useState<EstimateScale[]>([]);
+
+  const [estRequired, setEstRequired] = useState(false);
+
+  // 自定义值非法(单位有值但数值空/≤0)→ 禁保存(后端成对校验兕底)
+  const estInvalid =
+    estUnit !== "" && (estValue === "" || Number(estValue) <= 0);
+
   const [type, setType] = useState("task");
 
   const [typeOptions, setTypeOptions] = useState<ItemTypeLite[]>([]);
@@ -423,7 +441,11 @@ export default function ItemDetailPage() {
       await Promise.all([
         api<Item>(`/api/items/${itemId}`),
 
-        api<{ statuses: Status[] }>(`/api/projects/${key}`),
+        api<{
+          statuses: Status[];
+          estimateScales: EstimateScale[];
+          estimateRequired: boolean;
+        }>(`/api/projects/${key}`),
 
         api<Attribute[]>("/api/attributes"),
 
@@ -470,8 +492,12 @@ export default function ItemDetailPage() {
     setStartDate(it.startDate ?? "");
     setDueDate(it.dueDate ?? "");
     setPriority(it.priority ?? "");
+    setEstValue(it.estimateValue != null ? String(it.estimateValue) : "");
+    setEstUnit(it.estimateUnit ?? "");
 
     setStatuses(project.statuses);
+    setEstScales(project.estimateScales ?? []);
+    setEstRequired(project.estimateRequired ?? false);
     setAttributes(attrs);
     setSprints(spr);
 
@@ -546,6 +572,7 @@ export default function ItemDetailPage() {
   };
 
   async function saveBasics() {
+    if (estInvalid) return;
     try {
       await api(`/api/items/${itemId}`, {
         method: "PATCH",
@@ -557,6 +584,8 @@ export default function ItemDetailPage() {
           startDate,
           dueDate,
           priority,
+          estimateValue: estValue,
+          estimateUnit: estUnit,
         }),
       });
 
@@ -1191,8 +1220,31 @@ export default function ItemDetailPage() {
               }
             />
 
+            <Stack
+              direction="row"
+              spacing={1}
+              alignItems="center"
+              flexWrap="wrap"
+              useFlexGap
+            >
+              <EstimateField
+                scales={estScales}
+                required={estRequired}
+                value={estValue}
+                unit={estUnit}
+                onChange={(v, u) => {
+                  setEstValue(v);
+                  setEstUnit(u);
+                }}
+              />
+            </Stack>
+
             <Stack direction="row" spacing={1} alignItems="center">
-              <Button variant="contained" onClick={saveBasics}>
+              <Button
+                variant="contained"
+                onClick={saveBasics}
+                disabled={estInvalid}
+              >
                 {t.item.save}
               </Button>
 

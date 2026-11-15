@@ -101,6 +101,8 @@ class ItemService(
         val feasSignal: String? = null,
         val blocked: Boolean = false,
         val priority: String? = null,
+        val estimateValue: Double? = null, // YPJ-186(spec 0128):预估快照
+        val estimateUnit: String? = null,
         val createdAt: String? = null,
         val sprintId: UUID? = null,
         val sprintName: String? = null,
@@ -123,8 +125,15 @@ class ItemService(
         requirements: List<RequirementDto>,
         externalRef: String? = null,
         sprintId: UUID? = null,
+        estimateValue: String? = null,
+        estimateUnit: String? = null,
     ): ItemDto {
         val project = projects.findByKey(projectKey) ?: throw NotFoundException("项目不存在:$projectKey")
+        // YPJ-186(spec 0128):预估解析先于取号锁(fail fast);required=立票必须非空
+        val estimate = EstimateInput.parse(estimateValue, estimateUnit)
+        if (project.estimateRequired && (estimate == null || estimate.first == null)) {
+            throw BadRequestException("本项目立票必须填预估")
+        }
         // YPJ-177(spec 0123):type 校验改查项目级定义(白名单退役,CK 已放开)
         if (itemTypes.findByProjectObjectIdAndTypeKey(project.objectId!!, type) == null) {
             throw BadRequestException("type 非法:$type")
@@ -162,6 +171,8 @@ class ItemService(
                     parentObjectId = parentItemId,
                     externalRef = externalRef,
                     statusObjectId = status.objectId,
+                    estimateValue = estimate?.first,
+                    estimateUnit = estimate?.second,
                     createdByObjectId = memberService.current().objectId!!,
                 ),
             )
@@ -253,6 +264,8 @@ class ItemService(
         startDateText: String? = null,
         dueDateText: String? = null,
         priorityText: String? = null,
+        estimateValueText: String? = null,
+        estimateUnitText: String? = null,
     ): ItemDto {
         val item = itemRepo.findByObjectId(itemId) ?: throw NotFoundException("item 不存在")
         val project = projectOf(item.projectObjectId)
@@ -355,6 +368,14 @@ class ItemService(
             if (p != current.priority) {
                 current = itemRepo.save(current.copy(priority = p))
             }
+        }
+
+        // YPJ-186(spec 0128):预估三态合并(required 项目禁显式清除;同值跳过不记日志)
+        val withEstimate = applyEstimate(current, estimateValueText, estimateUnitText, project.estimateRequired)
+        if (withEstimate !== current) {
+            val old = estimateText(current.estimateValue, current.estimateUnit)
+            current = itemRepo.save(withEstimate)
+            logActivity(current.objectId!!, "estimate_changed", old, estimateText(current.estimateValue, current.estimateUnit), actorId)
         }
 
         // V8-S1 日期:参数 null = 不变;空串 = 清除;ISO 文本 = 设置。start<=due 由 DB CHECK + 此处双保险
@@ -682,6 +703,8 @@ class ItemService(
             overdue = isOverdue(item.dueDate, LocalDate.now(clock), statusById[item.statusObjectId]?.statusType == StatusType.FINAL),
             feasSignal = item.feasSignal,
             priority = item.priority,
+            estimateValue = item.estimateValue,
+            estimateUnit = item.estimateUnit,
             blocked = item.objectId in blockedIds,
             assignee = item.assigneeObjectId?.let { memberNames[it] },
             assigneeColor = item.assigneeObjectId?.let { memberMap[it]?.color },
@@ -732,6 +755,8 @@ data class CreateItemRequest(
     val externalRef: String? = null,
     val requirements: List<RequirementInput> = emptyList(),
     val sprintId: UUID? = null,
+    val estimateValue: String? = null, // YPJ-186(spec 0128):预估三态,与 priority/日期同式
+    val estimateUnit: String? = null,
 )
 
 data class AssigneeRequest(
@@ -760,6 +785,8 @@ data class UpdateItemRequest(
     val startDate: String? = null,
     val dueDate: String? = null,
     val priority: String? = null,
+    val estimateValue: String? = null, // YPJ-186(spec 0128):预估三态
+    val estimateUnit: String? = null,
 )
 
 /** dueSoon/overdue 纯函数(时钟纪律:today 由注入 Clock 提供,可测;spec 0051)。 */
@@ -773,3 +800,49 @@ internal fun isDueSoon(
     due: LocalDate?,
     today: LocalDate,
 ): Boolean = due != null && due >= today && due < today.plusDays(3)
+
+/** YPJ-186(spec 0128):预估显示文本(activity log 用;数值去尾零+单位 key)。 */
+internal fun estimateText(
+    value: Double?,
+    unit: String?,
+): String = when {
+    value == null || unit == null -> "(空)"
+    value == value.toLong().toDouble() -> "${value.toLong()} $unit"
+    else -> "$value $unit"
+}
+
+/** YPJ-186(spec 0128):预估三态合并(与 priority/日期同式)——两 null=不改;空对=清除;值对=设置。required 项目显式清除 → 400。 */
+internal fun applyEstimate(
+    current: Item,
+    valueText: String?,
+    unitText: String?,
+    required: Boolean,
+): Item {
+    val parsed = EstimateInput.parse(valueText, unitText) ?: return current
+    val (value, unit) = parsed
+    // 同值跳过在前:required 项目里「已空再清」=无变化,不拦(spec 0128:required 只禁「从有到无」)
+    if (value == current.estimateValue && unit == current.estimateUnit) return current
+    if (value == null && required) throw BadRequestException("本项目立票必须填预估,不能清除")
+    return current.copy(estimateValue = value, estimateUnit = unit)
+}
+
+/** YPJ-186(spec 0128):预估输入——value+unit 成对,unit 封闭枚举(复用 180 的 EstimateScales.UNITS)。 */
+object EstimateInput {
+    /** 三态:null=不改/未提供;Pair(null,null)=清除;Pair(v,u)=设置(校验 value∈(0,999]、unit∈枚举)。单给其一 → 400。 */
+    fun parse(
+        valueText: String?,
+        unitText: String?,
+    ): Pair<Double?, String?>? {
+        if (valueText == null && unitText == null) return null
+        val v = valueText?.trim().orEmpty()
+        val u = unitText?.trim().orEmpty()
+        if (v.isEmpty() && u.isEmpty()) return null to null
+        if (v.isEmpty() || u.isEmpty()) throw BadRequestException("estimateValue 与 estimateUnit 须成对提供")
+        val value = v.toDoubleOrNull() ?: throw BadRequestException("estimateValue 须为数字:$v")
+        if (value <= 0.0 || value > 999.0) throw BadRequestException("estimateValue 须 (0,999]:$v")
+        if (u !in yangzhou.api.business.project.EstimateScales.UNITS) {
+            throw BadRequestException("estimateUnit 须为 hour/day/week:$u")
+        }
+        return value to u
+    }
+}

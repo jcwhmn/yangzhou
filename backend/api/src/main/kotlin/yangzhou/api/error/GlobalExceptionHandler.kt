@@ -51,7 +51,11 @@ class GlobalExceptionHandler {
     fun integrity(
         e: org.springframework.dao.DataIntegrityViolationException,
         req: HttpServletRequest,
-    ): ResponseEntity<ApiError> = error(HttpStatus.CONFLICT, "CONFLICT", "数据约束冲突", req)
+    ): ResponseEntity<ApiError> {
+        // YPJ-186 排障补充:此前吞栈不记日志,409「数据约束冲突」无从归因(spec 0128 诊断实锤需要)
+        log.warn("数据约束冲突 {} {}", req.method, req.requestURI, e)
+        return error(HttpStatus.CONFLICT, "CONFLICT", "数据约束冲突", req)
+    }
 
     @ExceptionHandler(BadRequestException::class, IllegalArgumentException::class)
     fun badRequest(

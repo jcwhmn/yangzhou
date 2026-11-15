@@ -78,6 +78,8 @@ class Item {
   type: String
   startDate: LocalDate?
   dueDate: LocalDate?
+  estimateValue: Double?
+  estimateUnit: String?
   on_board: Boolean
   children: List<Item>
 }
