@@ -110,8 +110,6 @@ class ItemService(
         val sprintName: String? = null,
         val onBoard: Boolean = false,
         val autoAssignedSprintName: String? = null, // YPJ-120 仅 PATCH 触发自动挂载时非空
-        val releaseId: UUID? = null,
-        val releaseName: String? = null,
         /** 票 2(US-M7):gate 多归属回显,仅详情回填(列表批量代价高)。 */
         val milestoneIds: List<UUID> = emptyList(),
         /** YPJ-182(spec 0130):时间合计(分钟),仅列表填充;口径同 minutesOf。 */
@@ -677,13 +675,7 @@ class ItemService(
                     groupById[m.groupObjectId]?.takeIf { it.type == level1Key(projectObjectId) }?.let { m.itemObjectId to it }
                 }.groupBy({ it.first }) { it.second }
                 .mapValues { (_, gs) -> gs.firstOrNull { it.status != "completed" } ?: gs.maxBy { it.createdAt } }
-        // V15:release 归属(单选,spec 0012)
-        val currentRelease =
-            ms
-                .mapNotNull { m ->
-                    groupById[m.groupObjectId]?.takeIf { it.type == "release" }?.let { m.itemObjectId to it }
-                }.toMap()
-        return ItemCtx(project, statusById, blockedIds, attrNames, memberMap, reqs, currentSprint, latestSprint, currentRelease)
+        return ItemCtx(project, statusById, blockedIds, attrNames, memberMap, reqs, currentSprint, latestSprint)
     }
 
     private inner class ItemCtx(
@@ -695,7 +687,6 @@ class ItemService(
         val reqs: List<Requirement>,
         val currentSprint: Map<UUID, yangzhou.persistence.ItemGroup>,
         val latestSprint: Map<UUID, yangzhou.persistence.ItemGroup>,
-        val currentRelease: Map<UUID, yangzhou.persistence.ItemGroup>,
     ) {
         val finalIds: Set<UUID> = statusById.filterValues { it.statusType == StatusType.FINAL }.keys
         private val statusNames = statusById.mapValues { it.value.name }
@@ -723,8 +714,6 @@ class ItemService(
             sprintId = latestSprint[item.objectId]?.objectId,
             sprintName = latestSprint[item.objectId]?.name,
             onBoard = item.onBoard,
-            releaseId = currentRelease[item.objectId]?.objectId,
-            releaseName = currentRelease[item.objectId]?.name,
             externalRef = item.externalRef,
             parentItemId = item.parentObjectId,
             requirements =

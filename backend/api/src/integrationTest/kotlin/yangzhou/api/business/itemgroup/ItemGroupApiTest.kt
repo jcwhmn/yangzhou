@@ -149,10 +149,6 @@ class ItemGroupApiTest : AbstractApiTest() {
         assertEquals(1, wf[2]["transitions"].size()) // 0108:completed 加 reopen→active(重开=撤销内部收尾判断)
         assertEquals("reopen", wf[2]["transitions"][0]["function"].asText())
         assertEquals("active", wf[2]["transitions"][0]["target"].asText())
-
-        val rwf = get(authed, "/api/projects/GRP/group-types/release/workflow")
-        assertEquals(2, rwf.size())
-        assertEquals("released", rwf[1]["name"].asText())
     }
 
     @Test
@@ -189,27 +185,6 @@ class ItemGroupApiTest : AbstractApiTest() {
         action(authed, "GRP", gid, "start")
         action(authed, "GRP", gid, "complete")
         assertEquals(409, assign(authed, itemId, gid, "sprint").status.value())
-    }
-
-    @Test
-    fun `跨类型归属正交——sprint 与 release 共存`() {
-        val authed = bootstrapAndAuth()
-        createProject(authed, "GRP")
-        val item = createItem(authed, "GRP", "x")
-        val itemId = item["itemId"].asText()
-        val s = createGroup(authed, "GRP", mapOf("typeKey" to "sprint", "name" to "S1"))
-        val r = createGroup(authed, "GRP", mapOf("typeKey" to "release", "name" to "R1"))
-
-        assign(authed, itemId, s["groupId"].asText(), "sprint")
-        val both = json.readTree(assign(authed, itemId, r["groupId"].asText(), "release").responseBody!!)
-        assertEquals(s["groupId"].asText(), both["sprintId"].asText()) // release 挂入不丢 sprint
-        assertEquals(r["groupId"].asText(), both["releaseId"].asText())
-
-        // 换 sprint B → release 不丢
-        val b = createGroup(authed, "GRP", mapOf("typeKey" to "sprint", "name" to "S2"))
-        val swapped = json.readTree(assign(authed, itemId, b["groupId"].asText(), "sprint").responseBody!!)
-        assertEquals(b["groupId"].asText(), swapped["sprintId"].asText())
-        assertEquals(r["groupId"].asText(), swapped["releaseId"].asText())
     }
 
     @Test
@@ -338,19 +313,13 @@ class ItemGroupApiTest : AbstractApiTest() {
             .expectStatus()
             .isNoContent()
 
-        // spec 0100 切片B:sprint 非内建,空类型即可删;builtin release 仍不可删
+        // YPJ-165:release 类型已移除,自定义类型均可删(无内建保留)
         authed
             .delete()
             .uri("/api/projects/GRP/group-types/sprint")
             .exchange()
             .expectStatus()
             .isNoContent()
-        authed
-            .delete()
-            .uri("/api/projects/GRP/group-types/release")
-            .exchange()
-            .expectStatus()
-            .isEqualTo(409)
         authed
             .delete()
             .uri("/api/projects/GRP/group-types/phase")
@@ -360,7 +329,7 @@ class ItemGroupApiTest : AbstractApiTest() {
     }
 
     @Test
-    fun `新项目不再种子 sprint——只种 release(spec 0100 切片B)`() {
+    fun `新项目不种任何组类型——全由用户自配(YPJ-165)`() {
         val authed = bootstrapAndAuth()
         authed
             .post()
@@ -370,7 +339,7 @@ class ItemGroupApiTest : AbstractApiTest() {
             .expectStatus()
             .isCreated()
         val types = get(authed, "/api/projects/NEW/group-types")
-        assertEquals(listOf("release"), types.map { it["typeKey"].asText() })
+        assertEquals(0, types.size())
     }
 
     fun `类型重名冲突_自定义重名 409`() {
@@ -410,11 +379,7 @@ class ItemGroupApiTest : AbstractApiTest() {
         assertEquals(1, sprint["level"].asInt())
         assertEquals(true, sprint["timed"].asBoolean())
         assertEquals(false, sprint["builtin"].asBoolean())
-        // release 保持 builtin,level 非嵌套(空),timed false
-        val release = types.first { it["typeKey"].asText() == "release" }
-        assertEquals(true, release["builtin"].asBoolean())
-        assertEquals(false, release["timed"].asBoolean())
-        assertTrue(release["level"].isNull || release["level"].isMissingNode)
+        // YPJ-165:release 类型已移除,无内建类型
         // 新类型自底向上:已有 level-1 → level 2;timed 透传
         val r =
             authed

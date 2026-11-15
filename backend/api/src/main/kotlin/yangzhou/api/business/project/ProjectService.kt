@@ -73,9 +73,8 @@ class ProjectService(
                 projectObjectId = project.objectId!!, memberObjectId = members.current().objectId!!, role = yangzhou.persistence.ProjectMember.ROLE_LEADER,
             ),
         )
-        // spec 0100 切片B:新项目只种 release(builtin);组结构由用户「加 level」自配,sprint 不再种子
-        val t = groupTypes.save(yangzhou.persistence.ItemGroupType(projectObjectId = project.objectId!!, typeKey = "release", name = "Release", builtin = true, level = null, timed = false))
-        groupWorkflow.seedFor(t) // spec 0097 S2:类型落库同步种默认状态机
+        // YPJ-165(spec 0131):不再种子 release 组类型(旧组实现已拆,Release 将以独立实体重建,PRD v1.2);
+        // 组结构由用户「加 level」自配
         // YPJ-177(spec 0123):item type 四值全种——初始化占位(修订:builtin 概念移除,可增删改)
         listOf("task" to "Task", "bug" to "Bug", "story" to "Story", "goal" to "Goal").forEach { (k, n) ->
             itemTypes.save(yangzhou.persistence.ItemType(projectObjectId = project.objectId!!, typeKey = k, name = n))
@@ -171,7 +170,7 @@ class ProjectService(
         deletions.purgeItemGroupMembers(pid)
         // 子表(评论/工时/动态/状态历史/依赖/清单/git_ref/通知/群成员历史)随 item 级联;软删 item 一并物理删
         deletions.purgeItems(pid)
-        // 先于 milestone:release/sprint 同表,item_group.milestone_id restrict
+        // milestone 在 sprint/release 同表(item_group)之后清(YPJ-165:milestone_id 列已随旧 release 实现拆除)
         deletions.purgeItemGroups(pid)
         deletions.purgeItemGroupTypes(pid)
         deletions.purgeItemTypes(pid) // YPJ-177:item_type 随项目清(不清则 FK 违例 409)

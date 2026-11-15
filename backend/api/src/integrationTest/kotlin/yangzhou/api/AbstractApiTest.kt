@@ -190,7 +190,7 @@ abstract class AbstractApiTest {
                 .responseBody!!
                 .let { json.readTree(it) }
         // spec 0100 切片B:新项目不再种子 sprint;测试按 V48 存量形状补种 timed level-1 类型
-        // spec 0117:S0(无组)用例传 seedSprint=false(真无组项目仅 builtin release,level=NULL 不参与)
+        // spec 0117:S0(无组)用例传 seedSprint=false(YPJ-165 后新项目无任何 builtin 类型)
         if (seedSprint) {
             authed
                 .post()

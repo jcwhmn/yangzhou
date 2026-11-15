@@ -48,7 +48,7 @@ test("GroupTypesPanel——打开面板零点击见出边 4 槽展示行(W-RO,�
   await expect(panel.getByRole("combobox")).toHaveCount(0);
   await expect(panel.getByPlaceholder("显示名(可选)")).toHaveCount(0);
 
-  // release 类型不进本面板(非用户管理的分组类型)
+  // 内建/非分组类型不进本面板(YPJ-165 后无内建;历史断言保留防回归)
   await expect(panel.getByText("release", { exact: true })).toHaveCount(0);
 });
 

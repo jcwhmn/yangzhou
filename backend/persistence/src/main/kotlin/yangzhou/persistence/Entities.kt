@@ -461,8 +461,6 @@ data class ItemGroup(
     val status: String = "planned",
     val startDate: LocalDate? = null,
     val endDate: LocalDate? = null,
-    val releasedDate: LocalDate? = null,
-    val milestoneObjectId: UUID? = null,
     /** spec 0111(YPJ-111):父组(level-2);固定两层,叶层组可挂父,父层组必为 null。 */
     val parentObjectId: UUID? = null,
     @CreatedDate

@@ -120,7 +120,7 @@ class ItemGroupServiceUnitTest {
 
         @Test
         fun createTypeAssignsLevelBottomUpAndTimed() {
-            // 项目里尚无非 NULL level(如仅有 builtin release)→ 首个用户类型 = level 1;timed 透传
+            // 项目里尚无非 NULL level(首个用户类型 = level 1;timed 透传;YPJ-165 后无内建类型)
             every { types.findByProjectObjectIdOrderByCreatedAt(UUID(0, 1)) } returns listOf(sprintType.copy(level = null))
             every { types.save(any()) } answers { firstArg<ItemGroupType>().copy(id = 3L, objectId = UUID(0, 11)) }
             val dto = service.createType("CHE", ItemGroupService.CreateGroupTypeRequest("iteration", "迭代", timed = true))

@@ -113,8 +113,6 @@ class ItemGroup {
   status: String
   startDate: LocalDate?
   endDate: LocalDate?
-  releasedDate: LocalDate?
-  milestoneObjectId: UUID?
   parentObjectId: UUID?
 }
 class ItemGroupType {
@@ -188,7 +186,6 @@ Project "1" *-- "*" ItemGroup : Sprint
 Project "1" *-- "*" ItemGroupType : group 类型运行时定义(V35)
 ItemGroup "*" --> "1" ItemGroupType : type 命中项目类型(Phase 1)
 Project "1" *-- "*" Milestone : 时间轴节点(V14;0..1 in_progress)
-ItemGroup "*" --> "0..1" Milestone : release 关联(可空 N:1)
 Milestone "1" *-- "*" MilestoneItem : gate 挂接(V55,tracks 引用非归属)
 Item "1" *-- "*" MilestoneItem : 可多站共用(GA ⊇ MVP)
 ItemGroup "1" *-- "*" ItemGroupMember
@@ -270,7 +267,9 @@ note right of Notification
 end note
 note right of ItemGroup
   item_group:V12 Sprint 平面(spec 0010)。
-  type v1 仅 sprint(Phase 3 +release);
+  type 由项目组类型定义;YPJ-165 后
+  无内建类型(release 旧组形态已拆,
+  独立实体另票重建,PRD v1.2);
   status planned/active/completed;
   同一 item 至多一个 planned/active
   membership(应用层不变量);

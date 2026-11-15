@@ -442,9 +442,6 @@ class MetricsApiTest : AbstractApiTest() {
         put("/api/items/$id/group-membership", mapOf("groupId" to null, "groupType" to "sprint"))
         assertEquals(2, rows(false))
         assertEquals(0, rows(true)) // 移出:全 closed
-        val rel = post("/api/projects/MTR/releases", mapOf("name" to "R1"))["releaseId"].asText()
-        put("/api/items/$id/release", mapOf("releaseId" to rel))
-        assertEquals(3, rows(false)) // release 型同表留痕
     }
 
     @Test

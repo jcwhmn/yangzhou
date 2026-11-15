@@ -87,7 +87,7 @@ export async function apiCreateProject(
   // 409 = 并行下同名 key 已存在(理论不发生),容忍
   if (!res.ok && res.status !== 409) await assertOk(res, `创建项目 ${key}`);
   // spec 0100 切片B:新项目不再种子 sprint;按 V48 存量形状补种 timed level-1 类型
-  // spec 0117:拉入语义按有无 L1 类型分流——S0 用例传 s0:true 不补种(真无组项目仅 builtin release)
+  // spec 0117:拉入语义按有无 L1 类型分流——S0 用例传 s0:true 不补种(YPJ-165 后新项目无任何内建类型)
   if (!opts?.s0) await ensureSprintType(key);
 }
 

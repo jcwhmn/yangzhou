@@ -71,7 +71,7 @@ class BoardMembershipApiTest : AbstractApiTest() {
     @Test
     fun `无组S0——拉入置标记入看板_退回清标记`() {
         val authed = bootstrapAndAuth()
-        createProject(authed, "GRP", seedSprint = false) // 真 S0:仅 builtin release,level=NULL 不参与
+        createProject(authed, "GRP", seedSprint = false) // 真 S0:无任何组类型(YPJ-165 后 builtin 已废)
         val item = createItem(authed, "GRP", "板 item")["itemId"].asText()
         setBoard(authed, item, true)
         assertEquals(0, get(authed, "/api/projects/GRP/backlog").size())

@@ -1,4 +1,4 @@
-// YPJ-151(spec 0102):项目设置——release/milestone 启停,侧栏段门控
+// YPJ-151(spec 0102):项目设置——milestone 启停,侧栏段门控(YPJ-165:release 段已随旧组实现移除)
 import { expect, test } from "./support/fixtures";
 
 test("项目设置——关 milestone 段消失,release 段不受影响;重开恢复", async ({
@@ -6,9 +6,8 @@ test("项目设置——关 milestone 段消失,release 段不受影响;重开�
   projectKey,
 }) => {
   await page.goto(`/p/${projectKey}`);
-  // 默认开:两段都在
+  // 默认开:Milestone 段在(YPJ-165:Release 段已随旧实现移除,重建另票)
   await expect(page.getByText("Milestone", { exact: true })).toBeVisible();
-  await expect(page.getByText("Release", { exact: true })).toBeVisible();
 
   // 关 milestone
   await page.getByRole("button", { name: "项目设置" }).click();
@@ -18,9 +17,8 @@ test("项目设置——关 milestone 段消失,release 段不受影响;重开�
   await dialog.getByRole("button", { name: "保存" }).click();
   await expect(dialog).toBeHidden({ timeout: 15000 }); // MUI 淡出期吞点击,先等关;关=等 PATCH 响应,负载下可 >5s(实测 max 5.3s)
 
-  // 侧栏:Milestone 段消失,Release 段仍在
+  // 侧栏:Milestone 段消失
   await expect(page.getByText("Milestone", { exact: true })).toHaveCount(0);
-  await expect(page.getByText("Release", { exact: true })).toBeVisible();
 
   // 刷新后仍关(持久化)
   await page.reload();
