@@ -1,6 +1,6 @@
 # Milestone 与 Release PRD
 
-> 版本 1.1(2026-11-12;v1.1 = Release 独立实体修正)· 状态:待评审 · 上游:`ItemGroup PRD.md`(细化其 §7.3/§8/§9–12/§24–26 相关节,冲突处以本文为准)
+> 版本 1.2(2026-11-15;v1.2 = §12 全部拍板,本文定稿)· 状态:已定稿 · 上游:`ItemGroup PRD.md`(细化其 §7.3/§8/§9–12/§24–26 相关节,冲突处以本文为准)
 > 对标输入:Obsidian vault 两份外部规格书(`Milestone_项目里程碑功能需求规格说明书.md`、`Release_版本发布功能需求规格说明书.md`,企业级 PM 工具视角,2026-11-10)——**独立实体建模与本项目一致,可参考**;本文吸收其产品语义,裁掉企业级重特性。
 > 关联票:YPJ-165(Release 域移除,backlog)。
 
@@ -291,9 +291,10 @@ item 详情 ▸ Release:[ R1.0 ▾ ]          ← 未终态才可挂
 
 1. ~~收编 ItemGroupType~~ 已拍板:不收编,独立实体(2026-11-12)。
 2. ~~item ↔ Milestone 挂接~~ 已拍板:进 P1 票 2,gate 依据 tracks 多归属(2026-11-12 grill)。
-3. **YPJ-165 存量 release 数据处置**(A 不迁移[推荐] / B Flyway 清)——票内已列,开工时拍。
-4. **Release 挂接策略暂定**(字段化挂接 + 批量/自动规则 defer)——到 release 实现时才确认(2026-11-12)。
-5. **API 删除 milestone 补终态守卫**(spec 0116 §6 #1,唯一未拍项)。
+3. **YPJ-165 存量 release 数据处置**——已拍板:A 不迁移(2026-11-15);新增拆除迁移收回 type CHECK/drop released_date+milestone_id 列,存量 type='release' 组行废弃不转换;Flyway 只追加,新装走 V29→拆除路径终态一致。
+4. **Release 挂接策略**——已拍板:叉表挂接(2026-11-15,用户拍板;item 不耦合 release 域,历史多行自然保留);「同 item 至多属一个未终态 release」=应用层校验(挂新前查未终态挂接,冲突 409);批量/自动规则 defer。
+5. **API 删除 milestone 补终态守卫**——已拍板:做(2026-11-15),删除端点对 completed/cancelled 返回 409;随 milestone 相邻票顺手带上。
+6. 本文状态:待评审 → **已定稿**(2026-11-15,§12 全部拍板;YPJ-190 关闭)。
 
 ---
 
