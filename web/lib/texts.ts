@@ -595,4 +595,14 @@ export const t = {
     copyright: "© Jiang Chuanwei",
     versionFallback: "dev",
   },
+  estimate: {
+    // YPJ-186(spec 0128):封闭枚举显示名(180 拍板方案 B,后端 EstimateScales.UNITS 同源)
+    units: { hour: "小时", day: "天", week: "周" } as Record<string, string>,
+    label: "预估",
+    valueLabel: "数值",
+    unitLabel: "单位",
+    custom: "自定义",
+    clear: "清除",
+    requiredHint: "本项目立票必须填预估",
+  },
 };

@@ -31,9 +31,11 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import { useProjectToolbarSlot } from "@/components/ProjectToolbar";
+import { EstimateField } from "@/components/EstimateField";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { t } from "@/lib/texts";
+import { EstimateScale, estimateText } from "@/lib/estimate";
 import {
   listSprints,
   sprintAction,
@@ -66,6 +68,8 @@ type Item = {
   dueDate: string | null;
   overdue: boolean;
   dueSoon: boolean;
+  estimateValue: number | null; // YPJ-186 预估快照
+  estimateUnit: string | null;
   blocked: boolean;
   sprintName: string | null;
 };
@@ -85,6 +89,11 @@ export default function BoardPage() {
   const { slotRef } = useProjectToolbarSlot();
   const [items, setItems] = useState<Item[]>([]);
   const [newTitle, setNewTitle] = useState("");
+  const [newEstValue, setNewEstValue] = useState(""); // YPJ-186 预估表单态(成对空串=未填)
+  const [newEstUnit, setNewEstUnit] = useState("");
+  const [pendingEst, setPendingEst] = useState({ value: "", unit: "" }); // S2/S3 对话框路径的快照(同 pendingTitle)
+  const [estScales, setEstScales] = useState<EstimateScale[]>([]);
+  const [estRequired, setEstRequired] = useState(false);
   const [dragOver, setDragOver] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [sprintInfo, setSprintInfo] = useState(""); // YPJ-120:开始动作自动入 sprint 的轻提示
@@ -127,8 +136,14 @@ export default function BoardPage() {
 
   const load = useCallback(async () => {
     try {
-      const project = await api<{ statuses: Status[] }>(`/api/projects/${key}`);
+      const project = await api<{
+        statuses: Status[];
+        estimateScales: EstimateScale[];
+        estimateRequired: boolean;
+      }>(`/api/projects/${key}`);
       setStatuses(project.statuses);
+      setEstScales(project.estimateScales ?? []);
+      setEstRequired(project.estimateRequired ?? false);
       // V9-S1:item 列表自带 feasSignal 冗余,不再单 feasibility 调用
       // YPJ-29:看板数据范围由后端决定(active sprint 的 items;无 active → 全量)
       const board = await api<{ activeGroups: SprintLite[]; items: Item[] }>(
@@ -187,17 +202,22 @@ export default function BoardPage() {
     if (active.length > 1) {
       // S1m:多进行中组 → 用户选(归属是用户意图,不代选)
       setPendingTitle(title);
+      setPendingEst({ value: newEstValue, unit: newEstUnit });
       setSprintPickOpen(true);
       return;
     }
     if (active.length === 1) {
       // S1:直挂该组
-      await createInGroup(title, active[0].sprintId);
+      await createInGroup(title, active[0].sprintId, {
+        value: newEstValue,
+        unit: newEstUnit,
+      });
       return;
     }
     if (planned.length > 0) {
       // S2/S2m:激活并放入(确认制;取消=放弃创建,D6)
       setPendingTitle(title);
+      setPendingEst({ value: newEstValue, unit: newEstUnit });
       setLaunchPick(planned[0].sprintId);
       setLaunchMode("activate");
       setLaunchOpen(true);
@@ -208,13 +228,14 @@ export default function BoardPage() {
       const l1 = await level1Type(key);
       if (!l1) {
         // S0:无组概念,onBoard 上看板(0101 铁律);请求失败会 throw → 不静默当 S0
-        await createFree(title);
+        await createFree(title, { value: newEstValue, unit: newEstUnit });
         return;
       }
       // S3:新建组并激活;默认名=类型名+实例数+1,撞名递增
       let n = sprints.length + 1;
       while (sprints.some((s) => s.name === `${l1.name} ${n}`)) n += 1;
       setPendingTitle(title);
+      setPendingEst({ value: newEstValue, unit: newEstUnit });
       setLaunchMode("create");
       setLaunchName(`${l1.name} ${n}`);
       setLaunchOpen(true);
@@ -224,13 +245,24 @@ export default function BoardPage() {
   }
 
   /** S1/S1m/S2/S3 共用:建 item 并挂入组(后端 create 同事务校验 level-1 ∧ 非 completed)。 */
-  async function createInGroup(title: string, groupId: string) {
+  async function createInGroup(
+    title: string,
+    groupId: string,
+    est?: { value: string; unit: string },
+  ) {
     try {
       await api(`/api/projects/${key}/items`, {
         method: "POST",
-        body: JSON.stringify({ title, sprintId: groupId }),
+        body: JSON.stringify({
+          title,
+          sprintId: groupId,
+          estimateValue: est?.value || null,
+          estimateUnit: est?.unit || null,
+        }),
       });
       setNewTitle("");
+      setNewEstValue("");
+      setNewEstUnit("");
       setSprintPickOpen(false);
       await load();
     } catch (err) {
@@ -239,17 +271,29 @@ export default function BoardPage() {
   }
 
   /** 仅 S0(无组概念):建 item + onBoard 上看板(0099;无 active 时不挂组)。 */
-  async function createFree(title: string) {
+  async function createFree(
+    title: string,
+    est?: { value: string; unit: string },
+  ) {
     try {
       const created = await api<{ itemId: string }>(
         `/api/projects/${key}/items`,
-        { method: "POST", body: JSON.stringify({ title }) },
+        {
+          method: "POST",
+          body: JSON.stringify({
+            title,
+            estimateValue: est?.value || null,
+            estimateUnit: est?.unit || null,
+          }),
+        },
       );
       await api(`/api/items/${created.itemId}/board-membership`, {
         method: "PUT",
         body: JSON.stringify({ onBoard: true }),
       });
       setNewTitle("");
+      setNewEstValue("");
+      setNewEstUnit("");
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "创建失败");
@@ -259,6 +303,7 @@ export default function BoardPage() {
   /** 0105:确认=S2 激活并放入 / S3 新建组+激活+放入(组先行,item 后行;激活失败降级为挂入计划中组)。 */
   async function confirmLaunch() {
     const title = pendingTitle;
+    const est = pendingEst;
     setLaunchOpen(false);
     if (launchMode === "activate") {
       if (!launchPick) return;
@@ -267,7 +312,7 @@ export default function BoardPage() {
       } catch (err) {
         setError(err instanceof Error ? err.message : t.board.startFailed);
       }
-      await createInGroup(title, launchPick);
+      await createInGroup(title, launchPick, est);
       return;
     }
     const name = launchName.trim();
@@ -293,7 +338,7 @@ export default function BoardPage() {
         // 降级:新组已建但未激活,组列表已变化 → 手工补广播(sprintAction 失败不广播)
         window.dispatchEvent(new Event("sprints-changed"));
       }
-      await createInGroup(title, gid);
+      await createInGroup(title, gid, est);
     } catch (err) {
       setError(err instanceof Error ? err.message : "创建失败");
     }
@@ -389,7 +434,26 @@ export default function BoardPage() {
                 value={newTitle}
                 onChange={(e) => setNewTitle(e.target.value)}
               />
-              <Button type="submit" variant="outlined" disabled={loading}>
+              <EstimateField
+                scales={estScales}
+                required={estRequired}
+                value={newEstValue}
+                unit={newEstUnit}
+                onChange={(v, u) => {
+                  setNewEstValue(v);
+                  setNewEstUnit(u);
+                }}
+              />
+              <Button
+                type="submit"
+                variant="outlined"
+                disabled={
+                  loading ||
+                  (newEstUnit !== "" &&
+                    (newEstValue === "" || Number(newEstValue) <= 0)) ||
+                  (estRequired && newEstValue === "")
+                }
+              >
                 {t.board.addItem}
               </Button>
             </Stack>,
@@ -653,7 +717,10 @@ export default function BoardPage() {
                               {it.title}
                             </Typography>
                           </Link>
-                          {(it.dueDate || it.overdue || it.dueSoon) && (
+                          {(it.dueDate ||
+                            it.overdue ||
+                            it.dueSoon ||
+                            it.estimateValue != null) && (
                             <Typography
                               variant="caption"
                               sx={{
@@ -666,11 +733,28 @@ export default function BoardPage() {
                                   it.overdue || it.dueSoon ? 700 : 400,
                               }}
                             >
-                              {it.overdue
-                                ? "⚠ 超期 "
-                                : it.dueSoon
-                                  ? "⏳ 将到期 "
-                                  : "📅 "}
+                              {it.estimateValue != null && (
+                                <Typography
+                                  component="span"
+                                  variant="caption"
+                                  sx={{
+                                    color: "text.secondary",
+                                    fontWeight: 400,
+                                  }}
+                                >
+                                  {estimateText(
+                                    it.estimateValue,
+                                    it.estimateUnit,
+                                  )}
+                                  {it.dueDate ? " · " : ""}
+                                </Typography>
+                              )}
+                              {it.dueDate &&
+                                (it.overdue
+                                  ? "⚠ 超期 "
+                                  : it.dueSoon
+                                    ? "⏳ 将到期 "
+                                    : "📅 ")}
                               {it.dueDate}
                             </Typography>
                           )}
@@ -707,7 +791,9 @@ export default function BoardPage() {
               <Button
                 key={sp.sprintId}
                 variant="outlined"
-                onClick={() => createInGroup(pendingTitle, sp.sprintId)}
+                onClick={() =>
+                  createInGroup(pendingTitle, sp.sprintId, pendingEst)
+                }
               >
                 {sp.name}
               </Button>

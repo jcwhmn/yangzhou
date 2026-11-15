@@ -34,6 +34,8 @@ class ItemController(
         statusItemId = request.statusItemId,
         externalRef = request.externalRef,
         sprintId = request.sprintId,
+        estimateValue = request.estimateValue,
+        estimateUnit = request.estimateUnit,
         requirements = request.requirements.map { ItemService.RequirementDto(it.attribute.trim(), it.minLevel) },
     )
 
@@ -103,5 +105,7 @@ class ItemController(
         request.startDate,
         request.dueDate,
         request.priority,
+        request.estimateValue,
+        request.estimateUnit,
     )
 }

@@ -30,6 +30,7 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { t } from "@/lib/texts";
+import { estimateHours, estimateText } from "@/lib/estimate";
 import { AssignPopover } from "@/components/AssignPopover";
 import SearchIcon from "@mui/icons-material/Search";
 
@@ -47,6 +48,8 @@ type Item = {
   overdue: boolean;
   dueSoon: boolean;
   priority: string | null;
+  estimateValue: number | null; // YPJ-186 预估快照
+  estimateUnit: string | null;
   blocked: boolean;
   sprintName: string | null;
   attributes: { name: string; value: string | null }[];
@@ -70,6 +73,7 @@ const COLUMN_DEFS: ColumnDef[] = [
   { id: "number", label: "编号", visible: true },
   { id: "title", label: "标题", visible: true },
   { id: "priority", label: "优先级", visible: false },
+  { id: "estimate", label: "预估", visible: true },
   { id: "status", label: "状态", visible: true },
   { id: "assignee", label: "负责人", visible: true },
   { id: "startDate", label: "开始", visible: true },
@@ -409,6 +413,7 @@ export default function TableViewPage() {
     number: (i) => i.number,
     title: (i) => i.title,
     priority: (i) => i.priority,
+    estimate: (i) => estimateHours(i.estimateValue, i.estimateUnit),
     status: (i) => i.status,
     assignee: (i) => i.assignee,
     startDate: (i) => i.startDate,
@@ -745,6 +750,8 @@ export default function TableViewPage() {
                           it.status
                         ) : c.id === "priority" ? (
                           (it.priority ?? "")
+                        ) : c.id === "estimate" ? (
+                          estimateText(it.estimateValue, it.estimateUnit)
                         ) : c.id === "assignee" ? (
                           <AssignPopover
                             itemId={it.itemId}

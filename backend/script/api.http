@@ -326,6 +326,26 @@ Content-Type: application/json
   "title": "写前端看板(改)"
 }
 
+### 预估:设置(成对 value+unit,快照语义;YPJ-186)
+PATCH {{host}}/api/items/{{itemId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "estimateValue": "5",
+  "estimateUnit": "day"
+}
+
+### 预估:清除(空对;required 开启时此请求 400,见负例区)
+PATCH {{host}}/api/items/{{itemId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "estimateValue": "",
+  "estimateUnit": ""
+}
+
 ### 整体替换需求(含显式 null = 不设等级)
 PUT {{host}}/api/items/{{itemId}}/requirements
 Authorization: Bearer {{token}}
@@ -2293,4 +2313,33 @@ Content-Type: application/json
   "estimateScales": [
     { "key": "k", "label": "零", "value": 0, "unit": "day" }
   ]
+}
+
+### [预期 400] 预估单给其一(YPJ-186)
+PATCH {{host}}/api/items/{{itemId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "estimateValue": "5"
+}
+
+### [预期 400] 预估非法单位(YPJ-186)
+PATCH {{host}}/api/items/{{itemId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "estimateValue": "5",
+  "estimateUnit": "month"
+}
+
+### [预期 400] 预估 value=0(YPJ-186)
+PATCH {{host}}/api/items/{{itemId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "estimateValue": "0",
+  "estimateUnit": "hour"
 }

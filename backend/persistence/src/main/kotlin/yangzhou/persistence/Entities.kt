@@ -256,6 +256,8 @@ data class Item(
     val dueDate: LocalDate? = null,
     val feasSignal: String? = null,
     val priority: String? = null,
+    val estimateValue: Double? = null, // YPJ-186(spec 0128):预估快照(选档=写档值;unit 封闭枚举 CHECK)
+    val estimateUnit: String? = null,
     val onBoard: Boolean = false,
     val deletedAt: Instant? = null,
     @CreatedDate
