@@ -136,6 +136,14 @@ class MilestoneItem {
   milestoneObjectId: UUID
   itemObjectId: UUID
 }
+class Release {
+  name: String
+  version: String?
+  stage: String?
+  status: String
+  targetDate: LocalDate?
+  releasedDate: LocalDate?
+}
 class Requirement {
   minLevel: Int?
 }
@@ -188,6 +196,7 @@ ItemGroup "*" --> "1" ItemGroupType : type 命中项目类型(Phase 1)
 Project "1" *-- "*" Milestone : 时间轴节点(V14;0..1 in_progress)
 Milestone "1" *-- "*" MilestoneItem : gate 挂接(V55,tracks 引用非归属)
 Item "1" *-- "*" MilestoneItem : 可多站共用(GA ⊇ MVP)
+Project "1" *-- "*" Release : 交付集合(V63)
 ItemGroup "1" *-- "*" ItemGroupMember
 ItemGroup "1" *-- "*" ItemGroupMemberHistory
 ProjectWorkflowRule "*" --> "1" Status : 目标列
@@ -212,6 +221,13 @@ note right of Milestone
   completed, cancelled};终态不可变。
   ux_milestone_project_current:
   每项目至多一个 in_progress(部分唯一索引)。
+end note
+note right of Release
+  V63(spec 0132,PRD v1.2 §4.1):
+  独立实体,非 ItemGroup(YPJ-165 拆除后重建)。
+  status planned → released(单向终态);
+  stage ∈ {alpha,beta,rc,ga} 为属性非状态,
+  显示词外置文案层;version 归组维度非实体。
 end note
 
 Item "父 0..1" o-- "children *" Item : 同质树(防环)
