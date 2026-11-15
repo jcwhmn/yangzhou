@@ -332,6 +332,8 @@ interface NotificationRepository : CrudRepository<Notification, Long> {
 interface TimeEntryRepository : CrudRepository<TimeEntry, Long> {
     fun findByItemObjectIdOrderByStartedAtDesc(itemObjectId: UUID): List<TimeEntry>
 
+    fun findByItemObjectIdAndEndedAtIsNull(itemObjectId: UUID): List<TimeEntry>
+
     fun findByMemberObjectIdAndEndedAtIsNull(memberObjectId: UUID): List<TimeEntry>
 
     fun findByItemObjectIdIn(itemObjectIds: Collection<UUID>): List<TimeEntry>
