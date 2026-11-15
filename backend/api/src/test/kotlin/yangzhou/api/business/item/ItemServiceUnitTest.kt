@@ -137,6 +137,7 @@ class ItemServiceUnitTest {
             memberHistory = mockk(relaxed = true),
             milestoneItems = mockk(relaxed = true),
             itemFinalize = mockk(relaxed = true),
+            timeEntries = mockk(relaxed = true),
             clock = Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC),
         )
 

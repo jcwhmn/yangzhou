@@ -52,6 +52,7 @@ type Item = {
   estimateUnit: string | null;
   blocked: boolean;
   sprintName: string | null;
+  totalMinutes: number; // YPJ-182 时间合计(分钟),列表响应才带
   attributes: { name: string; value: string | null }[];
 };
 type ViewDto = {
@@ -74,6 +75,7 @@ const COLUMN_DEFS: ColumnDef[] = [
   { id: "title", label: "标题", visible: true },
   { id: "priority", label: "优先级", visible: false },
   { id: "estimate", label: "预估", visible: true },
+  { id: "timesheet", label: "工时", visible: false },
   { id: "status", label: "状态", visible: true },
   { id: "assignee", label: "负责人", visible: true },
   { id: "startDate", label: "开始", visible: true },
@@ -414,6 +416,7 @@ export default function TableViewPage() {
     title: (i) => i.title,
     priority: (i) => i.priority,
     estimate: (i) => estimateHours(i.estimateValue, i.estimateUnit),
+    timesheet: (i) => (i.totalMinutes > 0 ? i.totalMinutes : null),
     status: (i) => i.status,
     assignee: (i) => i.assignee,
     startDate: (i) => i.startDate,
@@ -752,6 +755,12 @@ export default function TableViewPage() {
                           (it.priority ?? "")
                         ) : c.id === "estimate" ? (
                           estimateText(it.estimateValue, it.estimateUnit)
+                        ) : c.id === "timesheet" ? (
+                          it.totalMinutes > 0 ? (
+                            t.time.fmt(it.totalMinutes)
+                          ) : (
+                            "—"
+                          )
                         ) : c.id === "assignee" ? (
                           <AssignPopover
                             itemId={it.itemId}
