@@ -26,6 +26,7 @@ import yangzhou.persistence.repository.MilestoneItemRepository
 import yangzhou.persistence.repository.ProjectRepository
 import yangzhou.persistence.repository.RequirementRepository
 import yangzhou.persistence.repository.StatusRepository
+import yangzhou.persistence.repository.TimeEntryRepository
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
@@ -59,6 +60,7 @@ class ItemService(
     private val memberHistory: yangzhou.persistence.repository.ItemGroupMemberHistoryRepository,
     private val milestoneItems: MilestoneItemRepository,
     private val itemFinalize: ItemFinalizeService,
+    private val timeEntries: yangzhou.persistence.repository.TimeEntryRepository,
     private val clock: Clock,
 ) {
     data class RequirementDto(
@@ -112,6 +114,8 @@ class ItemService(
         val releaseName: String? = null,
         /** 票 2(US-M7):gate 多归属回显,仅详情回填(列表批量代价高)。 */
         val milestoneIds: List<UUID> = emptyList(),
+        /** YPJ-182(spec 0130):时间合计(分钟),仅列表填充;口径同 minutesOf。 */
+        val totalMinutes: Long = 0,
     )
 
     @Transactional
@@ -220,6 +224,11 @@ class ItemService(
         // YPJ-84 决策 2:父前缀标识(同项目全量行内可解析,直接查表)
         val numberById = projectItems.associate { it.objectId to "${project.key}-${it.number}" }
         val attrsByItem = itemAttributes.findByItemObjectIdIn(visible.mapNotNull { it.objectId }).groupBy { it.itemObjectId }
+        // YPJ-182(spec 0130):时间合计批量取,内存分组(口径同 TimeEntryService.minutesOf:minutes 优先,否则起止折算,进行中折算到 now)
+        val minutesByItem = timeEntries
+            .findByItemObjectIdIn(visible.mapNotNull { it.objectId })
+            .groupBy { it.itemObjectId }
+            .mapValues { (_, rows) -> rows.sumOf { e -> e.minutes?.toLong() ?: java.time.Duration.between(e.startedAt, e.endedAt ?: clock.instant()).toMinutes() } }
         val attrNames =
             definitions.findAllByObjectIdIn(attrsByItem.values.flatten().map { it.attributeDefinitionObjectId }).associate {
                 it.objectId!! to
@@ -228,6 +237,7 @@ class ItemService(
         return visible.map {
             ctx.toDto(it).copy(
                 parentNumber = it.parentObjectId?.let(numberById::get),
+                totalMinutes = minutesByItem[it.objectId] ?: 0L,
                 attributes =
                 attrsByItem[it.objectId].orEmpty().map { a ->
                     ItemAttributeDto(attrNames[a.attributeDefinitionObjectId] ?: "?", a.value)
