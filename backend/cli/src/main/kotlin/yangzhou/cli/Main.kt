@@ -371,7 +371,7 @@ private fun run(args: List<String>) {
                         println(
 
                             "将物理删除项目 ${p["key"].asString()}(${p["name"].asString()}):" +
-                                "item ${p["itemCount"].asInt()}、sprint/release ${p["groupCount"].asInt()}、里程碑 ${p["milestoneCount"].asInt()}、" +
+                                "item ${p["itemCount"].asInt()}、sprint ${p["groupCount"].asInt()}、里程碑 ${p["milestoneCount"].asInt()}、" +
                                 "视图 ${p["viewCount"].asInt()}、状态 ${p["statusCount"].asInt()}、成员关系 ${p["memberCount"].asInt()}",
                         )
                     }

@@ -87,16 +87,6 @@ class GroupReopenApiTest : AbstractApiTest() {
     }
 
     @Test
-    fun `release 终态无 reopen——409(对外承诺不可重开)`() {
-        val authed = bootstrapAndAuth()
-        createProject(authed, "RPN")
-        val rel = createGroup(authed, "RPN", mapOf("typeKey" to "release", "name" to "R1"))
-        val rid = rel["groupId"].asText()
-        assertEquals(200, action(authed, "RPN", rid, "complete").status.value())
-        assertEquals(409, action(authed, "RPN", rid, "reopen").status.value())
-    }
-
-    @Test
     fun `重开恢复归属——completed 期间拒挂_重开后续挂成功`() {
         val authed = bootstrapAndAuth()
         createProject(authed, "RPN")

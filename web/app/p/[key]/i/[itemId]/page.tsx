@@ -111,10 +111,6 @@ type Item = {
 
   sprintName: string | null;
 
-  releaseId: string | null;
-
-  releaseName: string | null;
-
   /** 票 2(US-M7):gate 多归属回显。 */
 
   milestoneIds: string[];
@@ -129,8 +125,6 @@ type Item = {
 };
 
 type SprintLite = { sprintId: string; name: string; status: string };
-
-type ReleaseLite = { releaseId: string; name: string; status: string };
 
 type MilestoneLite = { milestoneId: string; name: string; status: string };
 
@@ -366,8 +360,6 @@ export default function ItemDetailPage() {
 
   const [sprints, setSprints] = useState<SprintLite[]>([]);
 
-  const [releases, setReleases] = useState<ReleaseLite[]>([]);
-
   const [milestones, setMilestones] = useState<MilestoneLite[]>([]);
 
   const [saved, setSaved] = useState(false);
@@ -437,8 +429,8 @@ export default function ItemDetailPage() {
   const load = useCallback(async () => {
     if (!itemId) return;
 
-    const [it, project, attrs, feas, acts, spr, rel, msLit, tps] =
-      await Promise.all([
+    const [it, project, attrs, feas, acts, spr, msLit, tps] = await Promise.all(
+      [
         api<Item>(`/api/items/${itemId}`),
 
         api<{
@@ -465,10 +457,6 @@ export default function ItemDetailPage() {
 
           .catch(() => [] as SprintLite[]),
 
-        api<ReleaseLite[]>(`/api/projects/${key}/releases`).catch(
-          () => [] as ReleaseLite[],
-        ),
-
         api<MilestoneLite[]>(`/api/projects/${key}/milestones`).catch(
           () => [] as MilestoneLite[],
         ),
@@ -476,9 +464,8 @@ export default function ItemDetailPage() {
         api<ItemTypeLite[]>(`/api/projects/${key}/item-types`).catch(
           () => [] as ItemTypeLite[],
         ),
-      ]);
-
-    setReleases(rel);
+      ],
+    );
 
     setMilestones(msLit);
 
@@ -636,8 +623,6 @@ export default function ItemDetailPage() {
     await load();
   }
 
-  // V15:拉入/移出 release(值 = 指派,null = 移出;released 也可补录,spec 0012)
-
   // 票 2(US-M7):挂/摘 gate——切该站的依据全量(PUT),回刷详情
   async function toggleMilestone(msId: string) {
     try {
@@ -655,20 +640,6 @@ export default function ItemDetailPage() {
       setItem(await api<Item>(`/api/items/${itemId}`));
     } catch (e) {
       setError(e instanceof Error ? e.message : "挂接失败");
-    }
-  }
-
-  async function assignRelease(releaseId: string | null) {
-    try {
-      const it = await api<Item>(`/api/items/${itemId}/release`, {
-        method: "PUT",
-
-        body: JSON.stringify({ releaseId }),
-      });
-
-      setItem(it);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "指派失败");
     }
   }
 
@@ -1143,25 +1114,6 @@ export default function ItemDetailPage() {
                   </Typography>
                 </Link>
               )}
-
-              <Dropdown
-                label={t.item.release}
-
-                size="small"
-
-                value={item.releaseId ?? ""}
-
-                onChange={(v) => assignRelease(v || null)}
-
-                sx={{ width: 170 }}
-
-                clearable
-
-                options={releases.map((r) => ({
-                  value: r.releaseId,
-                  label: r.name,
-                }))}
-              />
             </Stack>
 
             {milestones.length > 0 && (

@@ -33,7 +33,6 @@ import {
   type GroupNode,
 } from "@/lib/sprints";
 import type { Milestone } from "@/components/MilestonePage";
-import { ReleaseManager, type Release } from "@/components/ReleaseManager";
 import { ProjectSettingsDialog } from "@/components/ProjectSettingsDialog";
 import {
   ProjectToolbar,
@@ -82,8 +81,6 @@ export default function ProjectLayout({
   const [l1, setL1] = useState<{ name: string } | null>(null);
   const [items, setItems] = useState<NavItem[]>([]);
   const [milestones, setMilestones] = useState<Milestone[]>([]);
-  const [releases, setReleases] = useState<Release[]>([]);
-  const [relOpen, setRelOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   // spec 0112:两级树——null = 平面模式(无 level-2 类型,现状);expanded = 用户手动开合的父层组集合
   const [tree, setTree] = useState<GroupTree | null>(null);
@@ -173,9 +170,6 @@ export default function ProjectLayout({
       .then(setItems)
       .catch(() => setItems([]));
     loadMilestones();
-    api<Release[]>(`/api/projects/${key}/releases`)
-      .then(setReleases)
-      .catch(() => setReleases([]));
   };
 
   // YPJ-107:header 星标收藏状态(null=加载中;失败静默视为未收藏)
@@ -519,59 +513,6 @@ export default function ProjectLayout({
                 )}
               </>
             )}
-            {flags?.release !== false && (
-              <>
-                <Divider sx={{ my: 1 }} />
-                <ListSubheader
-                  disableSticky
-                  sx={{
-                    bgcolor: "transparent",
-                    display: "flex",
-                    alignItems: "center",
-                  }}
-                >
-                  <span style={{ flex: 1 }}>{t.projectNav.releases}</span>
-                  <IconButton
-                    size="small"
-                    aria-label={t.projectNav.manageRelease}
-                    onClick={() => setRelOpen(true)}
-                  >
-                    <TuneIcon fontSize="small" />
-                  </IconButton>
-                </ListSubheader>
-                {releases.length === 0 && (
-                  <ListItemButton disabled sx={{ py: 0.25 }}>
-                    <ListItemText
-                      primary={t.projectNav.noReleases}
-                      primaryTypographyProps={{
-                        variant: "caption",
-                        color: "text.secondary",
-                      }}
-                    />
-                  </ListItemButton>
-                )}
-                {releases.map((r) => (
-                  <ListItemButton key={r.releaseId} disabled sx={{ py: 0.25 }}>
-                    <ListItemText
-                      primary={`${r.name} (${r.memberCount})`}
-                      secondary={[
-                        t.release.status[
-                          r.status as keyof typeof t.release.status
-                        ],
-                        r.targetDate
-                          ? `${t.release.targetDate} ${r.targetDate}`
-                          : null,
-                        r.releasedDate
-                          ? `${t.release.releasedDate} ${r.releasedDate}`
-                          : null,
-                      ]
-                        .filter(Boolean)
-                        .join(" · ")}
-                    />
-                  </ListItemButton>
-                ))}
-              </>
-            )}
           </List>
         </Box>
         <Box
@@ -655,13 +596,6 @@ export default function ProjectLayout({
             </Button>
           </DialogActions>
         </Dialog>
-        <ReleaseManager
-          open={relOpen}
-          onClose={() => setRelOpen(false)}
-          projectKey={String(key)}
-          releases={releases}
-          onChanged={loadSide}
-        />
         <ProjectSettingsDialog
           projectKey={String(key)}
           open={settingsHubOpen}

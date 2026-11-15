@@ -553,7 +553,7 @@ Authorization: Bearer {{token}}
 
 ### ============ 11b. GroupType / 通用组(YPJ-48,spec 0056;自定义类型走最小语义) ============
 
-### 类型列表(新项目应含内建 sprint/release)
+### 类型列表(YPJ-165 后新项目无内建类型;此处为空或用户自配)
 GET {{host}}/api/projects/{{pkey}}/group-types
 Authorization: Bearer {{token}}
 
@@ -619,7 +619,7 @@ Authorization: Bearer {{token}}
 
 ### ========== spec 0100 切片B:层级化类型(去内置 sprint;可删性=空即可删,保留字废除) ==========
 
-### 建类型列表(新项目只有 release;sprint 由用户加 level 自配)
+### 建类型列表(YPJ-165 后新项目无内建类型;sprint 由用户加 level 自配)
 GET {{host}}/api/projects/{{pkey}}/group-types
 Authorization: Bearer {{token}}
 
@@ -858,10 +858,6 @@ Content-Type: application/json
   "name": "重复"
 }
 
-### 负例:删 builtin release → 409(内建不可删)
-DELETE {{host}}/api/projects/{{pkey}}/group-types/release
-Authorization: Bearer {{token}}
-
 ### [预期 409] 删 sprint2(L2)——上下层类型均在,中间链 guard(spec 0114;原「删空即 204」语义已收严)
 DELETE {{host}}/api/projects/{{pkey}}/group-types/{{l1Key}}
 Authorization: Bearer {{token}}
@@ -1033,44 +1029,6 @@ Content-Type: application/json
 ### 全局驾驶舱(跨项目聚合:我的三桶 + 活跃 sprint/进行中 milestone;响应存 dashboard)
 GET {{host}}/api/dashboard
 Authorization: Bearer {{token}}
-
-### 建 Release(handler 存变量 releaseId;status 缺省 planned;补建传 status=released+releasedDate)
-POST {{host}}/api/projects/{{pkey}}/releases
-Authorization: Bearer {{token}}
-Content-Type: application/json
-
-{
-  "name": "R2.0",
-  "targetDate": "2026-12-01"
-}
-> {%
-    client.global.set("releaseId", response.body.releaseId);
- %}
-
-### Release 列表(planned 先 target 升序;released 按发布日降序;含 memberCount)
-GET {{host}}/api/projects/{{pkey}}/releases
-Authorization: Bearer {{token}}
-
-### 改 Release(名称/目标日;日期空串=清除;milestoneId 空串=清除)
-PATCH {{host}}/api/projects/{{pkey}}/releases/{{releaseId}}
-Authorization: Bearer {{token}}
-Content-Type: application/json
-
-{
-  "targetDate": "2026-12-15"
-}
-
-### item 拉入 Release(值=指派,null=移出;released 亦可补录)
-PUT {{host}}/api/items/{{itemId}}/release
-Authorization: Bearer {{token}}
-Content-Type: application/json
-
-{
-  "releaseId": "{{releaseId}}"
-}
-
-### 删除 Release(非空 409,见负例区)
-DELETE {{host}}/api/projects/{{pkey}}/releases/{{releaseId}}
 
 ### 看板(YPJ-29 spec 0023;active sprint 的 items,无 active → 全量降级)
 GET {{host}}/api/projects/{{pkey}}/board
@@ -1459,19 +1417,6 @@ Content-Type: application/json
 
 ###
 DELETE {{host}}/api/projects/{{pkey}}/milestones/{{msGuardId}}
-Authorization: Bearer {{token}}
-
-### [预期 409] released 后再变更(历史保留)
-PATCH {{host}}/api/projects/{{pkey}}/releases/{{releaseId}}
-Authorization: Bearer {{token}}
-Content-Type: application/json
-
-{
-  "name": "改名"
-}
-
-### [预期 409] 非空删除 Release(成员关系即交付历史)
-DELETE {{host}}/api/projects/{{pkey}}/releases/{{releaseId}}
 Authorization: Bearer {{token}}
 
 ### [预期 400] metrics:bucket 非法(仅 day|week)
