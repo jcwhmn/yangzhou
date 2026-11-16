@@ -1,6 +1,11 @@
 // Releases 页 + 侧栏段 + item 挂接(YPJ-201,spec 0134):建/发布终态置灰/侧栏折叠。
 import { expect, test } from "./support/fixtures";
-import { apiCall, apiCreateItem, openSelect, selectOption } from "./support/helpers";
+import {
+  apiCall,
+  apiCreateItem,
+  openSelect,
+  selectOption,
+} from "./support/helpers";
 import { t } from "../lib/texts";
 
 test("Releases——建/发布/终态置灰/侧栏/item 挂接 @smoke", async ({
@@ -15,11 +20,9 @@ test("Releases——建/发布/终态置灰/侧栏/item 挂接 @smoke", async ({
       { name: "v0.1 历史发布" },
     )
   ).releaseId;
-  await apiCall(
-    "PATCH",
-    `/api/projects/${projectKey}/releases/${doneId}`,
-    { status: "released" },
-  );
+  await apiCall("PATCH", `/api/projects/${projectKey}/releases/${doneId}`, {
+    status: "released",
+  });
   const item = await apiCreateItem(projectKey, "挂接用 item");
 
   await page.goto(`/p/${projectKey}/releases`);
@@ -47,9 +50,7 @@ test("Releases——建/发布/终态置灰/侧栏/item 挂接 @smoke", async ({
     .filter({ hasText: "v1.0 首个发布" });
   await row.getByRole("button", { name: "发布" }).click();
   await page.getByTestId("release-confirm").click();
-  await expect(
-    row.getByTestId("release-released-badge"),
-  ).toBeVisible();
+  await expect(row.getByTestId("release-released-badge")).toBeVisible();
   await expect(page.getByText("○ v1.0 首个发布")).toHaveCount(0);
 
   // item 详情挂接:下拉只含 planned(此处无 planned,只有兜底「已发布」回显后清空)
