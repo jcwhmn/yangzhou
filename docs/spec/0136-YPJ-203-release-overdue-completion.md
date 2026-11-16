@@ -61,4 +61,7 @@
 
 ## As-built
 
-(完工后补)
+- 与设计一致;`ReleaseDto` 新增 overdue/doneCount/totalCount(单建/改路径默认 false/0/0,list() 批量计算防 N+1)。
+- 完成/软删判定与 milestone gateRows 同源(StatusType.FINAL + deletedAt 滤除);spec 中「取消排除」语义断言保持原样,待用户核默认 workflow。
+- 验证:单元新 1 例(overdue+完成率+软删滤除+零挂接);集成新 1 例(黑盒:过日 targetDate→overdue,挂接后 0/1);`gradle build` + `gradle integrationTest --tests yangzhou.api.business.release.*` 绿;web tsc+build 绿。
+- api.http list 节注释补三字段说明。

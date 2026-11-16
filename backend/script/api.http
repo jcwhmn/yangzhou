@@ -935,7 +935,7 @@ Content-Type: application/json
     client.global.set("releaseStageId", response.body.releaseId);
  %}
 
-### Release 列表(planned 前 targetDate 升序,released 后按发布日倒序)
+### Release 列表(planned 前 targetDate 升序,released 后按发布日倒序;YPJ-203 起带 overdue/doneCount/totalCount)
 GET {{host}}/api/projects/{{pkey}}/releases
 Authorization: Bearer {{token}}
 

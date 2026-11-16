@@ -10,12 +10,14 @@ import yangzhou.api.guard.LeaderGuard
 import yangzhou.persistence.Release
 import yangzhou.persistence.ReleaseItem
 import yangzhou.persistence.ReleaseItemHistory
+import yangzhou.persistence.StatusType
 import yangzhou.persistence.repository.ItemRepository
 import yangzhou.persistence.repository.MemberRepository
 import yangzhou.persistence.repository.ProjectRepository
 import yangzhou.persistence.repository.ReleaseItemHistoryRepository
 import yangzhou.persistence.repository.ReleaseItemRepository
 import yangzhou.persistence.repository.ReleaseRepository
+import yangzhou.persistence.repository.StatusRepository
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
@@ -33,6 +35,7 @@ class ReleaseService(
     private val releaseItemHistories: ReleaseItemHistoryRepository,
     private val members: MemberRepository,
     private val items: ItemRepository,
+    private val statuses: StatusRepository,
     private val leaderGuard: LeaderGuard,
     private val memberService: MemberService,
     private val clock: Clock,
@@ -47,6 +50,11 @@ class ReleaseService(
         /** 仅 released 终态有值(实际发布日)。 */
         val releasedDate: String? = null,
         val createdAt: String,
+        /** US-R7(spec 0136):planned 且 targetDate 已过;计算不落库。 */
+        val overdue: Boolean = false,
+        /** US-R8(spec 0136)口径 1b:done=FINAL 状态,分母=挂接未软删;仅供参考非发布资格。 */
+        val doneCount: Int = 0,
+        val totalCount: Int = 0,
     )
 
     data class ReleaseItemHistoryDto(
@@ -74,7 +82,11 @@ class ReleaseService(
 
     private fun today() = LocalDate.now(clock)
 
-    private fun Release.toDto() = ReleaseDto(
+    private fun Release.toDto(
+        overdue: Boolean = false,
+        doneCount: Int = 0,
+        totalCount: Int = 0,
+    ) = ReleaseDto(
         releaseId = objectId,
         name = name,
         version = version,
@@ -83,18 +95,47 @@ class ReleaseService(
         targetDate = targetDate?.toString(),
         releasedDate = releasedDate?.toString(),
         createdAt = createdAt.toString(),
+        overdue = overdue,
+        doneCount = doneCount,
+        totalCount = totalCount,
     )
 
     /** planned 在前(targetDate asc nulls last,创建序),released 在后(按发布日倒序——最新发布在最上)。 */
     fun list(key: String): List<ReleaseDto> {
-        // released 取负 epochDay = 发布日倒序;planned 取正 epochDay = 目标日升序;null 都垫底
+        val all = releases.findByProjectObjectIdOrderByCreatedAt(project(key).objectId!!)
+        val today = today()
+        // US-R8 口径 1b(spec 0136):done=FINAL,分母=挂接未软删;批量取避免 N+1
+        val rowsByRelease =
+            releaseItems.findByReleaseObjectIdIn(all.map { it.objectId })
+                .groupBy { it.releaseObjectId }
+        val itemMap =
+            items.findAllByObjectIdIn(rowsByRelease.values.flatten().map { it.itemObjectId }.toSet())
+                .filter { it.deletedAt == null }
+                .associateBy { it.objectId }
+        val statusMap =
+            statuses.findAllByObjectIdIn(itemMap.values.map { it.statusObjectId }.toSet())
+                .associateBy { it.objectId }
+
+        fun completion(r: Release): Pair<Int, Int> {
+            val valid = (rowsByRelease[r.objectId] ?: emptyList()).mapNotNull { itemMap[it.itemObjectId] }
+            return valid.count { statusMap[it.statusObjectId]?.statusType == StatusType.FINAL } to valid.size
+        }
+
         fun sortKey(r: Release): Long = when {
             r.status == "released" -> -(r.releasedDate?.toEpochDay() ?: Long.MAX_VALUE)
             else -> r.targetDate?.toEpochDay() ?: Long.MAX_VALUE
         }
-        return releases.findByProjectObjectIdOrderByCreatedAt(project(key).objectId!!)
+        return all
             .sortedWith(compareBy<Release> { if (it.status == "released") 1 else 0 }.thenBy { sortKey(it) }.thenBy { it.objectId })
-            .map { it.toDto() }
+            .map {
+                val (done, total) = completion(it)
+                val td = it.targetDate
+                it.toDto(
+                    overdue = it.status == "planned" && td != null && td.isBefore(today),
+                    doneCount = done,
+                    totalCount = total,
+                )
+            }
     }
 
     @Transactional

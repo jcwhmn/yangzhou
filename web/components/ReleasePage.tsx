@@ -31,6 +31,9 @@ type Release = {
   targetDate: string | null;
   releasedDate: string | null;
   createdAt: string;
+  overdue: boolean;
+  doneCount: number;
+  totalCount: number;
 };
 
 const STAGES = ["alpha", "beta", "rc", "ga"] as const;
@@ -158,6 +161,33 @@ export function ReleasePage() {
       {r.status === "planned" && r.targetDate && (
         <Typography variant="body2" color="text.secondary">
           {t.releases.targetDate}:{r.targetDate}
+        </Typography>
+      )}
+      {/* YPJ-203(spec 0136):overdue 红标(计算不落库);完成率口径 1b,仅供参考 */}
+      {r.overdue && (
+        <Chip
+          data-testid="release-overdue-badge"
+          label={t.releases.overdue}
+          size="small"
+          color="error"
+        />
+      )}
+      {r.totalCount > 0 && (
+        <Typography variant="caption" color="text.secondary">
+          {t.releases.doneRate
+            .replace("{done}", String(r.doneCount))
+            .replace("{total}", String(r.totalCount))
+            .replace(
+              "{pct}",
+              String(Math.round((r.doneCount / r.totalCount) * 100)),
+            )}
+          {" · "}
+          {t.releases.doneRateHint}
+        </Typography>
+      )}
+      {r.status !== "released" && r.totalCount === 0 && (
+        <Typography variant="caption" color="text.secondary">
+          {t.releases.noItems}
         </Typography>
       )}
       {r.status === "released" && (
