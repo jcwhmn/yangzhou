@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
@@ -63,4 +64,16 @@ class ReleaseController(
         @PathVariable key: String,
         @PathVariable releaseId: UUID,
     ) = service.delete(key, releaseId)
+
+    /** item ↔ release 挂接(US-R3,spec 0133):{releaseId|null};返回当前归属真相。 */
+    @GetMapping("/items/{itemId}/release-membership")
+    fun getMembership(
+        @PathVariable itemId: UUID,
+    ) = service.getMembership(itemId)
+
+    @PutMapping("/items/{itemId}/release-membership")
+    fun setMembership(
+        @PathVariable itemId: UUID,
+        @RequestBody request: SetReleaseMembershipRequest,
+    ) = service.setMembership(itemId, request)
 }

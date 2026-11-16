@@ -589,6 +589,17 @@ data class Release(
     var updatedByObjectId: UUID? = null,
 )
 
+/** YPJ-200(spec 0133):US-R3 item 挂接——release_item 叉表(弱引用无 FK,同 milestone_item 形态)。 */
+@Table("release_item")
+data class ReleaseItem(
+    @Id val id: Long? = null,
+    val objectId: UUID = UUID.randomUUID(),
+    val releaseObjectId: UUID,
+    val itemObjectId: UUID,
+    @CreatedDate
+    var createdAt: Instant = Instant.now(),
+)
+
 /** YPJ-47 视图配置:表格筛选/列配置按 用户×项目 私有保存(spec 0045)。filters/columns 为小 JSON 串(TEXT 列)。 */
 @Table("project_view")
 data class ProjectView(
