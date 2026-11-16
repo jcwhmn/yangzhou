@@ -1,6 +1,7 @@
 // Releases 页 + 侧栏段 + item 挂接(YPJ-201,spec 0134):建/发布终态置灰/侧栏折叠。
 import { expect, test } from "./support/fixtures";
 import { apiCall, apiCreateItem, openSelect, selectOption } from "./support/helpers";
+import { t } from "../lib/texts";
 
 test("Releases——建/发布/终态置灰/侧栏/item 挂接 @smoke", async ({
   page,
@@ -28,7 +29,7 @@ test("Releases——建/发布/终态置灰/侧栏/item 挂接 @smoke", async ({
 
   // UI 新建(仅必填名称)
   await page.getByTestId("release-create").click();
-  await page.getByTestId("release-name-input").fill("v1.0 首个发布");
+  await page.getByLabel(t.releases.name, { exact: true }).fill("v1.0 首个发布");
   await page.getByTestId("release-save").click();
   await expect(
     page.getByTestId("releases-page").getByText("v1.0 首个发布"),
