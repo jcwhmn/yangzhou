@@ -566,6 +566,29 @@ data class MilestoneItem(
     var createdAt: Instant = Instant.now(),
 )
 
+/** V63 Release:交付集合(PRD v1.2 §4.1,spec 0132);独立实体,planned→released 单向终态;
+ * stage 封闭枚举属性(非状态),version 归组维度(非实体)。 */
+@Table("release")
+data class Release(
+    @Id val id: Long? = null,
+    val objectId: UUID = UUID.randomUUID(),
+    val projectObjectId: UUID,
+    val name: String,
+    val version: String? = null,
+    val stage: String? = null,
+    val status: String = "planned",
+    val targetDate: LocalDate? = null,
+    val releasedDate: LocalDate? = null,
+    @CreatedDate
+    var createdAt: Instant = Instant.now(),
+    @LastModifiedDate
+    var updatedAt: Instant = Instant.now(),
+    @CreatedBy
+    var createdByObjectId: UUID? = null,
+    @LastModifiedBy
+    var updatedByObjectId: UUID? = null,
+)
+
 /** YPJ-47 视图配置:表格筛选/列配置按 用户×项目 私有保存(spec 0045)。filters/columns 为小 JSON 串(TEXT 列)。 */
 @Table("project_view")
 data class ProjectView(

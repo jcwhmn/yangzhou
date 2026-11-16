@@ -902,6 +902,91 @@ Content-Type: application/json
   "description": "新描述"
 }
 
+### ============ 11b. Release(YPJ-191,spec 0132;V63 独立实体) ============
+# Release = 交付事件(planned → released 单向终态);stage 是成熟度属性非状态;
+# version 归组维度非实体;RC 序号不建模,靠 name。
+
+### 建 release(普通;handler 存变量 releaseId)
+POST {{host}}/api/projects/{{pkey}}/releases
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "1.0 {{run}}",
+  "targetDate": "2026-12-31"
+}
+
+> {%
+    client.global.set("releaseId", response.body.releaseId);
+ %}
+
+### 建 stage release(version + stage;handler 存变量 releaseStageId)
+POST {{host}}/api/projects/{{pkey}}/releases
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "1.0 RC2 {{run}}",
+  "version": "1.0",
+  "stage": "rc"
+}
+
+> {%
+    client.global.set("releaseStageId", response.body.releaseId);
+ %}
+
+### Release 列表(planned 前 targetDate 升序,released 后按发布日倒序)
+GET {{host}}/api/projects/{{pkey}}/releases
+Authorization: Bearer {{token}}
+
+### 发布(planned → released;releasedDate 缺省 = 今天)
+PATCH {{host}}/api/projects/{{pkey}}/releases/{{releaseId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "status": "released"
+}
+
+### 改 planned release(名称/目标日/version/stage;日期空串 = 清除,null = 不动)
+PATCH {{host}}/api/projects/{{pkey}}/releases/{{releaseStageId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "1.0 RC2 改 {{run}}",
+  "targetDate": "2026-12-20"
+}
+
+### 删 planned release(本票无成员机制,直接 204)
+DELETE {{host}}/api/projects/{{pkey}}/releases/{{releaseStageId}}
+Authorization: Bearer {{token}}
+
+### [预期 400] 非法 stage(封闭枚举 alpha/beta/rc/ga)
+POST {{host}}/api/projects/{{pkey}}/releases
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "bad stage {{run}}",
+  "stage": "dev"
+}
+
+### [预期 409] 终态冻结(已 released 的 release 改名)
+PATCH {{host}}/api/projects/{{pkey}}/releases/{{releaseId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "试图改已发布的 {{run}}"
+}
+
+### [预期 409] 终态不可删(已 released)
+DELETE {{host}}/api/projects/{{pkey}}/releases/{{releaseId}}
+Authorization: Bearer {{token}}
+
+### [预期 409] 非法迁移(released 无法回 planned;此处用新建 planned 直改 status=released 已覆盖正向,反向由终态冻结拦截)
+
 ### 建 gate item(spec 0116 票 2,US-M7;自含,存 gateItemId)
 POST {{host}}/api/projects/{{pkey}}/items
 Authorization: Bearer {{token}}

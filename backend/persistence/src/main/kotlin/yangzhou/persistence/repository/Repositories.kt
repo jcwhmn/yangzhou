@@ -32,6 +32,7 @@ import yangzhou.persistence.ProjectMember
 import yangzhou.persistence.ProjectRepo
 import yangzhou.persistence.ProjectView
 import yangzhou.persistence.ProjectWorkflowRule
+import yangzhou.persistence.Release
 import yangzhou.persistence.Requirement
 import yangzhou.persistence.Status
 import yangzhou.persistence.Team
@@ -508,6 +509,16 @@ interface MilestoneRepository : CrudRepository<Milestone, Long> {
         projectObjectId: UUID,
         status: String,
     ): List<Milestone>
+}
+
+/** V63 Release(spec 0132):交付集合 CRUD。 */
+interface ReleaseRepository : CrudRepository<Release, Long> {
+    fun findByProjectObjectIdOrderByCreatedAt(projectObjectId: UUID): List<Release>
+
+    fun findByProjectObjectIdAndObjectId(
+        projectObjectId: UUID,
+        objectId: UUID,
+    ): Release?
 }
 
 // ---------- YPJ-45 Flow Metrics 只读聚合(spec 0037/0038)----------
