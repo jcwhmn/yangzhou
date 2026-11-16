@@ -29,7 +29,7 @@ test("Releases——建/发布/终态置灰/侧栏/item 挂接 @smoke", async ({
 
   // UI 新建(仅必填名称)
   await page.getByTestId("release-create").click();
-  await page.getByLabel(t.releases.name, { exact: true }).fill("v1.0 首个发布");
+  await page.getByLabel(t.releases.name).fill("v1.0 首个发布");
   await page.getByTestId("release-save").click();
   await expect(
     page.getByTestId("releases-page").getByText("v1.0 首个发布"),
