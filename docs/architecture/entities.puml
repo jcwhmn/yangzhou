@@ -144,6 +144,10 @@ class Release {
   targetDate: LocalDate?
   releasedDate: LocalDate?
 }
+class ReleaseItem {
+  releaseObjectId: UUID
+  itemObjectId: UUID
+}
 class Requirement {
   minLevel: Int?
 }
@@ -197,6 +201,8 @@ Project "1" *-- "*" Milestone : 时间轴节点(V14;0..1 in_progress)
 Milestone "1" *-- "*" MilestoneItem : gate 挂接(V55,tracks 引用非归属)
 Item "1" *-- "*" MilestoneItem : 可多站共用(GA ⊇ MVP)
 Project "1" *-- "*" Release : 交付集合(V63)
+Release "1" *-- "*" ReleaseItem : item 挂接(V64,历史多行保留)
+Item "1" *-- "*" ReleaseItem : 至多属一个未终态 release(应用层校验)
 ItemGroup "1" *-- "*" ItemGroupMember
 ItemGroup "1" *-- "*" ItemGroupMemberHistory
 ProjectWorkflowRule "*" --> "1" Status : 目标列

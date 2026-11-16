@@ -987,6 +987,58 @@ Authorization: Bearer {{token}}
 
 ### [预期 409] 非法迁移(released 无法回 planned;此处用新建 planned 直改 status=released 已覆盖正向,反向由终态冻结拦截)
 
+### 挂 item 到 release(US-R3,spec 0133;handler 存变量 relItemId;releaseId=null = 摘,只动 planned 行)
+POST {{host}}/api/projects/{{pkey}}/items
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "挂接测试 item {{run}}"
+}
+
+> {%
+    client.global.set("relItemId", response.body.itemId);
+ %}
+
+###
+PUT {{host}}/api/items/{{relItemId}}/release-membership
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "releaseId": "{{releaseId}}"
+}
+
+### 查挂接(当前归属真相,只看 planned)
+GET {{host}}/api/items/{{relItemId}}/release-membership
+Authorization: Bearer {{token}}
+
+### [预期 409] 不变量:item 已属未终态 release A,再挂 B 拒
+POST {{host}}/api/projects/{{pkey}}/releases
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "B {{run}}"
+}
+
+> {%
+    client.global.set("releaseBId", response.body.releaseId);
+ %}
+
+###
+PUT {{host}}/api/items/{{relItemId}}/release-membership
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "releaseId": "{{releaseBId}}"
+}
+
+### [预期 409] release 下仍有挂接 item,拒删
+DELETE {{host}}/api/projects/{{pkey}}/releases/{{releaseBId}}
+Authorization: Bearer {{token}}
+
 ### 建 gate item(spec 0116 票 2,US-M7;自含,存 gateItemId)
 POST {{host}}/api/projects/{{pkey}}/items
 Authorization: Bearer {{token}}

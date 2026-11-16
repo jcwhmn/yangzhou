@@ -92,6 +92,7 @@ abstract class AbstractApiTest {
             "milestone",
             "milestone_item",
             "release",
+            "release_item",
             "item_dependency",
             "item_activity",
             "item_status_history",

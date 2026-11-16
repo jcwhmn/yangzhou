@@ -25,7 +25,7 @@
 | 挂(releaseId=X) | 不存在/跨项目/软删 item | 404/400 |
 | 挂(releaseId=X) | 已挂同一个 X(幂等) | 200 原样返回 |
 | 摘(releaseId=null) | 无挂接 | 200 {null,null} |
-| 摘 | 挂在 released release 上 | 409(终态不可摘) |
+| 摘 | 挂在 released release 上(历史行) | 200——只删 planned 行,released 历史行永不碰(挂接真相只看 planned;PRD「不可摘」由 released 行不可动保证) |
 
 ## 二、详细设计
 

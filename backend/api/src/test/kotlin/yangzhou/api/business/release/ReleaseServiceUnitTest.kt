@@ -8,9 +8,13 @@ import yangzhou.api.error.BadRequestException
 import yangzhou.api.error.ConflictException
 import yangzhou.api.error.NotFoundException
 import yangzhou.api.guard.LeaderGuard
+import yangzhou.persistence.Item
 import yangzhou.persistence.Project
 import yangzhou.persistence.Release
+import yangzhou.persistence.ReleaseItem
+import yangzhou.persistence.repository.ItemRepository
 import yangzhou.persistence.repository.ProjectRepository
+import yangzhou.persistence.repository.ReleaseItemRepository
 import yangzhou.persistence.repository.ReleaseRepository
 import java.time.Clock
 import java.time.Instant
@@ -21,14 +25,17 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /** YPJ-191(spec 0132):ReleaseService 单元测试——校验/状态机(发布记 releasedDate)/终态冻结/删除守卫/排序。 */
 class ReleaseServiceUnitTest {
     private val projects = mockk<ProjectRepository>(relaxed = true)
     private val releases = mockk<ReleaseRepository>(relaxed = true)
+    private val releaseItems = mockk<ReleaseItemRepository>(relaxed = true)
+    private val items = mockk<ItemRepository>(relaxed = true)
     private val leaderGuard = mockk<LeaderGuard>(relaxed = true)
     private val clock = Clock.fixed(Instant.parse("2026-11-20T00:00:00Z"), ZoneOffset.UTC)
-    private val service = ReleaseService(projects, releases, leaderGuard, clock)
+    private val service = ReleaseService(projects, releases, releaseItems, items, leaderGuard, clock)
 
     private val project = Project(id = 1L, objectId = UUID(0, 1), workspaceObjectId = UUID(0, 9), key = "CHE", name = "CHE")
     private val r = Release(id = 1L, objectId = UUID(0, 2), projectObjectId = UUID(0, 1), name = "1.0", stage = "rc")
@@ -131,5 +138,79 @@ class ReleaseServiceUnitTest {
         every { releases.findByProjectObjectIdOrderByCreatedAt(UUID(0, 1)) } returns listOf(p1, done1, p2, done2, p3)
         val names = service.list("CHE").map { it.name }
         assertEquals(listOf("近目标", "远目标", "无目标", "发布B", "发布A"), names)
+    }
+
+    // ---------- US-R3 挂接(spec 0133) ----------
+
+    private val item = Item(id = 9L, number = 1, objectId = UUID(0, 11), projectObjectId = UUID(0, 1), title = "it", statusObjectId = UUID(0, 99))
+    private val relA = Release(id = 11L, objectId = UUID(0, 21), projectObjectId = UUID(0, 1), name = "A")
+    private val relB = Release(id = 12L, objectId = UUID(0, 22), projectObjectId = UUID(0, 1), name = "B")
+
+    @Test
+    fun `membership - attach ok and idempotent`() {
+        every { items.findByObjectId(item.objectId!!) } returns item
+        every { releases.findByObjectId(relA.objectId) } returns relA
+        every { releaseItems.findByItemObjectId(item.objectId!!) } returns emptyList()
+        every { releaseItems.save(any()) } answers { firstArg<ReleaseItem>() }
+        val dto = service.setMembership(item.objectId!!, SetReleaseMembershipRequest(relA.objectId))
+        assertEquals(relA.objectId, dto.releaseId)
+        assertEquals("A", dto.releaseName)
+        // 幂等:已有同 release 行
+        every { releaseItems.findByItemObjectId(item.objectId!!) } returns listOf(ReleaseItem(id = 1, objectId = UUID(0, 31), releaseObjectId = relA.objectId, itemObjectId = item.objectId!!))
+        every { releases.findAllByObjectIdIn(any()) } returns listOf(relA)
+        assertEquals(dto.releaseId, service.setMembership(item.objectId!!, SetReleaseMembershipRequest(relA.objectId)).releaseId)
+    }
+
+    @Test
+    fun `membership - attach to released rejected`() {
+        every { items.findByObjectId(item.objectId!!) } returns item
+        every { releaseItems.findByItemObjectId(item.objectId!!) } returns emptyList()
+        every { releases.findByObjectId(relA.objectId) } returns relA.copy(status = "released", releasedDate = today)
+        assertFailsWith<ConflictException> { service.setMembership(item.objectId!!, SetReleaseMembershipRequest(relA.objectId)) }
+    }
+
+    @Test
+    fun `membership - two planned releases conflict`() {
+        every { items.findByObjectId(item.objectId!!) } returns item
+        every { releases.findByObjectId(relB.objectId) } returns relB
+        every { releaseItems.findByItemObjectId(item.objectId!!) } returns listOf(ReleaseItem(id = 1, objectId = UUID(0, 31), releaseObjectId = relA.objectId, itemObjectId = item.objectId!!))
+        every { releases.findAllByObjectIdIn(any()) } returns listOf(relA)
+        val ex = assertFailsWith<ConflictException> { service.setMembership(item.objectId!!, SetReleaseMembershipRequest(relB.objectId)) }
+        assertTrue("A" in ex.message!!, ex.message)
+    }
+
+    @Test
+    fun `membership - detach planned ok, released history row untouched`() {
+        val rowOnA = ReleaseItem(id = 1, objectId = UUID(0, 31), releaseObjectId = relA.objectId, itemObjectId = item.objectId!!)
+        every { items.findByObjectId(item.objectId!!) } returns item
+        every { releases.findByObjectId(relA.objectId) } returns relA
+        every { releaseItems.findByItemObjectId(item.objectId!!) } returns listOf(rowOnA)
+        every { releases.findAllByObjectIdIn(any()) } returns listOf(relA)
+        val dto = service.setMembership(item.objectId!!, SetReleaseMembershipRequest(null))
+        assertNull(dto.releaseId)
+        io.mockk.verify { releaseItems.delete(rowOnA) }
+        // released 历史行不报错也不被删(挂接真相只看 planned)
+        val rowOnDone = ReleaseItem(id = 2, objectId = UUID(0, 32), releaseObjectId = relA.objectId, itemObjectId = item.objectId!!)
+        every { releaseItems.findByItemObjectId(item.objectId!!) } returns listOf(rowOnDone)
+        every { releases.findAllByObjectIdIn(any()) } returns listOf(relA.copy(status = "released", releasedDate = today))
+        assertNull(service.setMembership(item.objectId!!, SetReleaseMembershipRequest(null)).releaseId)
+        io.mockk.verify(exactly = 0) { releaseItems.delete(rowOnDone) }
+    }
+
+    @Test
+    fun `membership - cross project release 404, deleted item rejected`() {
+        every { items.findByObjectId(item.objectId!!) } returns item
+        every { releaseItems.findByItemObjectId(item.objectId!!) } returns emptyList()
+        every { releases.findByObjectId(relA.objectId) } returns relA.copy(projectObjectId = UUID(0, 99))
+        assertFailsWith<NotFoundException> { service.setMembership(item.objectId!!, SetReleaseMembershipRequest(relA.objectId)) }
+        every { items.findByObjectId(item.objectId!!) } returns item.copy(deletedAt = Instant.now(clock))
+        assertFailsWith<BadRequestException> { service.setMembership(item.objectId!!, SetReleaseMembershipRequest(null)) }
+    }
+
+    @Test
+    fun `delete guard - members present rejected`() {
+        every { releases.findByProjectObjectIdAndObjectId(UUID(0, 1), r.objectId) } returns r
+        every { releaseItems.findByReleaseObjectId(r.objectId) } returns listOf(ReleaseItem(id = 1, objectId = UUID(0, 31), releaseObjectId = r.objectId, itemObjectId = UUID(0, 11)))
+        assertFailsWith<ConflictException> { service.delete("CHE", r.objectId) }
     }
 }

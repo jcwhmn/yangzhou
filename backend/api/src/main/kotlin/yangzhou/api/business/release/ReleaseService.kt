@@ -7,17 +7,26 @@ import yangzhou.api.error.ConflictException
 import yangzhou.api.error.NotFoundException
 import yangzhou.api.guard.LeaderGuard
 import yangzhou.persistence.Release
+import yangzhou.persistence.ReleaseItem
+import yangzhou.persistence.repository.ItemRepository
 import yangzhou.persistence.repository.ProjectRepository
+import yangzhou.persistence.repository.ReleaseItemRepository
 import yangzhou.persistence.repository.ReleaseRepository
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
 import java.util.UUID
 
+data class ReleaseMembershipDto(val releaseId: UUID? = null, val releaseName: String? = null)
+
+data class SetReleaseMembershipRequest(val releaseId: UUID? = null)
+
 @Service
 class ReleaseService(
     private val projects: ProjectRepository,
     private val releases: ReleaseRepository,
+    private val releaseItems: ReleaseItemRepository,
+    private val items: ItemRepository,
     private val leaderGuard: LeaderGuard,
     private val clock: Clock,
 ) {
@@ -142,8 +151,51 @@ class ReleaseService(
         leaderGuard.requireLeader(key)
         val r = find(key, releaseId)
         if (r.status == "released") throw ConflictException("终态 release 不可删除(历史保留)")
-        // 「有成员拒删」守卫随 US-R3(挂接叉表)落地;本票尚无成员机制,planned 可直接删
+        // US-R3(spec 0133):有成员拒删(PRD §5.1「有成员才拒绝」)——先摘空再删
+        if (releaseItems.findByReleaseObjectId(r.objectId).isNotEmpty()) {
+            throw ConflictException("release 下仍有挂接 item,先摘除后再删除")
+        }
         releases.delete(r)
+    }
+
+    /** 当前归属真相(spec 0133):live 挂接 = 指向存在的 release;历史行(released 后被换挂)永不删。 */
+    fun getMembership(itemId: UUID): ReleaseMembershipDto = membershipDto(itemId)
+
+    @Transactional
+    fun setMembership(
+        itemId: UUID,
+        request: SetReleaseMembershipRequest,
+    ): ReleaseMembershipDto {
+        val item = items.findByObjectId(itemId) ?: throw NotFoundException("item 不存在")
+        if (item.deletedAt != null) throw BadRequestException("item 已删除")
+        val current = liveRows(item.objectId!!)
+        if (request.releaseId == null) {
+            // 摘:只删 planned 行;released 历史行永不碰(挂接真相只看 planned,PRD §5.1 冻结由行不可动保证)
+            current.filter { it.second.status == "planned" }.forEach { releaseItems.delete(it.first) }
+            return ReleaseMembershipDto()
+        }
+        val target = releases.findByObjectId(request.releaseId) ?: throw NotFoundException("release 不存在")
+        if (target.projectObjectId != item.projectObjectId) throw NotFoundException("release 不存在")
+        if (target.status == "released") throw ConflictException("终态 release 不可挂接(历史保留)")
+        // 不变量(PRD §12.4):同 item 至多属一个未终态 release
+        current.firstOrNull { it.second.objectId != target.objectId && it.second.status == "planned" }
+            ?.let { throw ConflictException("item 已属未终态 release:${it.second.name}(先摘后再挂)") }
+        if (current.any { it.second.objectId == target.objectId }) return membershipDto(itemId) // 幂等
+        releaseItems.save(ReleaseItem(releaseObjectId = target.objectId, itemObjectId = item.objectId!!))
+        return ReleaseMembershipDto(target.objectId, target.name)
+    }
+
+    /** live 行 = (行, release)。 */
+    private fun liveRows(itemObjectId: UUID): List<Pair<ReleaseItem, Release>> {
+        val rows = releaseItems.findByItemObjectId(itemObjectId)
+        if (rows.isEmpty()) return emptyList()
+        val map = releases.findAllByObjectIdIn(rows.map { it.releaseObjectId }.toSet()).associateBy { it.objectId }
+        return rows.mapNotNull { row -> map[row.releaseObjectId]?.let { row to it } }
+    }
+
+    private fun membershipDto(itemId: UUID): ReleaseMembershipDto {
+        val current = liveRows(itemId).firstOrNull { it.second.status == "planned" }
+        return current?.let { ReleaseMembershipDto(it.second.objectId, it.second.name) } ?: ReleaseMembershipDto()
     }
 
     private fun validateStage(text: String?): String? {
