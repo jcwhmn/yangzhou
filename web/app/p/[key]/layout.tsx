@@ -81,6 +81,11 @@ export default function ProjectLayout({
   const [l1, setL1] = useState<{ name: string } | null>(null);
   const [items, setItems] = useState<NavItem[]>([]);
   const [milestones, setMilestones] = useState<Milestone[]>([]);
+  // YPJ-201(spec 0134):侧栏 Releases 段——planned 行,最多显 3 条超出折叠
+  const [releases, setReleases] = useState<
+    { releaseId: string; name: string; targetDate: string | null }[]
+  >([]);
+  const [releasesExpanded, setReleasesExpanded] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   // spec 0112:两级树——null = 平面模式(无 level-2 类型,现状);expanded = 用户手动开合的父层组集合
   const [tree, setTree] = useState<GroupTree | null>(null);
@@ -164,12 +169,36 @@ export default function ProjectLayout({
       .catch(() => setMilestones([]));
   };
 
+  const loadReleases = () => {
+    api<
+      {
+        releaseId: string;
+        name: string;
+        targetDate: string | null;
+        status: string;
+      }[]
+    >(`/api/projects/${key}/releases`)
+      .then((rs) =>
+        setReleases(
+          rs
+            .filter((r) => r.status === "planned")
+            .map(({ releaseId, name, targetDate }) => ({
+              releaseId,
+              name,
+              targetDate,
+            })),
+        ),
+      )
+      .catch(() => setReleases([]));
+  };
+
   const loadSide = () => {
     loadFlags();
     api<NavItem[]>(`/api/projects/${key}/items`)
       .then(setItems)
       .catch(() => setItems([]));
     loadMilestones();
+    loadReleases();
   };
 
   // YPJ-107:header 星标收藏状态(null=加载中;失败静默视为未收藏)
@@ -215,8 +244,12 @@ export default function ProjectLayout({
   useEffect(() => {
     const onMilestonesChanged = () => loadMilestones();
     window.addEventListener("milestones-changed", onMilestonesChanged);
-    return () =>
+    const onReleasesChanged = () => loadReleases();
+    window.addEventListener("releases-changed", onReleasesChanged);
+    return () => {
       window.removeEventListener("milestones-changed", onMilestonesChanged);
+      window.removeEventListener("releases-changed", onReleasesChanged);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
 
@@ -440,6 +473,77 @@ export default function ProjectLayout({
                   </>
                 ) : (
                   sorted.map((s) => sprintRow(s))
+                )}
+              </>
+            )}
+            {flags?.release !== false && (
+              <>
+                <Divider sx={{ my: 1 }} />
+                {/* YPJ-201 真值表:段头常驻可点进页;planned 行最多显 3 条,超出折叠「+N」;released 不进侧栏 */}
+                <ListSubheader
+                  disableSticky
+                  component={Link}
+                  href={`/p/${key}/releases`}
+                  sx={{
+                    bgcolor: "transparent",
+                    display: "flex",
+                    alignItems: "center",
+                    textDecoration: "none",
+                    color: "inherit",
+                  }}
+                >
+                  <span style={{ flex: 1 }}>{t.projectNav.releases}</span>
+                </ListSubheader>
+                {(releasesExpanded ? releases : releases.slice(0, 3)).map(
+                  (r) => (
+                    <ListItemButton
+                      key={r.releaseId}
+                      component={Link}
+                      href={`/p/${key}/releases`}
+                      sx={{ py: 0.25 }}
+                    >
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography variant="body2" noWrap>
+                          {`○ ${r.name}`}
+                          {r.targetDate ? ` · ${r.targetDate}` : ""}
+                        </Typography>
+                      </Box>
+                    </ListItemButton>
+                  ),
+                )}
+                {releases.length > 3 && (
+                  <ListItemButton
+                    sx={{ py: 0.25 }}
+                    data-testid="release-nav-more"
+                    onClick={() => setReleasesExpanded((v) => !v)}
+                  >
+                    <ListItemText
+                      primary={
+                        releasesExpanded
+                          ? t.releases.less
+                          : `+${releases.length - 3}`
+                      }
+                      primaryTypographyProps={{
+                        variant: "caption",
+                        color: "text.secondary",
+                      }}
+                    />
+                  </ListItemButton>
+                )}
+                {releases.length === 0 && (
+                  <ListItemButton
+                    disabled
+                    sx={{ py: 0.25 }}
+                    data-testid="release-nav-empty"
+                  >
+                    <ListItemText
+                      primary={t.releases.noPlanned}
+                      primaryTypographyProps={{
+                        variant: "caption",
+                        color: "text.secondary",
+                      }}
+                    />
+                  </ListItemButton>
                 )}
               </>
             )}
