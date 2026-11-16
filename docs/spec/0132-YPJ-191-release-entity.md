@@ -92,6 +92,17 @@ create index ix_release_project on release(project_object_id);
 - create 直建 released(合并 US-R5):切票边界,本票不做。
 - 复用 item_group 机制:PRD §0 已架构回退,禁止。
 
+## 四、As-built(2026-11-16 实工)
+
+- 迁移落 `V63__release.sql`;实体/repo 按 §二形态落地,无偏差。
+- API 切片:`ReleaseController` + `ReleaseService`(同包两文件,DTO/请求同文件);发布动作 releasedDate 缺省 = Clock 今天;create 无 released 通道(US-R5 另票)。
+- 排序:planned 前(targetDate 升序、空垫底、创建序),released 后(发布日倒序,最新在上)。
+- leader guard 进 b/d/e/f 四张子票覆盖的全部写路径;guard「项目无 leader 则放行」同现有 R2 语义。
+- 测试:单测 `ReleaseServiceUnitTest` 12 例;集成 `ReleaseApiTest` 3 例(主链/校验边界/跨项目 404)。
+- cleanDatabase 审计与 delete 清单各加 `release`;`entities.puml` 加 Release 实体+关系+注记;api.http 新增「11b. Release」区块(含负例三例)。
+- 验证:`gradle build` + `gradle integrationTest` + E2E + api.http 全绿(2026-11-16,用户跑)。
+- 遗留:leader guard 非法 token 场景未写自动化用例(手工验证);「有成员拒删」随 US-R3 落地。
+
 ## 三、手工测试用例(用户 build/debug 阶段执行;api 8082 / api.http Release 区块)
 
 1. 建普通 release:name="1.0",targetDate=未来某日 → 201,响应 status=planned。
