@@ -91,4 +91,8 @@ create table release_item_history (
 
 ## As-built
 
-(完工后补)
+- 落地与设计一致;两处偏差修正:
+  1. history 端点不要求 release 活着(删后仍可查):项目存在性校验 + 直查 releaseId,跨项目仍 404(设计即「弱引用悬空行照返」,首版误用 find() 导致删后 404,集成测试抓出)。
+  2. itemName 回显 = item.title(Entities 裸名里 item 字段是 title 非文字 name)。
+- actor 取 `memberService.current()`(挂/摘操作者);幂等路径不留痕,同设计。
+- 验证:`gradle build` 绿;`gradle integrationTest --tests yangzhou.api.business.release.*` 绿(含新增 US-R5 集成 1 例 + US-R6 留痕 1 例);US-R5 单元 4 例;api.http 新增补建/history/未来日负例三节。

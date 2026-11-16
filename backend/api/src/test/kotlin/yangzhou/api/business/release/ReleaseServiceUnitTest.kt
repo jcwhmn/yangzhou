@@ -9,11 +9,15 @@ import yangzhou.api.error.ConflictException
 import yangzhou.api.error.NotFoundException
 import yangzhou.api.guard.LeaderGuard
 import yangzhou.persistence.Item
+import yangzhou.persistence.Member
 import yangzhou.persistence.Project
 import yangzhou.persistence.Release
 import yangzhou.persistence.ReleaseItem
+import yangzhou.persistence.ReleaseItemHistory
 import yangzhou.persistence.repository.ItemRepository
+import yangzhou.persistence.repository.MemberRepository
 import yangzhou.persistence.repository.ProjectRepository
+import yangzhou.persistence.repository.ReleaseItemHistoryRepository
 import yangzhou.persistence.repository.ReleaseItemRepository
 import yangzhou.persistence.repository.ReleaseRepository
 import java.time.Clock
@@ -32,10 +36,14 @@ class ReleaseServiceUnitTest {
     private val projects = mockk<ProjectRepository>(relaxed = true)
     private val releases = mockk<ReleaseRepository>(relaxed = true)
     private val releaseItems = mockk<ReleaseItemRepository>(relaxed = true)
+    private val releaseItemHistories = mockk<ReleaseItemHistoryRepository>(relaxed = true)
+    private val members = mockk<MemberRepository>(relaxed = true)
     private val items = mockk<ItemRepository>(relaxed = true)
     private val leaderGuard = mockk<LeaderGuard>(relaxed = true)
+    private val memberService = mockk<yangzhou.api.business.member.MemberService>(relaxed = true)
     private val clock = Clock.fixed(Instant.parse("2026-11-20T00:00:00Z"), ZoneOffset.UTC)
-    private val service = ReleaseService(projects, releases, releaseItems, items, leaderGuard, clock)
+    private val service =
+        ReleaseService(projects, releases, releaseItems, releaseItemHistories, members, items, leaderGuard, memberService, clock)
 
     private val project = Project(id = 1L, objectId = UUID(0, 1), workspaceObjectId = UUID(0, 9), key = "CHE", name = "CHE")
     private val r = Release(id = 1L, objectId = UUID(0, 2), projectObjectId = UUID(0, 1), name = "1.0", stage = "rc")
@@ -48,10 +56,12 @@ class ReleaseServiceUnitTest {
         clearMocks(projects, releases, leaderGuard)
         every { projects.findByKey("CHE") } returns project
         every { releases.findByProjectObjectIdAndObjectId(UUID(0, 1), r.objectId) } returns r
+        every { memberService.current() } returns Member(workspaceObjectId = UUID(0, 9), username = "me", passwordHash = null, displayName = "我")
     }
 
     private fun saveReturns() {
         every { releases.save(any()) } answers { firstArg<Release>() }
+        every { releaseItemHistories.save(any()) } answers { firstArg<ReleaseItemHistory>() }
     }
 
     @Test
@@ -77,6 +87,36 @@ class ReleaseServiceUnitTest {
         assertNull(dto.version)
         assertEquals("rc", dto.stage)
         assertEquals("planned", dto.status)
+    }
+
+    // ---------- YPJ-202(spec 0135):US-R5 事后补建 ----------
+
+    @Test
+    fun `create - released backfill with explicit date`() {
+        saveReturns()
+        val dto = service.create("CHE", CreateReleaseRequest("v0.5 补录", status = "released", releasedDate = "2026-06-01"))
+        assertEquals("released", dto.status)
+        assertEquals("2026-06-01", dto.releasedDate)
+    }
+
+    @Test
+    fun `create - released backfill defaults to today`() {
+        saveReturns()
+        val dto = service.create("CHE", CreateReleaseRequest("v0.5 补录", status = "released"))
+        assertEquals("released", dto.status)
+        assertEquals("2026-11-20", dto.releasedDate)
+    }
+
+    @Test
+    fun `create - released backfill future date rejected`() {
+        assertFailsWith<BadRequestException> {
+            service.create("CHE", CreateReleaseRequest("v0.5", status = "released", releasedDate = "2026-11-21"))
+        }
+    }
+
+    @Test
+    fun `create - bad status rejected`() {
+        assertFailsWith<BadRequestException> { service.create("CHE", CreateReleaseRequest("1.0", status = "bogus")) }
     }
 
     @Test
@@ -152,6 +192,7 @@ class ReleaseServiceUnitTest {
         every { releases.findByObjectId(relA.objectId) } returns relA
         every { releaseItems.findByItemObjectId(item.objectId!!) } returns emptyList()
         every { releaseItems.save(any()) } answers { firstArg<ReleaseItem>() }
+        every { releaseItemHistories.save(any()) } answers { firstArg<ReleaseItemHistory>() }
         val dto = service.setMembership(item.objectId!!, SetReleaseMembershipRequest(relA.objectId))
         assertEquals(relA.objectId, dto.releaseId)
         assertEquals("A", dto.releaseName)
@@ -186,6 +227,7 @@ class ReleaseServiceUnitTest {
         every { releases.findByObjectId(relA.objectId) } returns relA
         every { releaseItems.findByItemObjectId(item.objectId!!) } returns listOf(rowOnA)
         every { releases.findAllByObjectIdIn(any()) } returns listOf(relA)
+        every { releaseItemHistories.save(any()) } answers { firstArg<ReleaseItemHistory>() }
         val dto = service.setMembership(item.objectId!!, SetReleaseMembershipRequest(null))
         assertNull(dto.releaseId)
         io.mockk.verify { releaseItems.delete(rowOnA) }

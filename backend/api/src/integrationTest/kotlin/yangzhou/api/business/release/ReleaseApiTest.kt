@@ -124,10 +124,33 @@ class ReleaseApiTest : AbstractApiTest() {
         assertEquals(400, s2)
         val (s3, _) = create(authed, "RELB", mapOf("name" to "x", "targetDate" to "2026/01/01"))
         assertEquals(400, s3)
-        // create 无 status 通道(US-R5 事后补建另票):传了也应被忽略,落库 planned
-        val (s4, ignored) = create(authed, "RELB", mapOf("name" to "补建负例", "status" to "released"))
-        assertEquals(201, s4)
-        assertEquals("planned", ignored!!["status"].asText())
+        // YPJ-202(spec 0135):status 通道已开——非法值 400;released 补建走独立用例
+        val (s4, _) = create(authed, "RELB", mapOf("name" to "补建负例", "status" to "bogus"))
+        assertEquals(400, s4)
+    }
+
+    /** YPJ-202(spec 0135):US-R5 事后补建。 */
+    @Test
+    fun `事后补建 - released 加日期 - 缺省今天 - 未来日 400`() {
+        val authed = bootstrapAndAuth()
+        createProject(authed, "REL5")
+
+        val (s1, backfill) = create(authed, "REL5", mapOf("name" to "v0.5 补录", "status" to "released", "releasedDate" to "2026-06-01"))
+        assertEquals(201, s1)
+        assertEquals("released", backfill!!["status"].asText())
+        assertEquals("2026-06-01", backfill["releasedDate"].asText())
+
+        val (s2, todayRow) = create(authed, "REL5", mapOf("name" to "v0.4 补录", "status" to "released"))
+        assertEquals(201, s2)
+        assertEquals("released", todayRow!!["status"].asText())
+        assertTrue(todayRow["releasedDate"].asText().length == 10)
+
+        val (s3, _) = create(authed, "REL5", mapOf("name" to "未来", "status" to "released", "releasedDate" to "2999-01-01"))
+        assertEquals(400, s3)
+
+        // 补录行进列表 released 区(排序不在本票验证,只验出现)
+        val names = list(authed, "REL5").map { it["name"].asText() }
+        assertTrue("v0.5 补录" in names)
     }
 
     @Test

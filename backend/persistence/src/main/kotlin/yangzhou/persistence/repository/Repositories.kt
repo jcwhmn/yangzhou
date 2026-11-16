@@ -34,6 +34,7 @@ import yangzhou.persistence.ProjectView
 import yangzhou.persistence.ProjectWorkflowRule
 import yangzhou.persistence.Release
 import yangzhou.persistence.ReleaseItem
+import yangzhou.persistence.ReleaseItemHistory
 import yangzhou.persistence.Requirement
 import yangzhou.persistence.Status
 import yangzhou.persistence.Team
@@ -535,6 +536,11 @@ interface ReleaseItemRepository : CrudRepository<ReleaseItem, Long> {
     fun findByItemObjectIdIn(itemObjectIds: Collection<UUID>): List<ReleaseItem>
 
     fun deleteByReleaseObjectId(releaseObjectId: UUID): Int
+}
+
+/** YPJ-202(spec 0135):US-R6 留痕查询——release 侧倒序。 */
+interface ReleaseItemHistoryRepository : CrudRepository<ReleaseItemHistory, Long> {
+    fun findByReleaseObjectIdOrderByCreatedAtDesc(releaseObjectId: UUID): List<ReleaseItemHistory>
 }
 
 // ---------- YPJ-45 Flow Metrics 只读聚合(spec 0037/0038)----------
