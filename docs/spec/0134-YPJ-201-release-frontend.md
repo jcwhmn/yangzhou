@@ -14,12 +14,17 @@
    - 删除:仅 planned 行;released 行无删除按钮(后端摘只删 planned 行)。
    - 发布按钮:仅 planned 行有;点击 → 确认对话框 → `PATCH status=released`(releasedDate 缺省=今天);成功后行移入置灰区。
 2. **侧栏 Releases 段**(项目布局侧栏,milestone 段同型):
-   - 段头「Releases」可点进页;下方列 planned 行(名称 · targetDate);无 planned 显示空态提示;released 不进侧栏。
+   - 段头「Releases」可点进页;下方列 **planned 行,最多显 3 条,超出折叠为「+N」按钮,点击展开全部**(再点收起);行 = 名称 · targetDate;无 planned 显示空态提示;released 不进侧栏。
 3. **挂接下拉(US-R4)**:item 详情页侧栏,milestone chips 下方新增「Release」区:
    - 显示当前归属(release-membership GET);下拉可选本项目 planned release 或「无」;选择即 `PUT release-membership`;released release 不出现在下拉。
-4. **设置门控**:项目设置已有 `releaseEnabled` 开关(YPJ-151 已落);本票把 `flags.release === false` 时隐藏侧栏 Releases 段与 Releases 页入口(与 milestone 门控同型)。设置面板本身不动。
+4. **挂接(US-R4,只做 item 侧)**:item 详情页侧栏,milestone chips 下方新增「Release」区:
+   - 显示当前归属(release-membership GET);下拉可选本项目 planned release 或「无」;选择即 `PUT release-membership`;released release 不出现在下拉。
+   - release 页侧不做 items 列表/添加(后端无该端点,本期不加);也不做挂接计数。
+5. **设置门控**:项目设置已有 `releaseEnabled` 开关(YPJ-151 已落);本票把 `flags.release === false` 时隐藏侧栏 Releases 段与 Releases 页入口(与 milestone 门控同型)。设置面板本身不动。
 
 ### 非目标(Out of Scope)
+
+- release 页侧的 items 列表/添加、挂接计数(后端无端点,本期不做)。
 
 - Release 详情页(单独路由页)——本期列表行内编辑足够,详情页另票(若 PRD §10.2 要求,待 202/203 之后再议)。
 - stage 显示词中文化之外的文案工作(封闭枚举值 alpha/beta/rc/ga 直显,显示词外置 texts.ts 但本期先用原值,中文映射另票)。
@@ -79,7 +84,10 @@ Releases 页(`/p/{key}/releases`):
 │ ▸ Items             │
 │ ──────────────────  │
 │ Releases            │  ← 段头,点进 /p/{key}/releases
-│   v1.0 · 12-01      │  ← planned 行
+│   v1.0 · 12-01      │  ← planned 行(最多 3 条)
+│   v0.9 · 11-30      │
+│   v0.8 · 11-20      │
+│   +2                │  ← 超出折叠,点开展开全部/收起
 │   (空态:无计划中)   │
 │ ──────────────────  │
 │ Milestones          │
@@ -102,7 +110,7 @@ item 详情侧栏挂接区:
 | `web/lib/api.ts` | 无需改(通用 api() 够用);Release 类型定义放新组件内 |
 | `web/components/ReleasePage.tsx`(新) | 列表+新建/编辑对话框+发布/删除确认;仿 `MilestonePage.tsx` 结构(数据自拉、广播 `releases-changed`) |
 | `web/app/p/[key]/releases/page.tsx`(新) | 薄壳,render `ReleasePage` |
-| `web/app/p/[key]/layout.tsx` | 侧栏加 Releases 段(`flags.release !== false` 门控):拉 `/api/projects/{key}/releases` 过滤 planned,监听 `releases-changed` 重拉 |
+| `web/app/p/[key]/layout.tsx` | 侧栏加 Releases 段(`flags.release !== false` 门控):拉 `/api/projects/{key}/releases` 过滤 planned,**显前 3 条 + 「+N」展开/收起**;监听 `releases-changed` 重拉 |
 | `web/app/p/[key]/i/[itemId]/page.tsx` | 挂接区:milestones 区下方,GET/PUT `/api/items/{itemId}/release-membership`,下拉只含 planned |
 
 ### 否决的备选
@@ -124,6 +132,7 @@ item 详情侧栏挂接区:
 7. **删除**:planned 行删除 → 确认后消失;item 挂接若指向它,后端 0133 已做摘除,UI 刷新后 item 挂接区显「无」。
 8. **挂接**:item 详情下拉选 planned release → 显示归属;改选另一个 → 覆盖;选「无」→ 清除;下拉中无 released 项。
 9. **空态**:无任何 release 时,页与侧栏显空态文案。
+10. **侧栏折叠**:建第 4 个 planned release → 侧栏显 3 条 + 「+1」;点开显全部,再点收起。
 
 ## As-built
 
