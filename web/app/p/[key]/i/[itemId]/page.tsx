@@ -362,6 +362,15 @@ export default function ItemDetailPage() {
 
   const [milestones, setMilestones] = useState<MilestoneLite[]>([]);
 
+  // YPJ-201(US-R4,spec 0134):release 挂接——下拉只含 planned;released 历史不可达
+  type ReleaseLite = {
+    releaseId: string;
+    name: string;
+    status: string;
+  };
+  const [releases, setReleases] = useState<ReleaseLite[]>([]);
+  const [releaseId, setReleaseId] = useState<string | null>(null);
+
   const [saved, setSaved] = useState(false);
 
   const [sprintHint, setSprintHint] = useState(""); // YPJ-120:开始动作自动入 sprint 的轻提示
@@ -425,6 +434,35 @@ export default function ItemDetailPage() {
 
     setBack(resolveBack(from, key));
   }, [key]);
+
+  // release 挂接独立拉取(不并首屏 Promise.all,避免动脆弱的下拉菜单时序)
+  useEffect(() => {
+    if (!itemId) return;
+    api<{ releaseId: string | null }>(`/api/items/${itemId}/release-membership`)
+      .then((m) => setReleaseId(m.releaseId))
+      .catch(() => setReleaseId(null));
+  }, [itemId]);
+
+  useEffect(() => {
+    api<ReleaseLite[]>(`/api/projects/${key}/releases`)
+      .then((rs) => setReleases(rs.filter((r) => r.status === "planned")))
+      .catch(() => setReleases([]));
+  }, [key]);
+
+  async function setReleaseMembership(next: string | null) {
+    try {
+      const m = await api<{ releaseId: string | null }>(
+        `/api/items/${itemId}/release-membership`,
+        {
+          method: "PUT",
+          body: JSON.stringify({ releaseId: next }),
+        },
+      );
+      setReleaseId(m.releaseId);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "挂接失败");
+    }
+  }
 
   const load = useCallback(async () => {
     if (!itemId) return;
@@ -1148,6 +1186,27 @@ export default function ItemDetailPage() {
                 ))}
               </Stack>
             )}
+
+            {/* YPJ-201:release 挂接——单选下拉;无归属显空串;released 不在选项 */}
+            <Dropdown
+              label={t.item.release}
+              value={releaseId ?? ""}
+              onChange={(v) => setReleaseMembership(v || null)}
+              clearable={releaseId !== null}
+              sx={{ width: 260 }}
+              options={[
+                { value: "", label: t.releases.stageNone },
+                ...releases.map((r) => ({
+                  value: r.releaseId,
+                  label: r.name,
+                })),
+                // 已挂的 release 已不在 planned(已发布)→ 兜底回显,防选中态丢 label
+                ...(releaseId &&
+                !releases.some((r) => r.releaseId === releaseId)
+                  ? [{ value: releaseId, label: t.releases.released }]
+                  : []),
+              ]}
+            />
 
             <Dropdown
               label={t.item.type}
