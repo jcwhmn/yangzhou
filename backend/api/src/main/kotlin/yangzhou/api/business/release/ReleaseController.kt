@@ -21,6 +21,10 @@ data class CreateReleaseRequest(
     /** 成熟度标签,封闭枚举可空;与 status 正交(stage=多成熟,status=发了没有)。 */
     val stage: String? = null,
     val targetDate: String? = null,
+    /** YPJ-202(spec 0135):US-R5 事后补建——"released" 直接落终态;缺省/"planned" 同现状。 */
+    val status: String? = null,
+    /** 仅 status=released 生效;缺省 = 今天(Clock);未来日 400(补建是历史)。 */
+    val releasedDate: String? = null,
 )
 
 data class UpdateReleaseRequest(
@@ -76,4 +80,11 @@ class ReleaseController(
         @PathVariable itemId: UUID,
         @RequestBody request: SetReleaseMembershipRequest,
     ) = service.setMembership(itemId, request)
+
+    /** YPJ-202(spec 0135):US-R6 挂接变更留痕(倒序)。 */
+    @GetMapping("/projects/{key}/releases/{releaseId}/history")
+    fun history(
+        @PathVariable key: String,
+        @PathVariable releaseId: UUID,
+    ) = service.history(key, releaseId)
 }

@@ -972,6 +972,36 @@ Content-Type: application/json
   "stage": "dev"
 }
 
+### 事后补建 release(US-R5,spec 0135;status=released 直接落终态;handler 存 backfillId)
+POST {{host}}/api/projects/{{pkey}}/releases
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "v0.5 补录 {{run}}",
+  "status": "released",
+  "releasedDate": "2026-06-01"
+}
+
+> {%
+    client.global.set("backfillId", response.body.releaseId);
+ %}
+
+### 挂接留痕(US-R6,spec 0135;release 侧倒序;删 release 后仍可查)
+GET {{host}}/api/projects/{{pkey}}/releases/{{releaseId}}/history
+Authorization: Bearer {{token}}
+
+### [预期 400] 补建未来日(补建是历史,不能晚于今天)
+POST {{host}}/api/projects/{{pkey}}/releases
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "未来发布 {{run}}",
+  "status": "released",
+  "releasedDate": "2999-01-01"
+}
+
 ### [预期 409] 终态冻结(已 released 的 release 改名)
 PATCH {{host}}/api/projects/{{pkey}}/releases/{{releaseId}}
 Authorization: Bearer {{token}}

@@ -600,6 +600,19 @@ data class ReleaseItem(
     var createdAt: Instant = Instant.now(),
 )
 
+/** YPJ-202(spec 0135):US-R6 挂接变更留痕——挂/摘各记一行,永不删(release 删除也不清)。 */
+@Table("release_item_history")
+data class ReleaseItemHistory(
+    @Id val id: Long? = null,
+    val objectId: UUID = UUID.randomUUID(),
+    val releaseObjectId: UUID,
+    val itemObjectId: UUID,
+    val action: String,
+    val actorMemberObjectId: UUID? = null,
+    @CreatedDate
+    var createdAt: Instant = Instant.now(),
+)
+
 /** YPJ-47 视图配置:表格筛选/列配置按 用户×项目 私有保存(spec 0045)。filters/columns 为小 JSON 串(TEXT 列)。 */
 @Table("project_view")
 data class ProjectView(

@@ -2,14 +2,18 @@ package yangzhou.api.business.release
 
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import yangzhou.api.business.member.MemberService
 import yangzhou.api.error.BadRequestException
 import yangzhou.api.error.ConflictException
 import yangzhou.api.error.NotFoundException
 import yangzhou.api.guard.LeaderGuard
 import yangzhou.persistence.Release
 import yangzhou.persistence.ReleaseItem
+import yangzhou.persistence.ReleaseItemHistory
 import yangzhou.persistence.repository.ItemRepository
+import yangzhou.persistence.repository.MemberRepository
 import yangzhou.persistence.repository.ProjectRepository
+import yangzhou.persistence.repository.ReleaseItemHistoryRepository
 import yangzhou.persistence.repository.ReleaseItemRepository
 import yangzhou.persistence.repository.ReleaseRepository
 import java.time.Clock
@@ -26,8 +30,11 @@ class ReleaseService(
     private val projects: ProjectRepository,
     private val releases: ReleaseRepository,
     private val releaseItems: ReleaseItemRepository,
+    private val releaseItemHistories: ReleaseItemHistoryRepository,
+    private val members: MemberRepository,
     private val items: ItemRepository,
     private val leaderGuard: LeaderGuard,
+    private val memberService: MemberService,
     private val clock: Clock,
 ) {
     data class ReleaseDto(
@@ -40,6 +47,15 @@ class ReleaseService(
         /** 仅 released 终态有值(实际发布日)。 */
         val releasedDate: String? = null,
         val createdAt: String,
+    )
+
+    data class ReleaseItemHistoryDto(
+        val itemObjectId: UUID,
+        val itemName: String,
+        val action: String,
+        val actorMemberObjectId: UUID? = null,
+        val actorName: String? = null,
+        val createdAt: Instant,
     )
 
     val stages = setOf("alpha", "beta", "rc", "ga")
@@ -89,6 +105,17 @@ class ReleaseService(
         leaderGuard.requireLeader(key)
         val name = request.name?.trim().takeUnless { it.isNullOrEmpty() } ?: throw BadRequestException("name 必填")
         val stage = validateStage(request.stage)
+        // US-R5(spec 0135):事后补建——status=released 直接落终态;其余值非法(缺省 planned)
+        val createStatus =
+            when (request.status ?: "planned") {
+                "planned" -> "planned"
+                "released" -> "released"
+                else -> throw BadRequestException("status 只能是 planned/released")
+            }
+        val backfillDate = parseDate(request.releasedDate, "releasedDate")
+        if (createStatus == "released" && backfillDate != null && backfillDate.isAfter(today())) {
+            throw BadRequestException("补建的 releasedDate 不能晚于今天")
+        }
         val saved =
             releases.save(
                 Release(
@@ -97,7 +124,8 @@ class ReleaseService(
                     version = request.version?.trim()?.takeIf { it.isNotEmpty() },
                     stage = stage,
                     targetDate = parseDate(request.targetDate, "targetDate"),
-                    // US-R5 另票:事后补建(直接 released)不在本票,create 一律 planned
+                    status = createStatus,
+                    releasedDate = if (createStatus == "released") (backfillDate ?: today()) else null,
                 ),
             )
         return saved.toDto()
@@ -168,10 +196,14 @@ class ReleaseService(
     ): ReleaseMembershipDto {
         val item = items.findByObjectId(itemId) ?: throw NotFoundException("item 不存在")
         if (item.deletedAt != null) throw BadRequestException("item 已删除")
+        val actor = memberService.current().objectId
         val current = liveRows(item.objectId!!)
         if (request.releaseId == null) {
             // 摘:只删 planned 行;released 历史行永不碰(挂接真相只看 planned,PRD §5.1 冻结由行不可动保证)
-            current.filter { it.second.status == "planned" }.forEach { releaseItems.delete(it.first) }
+            current.filter { it.second.status == "planned" }.forEach {
+                releaseItems.delete(it.first)
+                recordHistory(it.second.objectId, item.objectId!!, "detached", actor)
+            }
             return ReleaseMembershipDto()
         }
         val target = releases.findByObjectId(request.releaseId) ?: throw NotFoundException("release 不存在")
@@ -182,7 +214,50 @@ class ReleaseService(
             ?.let { throw ConflictException("item 已属未终态 release:${it.second.name}(先摘后再挂)") }
         if (current.any { it.second.objectId == target.objectId }) return membershipDto(itemId) // 幂等
         releaseItems.save(ReleaseItem(releaseObjectId = target.objectId, itemObjectId = item.objectId!!))
+        recordHistory(target.objectId, item.objectId!!, "attached", actor)
         return ReleaseMembershipDto(target.objectId, target.name)
+    }
+
+    /** YPJ-202(spec 0135):US-R6 留痕——挂/摘成功各一行;actor 可空。 */
+    private fun recordHistory(
+        releaseObjectId: UUID,
+        itemObjectId: UUID,
+        action: String,
+        actorMemberObjectId: UUID?,
+    ) {
+        releaseItemHistories.save(
+            ReleaseItemHistory(
+                releaseObjectId = releaseObjectId,
+                itemObjectId = itemObjectId,
+                action = action,
+                actorMemberObjectId = actorMemberObjectId,
+            ),
+        )
+    }
+
+    /** US-R6:release 侧留痕查询(倒序);release 删除后仍可查(弱引用悬空行照返)。 */
+    fun history(
+        key: String,
+        releaseId: UUID,
+    ): List<ReleaseItemHistoryDto> {
+        val p = project(key)
+        val target = releases.findByObjectId(releaseId)
+        if (target != null && target.projectObjectId != p.objectId) throw NotFoundException("release 不存在")
+        val rows = releaseItemHistories.findByReleaseObjectIdOrderByCreatedAtDesc(releaseId)
+        val itemMap = items.findByObjectIdIn(rows.map { it.itemObjectId }.toSet()).associateBy { it.objectId }
+        val memberMap = members.findAllByObjectIdIn(rows.mapNotNull { it.actorMemberObjectId }.toSet()).associateBy { it.objectId }
+        return rows.map { row ->
+            val item = itemMap[row.itemObjectId]
+            val actor = row.actorMemberObjectId?.let { memberMap[it] }
+            ReleaseItemHistoryDto(
+                itemObjectId = row.itemObjectId,
+                itemName = item?.title ?: "(已删除 item)",
+                action = row.action,
+                actorMemberObjectId = row.actorMemberObjectId,
+                actorName = actor?.displayName,
+                createdAt = row.createdAt,
+            )
+        }
     }
 
     /** live 行 = (行, release)。 */
