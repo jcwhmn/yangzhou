@@ -22,6 +22,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { t } from "@/lib/texts";
 import { AssignPopover } from "@/components/AssignPopover";
+import { fmtDate } from "@/lib/dates";
 
 type Item = {
   itemId: string;
@@ -184,7 +185,7 @@ export default function BacklogPage() {
                       {t.board.pullItem}
                     </Button>
                   </TableCell>
-                  <TableCell>{it.startDate ?? "—"}</TableCell>
+                  <TableCell>{fmtDate(it.startDate) || "—"}</TableCell>
                   <TableCell>
                     <span
                       style={{
@@ -195,7 +196,7 @@ export default function BacklogPage() {
                             : "inherit",
                       }}
                     >
-                      {it.dueDate ?? "—"}
+                      {fmtDate(it.dueDate) || "—"}
                     </span>
                   </TableCell>
                   <TableCell>
