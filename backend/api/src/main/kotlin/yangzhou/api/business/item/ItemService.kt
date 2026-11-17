@@ -390,7 +390,8 @@ class ItemService(
 
         // V8-S1 日期:参数 null = 不变;空串 = 清除;ISO 文本 = 设置。start<=due 由 DB CHECK + 此处双保险
         if (startDateText != null || dueDateText != null) {
-            // YPJ-208(spec 0138):date-only → 工作日界默认时刻(日历可改前硬编码 09:00/18:00);datetime 原样
+            // YPJ-208(spec 0138 切片 b):date-only → 项目工作日界默认时刻;datetime 原样
+            val (ws, we) = workdayBounds(project)
             fun parse(
                 text: String?,
                 field: String,
@@ -400,8 +401,8 @@ class ItemService(
                     .recoverCatching { LocalDate.parse(raw).atTime(defaultTime) }
                     .getOrElse { throw BadRequestException("$field 格式应为 yyyy-MM-dd 或 yyyy-MM-dd'T'HH:mm:$it") }
             }
-            val newStart = parse(startDateText, "startDate", DEFAULT_WORKDAY_START)
-            val newDue = parse(dueDateText, "dueDate", DEFAULT_WORKDAY_END)
+            val newStart = parse(startDateText, "startDate", ws)
+            val newDue = parse(dueDateText, "dueDate", we)
             val start = newStart ?: current.startDate
             val due = newDue ?: current.dueDate
             if (start != null && due != null && start > due) throw BadRequestException("开始日期不能晚于截止日期")
@@ -795,7 +796,14 @@ data class UpdateItemRequest(
 )
 
 /** dueSoon/overdue 纯函数(时钟纪律:today 由注入 Clock 提供,可测;spec 0051)。 */
-/** YPJ-208(spec 0138):date-only 输入的默认工作日界(切片 b 前硬编码;日历票后改注入)。 */
+/** YPJ-208(spec 0138 切片 b):解析项目工作日历(非法存值兑退默认 09:00/18:00,信任边界在 settings 写入)。 */
+internal fun workdayBounds(project: yangzhou.persistence.Project): Pair<LocalTime, LocalTime> {
+    val ws = runCatching { LocalTime.parse(project.workdayStart) }.getOrElse { DEFAULT_WORKDAY_START }
+    val we = runCatching { LocalTime.parse(project.workdayEnd) }.getOrElse { DEFAULT_WORKDAY_END }
+    return ws to we
+}
+
+/** YPJ-208(spec 0138):date-only 输入的默认工作日界(日历缺失/非法时兜底)。 */
 internal val DEFAULT_WORKDAY_START: LocalTime = LocalTime.of(9, 0)
 internal val DEFAULT_WORKDAY_END: LocalTime = LocalTime.of(18, 0)
 

@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional
 import tools.jackson.databind.ObjectMapper
 import yangzhou.api.business.github.VcsEvent
 import yangzhou.api.business.workspace.WorkspaceService
+import yangzhou.api.error.BadRequestException
 import yangzhou.api.error.ConflictException
 import yangzhou.api.error.NotFoundException
 import yangzhou.api.guard.LeaderGuard
@@ -56,6 +57,9 @@ class ProjectService(
         val estimateScales: List<EstimateScaleDto>,
         val estimateRequired: Boolean,
         val estimateScalesIsDefault: Boolean,
+        /** YPJ-208(spec 0138 切片 b):工作日历(HH:mm)。 */
+        val workdayStart: String,
+        val workdayEnd: String,
         val statuses: List<StatusDto>,
     )
 
@@ -106,6 +110,8 @@ class ProjectService(
             scales,
             project.estimateRequired,
             project.estimateScales == null,
+            project.workdayStart,
+            project.workdayEnd,
             statusDtos,
         )
     }
@@ -116,6 +122,16 @@ class ProjectService(
         request: UpdateProjectSettingsRequest,
     ): ProjectDto {
         val project = projects.findByKey(key) ?: throw NotFoundException("项目不存在:$key")
+        // YPJ-208 切片 b:工作日历校验(格式 + start<end;null=不改)
+        val ws = request.workdayStart
+        val we = request.workdayEnd
+        if (ws != null) runCatching { java.time.LocalTime.parse(ws) }.getOrElse { throw BadRequestException("workdayStart 格式应为 HH:mm:$ws") }
+        if (we != null) runCatching { java.time.LocalTime.parse(we) }.getOrElse { throw BadRequestException("workdayEnd 格式应为 HH:mm:$we") }
+        val newWs = ws ?: project.workdayStart
+        val newWe = we ?: project.workdayEnd
+        if (java.time.LocalTime.parse(newWs) >= java.time.LocalTime.parse(newWe)) {
+            throw BadRequestException("workdayStart 必须早于 workdayEnd($newWs >= $newWe)")
+        }
         val saved =
             projects.save(
                 project.copy(
@@ -128,6 +144,8 @@ class ProjectService(
                         project.estimateScales
                     },
                     estimateRequired = request.estimateRequired ?: project.estimateRequired,
+                    workdayStart = request.workdayStart ?: project.workdayStart,
+                    workdayEnd = request.workdayEnd ?: project.workdayEnd,
                 ),
             )
         return get(saved.key)
@@ -280,4 +298,7 @@ data class UpdateProjectSettingsRequest(
     /** YPJ-180:null=不改;传数组即整体替换(恢复默认=传默认五档)。 */
     val estimateScales: List<EstimateScaleDto>? = null,
     val estimateRequired: Boolean? = null,
+    /** YPJ-208(spec 0138 切片 b):工作日历(HH:mm;null=不改)。 */
+    val workdayStart: String? = null,
+    val workdayEnd: String? = null,
 )

@@ -180,6 +180,9 @@ data class Project(
     val estimateScales: String? = null,
     /** V60:立票必须填预估(item 写入侧强制在 YPJ-186 接)。 */
     val estimateRequired: Boolean = false,
+    /** YPJ-208(spec 0138 切片 b):工作日历(HH:mm);date-only 默认填充与时长换算用。 */
+    val workdayStart: String = "09:00",
+    val workdayEnd: String = "18:00",
     @CreatedDate
     var createdAt: Instant = Instant.now(),
     @LastModifiedDate

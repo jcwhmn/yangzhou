@@ -2442,6 +2442,30 @@ Content-Type: application/json
   "onBoard": true
 }
 
+### api.http:settings 工作日历(切片 b)
+PATCH {{host}}/api/projects/{{pkey}}/settings
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "workdayStart": "08:30",
+  "workdayEnd": "17:00"
+}
+
+> {%
+    client.global.set("ws208", response.body.workdayStart);
+ %}
+
+### [预期 400] 工作日历倒挂
+PATCH {{host}}/api/projects/{{pkey}}/settings
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "workdayStart": "18:00",
+  "workdayEnd": "09:00"
+}
+
 ### ============ 负例区(YPJ-180 工作量刻度) ============
 
 ### [预期 400] 刻度 key 重复
