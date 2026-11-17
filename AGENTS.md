@@ -114,6 +114,8 @@ docs/      adr/ · spec/ · architecture/(puml 类图) · requirement/(PRD) · p
 
 ## 工作流
 
+- **票卡排期纪律(2026-11-17 定,用户拍板)**:① 每个新 item 建票必带预估时长(estimateValue+estimateUnit);② item 进 sprint(backlog 拉入或建票直挂)必设预计开始时间,结束时间 = 开始 + 预估工作时长换算(DATE 粒度:不足一天=当天,跨天进一);③ 这是 dogfood 流程纪律兼未来系统强约束的先行版(甘特计划线需要,PRD 见 docs/requirement/甘特图 PRD.md R2);④ CLI 缺口(建票 --estimate、items 排期命令)见 YPJ-207,补齐前用 API 直调设置,不得留空。
+
 main 干线开发;原型留 `prototype/*` 分支;每张票 = 一个 YPJ item(dogfood),验收清单全绿才关票。
 
 - **架构破坏必须显要标注**:凡偏离 ADR/既定架构处,在 spec/PR/报告中专节置顶 + 加粗,不得混在设计细节里带过(2026-10-17 定;起因:0046/0048 的 jdbc client 用法埋在细节未标破坏)
