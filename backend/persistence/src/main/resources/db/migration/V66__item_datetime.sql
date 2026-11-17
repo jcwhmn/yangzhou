@@ -4,5 +4,5 @@
 alter table item alter start_date type timestamp using start_date::timestamp;
 alter table item alter due_date type timestamp using due_date::timestamp;
 
-alter table projects add column workday_start varchar(5) not null default '09:00';
-alter table projects add column workday_end varchar(5) not null default '18:00';
+alter table project add column workday_start varchar(5) not null default '09:00';
+alter table project add column workday_end varchar(5) not null default '18:00';
