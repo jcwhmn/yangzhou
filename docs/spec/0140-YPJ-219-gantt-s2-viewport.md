@@ -126,3 +126,17 @@
 1. v2 模型本身是否成立(替代年季月周档)?
 2. 缩放交互选型:± 按钮 / 滑杆 / Ctrl+滚轮(可组合,给可点原型或摆两案拍板,七规 6)。
 3. 年/季档是否彻底删除(多项目 roadmap 类远景需求未立票,建议删,YAGNI)。
+
+### v2 定案(2026-11-18 用户拍板,实施依据)
+
+1. **轴范围**:去掉 ±3d padding——数据锚定到**日界**:start = min(全部 item 日期) 所在日 00:00,end = max 所在日次日 00:00;无日期数据时退化为今日 0–24。小时刻度铺满全区间。
+2. **header 自适应 2–3 行**,行粒度自上而下:月(YYYY-MM)/ 周(Wnn + 周一日期)/ 日(MM-DD)/ 时(HH:mm 细刻度),按各粒度段宽阈值(月≥70px、周≥90px、日≥44px)决定显示哪几行,超 3 行自顶丢弃;极缩小时保底月行(抽稀)。
+3. **缩放交互**(agent 选型,实现后用户评估):**± 按钮(×1.5) + Ctrl+滚轮(锚点=鼠标位置) + 今日按钮 + 日窗预设按钮(1/2/3/5 日,以视点日为中心)**;pxPerDay ∈ [全区间压一屏的 fit, 720(=1h/30px)];缩放/视点/滚动位持久化 sessionStorage。
+4. 年/季档删除(梯子保留大步长用于缩小时刻度,不再有语义档按钮)。
+
+### As-built(2026-11-18)
+
+- `web/app/p/[key]/gantt/page.tsx` 整体重写轴层:删 GRANULARITIES/9 档/语义刻度,改 `axis`(数据锚定 start/end + pxPerDay 连续)+ `headerRows`(月/周/日行,段宽阈值门控)+ `hourTicks`(1/2/3/6/12h 梯子取最小步长使间距≥44px)。条渲染/汇总条/FINAL 置灰/B3 不变。
+- 缩放:`zoomTo(newPpd, anchorClientX)` 保持鼠标下数据时刻不动(重算 scrollLeft);± 按钮 ×1.5 以视口中心为锚;Ctrl+wheel 经 ref 非被动监听 preventDefault。
+- 工况持久化 sessionStorage `gantt.view` = { zoom, center(视点日), scroll };日窗预设/今日 = 设 center + zoom=N 天撑满。
+- e2e(gantt.spec):gran-* 档位用例删除,换 v2 用例:轴锚定全区间、缩放 ±、今日回中、1 日预设小时刻度、工况保持;S1 三例(汇总/禁用/加子)不变全绿。

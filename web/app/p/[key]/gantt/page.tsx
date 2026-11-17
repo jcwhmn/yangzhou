@@ -28,24 +28,14 @@ type GanttRow = {
 
 const DAY = 24 * 60 * 60 * 1000;
 
-// YPJ-219(spec 0140):缩放档;日窗族(1/2/3/5 日)= 0–24 墙钟全程(不跳周末;工作制轴归 YPJ-226)
-type Granularity =
-  "year" | "quarter" | "month" | "week" | "day" | "h1" | "h2" | "h3" | "h5";
-const GRANULARITIES: [Granularity, string, number, number][] = [
-  // [档, 标签, px/天基准, 日窗宽(0=非日窗)]
-  ["year", "年", 2, 0],
-  ["quarter", "季", 6, 0],
-  ["month", "月", 15, 0],
-  ["week", "周", 40, 0],
-  ["day", "日", 120, 0],
-  ["h1", "1日", 1200, 1],
-  ["h2", "2日", 700, 2],
-  ["h3", "3日", 500, 3],
-  ["h5", "5日", 320, 5],
-];
+// YPJ-219 v2(spec 0140):轴 = 数据锚定(首日 00:00 → 末日 24:00),连续缩放,无语义档位
 const TITLE_W = 280;
-const MIN_TIMELINE_W = 900;
-const TICK_MIN_PX = 48; // 刻度标签最小间距(密度不足时抽稀/放粗步长)
+const MAX_PPD = 720; // 缩放上限:1h = 30px(细节级)
+const MIN_LABEL_PX = 44; // 刻度标签最小间距
+const ZOOM_STEP = 1.5; // ± 按钮步进系数
+
+type Tick = { x: number; label: string; key: string };
+type HeaderRow = { gran: "month" | "week" | "day" | "hour"; ticks: Tick[] };
 
 // estimateUnit 封闭枚举(hour/day/week)的短标(YPJ-204)
 const EST_UNIT_SHORT: Record<string, string> = {
@@ -54,29 +44,27 @@ const EST_UNIT_SHORT: Record<string, string> = {
   week: "w",
 };
 
-/** V8-S2:单项目树形甘特(只读)。条 = start→due;只有 due 画里程碑菱形;今日线;未排期折叠组。 */
+/** 单项目树形甘特(只读)。条 = start→due;只有 due 画里程碑菱形;今日线;未排期折叠组。 */
 export default function GanttPage() {
   const { key } = useParams<{ key: string }>();
   const [rows, setRows] = useState<GanttRow[] | null>(null);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [showUnscheduled, setShowUnscheduled] = useState(false);
-  // YPJ-219(spec 0140 拍板补充):时档基准日可导航(默认今日);工况持久化 sessionStorage(#1)
+  // v2 工况:zoom(pxPerDay,null=自适应全区间)+ 视点日(日窗预设/今日的中心)+ 滚动位,sessionStorage 持久化
   const savedView = (() => {
     try {
       return JSON.parse(sessionStorage.getItem("gantt.view") ?? "{}") as {
-        gran?: Granularity;
-        hourBase?: string;
+        zoom?: number;
+        center?: string;
         scroll?: number;
       };
     } catch {
       return {};
     }
   })();
-  const [granularityState, setGranularityState] = useState<Granularity>(
-    savedView.gran ?? "month",
-  );
-  const [hourBase, setHourBase] = useState(savedView.hourBase ?? "");
-  const [containerW, setContainerW] = useState(0); // 可视宽(#3:时档内容撑满全屏)
+  const [zoom, setZoom] = useState<number | null>(savedView.zoom ?? null);
+  const [center, setCenter] = useState(savedView.center ?? "");
+  const [containerW, setContainerW] = useState(0); // 可视宽(内容至少撑满一屏)
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
@@ -88,118 +76,138 @@ export default function GanttPage() {
     load().catch(() => setRows([]));
   }, [load]);
 
-  // 时间轴(YPJ-219 spec 0140):像素制——跨度天数 × pxPerDay = 内容宽;时档固定基准日一天
+  // 轴(YPJ-219 spec 0140 v2):范围 = 数据锚定日界;pxPerDay 连续 ∈ [fit 全区间压一屏, MAX_PPD]
   const axis = useMemo(() => {
     const today = new Date();
-    const level = GRANULARITIES.find(([g]) => g === granularityState);
-    const winDays = level?.[3] ?? 0; // 日窗宽(0=非日窗)
-    let pxPerDay = level?.[2] ?? 15;
-    let start: Date;
-    let end: Date;
-    if (winDays > 0) {
-      // 日窗族:基准日 0 点起 winDays 天,0–24 墙钟全程
-      start = hourBase
-        ? parseLocal(hourBase)
-        : new Date(today.getFullYear(), today.getMonth(), today.getDate());
-      end = new Date(+start + winDays * DAY);
-    } else {
-      // 其余档:数据范围并入「今日±3 天」,保证今日恒在轴上(手测反馈 #2)
-      const dates = (rows ?? []).flatMap(
-        (r) => [r.startDate, r.dueDate].filter(Boolean) as string[],
-      );
-      const min = new Date(
-        Math.min(+today - 3 * DAY, ...dates.map((d) => +parseLocal(d))),
-      );
-      const max = new Date(
-        Math.max(+today + 3 * DAY, ...dates.map((d) => +parseLocal(d))),
-      );
-      start = new Date(min.getFullYear(), min.getMonth(), min.getDate());
-      pxPerDay = Math.max(pxPerDay, 15);
-      end = new Date(+max + 4 * DAY);
-    }
-    const spanDays = Math.max((+end - +start) / DAY, 1);
-    // #3:内容至少撑满可视区(可视宽未测得时用计算值)
-    if (containerW > 0) {
-      const fit =
-        winDays > 0
-          ? (containerW - TITLE_W) / winDays
-          : (containerW - TITLE_W) / spanDays;
-      pxPerDay = Math.max(pxPerDay, fit);
-    }
-    const timelineW = Math.max(spanDays * pxPerDay, MIN_TIMELINE_W);
+    const dates = (rows ?? []).flatMap(
+      (r) => [r.startDate, r.dueDate].filter(Boolean) as string[],
+    );
+    const minT = dates.length
+      ? Math.min(...dates.map((d) => +parseLocal(d)))
+      : +today;
+    const maxT = dates.length
+      ? Math.max(...dates.map((d) => +parseLocal(d)))
+      : +today;
+    const start = new Date(minT);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(maxT);
+    end.setHours(0, 0, 0, 0);
+    const endT = +end + DAY; // 末日 24:00
+    const spanDays = Math.max((endT - +start) / DAY, 1);
+    const fit = containerW > TITLE_W ? (containerW - TITLE_W) / spanDays : 20;
+    const pxPerDay = Math.min(Math.max(zoom ?? fit, fit), MAX_PPD);
+    const timelineW = spanDays * pxPerDay;
+    const xOfT = (t: number) => ((t - +start) / DAY) * pxPerDay;
 
-    // 刻度:按档取整点;标签按最小间距抽稀
-    const ticks: { x: number; label: string }[] = [];
-    const push = (d: Date, label: string) =>
-      ticks.push({
-        x: ((+d - +start) / DAY) * pxPerDay,
-        label,
-      });
-    if (winDays > 0) {
-      // 小时步长按密度自适应(标签 ≥ 48px):步长取 1/2/3/6h
-      const pxPerHour = pxPerDay / 24;
+    // 两级刻度:细刻度(小时梯子 1/2/3/6/12h,取间距≥MIN_LABEL_PX 的最小步长);粗行(月/周/日)按段宽门控
+    const rowsOut: HeaderRow[] = [];
+    const pxPerHour = pxPerDay / 24;
+    if (pxPerDay >= MIN_LABEL_PX) {
       const stepH =
-        pxPerHour >= 48 ? 1 : pxPerHour >= 24 ? 2 : pxPerHour >= 16 ? 3 : 6;
-      const totalH = winDays * 24;
-      for (let h = 0; h <= totalH; h += stepH) {
+        pxPerHour >= MIN_LABEL_PX
+          ? 1
+          : pxPerHour >= MIN_LABEL_PX / 2
+            ? 2
+            : pxPerHour >= MIN_LABEL_PX / 3
+              ? 3
+              : pxPerHour >= MIN_LABEL_PX / 6
+                ? 6
+                : 12;
+      const ticks: Tick[] = [];
+      for (let h = 0; h <= spanDays * 24; h += stepH) {
         const d = new Date(+start + (h * DAY) / 24);
         const label = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-        push(
-          d,
-          h % 24 === 0 && h > 0 && h < totalH
-            ? `${label} ${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
-            : label,
+        ticks.push({
+          x: xOfT(+d),
+          label,
+          key: `h${h}`,
+        });
+      }
+      rowsOut.push({ gran: "hour", ticks });
+    }
+    // 日行:每天一格 MM-DD
+    if (pxPerDay >= MIN_LABEL_PX) {
+      const ticks: Tick[] = [];
+      for (let t = +start; t < endT; t += DAY) {
+        const d = new Date(t);
+        ticks.push({
+          x: xOfT(t),
+          label: `${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`,
+          key: `d${t}`,
+        });
+      }
+      rowsOut.push({ gran: "day", ticks });
+    }
+    // 周行:周一 Wnn
+    if (pxPerDay * 7 >= 90) {
+      const first = new Date(+start);
+      const dow = (first.getDay() + 6) % 7;
+      first.setDate(first.getDate() - dow);
+      const ticks: Tick[] = [];
+      for (let t = +first; t < endT; t += 7 * DAY) {
+        const d = new Date(t);
+        const week = Math.ceil(
+          ((+d - +new Date(d.getFullYear(), 0, 1)) / DAY + 1) / 7,
         );
+        ticks.push({
+          x: xOfT(t),
+          label: `W${String(week).padStart(2, "0")}`,
+          key: `w${t}`,
+        });
       }
-    } else {
-      const cur = new Date(
-        start.getFullYear(),
-        start.getMonth(),
-        start.getDate(),
-      );
-      const add = {
-        year: () => cur.setFullYear(cur.getFullYear() + 1),
-        quarter: () => cur.setMonth(cur.getMonth() + 3),
-        month: () => cur.setMonth(cur.getMonth() + 1),
-        week: () => cur.setDate(cur.getDate() + 7),
-        day: () => cur.setDate(cur.getDate() + 1),
-      }[granularityState as Exclude<Granularity, "h1" | "h2" | "h3" | "h5">];
-      // 对齐:年/季/月对齐 1 号,周对齐周一,日从 start 起取整天
-      if (granularityState === "week") {
-        const dow = (cur.getDay() + 6) % 7;
-        cur.setDate(cur.getDate() - dow);
-      }
-      const advance = add as () => void;
-      while (+cur <= +start + spanDays * DAY) {
-        const label =
-          granularityState === "year"
-            ? `${cur.getFullYear()}`
-            : granularityState === "quarter"
-              ? `${cur.getFullYear()}-Q${Math.floor(cur.getMonth() / 3) + 1}`
-              : granularityState === "month"
-                ? `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, "0")}`
-                : `${String(cur.getMonth() + 1).padStart(2, "0")}-${String(cur.getDate()).padStart(2, "0")}`;
-        push(new Date(cur), label);
-        advance();
-      }
+      rowsOut.push({ gran: "week", ticks });
     }
-    // 密度不足 → 按序抽稀(保序,首刻度保留)
-    const shown: { x: number; label: string }[] = [];
-    for (const tk of ticks) {
-      if (shown.length === 0 || tk.x - shown[shown.length - 1].x >= TICK_MIN_PX)
-        shown.push(tk);
+    // 月行:日界月首 YYYY-MM
+    if (pxPerDay * 30 >= 70) {
+      const ticks: Tick[] = [];
+      const cur = new Date(+start);
+      cur.setDate(1);
+      while (+cur < endT) {
+        ticks.push({
+          x: xOfT(+cur),
+          label: `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, "0")}`,
+          key: `m${+cur}`,
+        });
+        cur.setMonth(cur.getMonth() + 1);
+      }
+      rowsOut.push({ gran: "month", ticks });
     }
+    // 保底:极缩小时只留月行(抽稀)
+    if (rowsOut.length === 0) {
+      const stepDays = Math.ceil((MIN_LABEL_PX * 1.5) / pxPerDay / 30) * 30;
+      const ticks: Tick[] = [];
+      const cur = new Date(+start);
+      cur.setDate(1);
+      let i = 0;
+      while (+cur < endT) {
+        if (i % Math.max(stepDays / 30, 1) === 0)
+          ticks.push({
+            x: xOfT(+cur),
+            label: `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, "0")}`,
+            key: `m${+cur}`,
+          });
+        cur.setMonth(cur.getMonth() + 1);
+        i++;
+      }
+      rowsOut.push({ gran: "month", ticks });
+    }
+    // 最多 3 行:自顶(最粗)丢弃;渲染序 = 粗→细(月在最上,时在最底)
+    rowsOut.reverse();
+    while (rowsOut.length > 3) rowsOut.shift();
 
     return {
       start,
+      endT,
+      spanDays,
       pxPerDay,
+      fit,
       timelineW,
-      ticks: shown,
-      todayX: ((+today - +start) / DAY) * pxPerDay,
+      headerRows: rowsOut,
+      todayX: xOfT(+today),
     };
-  }, [rows, granularityState, hourBase, containerW]);
+  }, [rows, zoom, containerW]);
 
-  // #3:测可视宽(含窗口缩放重算)
+  // 测可视宽(含窗口缩放重算)
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -209,64 +217,87 @@ export default function GanttPage() {
     return () => window.removeEventListener("resize", measure);
   }, [rows]);
 
-  // #1:滚动位置持久化;工况(档位/基准日/滚动)存 sessionStorage,切页回来还原
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (el && savedView.scroll) el.scrollLeft = savedView.scroll;
-    const save = () => {
-      if (scrollRef.current)
-        sessionStorage.setItem(
-          "gantt.view",
-          JSON.stringify({
-            gran: granularityState,
-            hourBase,
-            scroll: scrollRef.current.scrollLeft,
-          }),
-        );
-    };
-    el?.addEventListener("scroll", save);
-    return () => el?.removeEventListener("scroll", save);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [granularityState, hourBase, rows]);
+  const saveView = useCallback(() => {
+    if (scrollRef.current)
+      sessionStorage.setItem(
+        "gantt.view",
+        JSON.stringify({
+          zoom,
+          center,
+          scroll: scrollRef.current.scrollLeft,
+        }),
+      );
+  }, [zoom, center]);
 
-  // 切档/进页:今日线入视口(spec 0140);有保存滚动位时尊重保存值
+  // 滚动位置持久化
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    if (
-      savedView.gran === granularityState &&
-      savedView.hourBase === hourBase &&
-      savedView.scroll
-    )
-      return;
-    el.scrollLeft = Math.max(0, axis.todayX - (el.clientWidth - TITLE_W) / 2);
-  }, [granularityState, hourBase, rows, axis.todayX]);
+    if (savedView.scroll) el.scrollLeft = savedView.scroll;
+    el.addEventListener("scroll", saveView);
+    return () => el.removeEventListener("scroll", saveView);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saveView, rows]);
 
-  const setGranularity = (g: Granularity) => {
-    setGranularityState(g);
-    sessionStorage.setItem(
-      "gantt.view",
-      JSON.stringify({
-        gran: g,
-        hourBase,
-        scroll: scrollRef.current?.scrollLeft ?? 0,
-      }),
-    );
+  // 缩放:锚点(anchorClientX,视口坐标)下的数据时刻保持不动;null 锚 = 视口中心
+  const zoomTo = (newPpd: number, anchorClientX?: number) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const anchorX = (anchorClientX ?? el.clientWidth / 2 + TITLE_W) - TITLE_W;
+    const dataDays = (el.scrollLeft + anchorX) / axis.pxPerDay;
+    const clamped = Math.min(Math.max(newPpd, axis.fit), MAX_PPD);
+    el.scrollLeft = Math.max(0, dataDays * clamped - anchorX);
+    setZoom(clamped);
+    setTimeout(saveView, 0);
   };
-  const dayWinDays =
-    GRANULARITIES.find(([g]) => g === granularityState)?.[3] ?? 0;
-  const changeHourBase = (b: string) => {
-    setHourBase(b);
-    sessionStorage.setItem(
-      "gantt.view",
-      JSON.stringify({ gran: granularityState, hourBase: b, scroll: 0 }),
-    );
+
+  // Ctrl+滚轮缩放(非被动监听以 preventDefault)
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      const rect = el.getBoundingClientRect();
+      zoomTo(
+        axis.pxPerDay * (e.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP),
+        e.clientX - rect.left,
+      );
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [axis.pxPerDay, axis.fit, saveView]);
+
+  // 视点日变化时滚动到视点日居中(缩放导致的 pxPerDay 变化不重触发,避免覆盖锚点滚动)
+  const lastCenterRef = useRef("");
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || !center || center === lastCenterRef.current) return;
+    lastCenterRef.current = center;
+    const x = ((+parseLocal(center) - +axis.start) / DAY) * axis.pxPerDay;
+    el.scrollLeft = Math.max(0, x - (el.clientWidth - TITLE_W) / 2);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [center, axis.pxPerDay, rows]);
+
+  const fmtDay = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const shiftCenter = (days: number) => {
+    const base = center ? parseLocal(center) : new Date();
+    base.setDate(base.getDate() + days);
+    setCenter(fmtDay(base));
   };
-  const shiftDay = (base: string, days: number) => {
-    const d = base ? parseLocal(base) : new Date();
-    d.setDate(d.getDate() + days);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  // 日窗预设 / 今日:视点日为中心,N 天撑满可视区
+  const goToDayWindow = (days: number | null) => {
+    const target =
+      days === null ? new Date() : center ? parseLocal(center) : new Date();
+    lastCenterRef.current = ""; // 同值重设也要触发居中
+    setCenter(fmtDay(target));
+    if (days !== null && containerW > TITLE_W)
+      setZoom((containerW - TITLE_W) / days);
+    else if (days === null) setZoom(null);
   };
+
   const xOf = (date: string | null) =>
     date === null
       ? null
@@ -278,7 +309,7 @@ export default function GanttPage() {
           ),
         );
 
-  // YPJ-218(spec 0139)B3:条宽含当天——仅 date-only +1 天;datetime 右端=精确 due(#2 修正:带时刻的 due 不再多画一天)
+  // YPJ-218(spec 0139)B3:条宽含当天——仅 date-only +1 天;datetime 右端=精确 due
   const xEndOf = (due: string | null) =>
     due === null
       ? null
@@ -294,7 +325,7 @@ export default function GanttPage() {
           ),
         );
 
-  // YPJ-218(spec 0139):父汇总条 = 全部子孙排期区间的并集;父自有日期忽略不画(定案:父不持有自有时间线)
+  // YPJ-218(spec 0139):父汇总条 = 全部子孙排期区间的并集;父自有日期忽略不画
   function summaryOf(itemId: string): [string, string] | null {
     let min: number | null = null;
     let max: number | null = null;
@@ -338,7 +369,7 @@ export default function GanttPage() {
   }
 
   const visible = (rows ?? []).filter((r) => !hiddenByCollapse(r));
-  // YPJ-218(spec 0139):有子孙的父归入已排期(靠汇总条画);真未排期 = 无日期且无子
+  // 有子孙的父归入已排期(靠汇总条画);真未排期 = 无日期且无子
   const hasKid = (r: GanttRow) =>
     (rows ?? []).some((x) => x.parentItemId === r.itemId);
   const unscheduled = visible.filter(
@@ -347,7 +378,6 @@ export default function GanttPage() {
   const scheduled = visible.filter(
     (r) => r.startDate || r.dueDate || hasKid(r),
   );
-  const byId = new Map((rows ?? []).map((r) => [r.itemId, r]));
 
   return (
     <PageShell>
@@ -359,52 +389,89 @@ export default function GanttPage() {
           sx={{ ml: "auto" }}
           alignItems="center"
         >
-          {GRANULARITIES.map(([g, label]) => (
+          {/* 缩放控件(v2 连续系数):− / + ;Ctrl+滚轮亦可(锚点=鼠标) */}
+          <Button
+            size="small"
+            variant="outlined"
+            data-testid="gantt-zoom-out"
+            aria-label="缩小"
+            onClick={() => zoomTo(axis.pxPerDay / ZOOM_STEP)}
+          >
+            −
+          </Button>
+          <Button
+            size="small"
+            variant="outlined"
+            data-testid="gantt-zoom-in"
+            aria-label="放大"
+            onClick={() => zoomTo(axis.pxPerDay * ZOOM_STEP)}
+          >
+            +
+          </Button>
+          {/* 全览:回到数据全区间(fit) */}
+          <Button
+            size="small"
+            variant="outlined"
+            data-testid="gantt-fit"
+            onClick={() => {
+              setZoom(null);
+              setCenter("");
+            }}
+          >
+            全览
+          </Button>
+          {/* 今日回中 */}
+          <Button
+            size="small"
+            variant="outlined"
+            data-testid="gantt-today"
+            onClick={() => goToDayWindow(null)}
+          >
+            今日
+          </Button>
+          {/* 日窗预设(视点日为中心,N 天撑满) */}
+          {[1, 2, 3, 5].map((n) => (
             <Button
-              key={g}
-              data-testid={`gantt-gran-${g}`}
+              key={n}
               size="small"
-              variant={granularityState === g ? "contained" : "outlined"}
-              onClick={() => {
-                setGranularity(g);
-              }}
+              variant="outlined"
+              data-testid={`gantt-win-${n}`}
+              onClick={() => goToDayWindow(n)}
             >
-              {label}
+              {n}日
             </Button>
           ))}
-          {/* 时档基准日导航(YPJ-219 拍板补充):◀ 前一天 / 后一天 ▶ / 指定日期 */}
-          {dayWinDays > 0 && (
-            <Stack
-              direction="row"
-              spacing={0.5}
-              alignItems="center"
-              data-testid="gantt-hour-nav"
+          {/* 视点日导航:◀ 前一天 / 后一天 ▶ / 指定日期 */}
+          <Stack
+            direction="row"
+            spacing={0.5}
+            alignItems="center"
+            data-testid="gantt-center-nav"
+          >
+            <Button
+              size="small"
+              variant="outlined"
+              data-testid="gantt-center-prev"
+              onClick={() => shiftCenter(-1)}
             >
-              <Button
-                size="small"
-                variant="outlined"
-                data-testid="gantt-hour-prev"
-                onClick={() => changeHourBase(shiftDay(hourBase, -1))}
-              >
-                ◀
-              </Button>
-              <DateInput
-                ariaLabel="时轴基准日"
-                size="small"
-                value={hourBase}
-                onChange={changeHourBase}
-                sx={{ width: 160 }}
-              />
-              <Button
-                size="small"
-                variant="outlined"
-                data-testid="gantt-hour-next"
-                onClick={() => changeHourBase(shiftDay(hourBase, 1))}
-              >
-                ▶
-              </Button>
-            </Stack>
-          )}
+              ◀
+            </Button>
+            <DateInput
+              ariaLabel="视点日"
+              size="small"
+              value={center}
+              onChange={(v) => setCenter(v)}
+              sx={{ width: 160 }}
+            />
+            <Button
+              size="small"
+              variant="outlined"
+              data-testid="gantt-center-next"
+              onClick={() => shiftCenter(1)}
+            >
+              ▶
+            </Button>
+          </Stack>
         </Stack>
       </Stack>
 
@@ -433,7 +500,7 @@ export default function GanttPage() {
             </Box>
           )}
 
-          {/* 时间轴视口(YPJ-219 spec 0140):横滚;标题列 sticky;内容宽 = 280 + 跨度×px/天 */}
+          {/* 时间轴视口:横滚;标题列 sticky;内容宽 = 280 + 跨度×px/天 */}
           <Box
             ref={scrollRef}
             data-testid="gantt-scroll"
@@ -447,66 +514,54 @@ export default function GanttPage() {
             }}
           >
             <Box sx={{ width: TITLE_W + axis.timelineW, minWidth: "100%" }}>
-              {/* 日期刻度 */}
-              <Stack
-                direction="row"
-                sx={{
-                  borderBottom: "1px solid",
-                  borderColor: "divider",
-                  bgcolor: "background.default",
-                }}
-              >
-                <Box
+              {/* header 自适应 2–3 行(月/周/日/时,自上而下粗→细) */}
+              {axis.headerRows.map((row) => (
+                <Stack
+                  key={row.gran}
+                  direction="row"
+                  data-testid={`gantt-row-${row.gran}`}
                   sx={{
-                    width: TITLE_W,
-                    flexShrink: 0,
-                    position: "sticky",
-                    left: 0,
-                    zIndex: 3,
+                    borderBottom: "1px solid",
+                    borderColor: "divider",
                     bgcolor: "background.default",
                   }}
-                />
-                <Box
-                  sx={{
-                    position: "relative",
-                    width: axis.timelineW,
-                    flexShrink: 0,
-                    height: 24,
-                  }}
                 >
-                  {axis.ticks.map((tk) => (
-                    <Typography
-                      key={`${tk.x}-${tk.label}`}
-                      variant="caption"
-                      color="text.secondary"
-                      sx={{
-                        position: "absolute",
-                        left: tk.x + 4,
-                        top: 2,
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {tk.label}
-                    </Typography>
-                  ))}
-                  {/* 今日线(刻度行) */}
-                  {axis.todayX >= 0 && axis.todayX <= axis.timelineW && (
-                    <Box
-                      sx={{
-                        position: "absolute",
-                        left: axis.todayX,
-                        top: 0,
-                        bottom: 0,
-                        width: "2px",
-                        bgcolor: "info.main",
-                        opacity: 0.6,
-                      }}
-                    />
-                  )}
-                </Box>
-              </Stack>
-
-              {/* 今日线全高遮罩参考:各自行内画(条区内) */}
+                  <Box
+                    sx={{
+                      width: TITLE_W,
+                      flexShrink: 0,
+                      position: "sticky",
+                      left: 0,
+                      zIndex: 3,
+                      bgcolor: "background.default",
+                    }}
+                  />
+                  <Box
+                    sx={{
+                      position: "relative",
+                      width: axis.timelineW,
+                      flexShrink: 0,
+                      height: 24,
+                    }}
+                  >
+                    {row.ticks.map((tk) => (
+                      <Typography
+                        key={tk.key}
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{
+                          position: "absolute",
+                          left: tk.x + 4,
+                          top: 2,
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {tk.label}
+                      </Typography>
+                    ))}
+                  </Box>
+                </Stack>
+              ))}
 
               {scheduled.length === 0 && (
                 <Typography
@@ -526,7 +581,7 @@ export default function GanttPage() {
                   summary !== null
                     ? Math.max((xEndOf(summary[1]) ?? 0) - summaryLeft, 1.2)
                     : 0;
-                // YPJ-218(spec 0139):有子孙的父行只画汇总条,不画自有条
+                // 有子孙的父行只画汇总条,不画自有条
                 const drawOwn = !hasKid(r);
                 const hasStart = drawOwn && r.startDate !== null;
                 const left = xOf(hasStart ? r.startDate : r.dueDate) ?? 0;
@@ -718,7 +773,8 @@ export default function GanttPage() {
             sx={{ mt: 1, display: "block" }}
           >
             蓝竖线 = 今天 · 菱形 = 里程碑(只有截止日期) · 红色 = 超期 · 灰 =
-            已完成 · 灰横条 = 父汇总(子孙并集) · 点行进详情 · 横向滚动看更多
+            已完成 · 灰横条 = 父汇总(子孙并集) · Ctrl+滚轮或 ± 缩放 ·
+            「今日」回中今天
           </Typography>
         </>
       )}
