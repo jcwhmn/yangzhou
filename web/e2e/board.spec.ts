@@ -71,8 +71,16 @@ test("日期与超期标识——详情设置日期,看板红标,甘特可见", 
   const saveResp = page.waitForResponse(
     (r) => r.url().includes("/api/items/") && r.request().method() === "PATCH",
   );
+  // 保存成功后前端 load() 回拉 item(date-only 会被后端按日历填 T18:00 并回填时刻框),
+  // 必须等这次 GET 完成再录时刻,否则回填覆盖 fill(竞态,叠加态跑绿属时序运气)
+  const reloadResp = page.waitForResponse(
+    (r) =>
+      r.url().includes(`/api/items/${itemId}`) &&
+      r.request().method() === "GET",
+  );
   await page.getByRole("button", { name: "保存" }).click();
-  await saveResp; // 等 PATCH 落库再导航,否则请求被打断
+  await saveResp;
+  await reloadResp;
   await expectDate(page, "开始日期", "2020-01-01");
   // YPJ-208 切片 c:时刻字段在,可录并随保存发出 datetime
   await page.getByLabel("截止时刻").fill("12:30");
