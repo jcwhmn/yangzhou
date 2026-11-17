@@ -112,7 +112,8 @@ test("无子的父加子不弹窗", async ({ page, projectKey }) => {
   await expect(page.getByText("E2E 直接子")).toBeVisible();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   // 定案:加了子即禁用(哪怕父从没填过时间线)
-  await expect(
-    page.getByRole("group", { name: "开始日期" }),
-  ).toHaveAttribute("aria-disabled", "true");
+  await expect(page.getByRole("group", { name: "开始日期" })).toHaveAttribute(
+    "aria-disabled",
+    "true",
+  );
 });

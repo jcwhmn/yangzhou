@@ -176,9 +176,14 @@ export default function GanttPage() {
 
   const visible = (rows ?? []).filter((r) => !hiddenByCollapse(r));
   // YPJ-218(spec 0139):有子孙的父归入已排期(靠汇总条画);真未排期 = 无日期且无子
-  const hasKid = (r: GanttRow) => (rows ?? []).some((x) => x.parentItemId === r.itemId);
-  const unscheduled = visible.filter((r) => !r.startDate && !r.dueDate && !hasKid(r));
-  const scheduled = visible.filter((r) => r.startDate || r.dueDate || hasKid(r));
+  const hasKid = (r: GanttRow) =>
+    (rows ?? []).some((x) => x.parentItemId === r.itemId);
+  const unscheduled = visible.filter(
+    (r) => !r.startDate && !r.dueDate && !hasKid(r),
+  );
+  const scheduled = visible.filter(
+    (r) => r.startDate || r.dueDate || hasKid(r),
+  );
   const byId = new Map((rows ?? []).map((r) => [r.itemId, r]));
 
   return (
