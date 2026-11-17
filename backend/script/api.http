@@ -64,6 +64,14 @@ Authorization: Bearer {{token}}
     client.global.set("statusTo", response.body.statuses[1].name);
  %}
 
+### 甘特数据(YPJ-204/spec 0137:行含 blocked/estimateValue/estimateUnit;响应不回填)
+GET {{host}}/api/projects/{{pkey}}/gantt
+Authorization: Bearer {{token}}
+
+### [预期 404] 甘特数据——未知项目
+GET {{host}}/api/projects/NOPE77/gantt
+Authorization: Bearer {{token}}
+
 ### 项目设置——关 milestone 开关(YPJ-151;null=不改)
 PATCH {{host}}/api/projects/{{pkey}}/settings
 Authorization: Bearer {{token}}

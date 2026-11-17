@@ -83,6 +83,45 @@ test("日期与超期标识——详情设置日期,看板红标,甘特可见", 
   await expect(page.getByText(/未排期\(/)).toBeVisible();
 });
 
+test("甘特粒度切换 + blocked 标记 + estimate 可见(YPJ-204/spec 0137)", async ({
+  page,
+  projectKey,
+}) => {
+  // 数据准备全走 API:blocker 未终态 → blocked 行有标记；被阻塞行带 estimate
+  const blocker = await apiCreateItem(projectKey, "E2E 甘特依赖源");
+  const blockedItem = await apiCreateItem(projectKey, "E2E 甘特被阻塞");
+  await apiCall("PATCH", `/api/items/${blockedItem}`, {
+    startDate: "2020-01-01",
+    dueDate: "2020-01-15",
+    estimateValue: 2,
+    estimateUnit: "hour",
+  });
+  await apiCall("POST", `/api/items/${blockedItem}/dependencies`, {
+    dependsOnItemId: blocker,
+  });
+
+  await page.goto(`/p/${projectKey}/gantt`);
+  const row = page.getByText("E2E 甘特被阻塞");
+  await expect(row).toBeVisible();
+  await expect(page.getByTestId(`gantt-est-${projectKey}-2`)).toBeVisible();
+  await expect(page.getByTestId(`gantt-blocked-${projectKey}-2`)).toBeVisible();
+
+  // 粒度切换：月默认 → 周刻度变密 → 日刻度含具体日
+  await page.getByTestId("gantt-gran-month").click();
+  await expect(page.getByTestId("gantt-gran-month")).toHaveClass(
+    /MuiButton-containedPrimary/,
+  );
+  await page.getByTestId("gantt-gran-week").click();
+  await expect(page.getByTestId("gantt-gran-week")).toHaveClass(
+    /MuiButton-containedPrimary/,
+  );
+  await page.getByTestId("gantt-gran-day").click();
+  await expect(page.getByTestId("gantt-gran-day")).toHaveClass(
+    /MuiButton-containedPrimary/,
+  );
+  await expect(row).toBeVisible();
+});
+
 test("V11-S4 detail 优先级 Select 接通(P1 落库/清除)", async ({
   page,
   projectKey,
