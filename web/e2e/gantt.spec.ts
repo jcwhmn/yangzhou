@@ -129,7 +129,17 @@ test("甘特视口与六级缩放(YPJ-219)", async ({ page, projectKey }) => {
   await expect(page.getByText("E2E 缩放条")).toBeVisible();
 
   // 六档按钮
-  for (const g of ["year", "quarter", "month", "week", "day", "hour"]) {
+  for (const g of [
+    "year",
+    "quarter",
+    "month",
+    "week",
+    "day",
+    "h1",
+    "h2",
+    "h3",
+    "h5",
+  ]) {
     await expect(page.getByTestId(`gantt-gran-${g}`)).toBeVisible();
   }
 
@@ -143,17 +153,20 @@ test("甘特视口与六级缩放(YPJ-219)", async ({ page, projectKey }) => {
     )
     .toBe(true);
 
-  // 时档:单日 0–24 全程刻度(首尾标签在)
-  await page.getByTestId("gantt-gran-hour").click();
-  await expect(page.getByText("0:00", { exact: true })).toBeVisible();
+  // 日窗族:1日 0–24 全程刻度(首尾标签在);2日/3日/5日按钮在
+  await page.getByTestId("gantt-gran-h1").click();
+  await expect(page.getByText("00:00", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("23:00", { exact: true })).toBeVisible();
+  for (const g of ["h2", "h3", "h5"]) {
+    await expect(page.getByTestId(`gantt-gran-${g}`)).toBeVisible();
+  }
 
   // 切档后回到月档仍可用
   await page.getByTestId("gantt-gran-month").click();
   await expect(page.getByText("E2E 缩放条")).toBeVisible();
 });
 
-test("时档基准日导航(YPJ-219 拍板补充)", async ({ page, projectKey }) => {
+test("日窗基准日导航(YPJ-219 拍板补充)", async ({ page, projectKey }) => {
   const item = await apiCreateItem(projectKey, "E2E 时轴条");
   // 排明天 10:00–12:00,验证基准日切换后条入轴
   const tomorrow = new Date();
@@ -166,7 +179,7 @@ test("时档基准日导航(YPJ-219 拍板补充)", async ({ page, projectKey })
   });
 
   await page.goto(`/p/${projectKey}/gantt`);
-  await page.getByTestId("gantt-gran-hour").click();
+  await page.getByTestId("gantt-gran-h1").click();
 
   // 默认今日轴:明天的条不在;导航控件在
   await expect(page.getByTestId("gantt-hour-nav")).toBeVisible();
@@ -195,7 +208,7 @@ test("工况保持与视口撑满(YPJ-219 手测反馈)", async ({ page, project
   await page.goto(`/p/${projectKey}/gantt`);
   await page.getByTestId("gantt-gran-day").click();
   // 时档:时轴宽度撑满可视区(#3)
-  await page.getByTestId("gantt-gran-hour").click();
+  await page.getByTestId("gantt-gran-h1").click();
   const fills = await page.getByTestId("gantt-scroll").evaluate((el) => {
     const inner = el.firstElementChild as HTMLElement;
     return inner.scrollWidth >= el.clientWidth - 280;

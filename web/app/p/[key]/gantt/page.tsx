@@ -28,15 +28,20 @@ type GanttRow = {
 
 const DAY = 24 * 60 * 60 * 1000;
 
-// YPJ-219(spec 0140):六级缩放,px/天;时档=单日 0–24 墙钟全程(不跳周末;工作制轴归 YPJ-226)
-type Granularity = "year" | "quarter" | "month" | "week" | "day" | "hour";
-const GRANULARITIES: [Granularity, string, number][] = [
-  ["year", "年", 2],
-  ["quarter", "季", 6],
-  ["month", "月", 15],
-  ["week", "周", 40],
-  ["day", "日", 120],
-  ["hour", "时", 1200],
+// YPJ-219(spec 0140):缩放档;日窗族(1/2/3/5 日)= 0–24 墙钟全程(不跳周末;工作制轴归 YPJ-226)
+type Granularity =
+  "year" | "quarter" | "month" | "week" | "day" | "h1" | "h2" | "h3" | "h5";
+const GRANULARITIES: [Granularity, string, number, number][] = [
+  // [档, 标签, px/天基准, 日窗宽(0=非日窗)]
+  ["year", "年", 2, 0],
+  ["quarter", "季", 6, 0],
+  ["month", "月", 15, 0],
+  ["week", "周", 40, 0],
+  ["day", "日", 120, 0],
+  ["h1", "1日", 1200, 1],
+  ["h2", "2日", 700, 2],
+  ["h3", "3日", 500, 3],
+  ["h5", "5日", 320, 5],
 ];
 const TITLE_W = 280;
 const MIN_TIMELINE_W = 900;
@@ -86,37 +91,40 @@ export default function GanttPage() {
   // 时间轴(YPJ-219 spec 0140):像素制——跨度天数 × pxPerDay = 内容宽;时档固定基准日一天
   const axis = useMemo(() => {
     const today = new Date();
-    let pxPerDay =
-      GRANULARITIES.find(([g]) => g === granularityState)?.[2] ?? 15;
+    const level = GRANULARITIES.find(([g]) => g === granularityState);
+    const winDays = level?.[3] ?? 0; // 日窗宽(0=非日窗)
+    let pxPerDay = level?.[2] ?? 15;
     let start: Date;
-    if (granularityState === "hour") {
-      // 单日 0–24 全程轴,基准=基准日(默认今日)
+    let end: Date;
+    if (winDays > 0) {
+      // 日窗族:基准日 0 点起 winDays 天,0–24 墙钟全程
       start = hourBase
         ? parseLocal(hourBase)
         : new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      end = new Date(+start + winDays * DAY);
     } else {
+      // 其余档:数据范围并入「今日±3 天」,保证今日恒在轴上(手测反馈 #2)
       const dates = (rows ?? []).flatMap(
         (r) => [r.startDate, r.dueDate].filter(Boolean) as string[],
       );
-      const min = dates.length
-        ? new Date(Math.min(...dates.map((d) => +parseLocal(d))))
-        : today;
-      const max = dates.length
-        ? new Date(Math.max(...dates.map((d) => +parseLocal(d))))
-        : new Date(+today + 30 * DAY);
-      start = new Date(+min - 3 * DAY);
+      const min = new Date(
+        Math.min(+today - 3 * DAY, ...dates.map((d) => +parseLocal(d))),
+      );
+      const max = new Date(
+        Math.max(+today + 3 * DAY, ...dates.map((d) => +parseLocal(d))),
+      );
+      start = new Date(min.getFullYear(), min.getMonth(), min.getDate());
+      pxPerDay = Math.max(pxPerDay, 15);
+      end = new Date(+max + 4 * DAY);
     }
-    const end =
-      granularityState === "hour"
-        ? new Date(+start + DAY)
-        : new Date(
-            +start +
-              DAY * 400 * (pxPerDay <= 6 ? 1 : pxPerDay <= 40 ? 0.4 : 0.15),
-          );
     const spanDays = Math.max((+end - +start) / DAY, 1);
     // #3:内容至少撑满可视区(可视宽未测得时用计算值)
     if (containerW > 0) {
-      pxPerDay = Math.max(pxPerDay, (containerW - TITLE_W) / spanDays);
+      const fit =
+        winDays > 0
+          ? (containerW - TITLE_W) / winDays
+          : (containerW - TITLE_W) / spanDays;
+      pxPerDay = Math.max(pxPerDay, fit);
     }
     const timelineW = Math.max(spanDays * pxPerDay, MIN_TIMELINE_W);
 
@@ -127,9 +135,21 @@ export default function GanttPage() {
         x: ((+d - +start) / DAY) * pxPerDay,
         label,
       });
-    if (granularityState === "hour") {
-      for (let h = 0; h < 24; h++) {
-        push(new Date(+start + (h * DAY) / 24), `${h}:00`);
+    if (winDays > 0) {
+      // 小时步长按密度自适应(标签 ≥ 48px):步长取 1/2/3/6h
+      const pxPerHour = pxPerDay / 24;
+      const stepH =
+        pxPerHour >= 48 ? 1 : pxPerHour >= 24 ? 2 : pxPerHour >= 16 ? 3 : 6;
+      const totalH = winDays * 24;
+      for (let h = 0; h <= totalH; h += stepH) {
+        const d = new Date(+start + (h * DAY) / 24);
+        const label = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+        push(
+          d,
+          h % 24 === 0 && h > 0 && h < totalH
+            ? `${label} ${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+            : label,
+        );
       }
     } else {
       const cur = new Date(
@@ -143,12 +163,13 @@ export default function GanttPage() {
         month: () => cur.setMonth(cur.getMonth() + 1),
         week: () => cur.setDate(cur.getDate() + 7),
         day: () => cur.setDate(cur.getDate() + 1),
-      }[granularityState as Exclude<Granularity, "hour">];
+      }[granularityState as Exclude<Granularity, "h1" | "h2" | "h3" | "h5">];
       // 对齐:年/季/月对齐 1 号,周对齐周一,日从 start 起取整天
       if (granularityState === "week") {
         const dow = (cur.getDay() + 6) % 7;
         cur.setDate(cur.getDate() - dow);
       }
+      const advance = add as () => void;
       while (+cur <= +start + spanDays * DAY) {
         const label =
           granularityState === "year"
@@ -159,7 +180,7 @@ export default function GanttPage() {
                 ? `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, "0")}`
                 : `${String(cur.getMonth() + 1).padStart(2, "0")}-${String(cur.getDate()).padStart(2, "0")}`;
         push(new Date(cur), label);
-        add();
+        advance();
       }
     }
     // 密度不足 → 按序抽稀(保序,首刻度保留)
@@ -232,6 +253,8 @@ export default function GanttPage() {
       }),
     );
   };
+  const dayWinDays =
+    GRANULARITIES.find(([g]) => g === granularityState)?.[3] ?? 0;
   const changeHourBase = (b: string) => {
     setHourBase(b);
     sessionStorage.setItem(
@@ -350,7 +373,7 @@ export default function GanttPage() {
             </Button>
           ))}
           {/* 时档基准日导航(YPJ-219 拍板补充):◀ 前一天 / 后一天 ▶ / 指定日期 */}
-          {granularityState === "hour" && (
+          {dayWinDays > 0 && (
             <Stack
               direction="row"
               spacing={0.5}
