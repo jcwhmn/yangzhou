@@ -169,4 +169,47 @@ class ItemDateApiTest : AbstractApiTest() {
         val item2 = createItem(authed, "CHE", "y")
         assertTrue(!detail(authed, item2["itemId"].asText())["overdue"].asBoolean())
     }
+
+    /** YPJ-208(spec 0138 切片 b):项目工作日历——date-only 填充跟日历走;非法/倒挂 400。 */
+    @Test
+    fun `工作日历改默认时刻——非法与倒挂 400`() {
+        val (authed, itemId) = setup()
+
+        // 改日历后 date-only 填充跟日历走
+        authed
+            .patch()
+            .uri("/api/projects/CHE/settings")
+            .body(mapOf("workdayStart" to "08:30", "workdayEnd" to "17:00"))
+            .exchange()
+            .expectStatus()
+            .isOk()
+        authed
+            .patch()
+            .uri("/api/items/$itemId")
+            .body(mapOf("startDate" to "2026-09-01", "dueDate" to "2026-09-30"))
+            .exchange()
+            .expectStatus()
+            .isOk()
+        assertEquals("2026-09-01T08:30", detail(authed, itemId)["startDate"].asText())
+        assertEquals("2026-09-30T17:00", detail(authed, itemId)["dueDate"].asText())
+        assertEquals("08:30", detail(authed, itemId)["workdayStart"].asText())
+
+        // 倒挂 → 400
+        authed
+            .patch()
+            .uri("/api/projects/CHE/settings")
+            .body(mapOf("workdayStart" to "18:00", "workdayEnd" to "09:00"))
+            .exchange()
+            .expectStatus()
+            .isBadRequest()
+
+        // 非法格式 → 400
+        authed
+            .patch()
+            .uri("/api/projects/CHE/settings")
+            .body(mapOf("workdayStart" to "9am"))
+            .exchange()
+            .expectStatus()
+            .isBadRequest()
+    }
 }
