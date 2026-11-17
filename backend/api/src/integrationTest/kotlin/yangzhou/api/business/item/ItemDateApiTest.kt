@@ -192,7 +192,12 @@ class ItemDateApiTest : AbstractApiTest() {
             .isOk()
         assertEquals("2026-09-01T08:30", detail(authed, itemId)["startDate"].asText())
         assertEquals("2026-09-30T17:00", detail(authed, itemId)["dueDate"].asText())
-        assertEquals("08:30", detail(authed, itemId)["workdayStart"].asText())
+        // 日历值落库验证:settings 无 GET 端点,直查库(item detail 不含项目设置;切片 b 误断 detail.workdayStart,A11)
+        assertEquals(
+            "08:30",
+            jdbc
+                .queryForObject("select workday_start from project where key = 'CHE'", String::class.java),
+        )
 
         // 倒挂 → 400
         authed

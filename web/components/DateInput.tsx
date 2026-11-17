@@ -64,6 +64,7 @@ export function DateInput({
   onChange,
   size,
   sx,
+  disabled = false,
 }: {
   label?: string;
   ariaLabel?: string;
@@ -71,6 +72,7 @@ export function DateInput({
   onChange: (v: string) => void;
   size?: "small";
   sx?: SxProps<Theme>;
+  disabled?: boolean;
 }) {
   const segText: Record<keyof Segs, string> = {
     mm: t.date.month,
@@ -395,7 +397,20 @@ export function DateInput({
         role="group"
         aria-label={name}
         data-value={value}
-        sx={[fieldSx, ...(label ? [{ position: "relative" }] : [])]}
+        aria-disabled={disabled || undefined}
+        data-testid={disabled ? "date-disabled" : undefined}
+        sx={[
+          fieldSx,
+          ...(label ? [{ position: "relative" }] : []),
+          ...(disabled
+            ? [
+                {
+                  opacity: 0.5,
+                  pointerEvents: "none" as const,
+                },
+              ]
+            : []),
+        ]}
         onFocus={() => {
           focused.current = true;
         }}

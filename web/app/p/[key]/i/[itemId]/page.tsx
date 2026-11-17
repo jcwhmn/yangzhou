@@ -426,6 +426,9 @@ export default function ItemDetailPage() {
   const [subitems, setSubitems] = useState<Item[] | null>(null);
 
   const [newSubTitle, setNewSubTitle] = useState("");
+  const [subPolicyDialog, setSubPolicyDialog] = useState(false); // YPJ-218 spec 0139:加子时父自有时间线策略
+  // 已有子的父不持有自有时间线:时间线框禁用(spec 0139 定案)
+  const timelineLocked = (subitems ?? []).length > 0;
 
   const [tab, setTab] = useState(0);
 
@@ -578,12 +581,21 @@ export default function ItemDetailPage() {
   async function addSubitem() {
     if (!newSubTitle.trim()) return;
 
+    // YPJ-218(spec 0139):父无子且自有时间线时,加子先弹策略选择(迁移默认);有子时时间线框已禁用,直接建
+    if ((subitems ?? []).length === 0 && (startDate || dueDate)) {
+      setSubPolicyDialog(true);
+      return;
+    }
+    await createSubitem(newSubTitle.trim());
+  }
+
+  async function createSubitem(title: string) {
     try {
       await api(`/api/projects/${key}/items`, {
         method: "POST",
 
         body: JSON.stringify({
-          title: newSubTitle.trim(),
+          title,
           parentItemId: itemId,
         }),
       });
@@ -591,6 +603,44 @@ export default function ItemDetailPage() {
       setNewSubTitle("");
 
       await loadSubitems();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "创建失败");
+    }
+  }
+
+  // 定案②迁移:子「{父标题}·原排期」承接父原时间线(POST 后 PATCH 补日期),父清空后再建新子
+  async function addSubitemWithPolicy(policy: "ignore" | "migrate") {
+    setSubPolicyDialog(false);
+    const title = newSubTitle.trim();
+    if (!title) return;
+
+    try {
+      if (policy === "migrate") {
+        const legacy = (await api<{ itemId: string }>(
+          `/api/projects/${key}/items`,
+          {
+            method: "POST",
+            body: JSON.stringify({
+              title: `${item?.title ?? "父 item"}·原排期`,
+              parentItemId: itemId,
+            }),
+          },
+        )) as { itemId: string };
+        await api(`/api/items/${legacy.itemId}`, {
+          method: "PATCH",
+          body: JSON.stringify({ startDate, dueDate }),
+        });
+      }
+      await api(`/api/items/${itemId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ startDate: "", dueDate: "" }),
+      });
+      setStartDate("");
+      setStartTime("");
+      setDueDate("");
+      setDueTime("");
+      await createSubitem(title);
+      await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "创建失败");
     }
@@ -1063,13 +1113,15 @@ export default function ItemDetailPage() {
               fullWidth
             />
 
-            <Stack direction="row" spacing={1}>
+            <Stack direction="row" spacing={1} alignItems="flex-start">
+              {/* YPJ-218 spec 0139:已有子的父不持有自有时间线——四框禁用,保存原样回传 */}
               <DateInput
                 label="开始日期"
                 size="small"
                 value={startDate}
                 onChange={setStartDate}
                 sx={{ width: 200 }}
+                disabled={timelineLocked}
               />
 
               {/* YPJ-208 切片 c:时刻录入(datetime 语义;空=date-only 由后端按日历默认) */}
@@ -1081,6 +1133,7 @@ export default function ItemDetailPage() {
                 onChange={(e) => setStartTime(e.target.value)}
                 sx={{ width: 130 }}
                 slotProps={{ inputLabel: { shrink: true } }}
+                disabled={timelineLocked}
               />
 
               <DateInput
@@ -1089,6 +1142,7 @@ export default function ItemDetailPage() {
                 value={dueDate}
                 onChange={setDueDate}
                 sx={{ width: 200 }}
+                disabled={timelineLocked}
               />
 
               <TextField
@@ -1099,7 +1153,18 @@ export default function ItemDetailPage() {
                 onChange={(e) => setDueTime(e.target.value)}
                 sx={{ width: 130 }}
                 slotProps={{ inputLabel: { shrink: true } }}
+                disabled={timelineLocked}
               />
+
+              {timelineLocked && (
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ alignSelf: "center" }}
+                >
+                  已有子项,时间线由子项汇总
+                </Typography>
+              )}
 
               <Dropdown
                 label={t.item.priority}
@@ -2184,6 +2249,32 @@ export default function ItemDetailPage() {
           </Button>
           <Button variant="contained" onClick={confirmLaunchAsk}>
             {t.item.launchConfirm}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* YPJ-218 spec 0139:加子时父自有时间线策略(默认迁移) */}
+      <Dialog open={subPolicyDialog} onClose={() => setSubPolicyDialog(false)}>
+        <DialogTitle>父 item 已有自己的时间线</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary">
+            父 item 的起止时间将让给子项汇总。选择如何处置原有时间线:
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSubPolicyDialog(false)}>取消</Button>
+          <Button
+            onClick={() => addSubitemWithPolicy("ignore")}
+            data-testid="sub-policy-ignore"
+          >
+            忽略原时间线
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() => addSubitemWithPolicy("migrate")}
+            data-testid="sub-policy-migrate"
+          >
+            迁移为新子项(推荐)
           </Button>
         </DialogActions>
       </Dialog>
