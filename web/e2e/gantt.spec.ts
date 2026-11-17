@@ -152,3 +152,35 @@ test("甘特视口与六级缩放(YPJ-219)", async ({ page, projectKey }) => {
   await page.getByTestId("gantt-gran-month").click();
   await expect(page.getByText("E2E 缩放条")).toBeVisible();
 });
+
+test("时档基准日导航(YPJ-219 拍板补充)", async ({ page, projectKey }) => {
+  const item = await apiCreateItem(projectKey, "E2E 时轴条");
+  // 排明天 10:00–12:00,验证基准日切换后条入轴
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const y = tomorrow.getFullYear();
+  const md = `${String(tomorrow.getMonth() + 1).padStart(2, "0")}-${String(tomorrow.getDate()).padStart(2, "0")}`;
+  await apiCall("PATCH", `/api/items/${item}`, {
+    startDate: `${y}-${md}T10:00`,
+    dueDate: `${y}-${md}T12:00`,
+  });
+
+  await page.goto(`/p/${projectKey}/gantt`);
+  await page.getByTestId("gantt-gran-hour").click();
+
+  // 默认今日轴:明天的条不在;导航控件在
+  await expect(page.getByTestId("gantt-hour-nav")).toBeVisible();
+  // 指定日期=明天(fillDate 三段式)
+  const group = page.getByRole("group", { name: "时轴基准日", exact: true });
+  await group.getByLabel("月", { exact: true }).fill(md.slice(0, 2));
+  await group.getByLabel("日", { exact: true }).fill(md.slice(3, 5));
+  await group.getByLabel("年", { exact: true }).fill(String(y));
+  await group.getByLabel("年", { exact: true }).blur();
+  // 条出现在时轴(行标题可见即条区渲染;小时比例手测覆盖)
+  await expect(page.getByText("E2E 时轴条")).toBeVisible();
+
+  // ◀ 后退一天 → 回到今日轴,条出轴
+  await page.getByTestId("gantt-hour-prev").click();
+  const v = await group.getAttribute("data-value");
+  expect(v).not.toBe(`${y}-${md}`);
+});

@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { parseLocal } from "@/lib/dates";
 import { t } from "@/lib/texts";
+import { DateInput } from "@/components/DateInput";
 
 type GanttRow = {
   itemId: string;
@@ -55,6 +56,8 @@ export default function GanttPage() {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [showUnscheduled, setShowUnscheduled] = useState(false);
   const [granularity, setGranularity] = useState<Granularity>("month");
+  // YPJ-219(spec 0140 拍板补充):时档基准日可导航(默认今日)
+  const [hourBase, setHourBase] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
@@ -69,13 +72,13 @@ export default function GanttPage() {
   // 时间轴(YPJ-219 spec 0140):像素制——跨度天数 × pxPerDay = 内容宽;时档固定基准日一天
   const axis = useMemo(() => {
     const today = new Date();
-    const pxPerDay =
-      GRANULARITIES.find(([g]) => g === granularity)?.[2] ?? 15;
+    const pxPerDay = GRANULARITIES.find(([g]) => g === granularity)?.[2] ?? 15;
     let start: Date;
     if (granularity === "hour") {
-      // 单日 0–24 全程轴,基准=今日
-      const base = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-      start = base;
+      // 单日 0–24 全程轴,基准=基准日(默认今日)
+      start = hourBase
+        ? parseLocal(hourBase)
+        : new Date(today.getFullYear(), today.getMonth(), today.getDate());
     } else {
       const dates = (rows ?? []).flatMap(
         (r) => [r.startDate, r.dueDate].filter(Boolean) as string[],
@@ -89,7 +92,12 @@ export default function GanttPage() {
       start = new Date(+min - 3 * DAY);
     }
     const end =
-      granularity === "hour" ? new Date(+start + DAY) : new Date(+start + DAY * 400 * (pxPerDay <= 6 ? 1 : pxPerDay <= 40 ? 0.4 : 0.15));
+      granularity === "hour"
+        ? new Date(+start + DAY)
+        : new Date(
+            +start +
+              DAY * 400 * (pxPerDay <= 6 ? 1 : pxPerDay <= 40 ? 0.4 : 0.15),
+          );
     const spanDays = Math.max((+end - +start) / DAY, 1);
     const timelineW = Math.max(spanDays * pxPerDay, MIN_TIMELINE_W);
 
@@ -105,7 +113,11 @@ export default function GanttPage() {
         push(new Date(+start + (h * DAY) / 24), `${h}:00`);
       }
     } else {
-      const cur = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+      const cur = new Date(
+        start.getFullYear(),
+        start.getMonth(),
+        start.getDate(),
+      );
       const add = {
         year: () => cur.setFullYear(cur.getFullYear() + 1),
         quarter: () => cur.setMonth(cur.getMonth() + 3),
@@ -145,7 +157,7 @@ export default function GanttPage() {
       ticks: shown,
       todayX: ((+today - +start) / DAY) * pxPerDay,
     };
-  }, [rows, granularity]);
+  }, [rows, granularity, hourBase]);
 
   // 切档/进页:今日线入视口(spec 0140)
   useEffect(() => {
@@ -160,7 +172,10 @@ export default function GanttPage() {
       ? null
       : Math.min(
           axis.timelineW,
-          Math.max(0, ((+parseLocal(date) - +axis.start) / DAY) * axis.pxPerDay),
+          Math.max(
+            0,
+            ((+parseLocal(date) - +axis.start) / DAY) * axis.pxPerDay,
+          ),
         );
 
   // YPJ-218(spec 0139)B3:条宽含 due 当天——右端取 due+1 天(菱形不用)
@@ -234,7 +249,12 @@ export default function GanttPage() {
     <PageShell>
       <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
         <Typography variant="h5">{`${String(key)} · 甘特`}</Typography>
-        <Stack direction="row" spacing={0.5} sx={{ ml: "auto" }}>
+        <Stack
+          direction="row"
+          spacing={0.5}
+          sx={{ ml: "auto" }}
+          alignItems="center"
+        >
           {GRANULARITIES.map(([g, label]) => (
             <Button
               key={g}
@@ -246,6 +266,51 @@ export default function GanttPage() {
               {label}
             </Button>
           ))}
+          {/* 时档基准日导航(YPJ-219 拍板补充):◀ 前一天 / 后一天 ▶ / 指定日期 */}
+          {granularity === "hour" && (
+            <Stack
+              direction="row"
+              spacing={0.5}
+              alignItems="center"
+              data-testid="gantt-hour-nav"
+            >
+              <Button
+                size="small"
+                variant="outlined"
+                data-testid="gantt-hour-prev"
+                onClick={() =>
+                  setHourBase((b) => {
+                    const d = b ? parseLocal(b) : new Date();
+                    d.setDate(d.getDate() - 1);
+                    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+                  })
+                }
+              >
+                ◀
+              </Button>
+              <DateInput
+                ariaLabel="时轴基准日"
+                size="small"
+                value={hourBase}
+                onChange={setHourBase}
+                sx={{ width: 160 }}
+              />
+              <Button
+                size="small"
+                variant="outlined"
+                data-testid="gantt-hour-next"
+                onClick={() =>
+                  setHourBase((b) => {
+                    const d = b ? parseLocal(b) : new Date();
+                    d.setDate(d.getDate() + 1);
+                    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+                  })
+                }
+              >
+                ▶
+              </Button>
+            </Stack>
+          )}
         </Stack>
       </Stack>
 
@@ -350,7 +415,11 @@ export default function GanttPage() {
               {/* 今日线全高遮罩参考:各自行内画(条区内) */}
 
               {scheduled.length === 0 && (
-                <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ p: 2 }}
+                >
                   暂无已排期 item——在详情页填起止日期后出现在这里。
                 </Typography>
               )}
