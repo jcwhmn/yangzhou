@@ -75,10 +75,21 @@
 9. 11-01~11-03 的条视觉覆盖 3 个日格(含 03 当天)。
 
 ## 验收清单
-- [ ] B1 孤儿兜底为根(集成绿)
-- [ ] B2 日期解析统一本地墙钟
-- [ ] B3 条宽含 due 当天
-- [ ] 父汇总条(并集;父自有日期忽略——入口拦截+甘特兜底)
-- [ ] FINAL 置灰 + statusType 字段
-- [ ] 父时间线输入禁用(有子 → disabled+提示)
-- [ ] e2e 扩断言绿;全量验证绿;As-built
+- [x] B1 孤儿兜底为根(集成绿)
+- [x] B2 日期解析统一本地墙钟
+- [x] B3 条宽含 due 当天
+- [x] 父汇总条(并集;父自有日期忽略——入口拦截+甘特兜底)
+- [x] FINAL 置灰 + statusType 字段
+- [x] 父时间线输入禁用(有子 → disabled+提示)
+- [x] e2e 扩断言绿;全量验证绿;As-built
+
+## As-built(2026-11-17,PR #227)
+
+一票一支单 PR 交付(本票无切片拆分)。与设计的偏差:
+- 无日期的父归入「已排期」分桶(靠汇总条画),真未排期 = 无日期且无子——设计未明说,实现时补的判定;
+- DateInput 新增 `disabled` prop(pointerEvents:none + 半透明 + data-testid=date-disabled),复用组件而非外层包 disabled 容器;
+- 加子迁移因 POST /items 不带日期,流程为「建『·原排期』子 → PATCH 补父原日期 → PATCH 父清空 → 建新子」;
+- e2e 断言走 data-summary/data-final 属性与几何宽度(sx 宽度走 emotion class,inline style 拿不到)。
+
+验证:integrationTest 全量绿、e2e 全量绿、api.http 全绿(用户本机);GanttApiTest 单类+新 e2e 3 例(agent 本机)。CI build+e2e 双绿。
+顺带修复:ItemDateApiTest 切片 b 遗留坏断言(断言 detail 不存在的 workdayStart,台账 A11)。
