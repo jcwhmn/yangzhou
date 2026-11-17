@@ -19,7 +19,7 @@ import yangzhou.persistence.repository.ProjectDeletionRepository
 import yangzhou.persistence.repository.ProjectRepository
 import yangzhou.persistence.repository.ProjectWorkflowRuleRepository
 import yangzhou.persistence.repository.StatusRepository
-import java.time.LocalDate
+import java.time.LocalDateTime
 import java.util.UUID
 
 /** Project = 编号(key-N)+ workflow + 视图容器(ADR-0001)。 */
@@ -190,7 +190,7 @@ class ProjectService(
         val blocked = dependencyService.blockedItemObjectIds(projectId) // YPJ-204(spec 0137):甘特行 blocked 标记
         val byParent = all.groupBy { it.parentObjectId }
         val statusById = statuses.findByProjectObjectIdOrderByPosition(projectId).associateBy { it.objectId }
-        val today = LocalDate.now()
+        val now = LocalDateTime.now() // YPJ-208:时刻口径(spec 0138;甘特无 Clock seam,页面级展示容忍)
 
         fun depthOf(item: yangzhou.persistence.Item): Int {
             var depth = 0
@@ -212,7 +212,7 @@ class ProjectService(
                 startDate = item.startDate?.toString(),
                 dueDate = item.dueDate?.toString(),
                 statusName = status?.name ?: "?",
-                overdue = item.dueDate?.let { it < today } == true && status?.statusType != StatusType.FINAL,
+                overdue = item.dueDate?.let { now > it } == true && status?.statusType != StatusType.FINAL,
                 blocked = item.objectId in blocked,
                 estimateValue = item.estimateValue,
                 estimateUnit = item.estimateUnit,

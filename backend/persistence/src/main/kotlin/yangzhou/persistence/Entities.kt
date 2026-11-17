@@ -8,6 +8,7 @@ import org.springframework.data.annotation.LastModifiedDate
 import org.springframework.data.relational.core.mapping.Table
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.util.UUID
 
 @Table("workspace")
@@ -252,8 +253,8 @@ data class Item(
     val assigneeObjectId: UUID? = null,
     val externalRef: String? = null,
     val statusObjectId: UUID,
-    val startDate: LocalDate? = null,
-    val dueDate: LocalDate? = null,
+    val startDate: LocalDateTime? = null,
+    val dueDate: LocalDateTime? = null,
     val feasSignal: String? = null,
     val priority: String? = null,
     val estimateValue: Double? = null, // YPJ-186(spec 0128):预估快照(选档=写档值;unit 封闭枚举 CHECK)
