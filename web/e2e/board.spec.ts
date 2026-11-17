@@ -109,14 +109,16 @@ test("甘特粒度切换 + blocked 标记 + estimate 可见(YPJ-204/spec 0137)",
   // 粒度切换：月默认 → 周刻度变密 → 日刻度含具体日
   await page.getByTestId("gantt-gran-month").click();
   await expect(page.getByTestId("gantt-gran-month")).toHaveClass(
-    /Mui-contained/,
+    /MuiButton-containedPrimary/,
   );
   await page.getByTestId("gantt-gran-week").click();
   await expect(page.getByTestId("gantt-gran-week")).toHaveClass(
-    /Mui-contained/,
+    /MuiButton-containedPrimary/,
   );
   await page.getByTestId("gantt-gran-day").click();
-  await expect(page.getByTestId("gantt-gran-day")).toHaveClass(/Mui-contained/);
+  await expect(page.getByTestId("gantt-gran-day")).toHaveClass(
+    /MuiButton-containedPrimary/,
+  );
   await expect(row).toBeVisible();
 });
 
