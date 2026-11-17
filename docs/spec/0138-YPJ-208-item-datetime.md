@@ -75,9 +75,26 @@ ALTER TABLE projects ADD workday_end VARCHAR(5) NOT NULL DEFAULT '18:00';
 6. 甘特图正常渲染,存量 item 位置不变。
 
 ## 验收清单
-- [ ] V66 迁移 + entities.puml 同步(items 两列类型)
-- [ ] 契约兼容双向绿(集成)
-- [ ] 工作日历设置 + date-only 填充绿
-- [ ] overdue 时刻口径绿
-- [ ] CLI items schedule 可用
-- [ ] api.http 补节;`gradle build`/`integrationTest` 绿;As-built 补本 spec
+- [x] V66 迁移 + entities.puml 同步(items 两列类型)
+- [x] 契约兼容双向绿(集成)
+- [x] 工作日历设置 + date-only 填充绿
+- [x] overdue 时刻口径绿
+- [x] CLI items schedule 可用
+- [x] api.http 补节;`gradle build`/`integrationTest` 绿;As-built 补本 spec
+
+## As-built(2026-11-17)
+
+三切片按「一票一支、按序 PR」交付,全部合入 main:
+
+| 切片 | 票 | PR | 内容 |
+|---|---|---|---|
+| a | YPJ-223 | #224 | V66(items 两列 timestamp 墙钟 + project 两日历列)、契约 date-only/datetime 双进 datetime 出、overdue 时刻口径、CLI `items schedule` |
+| b | YPJ-224 | #225 | settings workdayStart/End(校验格式+start<end)、date-only 填充读日历、WorkdayCalculator.dueFrom 纯函数(供 YPJ-216) |
+| c | YPJ-225 | #226 | 详情页 DateInput+时刻 TextField(type=time)并排、`web/lib/dates.ts` fmtDate 列表裁剪 MM-dd、board e2e datetime 断言 |
+
+与设计的偏差:
+- date-only 默认时刻切片 a 先硬编码 09:00/18:00,切片 b 落地后改读项目日历 workdayBounds(设计即此序,无偏差);
+- 前端控件未用 `datetime-local`,拆成 DateInput + `TextField(type=time)` 并排(更贴合现有 DateInput 分段控件与 fillDate helper);
+- e2e 补修一处用例竞态:保存→前端 load() 回拉会回填时刻框,用例须等回拉 GET 完成(台账 A10)。
+
+验证:integrationTest 278 全例绿、api.http 全绿、全量 e2e 绿(均为用户本机);CLI 在 8082 test 实测。
