@@ -184,3 +184,26 @@ test("时档基准日导航(YPJ-219 拍板补充)", async ({ page, projectKey })
   const v = await group.getAttribute("data-value");
   expect(v).not.toBe(`${y}-${md}`);
 });
+
+test("工况保持与视口撑满(YPJ-219 手测反馈)", async ({ page, projectKey }) => {
+  const item = await apiCreateItem(projectKey, "E2E 工况条");
+  await apiCall("PATCH", `/api/items/${item}`, {
+    startDate: "2020-01-01",
+    dueDate: "2020-01-03",
+  });
+
+  await page.goto(`/p/${projectKey}/gantt`);
+  await page.getByTestId("gantt-gran-day").click();
+  // 时档:时轴宽度撑满可视区(#3)
+  await page.getByTestId("gantt-gran-hour").click();
+  const fills = await page.getByTestId("gantt-scroll").evaluate((el) => {
+    const inner = el.firstElementChild as HTMLElement;
+    return inner.scrollWidth >= el.clientWidth - 280;
+  });
+  expect(fills).toBe(true);
+
+  // #1:切页再回来,档位保持(时档仍在,导航控件在)
+  await page.goto(`/p/${projectKey}/backlog`);
+  await page.goto(`/p/${projectKey}/gantt`);
+  await expect(page.getByTestId("gantt-hour-nav")).toBeVisible();
+});

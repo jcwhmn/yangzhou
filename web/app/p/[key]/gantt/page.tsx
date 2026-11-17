@@ -55,9 +55,23 @@ export default function GanttPage() {
   const [rows, setRows] = useState<GanttRow[] | null>(null);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [showUnscheduled, setShowUnscheduled] = useState(false);
-  const [granularity, setGranularity] = useState<Granularity>("month");
-  // YPJ-219(spec 0140 拍板补充):时档基准日可导航(默认今日)
-  const [hourBase, setHourBase] = useState("");
+  // YPJ-219(spec 0140 拍板补充):时档基准日可导航(默认今日);工况持久化 sessionStorage(#1)
+  const savedView = (() => {
+    try {
+      return JSON.parse(sessionStorage.getItem("gantt.view") ?? "{}") as {
+        gran?: Granularity;
+        hourBase?: string;
+        scroll?: number;
+      };
+    } catch {
+      return {};
+    }
+  })();
+  const [granularityState, setGranularityState] = useState<Granularity>(
+    savedView.gran ?? "month",
+  );
+  const [hourBase, setHourBase] = useState(savedView.hourBase ?? "");
+  const [containerW, setContainerW] = useState(0); // 可视宽(#3:时档内容撑满全屏)
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
@@ -72,9 +86,10 @@ export default function GanttPage() {
   // 时间轴(YPJ-219 spec 0140):像素制——跨度天数 × pxPerDay = 内容宽;时档固定基准日一天
   const axis = useMemo(() => {
     const today = new Date();
-    const pxPerDay = GRANULARITIES.find(([g]) => g === granularity)?.[2] ?? 15;
+    let pxPerDay =
+      GRANULARITIES.find(([g]) => g === granularityState)?.[2] ?? 15;
     let start: Date;
-    if (granularity === "hour") {
+    if (granularityState === "hour") {
       // 单日 0–24 全程轴,基准=基准日(默认今日)
       start = hourBase
         ? parseLocal(hourBase)
@@ -92,13 +107,17 @@ export default function GanttPage() {
       start = new Date(+min - 3 * DAY);
     }
     const end =
-      granularity === "hour"
+      granularityState === "hour"
         ? new Date(+start + DAY)
         : new Date(
             +start +
               DAY * 400 * (pxPerDay <= 6 ? 1 : pxPerDay <= 40 ? 0.4 : 0.15),
           );
     const spanDays = Math.max((+end - +start) / DAY, 1);
+    // #3:内容至少撑满可视区(可视宽未测得时用计算值)
+    if (containerW > 0) {
+      pxPerDay = Math.max(pxPerDay, (containerW - TITLE_W) / spanDays);
+    }
     const timelineW = Math.max(spanDays * pxPerDay, MIN_TIMELINE_W);
 
     // 刻度:按档取整点;标签按最小间距抽稀
@@ -108,7 +127,7 @@ export default function GanttPage() {
         x: ((+d - +start) / DAY) * pxPerDay,
         label,
       });
-    if (granularity === "hour") {
+    if (granularityState === "hour") {
       for (let h = 0; h < 24; h++) {
         push(new Date(+start + (h * DAY) / 24), `${h}:00`);
       }
@@ -124,19 +143,19 @@ export default function GanttPage() {
         month: () => cur.setMonth(cur.getMonth() + 1),
         week: () => cur.setDate(cur.getDate() + 7),
         day: () => cur.setDate(cur.getDate() + 1),
-      }[granularity as Exclude<Granularity, "hour">];
+      }[granularityState as Exclude<Granularity, "hour">];
       // 对齐:年/季/月对齐 1 号,周对齐周一,日从 start 起取整天
-      if (granularity === "week") {
+      if (granularityState === "week") {
         const dow = (cur.getDay() + 6) % 7;
         cur.setDate(cur.getDate() - dow);
       }
       while (+cur <= +start + spanDays * DAY) {
         const label =
-          granularity === "year"
+          granularityState === "year"
             ? `${cur.getFullYear()}`
-            : granularity === "quarter"
+            : granularityState === "quarter"
               ? `${cur.getFullYear()}-Q${Math.floor(cur.getMonth() / 3) + 1}`
-              : granularity === "month"
+              : granularityState === "month"
                 ? `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, "0")}`
                 : `${String(cur.getMonth() + 1).padStart(2, "0")}-${String(cur.getDate()).padStart(2, "0")}`;
         push(new Date(cur), label);
@@ -157,16 +176,74 @@ export default function GanttPage() {
       ticks: shown,
       todayX: ((+today - +start) / DAY) * pxPerDay,
     };
-  }, [rows, granularity, hourBase]);
+  }, [rows, granularityState, hourBase, containerW]);
 
-  // 切档/进页:今日线入视口(spec 0140)
+  // #3:测可视宽(含窗口缩放重算)
   useEffect(() => {
     const el = scrollRef.current;
-    if (el) {
-      el.scrollLeft = Math.max(0, axis.todayX - (el.clientWidth - TITLE_W) / 2);
-    }
-  }, [granularity, rows, axis.todayX]);
+    if (!el) return;
+    const measure = () => setContainerW(el.clientWidth);
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [rows]);
 
+  // #1:滚动位置持久化;工况(档位/基准日/滚动)存 sessionStorage,切页回来还原
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el && savedView.scroll) el.scrollLeft = savedView.scroll;
+    const save = () => {
+      if (scrollRef.current)
+        sessionStorage.setItem(
+          "gantt.view",
+          JSON.stringify({
+            gran: granularityState,
+            hourBase,
+            scroll: scrollRef.current.scrollLeft,
+          }),
+        );
+    };
+    el?.addEventListener("scroll", save);
+    return () => el?.removeEventListener("scroll", save);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [granularityState, hourBase, rows]);
+
+  // 切档/进页:今日线入视口(spec 0140);有保存滚动位时尊重保存值
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    if (
+      savedView.gran === granularityState &&
+      savedView.hourBase === hourBase &&
+      savedView.scroll
+    )
+      return;
+    el.scrollLeft = Math.max(0, axis.todayX - (el.clientWidth - TITLE_W) / 2);
+  }, [granularityState, hourBase, rows, axis.todayX]);
+
+  const setGranularity = (g: Granularity) => {
+    setGranularityState(g);
+    sessionStorage.setItem(
+      "gantt.view",
+      JSON.stringify({
+        gran: g,
+        hourBase,
+        scroll: scrollRef.current?.scrollLeft ?? 0,
+      }),
+    );
+  };
+  const changeHourBase = (b: string) => {
+    setHourBase(b);
+    sessionStorage.setItem(
+      "gantt.view",
+      JSON.stringify({ gran: granularityState, hourBase: b, scroll: 0 }),
+    );
+  };
+  const shiftDay = (base: string, days: number) => {
+    const d = base ? parseLocal(base) : new Date();
+    d.setDate(d.getDate() + days);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
   const xOf = (date: string | null) =>
     date === null
       ? null
@@ -178,7 +255,7 @@ export default function GanttPage() {
           ),
         );
 
-  // YPJ-218(spec 0139)B3:条宽含 due 当天——右端取 due+1 天(菱形不用)
+  // YPJ-218(spec 0139)B3:条宽含当天——仅 date-only +1 天;datetime 右端=精确 due(#2 修正:带时刻的 due 不再多画一天)
   const xEndOf = (due: string | null) =>
     due === null
       ? null
@@ -186,7 +263,11 @@ export default function GanttPage() {
           axis.timelineW,
           Math.max(
             0,
-            ((+parseLocal(due) + DAY - +axis.start) / DAY) * axis.pxPerDay,
+            ((+parseLocal(due) +
+              (/^\d{4}-\d{2}-\d{2}$/.test(due) ? DAY : 0) -
+              +axis.start) /
+              DAY) *
+              axis.pxPerDay,
           ),
         );
 
@@ -260,14 +341,16 @@ export default function GanttPage() {
               key={g}
               data-testid={`gantt-gran-${g}`}
               size="small"
-              variant={granularity === g ? "contained" : "outlined"}
-              onClick={() => setGranularity(g)}
+              variant={granularityState === g ? "contained" : "outlined"}
+              onClick={() => {
+                setGranularity(g);
+              }}
             >
               {label}
             </Button>
           ))}
           {/* 时档基准日导航(YPJ-219 拍板补充):◀ 前一天 / 后一天 ▶ / 指定日期 */}
-          {granularity === "hour" && (
+          {granularityState === "hour" && (
             <Stack
               direction="row"
               spacing={0.5}
@@ -278,13 +361,7 @@ export default function GanttPage() {
                 size="small"
                 variant="outlined"
                 data-testid="gantt-hour-prev"
-                onClick={() =>
-                  setHourBase((b) => {
-                    const d = b ? parseLocal(b) : new Date();
-                    d.setDate(d.getDate() - 1);
-                    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-                  })
-                }
+                onClick={() => changeHourBase(shiftDay(hourBase, -1))}
               >
                 ◀
               </Button>
@@ -292,20 +369,14 @@ export default function GanttPage() {
                 ariaLabel="时轴基准日"
                 size="small"
                 value={hourBase}
-                onChange={setHourBase}
+                onChange={changeHourBase}
                 sx={{ width: 160 }}
               />
               <Button
                 size="small"
                 variant="outlined"
                 data-testid="gantt-hour-next"
-                onClick={() =>
-                  setHourBase((b) => {
-                    const d = b ? parseLocal(b) : new Date();
-                    d.setDate(d.getDate() + 1);
-                    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-                  })
-                }
+                onClick={() => changeHourBase(shiftDay(hourBase, 1))}
               >
                 ▶
               </Button>
