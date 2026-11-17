@@ -94,7 +94,7 @@ test("甘特粒度切换 + blocked 标记 + estimate 可见(YPJ-204/spec 0137)",
     startDate: "2020-01-01",
     dueDate: "2020-01-15",
     estimateValue: 2,
-    estimateUnit: "h",
+    estimateUnit: "hour",
   });
   await apiCall("POST", `/api/items/${blockedItem}/dependencies`, {
     dependsOnItemId: blocker,

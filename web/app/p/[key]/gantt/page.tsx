@@ -31,6 +31,13 @@ const GRANULARITIES: [Granularity, string][] = [
   ["day", "日"],
 ];
 
+// estimateUnit 封闭枚举(hour/day/week)的短标(YPJ-204)
+const EST_UNIT_SHORT: Record<string, string> = {
+  hour: "h",
+  day: "d",
+  week: "w",
+};
+
 /** V8-S2:单项目树形甘特(只读)。条 = start→due;只有 due 画里程碑菱形;今日线;未排期折叠组。 */
 export default function GanttPage() {
   const { key } = useParams<{ key: string }>();
@@ -288,7 +295,7 @@ export default function GanttPage() {
                       {r.estimateValue !== null && (
                         <Chip
                           data-testid={`gantt-est-${r.number}`}
-                          label={`${r.estimateValue}${r.estimateUnit ?? ""}`}
+                          label={`${r.estimateValue}${EST_UNIT_SHORT[r.estimateUnit ?? ""] ?? r.estimateUnit ?? ""}`}
                           size="small"
                           variant="outlined"
                           sx={{ height: 18 }}

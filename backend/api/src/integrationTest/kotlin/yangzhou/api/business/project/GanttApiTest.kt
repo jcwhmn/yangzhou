@@ -22,7 +22,7 @@ class GanttApiTest : AbstractApiTest() {
                     "startDate" to "2020-01-01",
                     "dueDate" to "2020-01-31",
                     "estimateValue" to 2,
-                    "estimateUnit" to "h",
+                    "estimateUnit" to "hour",
                 ),
             )
             .exchange()
@@ -61,11 +61,11 @@ class GanttApiTest : AbstractApiTest() {
         assertEquals("2020-01-31", rows[0]["dueDate"].asText())
         assertTrue(rows[0]["overdue"].asBoolean())
         assertEquals(2.0, rows[0]["estimateValue"].asDouble())
-        assertEquals("h", rows[0]["estimateUnit"].asText())
+        assertEquals("hour", rows[0]["estimateUnit"].asText())
         assertTrue(rows[0]["blocked"].asBoolean())
         assertTrue(!rows[1]["blocked"].asBoolean())
         assertEquals(2.0, rows[0]["estimateValue"].asDouble())
-        assertEquals("h", rows[0]["estimateUnit"].asText())
+        assertEquals("hour", rows[0]["estimateUnit"].asText())
         // 子任务无日期 → 不超期
         assertTrue(!rows[1]["overdue"].asBoolean())
         assertEquals(1, rows[1]["depth"].asInt())
