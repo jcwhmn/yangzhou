@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
+import { parseLocal } from "@/lib/dates";
 import { t } from "@/lib/texts";
 
 type GanttRow = {
@@ -16,6 +17,7 @@ type GanttRow = {
   startDate: string | null;
   dueDate: string | null;
   statusName: string;
+  statusType: string | null;
   overdue: boolean;
   blocked: boolean;
   estimateValue: number | null;
@@ -62,10 +64,10 @@ export default function GanttPage() {
     );
     const today = new Date();
     const min = dates.length
-      ? new Date(Math.min(...dates.map((d) => +new Date(d))))
+      ? new Date(Math.min(...dates.map((d) => +parseLocal(d))))
       : today;
     const max = dates.length
-      ? new Date(Math.max(...dates.map((d) => +new Date(d))))
+      ? new Date(Math.max(...dates.map((d) => +parseLocal(d))))
       : new Date(+today + 30 * DAY);
     const start = new Date(+min - 3 * DAY);
     const end = new Date(+max + 4 * DAY);
@@ -114,8 +116,43 @@ export default function GanttPage() {
       ? null
       : Math.min(
           100,
-          Math.max(0, ((+new Date(date) - +axis.start) / axis.span) * 100),
+          Math.max(0, ((+parseLocal(date) - +axis.start) / axis.span) * 100),
         );
+
+  // YPJ-218(spec 0139)B3:条宽含 due 当天——右端取 due+1 天(菱形不用)
+  const xEndOf = (due: string | null) =>
+    due === null
+      ? null
+      : Math.min(
+          100,
+          Math.max(
+            0,
+            ((+parseLocal(due) + DAY - +axis.start) / axis.span) * 100,
+          ),
+        );
+
+  // YPJ-218(spec 0139):父汇总条 = 全部子孙排期区间的并集;父自有日期忽略不画(定案:父不持有自有时间线)
+  function summaryOf(itemId: string): [string, string] | null {
+    let min: number | null = null;
+    let max: number | null = null;
+    const visit = (id: string) => {
+      for (const x of rows ?? []) {
+        if (x.parentItemId !== id) continue;
+        const s = x.startDate ?? x.dueDate;
+        const e = x.dueDate ?? x.startDate;
+        if (s && +parseLocal(s) < (min ?? Infinity)) min = +parseLocal(s);
+        if (e && +parseLocal(e) > (max ?? -Infinity)) max = +parseLocal(e);
+        visit(x.itemId);
+      }
+    };
+    visit(itemId);
+    return min === null || max === null
+      ? null
+      : [
+          new Date(min).toISOString().slice(0, 10),
+          new Date(max).toISOString().slice(0, 10),
+        ];
+  }
 
   function toggle(itemId: string) {
     setCollapsed((prev) => {
@@ -138,8 +175,10 @@ export default function GanttPage() {
   }
 
   const visible = (rows ?? []).filter((r) => !hiddenByCollapse(r));
-  const unscheduled = visible.filter((r) => !r.startDate && !r.dueDate);
-  const scheduled = visible.filter((r) => r.startDate || r.dueDate);
+  // YPJ-218(spec 0139):有子孙的父归入已排期(靠汇总条画);真未排期 = 无日期且无子
+  const hasKid = (r: GanttRow) => (rows ?? []).some((x) => x.parentItemId === r.itemId);
+  const unscheduled = visible.filter((r) => !r.startDate && !r.dueDate && !hasKid(r));
+  const scheduled = visible.filter((r) => r.startDate || r.dueDate || hasKid(r));
   const byId = new Map((rows ?? []).map((r) => [r.itemId, r]));
 
   return (
@@ -239,13 +278,22 @@ export default function GanttPage() {
             )}
 
             {scheduled.map((r) => {
-              const hasStart = r.startDate !== null;
-              const left = xOf(hasStart ? r.startDate : r.dueDate) ?? 0;
-              const right = xOf(r.dueDate) ?? 100;
-              const width = Math.max(hasStart ? right - left : 1.2, 1.2);
+              const isFinal = r.statusType === "FINAL";
               const hasKids = (rows ?? []).some(
                 (x) => x.parentItemId === r.itemId,
               );
+              const summary = hasKids ? summaryOf(r.itemId) : null;
+              const summaryLeft = summary ? (xOf(summary[0]) ?? 0) : 0;
+              const summaryWidth =
+                summary !== null
+                  ? Math.max((xEndOf(summary[1]) ?? 0) - summaryLeft, 1.2)
+                  : 0;
+              // YPJ-218(spec 0139):有子孙的父行只画汇总条,不画自有条
+              const drawOwn = !hasKids;
+              const hasStart = drawOwn && r.startDate !== null;
+              const left = xOf(hasStart ? r.startDate : r.dueDate) ?? 0;
+              const right = xEndOf(r.dueDate) ?? 100;
+              const width = Math.max(hasStart ? right - left : 1.2, 1.2);
               const folded = collapsed.has(r.itemId);
               return (
                 <Box
@@ -329,11 +377,32 @@ export default function GanttPage() {
                       />
                     )}
                     <Box
+                      data-summary={summary ? "" : undefined}
+                      sx={{
+                        position: "absolute",
+                        left: `${summaryLeft}%`,
+                        width: `${summaryWidth}%`,
+                        top: 4,
+                        display: summary ? "block" : "none",
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          height: 8,
+                          borderRadius: 1,
+                          bgcolor: "text.secondary",
+                          opacity: 0.45,
+                        }}
+                      />
+                    </Box>
+                    <Box
+                      data-final={isFinal ? "" : undefined}
                       sx={{
                         position: "absolute",
                         left: `${left}%`,
                         width: `${width}%`,
                         top: 10,
+                        display: drawOwn ? "block" : "none",
                       }}
                     >
                       {hasStart ? (
@@ -341,8 +410,12 @@ export default function GanttPage() {
                           sx={{
                             height: 14,
                             borderRadius: 1,
-                            bgcolor: r.overdue ? "error.main" : "primary.main",
-                            opacity: 0.85,
+                            bgcolor: isFinal
+                              ? "text.disabled"
+                              : r.overdue
+                                ? "error.main"
+                                : "primary.main",
+                            opacity: isFinal ? 0.5 : 0.85,
                           }}
                         />
                       ) : (
@@ -351,7 +424,12 @@ export default function GanttPage() {
                             width: 12,
                             height: 12,
                             transform: "rotate(45deg)",
-                            bgcolor: r.overdue ? "error.main" : "warning.main",
+                            bgcolor: isFinal
+                              ? "text.disabled"
+                              : r.overdue
+                                ? "error.main"
+                                : "warning.main",
+                            opacity: isFinal ? 0.5 : 1,
                             mx: "auto",
                           }}
                         />
@@ -388,8 +466,8 @@ export default function GanttPage() {
             color="text.secondary"
             sx={{ mt: 1, display: "block" }}
           >
-            蓝竖线 = 今天 · 菱形 = 里程碑(只有截止日期) · 红色 = 超期 ·
-            点行进详情
+            蓝竖线 = 今天 · 菱形 = 里程碑(只有截止日期) · 红色 = 超期 · 灰 =
+            已完成 · 灰横条 = 父汇总(子孙并集) · 点行进详情
           </Typography>
         </>
       )}

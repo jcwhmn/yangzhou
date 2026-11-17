@@ -206,16 +206,22 @@ class ProjectService(
         val projectId = project.objectId ?: error("no id")
         val all = items.findByProjectObjectIdAndDeletedAtIsNullOrderByNumber(projectId)
         val blocked = dependencyService.blockedItemObjectIds(projectId) // YPJ-204(spec 0137):甘特行 blocked 标记
-        val byParent = all.groupBy { it.parentObjectId }
+        val byId = all.associateBy { it.objectId }
         val statusById = statuses.findByProjectObjectIdOrderByPosition(projectId).associateBy { it.objectId }
         val now = LocalDateTime.now() // YPJ-208:时刻口径(spec 0138;甘特无 Clock seam,页面级展示容忍)
 
+        // YPJ-218(spec 0139)B1:孤儿兑底——父已删/不存在的 item 归入根组,不消失
+        val effectiveParent = { item: yangzhou.persistence.Item ->
+            item.parentObjectId?.takeIf { byId.containsKey(it) }
+        }
+        val byParent = all.groupBy { effectiveParent(it) }
+
         fun depthOf(item: yangzhou.persistence.Item): Int {
             var depth = 0
-            var cursor = item.parentObjectId
+            var cursor = effectiveParent(item)
             while (cursor != null) {
                 depth++
-                cursor = all.firstOrNull { it.objectId == cursor }?.parentObjectId
+                cursor = effectiveParent(byId[cursor] ?: return depth)
             }
             return depth
         }
@@ -230,6 +236,7 @@ class ProjectService(
                 startDate = item.startDate?.toString(),
                 dueDate = item.dueDate?.toString(),
                 statusName = status?.name ?: "?",
+                statusType = status?.statusType?.name, // YPJ-218(spec 0139):FINAL 置灰判定
                 overdue = item.dueDate?.let { now > it } == true && status?.statusType != StatusType.FINAL,
                 blocked = item.objectId in blocked,
                 estimateValue = item.estimateValue,
@@ -250,6 +257,7 @@ class ProjectService(
         val startDate: String?,
         val dueDate: String?,
         val statusName: String,
+        val statusType: String?,
         val overdue: Boolean,
         val blocked: Boolean,
         val estimateValue: Double?,
