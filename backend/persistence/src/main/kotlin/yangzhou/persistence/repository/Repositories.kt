@@ -533,6 +533,8 @@ interface ReleaseItemRepository : CrudRepository<ReleaseItem, Long> {
 
     fun findByReleaseObjectId(releaseObjectId: UUID): List<ReleaseItem>
 
+    fun findByReleaseObjectIdIn(releaseObjectIds: Collection<UUID>): List<ReleaseItem>
+
     fun findByItemObjectIdIn(itemObjectIds: Collection<UUID>): List<ReleaseItem>
 
     fun deleteByReleaseObjectId(releaseObjectId: UUID): Int

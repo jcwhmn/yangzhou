@@ -14,6 +14,8 @@ import yangzhou.persistence.Project
 import yangzhou.persistence.Release
 import yangzhou.persistence.ReleaseItem
 import yangzhou.persistence.ReleaseItemHistory
+import yangzhou.persistence.Status
+import yangzhou.persistence.StatusType
 import yangzhou.persistence.repository.ItemRepository
 import yangzhou.persistence.repository.MemberRepository
 import yangzhou.persistence.repository.ProjectRepository
@@ -39,11 +41,12 @@ class ReleaseServiceUnitTest {
     private val releaseItemHistories = mockk<ReleaseItemHistoryRepository>(relaxed = true)
     private val members = mockk<MemberRepository>(relaxed = true)
     private val items = mockk<ItemRepository>(relaxed = true)
+    private val statuses = mockk<yangzhou.persistence.repository.StatusRepository>(relaxed = true)
     private val leaderGuard = mockk<LeaderGuard>(relaxed = true)
     private val memberService = mockk<yangzhou.api.business.member.MemberService>(relaxed = true)
     private val clock = Clock.fixed(Instant.parse("2026-11-20T00:00:00Z"), ZoneOffset.UTC)
     private val service =
-        ReleaseService(projects, releases, releaseItems, releaseItemHistories, members, items, leaderGuard, memberService, clock)
+        ReleaseService(projects, releases, releaseItems, releaseItemHistories, members, items, statuses, leaderGuard, memberService, clock)
 
     private val project = Project(id = 1L, objectId = UUID(0, 1), workspaceObjectId = UUID(0, 9), key = "CHE", name = "CHE")
     private val r = Release(id = 1L, objectId = UUID(0, 2), projectObjectId = UUID(0, 1), name = "1.0", stage = "rc")
@@ -178,6 +181,39 @@ class ReleaseServiceUnitTest {
         every { releases.findByProjectObjectIdOrderByCreatedAt(UUID(0, 1)) } returns listOf(p1, done1, p2, done2, p3)
         val names = service.list("CHE").map { it.name }
         assertEquals(listOf("近目标", "远目标", "无目标", "发布B", "发布A"), names)
+    }
+
+    // ---------- YPJ-203(spec 0136):US-R7 逾期徽标 + US-R8 完成率(口径 1b) ----------
+
+    @Test
+    fun `list - overdue 与完成率 - 软删不入分母 - 零挂接`() {
+        val done = Status(projectObjectId = UUID(0, 1), name = "done", statusType = StatusType.FINAL)
+        val active = Status(projectObjectId = UUID(0, 1), name = "doing", statusType = StatusType.ACTIVE)
+        fun item(status: Status, deleted: Boolean = false) = Item(projectObjectId = UUID(0, 1), number = 1, title = "t", statusObjectId = status.objectId, deletedAt = if (deleted) Instant.now() else null)
+        val iDone = item(done)
+        val iDeletedDone = item(done, deleted = true)
+        val iActive = item(active)
+        val p1 = Release(objectId = UUID(0, 41), projectObjectId = UUID(0, 1), name = "p1", targetDate = LocalDate.parse("2026-11-19"))
+        val p2 = Release(objectId = UUID(0, 42), projectObjectId = UUID(0, 1), name = "p2") // 无 targetDate 不逾期;零挂接
+        every { releases.findByProjectObjectIdOrderByCreatedAt(UUID(0, 1)) } returns listOf(p1, p2)
+        every { releaseItems.findByReleaseObjectIdIn(any()) } returns
+            listOf(
+                ReleaseItem(releaseObjectId = p1.objectId, itemObjectId = iDone.objectId),
+                ReleaseItem(releaseObjectId = p1.objectId, itemObjectId = iDeletedDone.objectId),
+                ReleaseItem(releaseObjectId = p1.objectId, itemObjectId = iActive.objectId),
+            )
+        every { items.findAllByObjectIdIn(any()) } returns listOf(iDone, iDeletedDone, iActive)
+        every { statuses.findAllByObjectIdIn(any()) } returns listOf(done, active)
+
+        val dtos = service.list("CHE")
+        val overdueRow = dtos.first { it.name == "p1" }
+        assertTrue(overdueRow.overdue) // 昨天 < 今天(Clock 钉在 2026-11-20)
+        assertEquals(1, overdueRow.doneCount) // FINAL 入分子;软删的不入分母
+        assertEquals(2, overdueRow.totalCount)
+        val emptyRow = dtos.first { it.name == "p2" }
+        assertTrue(!emptyRow.overdue)
+        assertEquals(0, emptyRow.doneCount)
+        assertEquals(0, emptyRow.totalCount)
     }
 
     // ---------- US-R3 挂接(spec 0133) ----------

@@ -33,12 +33,18 @@ class ReleaseItemApiTest : AbstractApiTest() {
         authed: RestTestClient,
         key: String,
         name: String,
+        targetDate: String? = null,
     ): String {
+        val body =
+            buildMap<String, String?> {
+                put("name", name)
+                targetDate?.let { put("targetDate", it) }
+            }
         val r =
             authed
                 .post()
                 .uri("/api/projects/$key/releases")
-                .body(mapOf("name" to name))
+                .body(body)
                 .exchange()
                 .expectBody(String::class.java)
                 .returnResult()
@@ -186,5 +192,29 @@ class ReleaseItemApiTest : AbstractApiTest() {
         // 删 release(已摘空)→ 留痕仍在(永不删)
         assertEquals(204, deleteRelease(authed, a))
         assertEquals(2, historyCount())
+    }
+
+    /** YPJ-203(spec 0136):US-R7 逾期徽标 + US-R8 完成率(口径 1b,黑盒契约)。 */
+    @Test
+    fun `逾期徽标与完成率 - 计算不落库 - 软删滤除`() {
+        val authed = bootstrapAndAuth()
+        createProject(authed, "RIT")
+        // targetDate = 昨天(相对服务器今天取昨日,与 milestone 徽标同技巧)
+        val yesterday = java.time.LocalDate.now().minusDays(1).toString()
+        val r = createRelease(authed, "RIT", "过期发布", targetDate = yesterday)
+
+        fun row(): JsonNode = authed.get().uri("/api/projects/RIT/releases").exchange()
+            .expectBody(String::class.java).returnResult().responseBody!!
+            .let { json.readTree(it).first() }
+
+        assertTrue(row()["overdue"].asBoolean())
+        assertEquals(0, row()["doneCount"].asInt())
+        assertEquals(0, row()["totalCount"].asInt())
+
+        // 挂 1 个 item → 分母 1,分子 0(非 FINAL)
+        val i1 = createItem(authed, "RIT", "one")
+        put(authed, i1, mapOf("releaseId" to r))
+        assertEquals(1, row()["totalCount"].asInt())
+        assertEquals(0, row()["doneCount"].asInt())
     }
 }

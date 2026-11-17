@@ -83,7 +83,12 @@ export default function ProjectLayout({
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   // YPJ-201(spec 0134):侧栏 Releases 段——planned 行,最多显 3 条超出折叠
   const [releases, setReleases] = useState<
-    { releaseId: string; name: string; targetDate: string | null }[]
+    {
+      releaseId: string;
+      name: string;
+      targetDate: string | null;
+      overdue: boolean;
+    }[]
   >([]);
   const [releasesExpanded, setReleasesExpanded] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
@@ -176,16 +181,18 @@ export default function ProjectLayout({
         name: string;
         targetDate: string | null;
         status: string;
+        overdue: boolean;
       }[]
     >(`/api/projects/${key}/releases`)
       .then((rs) =>
         setReleases(
           rs
             .filter((r) => r.status === "planned")
-            .map(({ releaseId, name, targetDate }) => ({
+            .map(({ releaseId, name, targetDate, overdue }) => ({
               releaseId,
               name,
               targetDate,
+              overdue,
             })),
         ),
       )
