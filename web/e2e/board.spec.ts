@@ -74,6 +74,14 @@ test("日期与超期标识——详情设置日期,看板红标,甘特可见", 
   await page.getByRole("button", { name: "保存" }).click();
   await saveResp; // 等 PATCH 落库再导航,否则请求被打断
   await expectDate(page, "开始日期", "2020-01-01");
+  // YPJ-208 切片 c:时刻字段在,可录并随保存发出 datetime
+  await page.getByLabel("截止时刻").fill("12:30");
+  const patchBody = page.waitForRequest(
+    (r) => r.url().includes("/api/items/") && r.method() === "PATCH",
+  );
+  await page.getByRole("button", { name: "保存" }).click();
+  const req = await patchBody;
+  expect(req.postDataJSON().dueDate).toBe("2020-01-15T12:30");
   // 看板红标(active sprint → 根页 = 看板)
   await page.goto(`/p/${projectKey}`); // 红标在板卡上(item ∈ active sprint)
   await expect(page.getByText("⚠ 超期 2020-01-15")).toBeVisible();

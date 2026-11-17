@@ -338,7 +338,11 @@ export default function ItemDetailPage() {
 
   const [startDate, setStartDate] = useState("");
 
+  const [startTime, setStartTime] = useState(""); // YPJ-208 切片 c:HH:mm,与 startDate 拼 T
+
   const [dueDate, setDueDate] = useState("");
+
+  const [dueTime, setDueTime] = useState(""); // YPJ-208 切片 c
 
   const [priority, setPriority] = useState("");
 
@@ -514,8 +518,10 @@ export default function ItemDetailPage() {
     setDescription(it.description ?? "");
     setType(it.type);
 
-    setStartDate(it.startDate ?? "");
-    setDueDate(it.dueDate ?? "");
+    setStartDate(it.startDate?.slice(0, 10) ?? "");
+    setStartTime(it.startDate?.slice(11, 16) ?? "");
+    setDueDate(it.dueDate?.slice(0, 10) ?? "");
+    setDueTime(it.dueDate?.slice(11, 16) ?? "");
     setPriority(it.priority ?? "");
     setEstValue(it.estimateValue != null ? String(it.estimateValue) : "");
     setEstUnit(it.estimateUnit ?? "");
@@ -606,8 +612,12 @@ export default function ItemDetailPage() {
           title,
           description: description || null,
           type,
-          startDate,
-          dueDate,
+          startDate: startDate
+            ? startTime
+              ? `${startDate}T${startTime}`
+              : startDate
+            : "",
+          dueDate: dueDate ? (dueTime ? `${dueDate}T${dueTime}` : dueDate) : "",
           priority,
           estimateValue: estValue,
           estimateUnit: estUnit,
@@ -1062,12 +1072,33 @@ export default function ItemDetailPage() {
                 sx={{ width: 200 }}
               />
 
+              {/* YPJ-208 切片 c:时刻录入(datetime 语义;空=date-only 由后端按日历默认) */}
+              <TextField
+                label="开始时刻"
+                size="small"
+                type="time"
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+                sx={{ width: 130 }}
+                slotProps={{ inputLabel: { shrink: true } }}
+              />
+
               <DateInput
                 label="截止日期"
                 size="small"
                 value={dueDate}
                 onChange={setDueDate}
                 sx={{ width: 200 }}
+              />
+
+              <TextField
+                label="截止时刻"
+                size="small"
+                type="time"
+                value={dueTime}
+                onChange={(e) => setDueTime(e.target.value)}
+                sx={{ width: 130 }}
+                slotProps={{ inputLabel: { shrink: true } }}
               />
 
               <Dropdown

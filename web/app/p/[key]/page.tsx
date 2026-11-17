@@ -32,6 +32,7 @@ import { useParams, useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import { useProjectToolbarSlot } from "@/components/ProjectToolbar";
 import { EstimateField } from "@/components/EstimateField";
+import { fmtDate } from "@/lib/dates";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { t } from "@/lib/texts";
@@ -755,7 +756,7 @@ export default function BoardPage() {
                                   : it.dueSoon
                                     ? "⏳ 将到期 "
                                     : "📅 ")}
-                              {it.dueDate}
+                              {it.dueDate ? fmtDate(it.dueDate) : ""}
                             </Typography>
                           )}
                           {it.requirements.length > 0 && (
