@@ -41,6 +41,7 @@ private fun usage() {
           items create <KEY> <标题> [--desc 文本] [--sprint 名称|UUID] [--req 属性[>=N]]... [--json]   建 item(需求可分级)
           items list <KEY> [--json]                    项目 item 列表
           items move <ITEM_ID> <状态名>                改状态(经 workflow 校验)
+          items schedule <KEY-N> <start> [--due <due>]  排期(yyyy-MM-dd 或 yyyy-MM-dd'T'HH:mm;date-only 由后端按工作日界默认 09:00/18:00)
           items comment <KEY-N|itemId> <文本...>        给 item 加评论
           items show <KEY-N|itemId> [--json]            单票详情
           items comments <KEY-N|itemId>                 列 item 评论
@@ -523,6 +524,20 @@ private fun run(args: List<String>) {
             val body = api.json("PUT", "/api/items/$itemId/group-membership", mapOf("groupId" to sprintId, "groupType" to level1TypeKey(api, ikey)))
             val sprintName = body["sprintName"]?.takeUnless { it.isNull }?.asString()
             println(if (sprintName == null) "已移出 sprint:${body["number"].asString()}" else "已指派:${body["number"].asString()} → $sprintName")
+        }
+
+        "items schedule" -> {
+            // YPJ-208(spec 0138):排期——start 必填,due 可选;date-only 由后端按工作日界默认填充
+            val itemId = resolveItemId(api, rest.getOrNull(0) ?: error("缺少 item ID(支持 YPJ-58 或 UUID)"))
+            val start = rest.getOrNull(1) ?: error("缺少开始时间(yyyy-MM-dd 或 yyyy-MM-dd'T'HH:mm)")
+            val body = api.json(
+                "PATCH", "/api/items/$itemId",
+                buildMap {
+                    put("startDate", start)
+                    flags["due"]?.let { put("dueDate", it) }
+                },
+            )
+            println("已排期:${body["number"].asString()} ${body["startDate"].asString()} ~ ${body["dueDate"].asString()}")
         }
 
         "items move" -> {

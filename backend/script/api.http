@@ -68,7 +68,48 @@ Authorization: Bearer {{token}}
 GET {{host}}/api/projects/{{pkey}}/gantt
 Authorization: Bearer {{token}}
 
-### [预期 404] 甘特数据——未知项目
+### item 排期时刻级(YPJ-208/spec 0138:date-only 由后端按工作日界默认 09:00/18:00;datetime 原样;handler 存 pkey208)
+POST {{host}}/api/projects/{{pkey}}/items
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "208 排期时刻 item {{pkey208}}"
+}
+
+> {%
+    client.global.set("item208", response.body.itemId);
+ %}
+
+### PATCH date-only → 默认时刻(响应 startDate 含 T09:00)
+PATCH {{host}}/api/items/{{item208}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "startDate": "2026-11-21",
+  "dueDate": "2026-11-25"
+}
+
+### PATCH datetime 原样(响应含 T14:30)
+PATCH {{host}}/api/items/{{item208}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "startDate": "2026-11-21T14:30"
+}
+
+### [预期 400] 非法日期格式
+PATCH {{host}}/api/items/{{item208}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "startDate": "not-a-date"
+}
+
+### [预期 400] 甘特数据——未知项目
 GET {{host}}/api/projects/NOPE77/gantt
 Authorization: Bearer {{token}}
 

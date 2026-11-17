@@ -76,8 +76,8 @@ class Item {
   title: String
   description: String?
   type: String
-  startDate: LocalDate?
-  dueDate: LocalDate?
+  startDate: LocalDateTime?
+  dueDate: LocalDateTime?
   estimateValue: Double?
   estimateUnit: String?
   on_board: Boolean

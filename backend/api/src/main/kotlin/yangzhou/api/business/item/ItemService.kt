@@ -30,6 +30,8 @@ import yangzhou.persistence.repository.TimeEntryRepository
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.LocalTime
 import java.util.UUID
 
 /** Item:项目内递增编号(key-N)、type 属性、parentObjectId 同质树、自由迁移(ADR-0002)。 */
@@ -388,14 +390,18 @@ class ItemService(
 
         // V8-S1 日期:参数 null = 不变;空串 = 清除;ISO 文本 = 设置。start<=due 由 DB CHECK + 此处双保险
         if (startDateText != null || dueDateText != null) {
+            // YPJ-208(spec 0138):date-only → 工作日界默认时刻(日历可改前硬编码 09:00/18:00);datetime 原样
             fun parse(
                 text: String?,
                 field: String,
-            ): LocalDate? = text?.trim()?.ifEmpty { null }?.let {
-                runCatching { LocalDate.parse(it) }.getOrElse { throw BadRequestException("$field 格式应为 yyyy-MM-dd:$it") }
+                defaultTime: LocalTime,
+            ): LocalDateTime? = text?.trim()?.ifEmpty { null }?.let { raw ->
+                runCatching { LocalDateTime.parse(raw) }
+                    .recoverCatching { LocalDate.parse(raw).atTime(defaultTime) }
+                    .getOrElse { throw BadRequestException("$field 格式应为 yyyy-MM-dd 或 yyyy-MM-dd'T'HH:mm:$it") }
             }
-            val newStart = parse(startDateText, "startDate")
-            val newDue = parse(dueDateText, "dueDate")
+            val newStart = parse(startDateText, "startDate", DEFAULT_WORKDAY_START)
+            val newDue = parse(dueDateText, "dueDate", DEFAULT_WORKDAY_END)
             val start = newStart ?: current.startDate
             val due = newDue ?: current.dueDate
             if (start != null && due != null && start > due) throw BadRequestException("开始日期不能晚于截止日期")
@@ -701,7 +707,7 @@ class ItemService(
             status = statusNames[item.statusObjectId]?.let { if (item.deletedAt != null) "[已删除] $it" else it } ?: "?",
             startDate = item.startDate?.toString(),
             dueDate = item.dueDate?.toString(),
-            overdue = isOverdue(item.dueDate, LocalDate.now(clock), statusById[item.statusObjectId]?.statusType == StatusType.FINAL),
+            overdue = isOverdue(item.dueDate, LocalDateTime.now(clock), statusById[item.statusObjectId]?.statusType == StatusType.FINAL),
             feasSignal = item.feasSignal,
             priority = item.priority,
             estimateValue = item.estimateValue,
@@ -709,7 +715,7 @@ class ItemService(
             blocked = item.objectId in blockedIds,
             assignee = item.assigneeObjectId?.let { memberNames[it] },
             assigneeColor = item.assigneeObjectId?.let { memberMap[it]?.color },
-            dueSoon = isDueSoon(item.dueDate, LocalDate.now(clock)),
+            dueSoon = isDueSoon(item.dueDate, LocalDateTime.now(clock)),
             createdAt = item.createdAt.toString(),
             sprintId = latestSprint[item.objectId]?.objectId,
             sprintName = latestSprint[item.objectId]?.name,
@@ -789,16 +795,33 @@ data class UpdateItemRequest(
 )
 
 /** dueSoon/overdue 纯函数(时钟纪律:today 由注入 Clock 提供,可测;spec 0051)。 */
+/** YPJ-208(spec 0138):date-only 输入的默认工作日界(切片 b 前硬编码;日历票后改注入)。 */
+internal val DEFAULT_WORKDAY_START: LocalTime = LocalTime.of(9, 0)
+internal val DEFAULT_WORKDAY_END: LocalTime = LocalTime.of(18, 0)
+
 internal fun isOverdue(
     due: LocalDate?,
     today: LocalDate,
     statusFinal: Boolean,
 ): Boolean = due != null && due < today && !statusFinal
 
+/** YPJ-208(spec 0138):item 起止升到时刻级,overdue 改时刻口径;LocalDate 重载供 milestone targetDate(保持 DATE)同用。 */
+internal fun isOverdue(
+    due: LocalDateTime?,
+    now: LocalDateTime,
+    statusFinal: Boolean,
+): Boolean = due != null && now > due && !statusFinal
+
 internal fun isDueSoon(
     due: LocalDate?,
     today: LocalDate,
 ): Boolean = due != null && due >= today && due < today.plusDays(3)
+
+/** 时刻口径:窗口 [now, now+3d) 右开;与日期版同语义的 minute 级平移。 */
+internal fun isDueSoon(
+    due: LocalDateTime?,
+    now: LocalDateTime,
+): Boolean = due != null && due >= now && due < now.plusDays(3)
 
 /** YPJ-186(spec 0128):预估显示文本(activity log 用;数值去尾零+单位 key)。 */
 internal fun estimateText(

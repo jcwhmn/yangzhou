@@ -42,8 +42,8 @@ class ItemDateApiTest : AbstractApiTest() {
             .exchange()
             .expectStatus()
             .isOk()
-        assertEquals("2026-09-01", detail(authed, itemId)["startDate"].asText())
-        assertEquals("2026-09-30", detail(authed, itemId)["dueDate"].asText())
+        assertEquals("2026-09-01T09:00", detail(authed, itemId)["startDate"].asText())
+        assertEquals("2026-09-30T18:00", detail(authed, itemId)["dueDate"].asText())
 
         // 不传日期字段 → 保持不变
         authed
@@ -53,13 +53,31 @@ class ItemDateApiTest : AbstractApiTest() {
             .exchange()
             .expectStatus()
             .isOk()
-        assertEquals("2026-09-30", detail(authed, itemId)["dueDate"].asText())
+        assertEquals("2026-09-30T18:00", detail(authed, itemId)["dueDate"].asText())
 
         // start > due → 400
         authed
             .patch()
             .uri("/api/items/$itemId")
             .body(mapOf("startDate" to "2026-10-01"))
+            .exchange()
+            .expectStatus()
+            .isBadRequest()
+
+        // YPJ-208(spec 0138):datetime 进原样,非法格式 400
+        authed
+            .patch()
+            .uri("/api/items/$itemId")
+            .body(mapOf("startDate" to "2026-09-01T14:30", "dueDate" to "2026-09-30T12:00"))
+            .exchange()
+            .expectStatus()
+            .isOk()
+        assertEquals("2026-09-01T14:30", detail(authed, itemId)["startDate"].asText())
+        assertEquals("2026-09-30T12:00", detail(authed, itemId)["dueDate"].asText())
+        authed
+            .patch()
+            .uri("/api/items/$itemId")
+            .body(mapOf("startDate" to "not-a-date"))
             .exchange()
             .expectStatus()
             .isBadRequest()

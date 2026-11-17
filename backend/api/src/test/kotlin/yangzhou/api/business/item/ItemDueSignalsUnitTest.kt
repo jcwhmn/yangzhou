@@ -26,4 +26,17 @@ class ItemDueSignalsUnitTest {
         assertFalse(isDueSoon(today.minusDays(1), today))
         assertFalse(isDueSoon(null, today))
     }
+
+    /** YPJ-208(spec 0138):时刻口径( overdue=now>due;dueSoon 窗口 [now, now+3d) 右开)。 */
+    @Test
+    fun `时刻口径 overdue now 大于 due 才算,dueSoon 右开窗口`() {
+        val now = java.time.LocalDateTime.of(2026, 10, 18, 12, 0)
+        assertFalse(isOverdue(now, now, statusFinal = false))
+        assertTrue(isOverdue(now.minusMinutes(1), now, statusFinal = false))
+        assertFalse(isOverdue(now.minusDays(5), now, statusFinal = true))
+        assertFalse(isOverdue(null, now, statusFinal = false))
+        assertTrue(isDueSoon(now.plusDays(2), now))
+        assertFalse(isDueSoon(now.plusDays(3), now))
+        assertFalse(isDueSoon(now.minusMinutes(1), now))
+    }
 }
