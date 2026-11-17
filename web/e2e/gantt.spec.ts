@@ -117,3 +117,38 @@ test("无子的父加子不弹窗", async ({ page, projectKey }) => {
     "true",
   );
 });
+
+test("甘特视口与六级缩放(YPJ-219)", async ({ page, projectKey }) => {
+  const item = await apiCreateItem(projectKey, "E2E 缩放条");
+  await apiCall("PATCH", `/api/items/${item}`, {
+    startDate: "2020-01-01",
+    dueDate: "2020-01-03",
+  });
+
+  await page.goto(`/p/${projectKey}/gantt`);
+  await expect(page.getByText("E2E 缩放条")).toBeVisible();
+
+  // 六档按钮
+  for (const g of ["year", "quarter", "month", "week", "day", "hour"]) {
+    await expect(page.getByTestId(`gantt-gran-${g}`)).toBeVisible();
+  }
+
+  // 日档:像素制出现横向滚动
+  await page.getByTestId("gantt-gran-day").click();
+  await expect
+    .poll(() =>
+      page
+        .getByTestId("gantt-scroll")
+        .evaluate((el) => el.scrollWidth > el.clientWidth),
+    )
+    .toBe(true);
+
+  // 时档:单日 0–24 全程刻度(首尾标签在)
+  await page.getByTestId("gantt-gran-hour").click();
+  await expect(page.getByText("0:00", { exact: true })).toBeVisible();
+  await expect(page.getByText("23:00", { exact: true })).toBeVisible();
+
+  // 切档后回到月档仍可用
+  await page.getByTestId("gantt-gran-month").click();
+  await expect(page.getByText("E2E 缩放条")).toBeVisible();
+});
