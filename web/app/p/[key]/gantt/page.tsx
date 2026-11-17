@@ -17,10 +17,19 @@ type GanttRow = {
   dueDate: string | null;
   statusName: string;
   overdue: boolean;
+  blocked: boolean;
+  estimateValue: number | null;
+  estimateUnit: string | null;
   depth: number;
 };
 
 const DAY = 24 * 60 * 60 * 1000;
+type Granularity = "month" | "week" | "day";
+const GRANULARITIES: [Granularity, string][] = [
+  ["month", "月"],
+  ["week", "周"],
+  ["day", "日"],
+];
 
 /** V8-S2:单项目树形甘特(只读)。条 = start→due;只有 due 画里程碑菱形;今日线;未排期折叠组。 */
 export default function GanttPage() {
@@ -28,6 +37,7 @@ export default function GanttPage() {
   const [rows, setRows] = useState<GanttRow[] | null>(null);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [showUnscheduled, setShowUnscheduled] = useState(false);
+  const [granularity, setGranularity] = useState<Granularity>("month");
 
   const load = useCallback(async () => {
     const data = await api<{ rows: GanttRow[] }>(`/api/projects/${key}/gantt`);
@@ -54,16 +64,43 @@ export default function GanttPage() {
     const end = new Date(+max + 4 * DAY);
     const span = Math.max(+end - +start, DAY);
     const ticks: string[] = [];
-    // 按月取整:从起点次月 1 号起逐月一 tick(V65:跨度均分会产出 12-07 类非历法日期)
-    const cur = new Date(
-      Date.UTC(start.getFullYear(), start.getMonth() + 1, 1),
-    );
-    while (+cur <= +end) {
-      ticks.push(cur.toISOString().slice(0, 10));
-      cur.setUTCMonth(cur.getUTCMonth() + 1);
+    // YPJ-204(spec 0137):粒度切换——月=每月 1 号，周=每周一，日=每日(跨度大时隔 N 个显示)
+    if (granularity === "month") {
+      const cur = new Date(
+        Date.UTC(start.getFullYear(), start.getMonth() + 1, 1),
+      );
+      while (+cur <= +end) {
+        ticks.push(cur.toISOString().slice(0, 10));
+        cur.setUTCMonth(cur.getUTCMonth() + 1);
+      }
+    } else {
+      const step = granularity === "week" ? 7 : 1;
+      // 对齐到周一(周粒度)；日粒度直接从 start 起
+      const cur = new Date(start);
+      if (granularity === "week") {
+        const dow = (cur.getUTCDay() + 6) % 7; // 周一=0
+        cur.setUTCDate(cur.getUTCDate() + ((7 - dow) % 7));
+      }
+      while (+cur <= +end) {
+        ticks.push(cur.toISOString().slice(0, 10));
+        cur.setUTCDate(cur.getUTCDate() + step);
+      }
     }
-    return { start, span, ticks, todayX: ((+today - +start) / span) * 100 };
-  }, [rows]);
+    // 刻度过密时抽稀(按容器约 900px 可用宽，每刻度至少 ~48px)
+    const shown =
+      ticks.length > 18
+        ? ticks.filter(
+            (_, i) =>
+              i % Math.ceil(ticks.length / 18) === 0 || i === ticks.length - 1,
+          )
+        : ticks;
+    return {
+      start,
+      span,
+      ticks: shown,
+      todayX: ((+today - +start) / span) * 100,
+    };
+  }, [rows, granularity]);
 
   const xOf = (date: string | null) =>
     date === null
@@ -102,6 +139,19 @@ export default function GanttPage() {
     <PageShell>
       <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
         <Typography variant="h5">{`${String(key)} · 甘特`}</Typography>
+        <Stack direction="row" spacing={0.5} sx={{ ml: "auto" }}>
+          {GRANULARITIES.map(([g, label]) => (
+            <Button
+              key={g}
+              data-testid={`gantt-gran-${g}`}
+              size="small"
+              variant={granularity === g ? "contained" : "outlined"}
+              onClick={() => setGranularity(g)}
+            >
+              {label}
+            </Button>
+          ))}
+        </Stack>
       </Stack>
 
       {rows === null ? (
@@ -231,10 +281,28 @@ export default function GanttPage() {
                       <Typography
                         variant="caption"
                         noWrap
-                        sx={{ maxWidth: 150 }}
+                        sx={{ maxWidth: 120 }}
                       >
                         {r.title}
                       </Typography>
+                      {r.estimateValue !== null && (
+                        <Chip
+                          data-testid={`gantt-est-${r.number}`}
+                          label={`${r.estimateValue}${r.estimateUnit ?? ""}`}
+                          size="small"
+                          variant="outlined"
+                          sx={{ height: 18 }}
+                        />
+                      )}
+                      {r.blocked && (
+                        <Chip
+                          data-testid={`gantt-blocked-${r.number}`}
+                          label="🔗 blocked"
+                          size="small"
+                          color="warning"
+                          sx={{ height: 18 }}
+                        />
+                      )}
                     </Stack>
                   </Box>
 

@@ -37,6 +37,7 @@ class ProjectService(
     private val groupTypes: yangzhou.persistence.repository.ItemGroupTypeRepository,
     private val itemTypes: yangzhou.persistence.repository.ItemTypeRepository,
     private val groupWorkflow: yangzhou.api.business.itemgroup.GroupWorkflowService,
+    private val dependencyService: yangzhou.api.business.dependency.DependencyService,
     private val mapper: ObjectMapper,
 ) {
 
@@ -186,6 +187,7 @@ class ProjectService(
         val project = projects.findByKey(key) ?: throw NotFoundException("项目不存在:$key")
         val projectId = project.objectId ?: error("no id")
         val all = items.findByProjectObjectIdAndDeletedAtIsNullOrderByNumber(projectId)
+        val blocked = dependencyService.blockedItemObjectIds(projectId) // YPJ-204(spec 0137):甘特行 blocked 标记
         val byParent = all.groupBy { it.parentObjectId }
         val statusById = statuses.findByProjectObjectIdOrderByPosition(projectId).associateBy { it.objectId }
         val today = LocalDate.now()
@@ -211,6 +213,9 @@ class ProjectService(
                 dueDate = item.dueDate?.toString(),
                 statusName = status?.name ?: "?",
                 overdue = item.dueDate?.let { it < today } == true && status?.statusType != StatusType.FINAL,
+                blocked = item.objectId in blocked,
+                estimateValue = item.estimateValue,
+                estimateUnit = item.estimateUnit,
                 depth = depthOf(item),
             )
             listOf(row) + walk(item.objectId)
@@ -228,6 +233,9 @@ class ProjectService(
         val dueDate: String?,
         val statusName: String,
         val overdue: Boolean,
+        val blocked: Boolean,
+        val estimateValue: Double?,
+        val estimateUnit: String?,
         val depth: Int,
     )
 
