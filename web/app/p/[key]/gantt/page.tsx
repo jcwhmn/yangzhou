@@ -40,7 +40,7 @@ const DAY = 24 * 60 * 60 * 1000;
 
 // YPJ-219 v2(spec 0140):轴 = 数据锚定(首日 00:00 → 末日 24:00),连续缩放,无语义档位
 const TITLE_W = 280;
-const MAX_PPD = 720; // 缩放上限:1h = 30px(细节级)
+const MAX_PPD = 2400; // 缩放上限:1日窗承诺在内容宽 ≤2680 成立(YPJ-230;1920 屏内容 1386 原被 720 夹成 ~1.9 天)
 const MIN_LABEL_PX = 44; // 刻度标签最小间距
 const ZOOM_STEP = 1.5; // ± 按钮步进系数
 
@@ -804,7 +804,10 @@ export default function GanttPage() {
                           href={`/p/${key}/i/${r.itemId}?from=gantt`}
                           style={{ minWidth: 0 }}
                         >
+                          {/* component=div:inline span 吃不到 maxWidth/overflow,文字画出盒叠压 chip(YPJ-230) */}
                           <Typography
+                            component="div"
+                            data-testid={`gantt-title-${r.number}`}
                             variant="caption"
                             noWrap
                             sx={{
