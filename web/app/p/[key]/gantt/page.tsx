@@ -339,15 +339,27 @@ export default function GanttPage() {
   }, [axis.pxPerDay, axis.fit, saveView]);
 
   // 视点日变化时滚动到视点日居中(缩放导致的 pxPerDay 变化不重触发,避免覆盖锚点滚动)
+  // YPJ-229:轴起点变化(数据到达/切范围)后,同视点日也重居中——否则加载中设的视点日不重放;
+  // 视点日=今日时居中「当前时刻」而非 00:00(否则 1 日窗下今日线偏出视口)
   const lastCenterRef = useRef("");
+  const lastCenterStartRef = useRef<number | null>(null);
   useEffect(() => {
     const el = scrollRef.current;
-    if (!el || !center || center === lastCenterRef.current) return;
+    if (!el || !center) return;
+    if (
+      center === lastCenterRef.current &&
+      +axis.start === lastCenterStartRef.current
+    )
+      return;
     lastCenterRef.current = center;
-    const x = ((+parseLocal(center) - +axis.start) / DAY) * axis.pxPerDay;
+    lastCenterStartRef.current = +axis.start;
+    const x =
+      center === fmtDay(new Date())
+        ? axis.todayX
+        : ((+parseLocal(center) - +axis.start) / DAY) * axis.pxPerDay;
     el.scrollLeft = Math.max(0, x - (el.clientWidth - TITLE_W) / 2);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [center, axis.pxPerDay, rows]);
+  }, [center, axis.pxPerDay, axis.start, axis.todayX, rows]);
 
   const fmtDay = (d: Date) =>
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -357,15 +369,33 @@ export default function GanttPage() {
     setCenter(fmtDay(base));
   };
   // 日窗预设 / 今日:视点日为中心,N 天撑满可视区
-  const goToDayWindow = (days: number | null) => {
+  // YPJ-229:数据/容器未就绪(rows 未到/容器未测宽)时点击 → 缩放静默丢失;改挂起,就绪后补放
+  const pendingWinRef = useRef<number | null | undefined>(undefined);
+  const applyDayWindow = (days: number | null) => {
     const target =
       days === null ? new Date() : center ? parseLocal(center) : new Date();
     lastCenterRef.current = ""; // 同值重设也要触发居中
+    lastCenterStartRef.current = null;
     setCenter(fmtDay(target));
     if (days !== null && containerW > TITLE_W)
       setZoom((containerW - TITLE_W) / days);
     else if (days === null) setZoom(null);
   };
+  const goToDayWindow = (days: number | null) => {
+    if (rows === null || containerW <= TITLE_W) pendingWinRef.current = days;
+    else {
+      pendingWinRef.current = undefined; // 直接生效路径清挂起,防切范围后补放旧值
+      applyDayWindow(days);
+    }
+  };
+  useEffect(() => {
+    if (rows === null || containerW <= TITLE_W) return;
+    const p = pendingWinRef.current;
+    if (p === undefined) return;
+    pendingWinRef.current = undefined;
+    applyDayWindow(p);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, containerW]);
 
   const xOf = (date: string | null) =>
     date === null
@@ -723,7 +753,8 @@ export default function GanttPage() {
                   r.dueDate !== null
                     ? (xEndOf(r.dueDate) ?? axis.timelineW)
                     : left;
-                const width = Math.max(hasStart ? right - left : 1.2, 1.2);
+                // 零时长条(start=due 同刻)最小 3px 可见(YPJ-229;due-only 菱形是标记不受影响)
+                const width = hasStart ? Math.max(right - left, 3) : 1.2;
                 const folded = collapsed.has(r.itemId);
                 return (
                   <Box
