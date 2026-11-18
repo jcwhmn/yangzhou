@@ -562,6 +562,27 @@ class ItemGroupService(
         return BoardDto(activeDto, itemService.list(key).filter { it.itemId in objectIds })
     }
 
+    /** spec 0141(YPJ-220):甘特范围用——看板集合的 item objectId(与 board() 同口径,含无 active 退化为非 backlog 全量)。 */
+    fun boardItemObjectIds(key: String): Set<UUID> = board(key).items.map { it.itemId }.toSet()
+
+    /** spec 0141:group 范围——叶层组直取成员;父层组(level-2)= 叶子子组成员并集;多组并集。 */
+    fun groupMemberItemObjectIds(
+        key: String,
+        groupIds: List<UUID>,
+    ): Set<UUID> {
+        val pid = project(key).objectId!!
+        val all = groups.findByProjectObjectIdOrderByCreatedAt(pid)
+        val byId = all.associateBy { it.objectId }
+        val out = mutableSetOf<UUID>()
+        for (gid in groupIds) {
+            val g = byId[gid] ?: throw NotFoundException("group 不存在")
+            val childIds = all.filter { it.parentObjectId == g.objectId }.map { it.objectId }
+            val leafIds = if (childIds.isEmpty()) listOf(g.objectId) else childIds
+            leafIds.forEach { leaf -> out += memberships.findByGroupObjectId(leaf).map { it.itemObjectId } }
+        }
+        return out
+    }
+
     /**
      * 归属替换(PUT /items/{id}/group-membership):按 groupType 替换该类型未完成行(FINAL 态行 = 历史,保留);
      * groupId=null + groupType = 移出;目标组 FINAL 态 409(历史不可变,同 sprint 现状 completed 拒)。

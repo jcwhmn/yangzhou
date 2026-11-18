@@ -42,7 +42,7 @@ class GanttApiTest : AbstractApiTest() {
             json.readTree(
                 authed
                     .get()
-                    .uri("/api/projects/CHE/gantt")
+                    .uri("/api/projects/CHE/gantt?scope=all")
                     .exchange()
                     .expectStatus()
                     .isOk()
@@ -101,7 +101,7 @@ class GanttApiTest : AbstractApiTest() {
             json.readTree(
                 authed
                     .get()
-                    .uri("/api/projects/ORP/gantt")
+                    .uri("/api/projects/ORP/gantt?scope=all")
                     .exchange()
                     .expectStatus()
                     .isOk()
@@ -116,5 +116,115 @@ class GanttApiTest : AbstractApiTest() {
         assertEquals(0, rows[0]["depth"].asInt())
         assertEquals(parent["itemId"].asText(), rows[0]["parentItemId"].asText())
         assertEquals("普通根", rows[1]["title"].asText())
+    }
+
+    @Test
+    fun `YPJ-220 spec 0141 范围过滤——缺省 board 祖先链不截断 group 多选并集 milestone 与负例`() {
+        val authed = bootstrapAndAuth()
+        createProject(authed, "SCO")
+
+        val parent = createItem(authed, "SCO", "父")
+        val a = createItem(authed, "SCO", "A", parentItemId = parent["itemId"].asText())
+        val b = createItem(authed, "SCO", "B", parentItemId = parent["itemId"].asText())
+        createItem(authed, "SCO", "圈外O")
+
+        fun gantt(q: String) =
+            json.readTree(
+                authed
+                    .get()
+                    .uri("/api/projects/SCO/gantt$q")
+                    .exchange()
+                    .expectBody(String::class.java)
+                    .returnResult()
+                    .responseBody!!,
+            )["rows"].map { it["title"].asText() }
+
+        fun group(name: String): String =
+            json.readTree(
+                authed
+                    .post()
+                    .uri("/api/projects/SCO/groups")
+                    .body(mapOf("typeKey" to "sprint", "name" to name))
+                    .exchange()
+                    .expectStatus()
+                    .isCreated()
+                    .expectBody(String::class.java)
+                    .returnResult()
+                    .responseBody!!,
+            )["groupId"].asText()
+
+        val g1 = group("S1")
+        val g2 = group("S2")
+        authed
+            .put()
+            .uri("/api/items/${a["itemId"].asText()}/group-membership")
+            .body(mapOf("groupId" to g1, "groupType" to "sprint"))
+            .exchange()
+            .expectStatus()
+            .isOk()
+        authed
+            .put()
+            .uri("/api/items/${b["itemId"].asText()}/group-membership")
+            .body(mapOf("groupId" to g2, "groupType" to "sprint"))
+            .exchange()
+            .expectStatus()
+            .isOk()
+
+        // 无 active:缺省 board = 非 backlog 全量(onBoard/组籍者,与看板根页一致;圈外O 无组籍=backlog 被排除)
+        assertEquals(listOf("父", "A", "B"), gantt(""))
+
+        // g1 激活:缺省 board = active 成员 A + 祖先父(祖先链不截断);B/圈外O 不在
+        authed
+            .post()
+            .uri("/api/projects/SCO/groups/$g1/actions/start")
+            .exchange()
+            .expectStatus()
+            .isOk()
+        assertEquals(listOf("父", "A"), gantt(""))
+
+        // group 多选 g1,g2 → 并集 A,B + 祖先父;圈外O 仍不在
+        assertEquals(listOf("父", "A", "B"), gantt("?scope=group&scopeIds=$g1,$g2"))
+
+        // milestone 范围:挂 A → A + 祖先父
+        val ms =
+            json.readTree(
+                authed
+                    .post()
+                    .uri("/api/projects/SCO/milestones")
+                    .body(mapOf("name" to "M1"))
+                    .exchange()
+                    .expectStatus()
+                    .isCreated()
+                    .expectBody(String::class.java)
+                    .returnResult()
+                    .responseBody!!,
+            )["milestoneId"].asText()
+        authed
+            .put()
+            .uri("/api/projects/SCO/milestones/$ms/items")
+            .body(mapOf("itemIds" to listOf(a["itemId"].asText())))
+            .exchange()
+            .expectStatus()
+            .isOk()
+        assertEquals(listOf("父", "A"), gantt("?scope=milestone&scopeIds=$ms"))
+
+        // all 兜底:4 行
+        assertEquals(listOf("父", "A", "B", "圈外O"), gantt("?scope=all"))
+
+        // 负例:坏 scope 400 / group 无 scopeIds 400 / 坏 scopeId 404 / group 好格式不存在 404
+        authed.get().uri("/api/projects/SCO/gantt?scope=foo").exchange().expectStatus().isBadRequest()
+        authed.get().uri("/api/projects/SCO/gantt?scope=group").exchange().expectStatus().isBadRequest()
+        authed
+            .get()
+            .uri("/api/projects/SCO/gantt?scope=group&scopeIds=not-a-uuid")
+            .exchange()
+            .expectStatus()
+            .isBadRequest()
+        authed
+            .get()
+            .uri("/api/projects/SCO/gantt?scope=group&scopeIds=00000000-0000-0000-0000-000000000000")
+            .exchange()
+            .expectStatus()
+            .isNotFound()
     }
 }
