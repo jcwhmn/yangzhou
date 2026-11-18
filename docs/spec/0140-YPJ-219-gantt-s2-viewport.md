@@ -139,4 +139,4 @@
 - `web/app/p/[key]/gantt/page.tsx` 整体重写轴层:删 GRANULARITIES/9 档/语义刻度,改 `axis`(数据锚定 start/end + pxPerDay 连续)+ `headerRows`(月/周/日行,段宽阈值门控)+ `hourTicks`(1/2/3/6/12h 梯子取最小步长使间距≥44px)。条渲染/汇总条/FINAL 置灰/B3 不变。
 - 缩放:`zoomTo(newPpd, anchorClientX)` 保持鼠标下数据时刻不动(重算 scrollLeft);± 按钮 ×1.5 以视口中心为锚;Ctrl+wheel 经 ref 非被动监听 preventDefault。
 - 工况持久化 sessionStorage `gantt.view` = { zoom, center(视点日), scroll };日窗预设/今日 = 设 center + zoom=N 天撑满。
-- e2e(gantt.spec):gran-* 档位用例删除,换 v2 用例:轴锚定全区间、缩放 ±、今日回中、1 日预设小时刻度、工况保持;S1 三例(汇总/禁用/加子)不变全绿。
+- e2e 首轮 4 红(A12):①②用例改造遗漏已修;③刻度梯子真 bug 已修(最小满足间距步长,无解丢小时行);④milestone 用例与 spec 0121 接棒级联冲突已改(验级联+取消 GA 后开始 Beta)。复跑全量待用户验。

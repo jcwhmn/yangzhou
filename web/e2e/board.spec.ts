@@ -72,7 +72,7 @@ test("日期与超期标识——详情设置日期,看板红标,甘特可见", 
     (r) => r.url().includes("/api/items/") && r.request().method() === "PATCH",
   );
   // 保存成功后前端 load() 回拉 item(date-only 会被后端按日历填 T18:00 并回填时刻框),
-  // 必须等这次 GET 完成再录时刻,否则回填覆盖 fill(竞态,叠加态跑绿属时序运气)
+  // 必须等回填已渲染(时刻框=18:00)再录时刻,否则回填覆盖 fill(A10 同款竞态,2026-11-18 实锤)
   const reloadResp = page.waitForResponse(
     (r) =>
       r.url().includes(`/api/items/${itemId}`) &&
@@ -82,7 +82,8 @@ test("日期与超期标识——详情设置日期,看板红标,甘特可见", 
   await saveResp;
   await reloadResp;
   await expectDate(page, "开始日期", "2020-01-01");
-  // YPJ-208 切片 c:时刻字段在,可录并随保存发出 datetime
+  // YPJ-208 切片 c:时刻字段在,可录并随保存发出 datetime;先等回填渲染落地再覆盖
+  await expect(page.getByLabel("截止时刻")).toHaveValue("18:00");
   await page.getByLabel("截止时刻").fill("12:30");
   const patchBody = page.waitForRequest(
     (r) => r.url().includes("/api/items/") && r.method() === "PATCH",
@@ -122,19 +123,10 @@ test("甘特粒度切换 + blocked 标记 + estimate 可见(YPJ-204/spec 0137)",
   await expect(page.getByTestId(`gantt-est-${projectKey}-2`)).toBeVisible();
   await expect(page.getByTestId(`gantt-blocked-${projectKey}-2`)).toBeVisible();
 
-  // 粒度切换：月默认 → 周刻度变密 → 日刻度含具体日
-  await page.getByTestId("gantt-gran-month").click();
-  await expect(page.getByTestId("gantt-gran-month")).toHaveClass(
-    /MuiButton-containedPrimary/,
-  );
-  await page.getByTestId("gantt-gran-week").click();
-  await expect(page.getByTestId("gantt-gran-week")).toHaveClass(
-    /MuiButton-containedPrimary/,
-  );
-  await page.getByTestId("gantt-gran-day").click();
-  await expect(page.getByTestId("gantt-gran-day")).toHaveClass(
-    /MuiButton-containedPrimary/,
-  );
+  // v2 轴(YPJ-219):自适应 header 日行在;放大一档 → 小时行出现(梯子联动)
+  await expect(page.getByTestId("gantt-row-day")).toBeVisible();
+  await page.getByTestId("gantt-zoom-in").click();
+  await expect(page.getByTestId("gantt-row-hour")).toBeVisible();
   await expect(row).toBeVisible();
 });
 

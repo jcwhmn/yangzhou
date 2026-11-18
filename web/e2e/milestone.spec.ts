@@ -67,6 +67,9 @@ test("Milestone 页——建/推进/编辑/删除 @smoke", async ({ page, projec
   await expect(
     mvpRow.getByRole("button", { name: /开始|完成|取消/ }),
   ).toHaveCount(0); // 终态无状态按钮
+  // 完成 A → 接棒级联(spec 0121):GA(targetDate 排序在 Beta 前)自动开始 → 取消 GA 解除 → B 可开始
+  await expect(gaRow.getByText("▶")).toBeVisible();
+  await gaRow.getByRole("button", { name: /取消/ }).click();
   await betaRow.getByRole("button", { name: /开始/ }).click();
   await expect(page.getByText(/已有进行中的 milestone/)).toHaveCount(0);
 

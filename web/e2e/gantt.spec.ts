@@ -174,10 +174,10 @@ test("v2 数据锚定轴 + 连续缩放(YPJ-219)", async ({ page, projectKey }) 
     )
     .toBeGreaterThan(before);
 
-  // 1 日预设:0–24 墙钟全程小时刻度(首尾在)
+  // 1 日预设:0–24 墙钟小时刻度(视口 1000px/天 → 2h 步长,末档 22:00)
   await page.getByTestId("gantt-win-1").click();
   await expect(page.getByText("00:00", { exact: true }).first()).toBeVisible();
-  await expect(page.getByText("23:00", { exact: true })).toBeVisible();
+  await expect(page.getByText("22:00", { exact: true })).toBeVisible();
 
   // 工况保持:切页再回来,日窗预设仍在(小时刻度还在)
   await page.goto(`/p/${projectKey}/backlog`);

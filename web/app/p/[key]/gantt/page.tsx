@@ -102,17 +102,9 @@ export default function GanttPage() {
     // 两级刻度:细刻度(小时梯子 1/2/3/6/12h,取间距≥MIN_LABEL_PX 的最小步长);粗行(月/周/日)按段宽门控
     const rowsOut: HeaderRow[] = [];
     const pxPerHour = pxPerDay / 24;
-    if (pxPerDay >= MIN_LABEL_PX) {
-      const stepH =
-        pxPerHour >= MIN_LABEL_PX
-          ? 1
-          : pxPerHour >= MIN_LABEL_PX / 2
-            ? 2
-            : pxPerHour >= MIN_LABEL_PX / 3
-              ? 3
-              : pxPerHour >= MIN_LABEL_PX / 6
-                ? 6
-                : 12;
+    // 小时行:梯子取最小步长使间距≥MIN_LABEL_PX;无解(极度缩小时)整行丢弃,不吐过密标签
+    const stepH = [1, 2, 3, 6, 12].find((s) => s * pxPerHour >= MIN_LABEL_PX);
+    if (pxPerDay >= MIN_LABEL_PX && stepH) {
       const ticks: Tick[] = [];
       for (let h = 0; h <= spanDays * 24; h += stepH) {
         const d = new Date(+start + (h * DAY) / 24);
