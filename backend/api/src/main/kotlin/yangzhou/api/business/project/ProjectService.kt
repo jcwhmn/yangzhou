@@ -38,6 +38,12 @@ class ProjectService(
     private val groupTypes: yangzhou.persistence.repository.ItemGroupTypeRepository,
     private val itemTypes: yangzhou.persistence.repository.ItemTypeRepository,
     private val groupWorkflow: yangzhou.api.business.itemgroup.GroupWorkflowService,
+    // spec 0141(YPJ-220):范围过滤——board/group 复用 ItemGroupService 语义,milestone/release 直取挂接表
+    private val itemGroupService: yangzhou.api.business.itemgroup.ItemGroupService,
+    private val milestones: yangzhou.persistence.repository.MilestoneRepository,
+    private val milestoneItems: yangzhou.persistence.repository.MilestoneItemRepository,
+    private val releases: yangzhou.persistence.repository.ReleaseRepository,
+    private val releaseItems: yangzhou.persistence.repository.ReleaseItemRepository,
     private val dependencyService: yangzhou.api.business.dependency.DependencyService,
     private val mapper: ObjectMapper,
 ) {
@@ -200,11 +206,17 @@ class ProjectService(
         deletions.deleteProject(pid) // repo/rule/favorite/project_member 级联
     }
 
-    /** V8-S2 甘特数据:全量 item 按树序(父先子后,number 次序);日期可空;overdue 同看板语义。 */
-    fun gantt(key: String): GanttDto {
+    /** V8-S2 甘特数据:全量 item 按树序(父先子后,number 次序);日期可空;overdue 同看板语义。
+     * spec 0141(YPJ-220):范围过滤,缺省 board(⚠ 契约变更,原缺省=全部);树形 = 命中 ∪ 后代 ∪ 祖先链(不截断)。 */
+    fun gantt(
+        key: String,
+        scope: String = "board",
+        scopeIds: String? = null,
+    ): GanttDto {
         val project = projects.findByKey(key) ?: throw NotFoundException("项目不存在:$key")
         val projectId = project.objectId ?: error("no id")
         val all = items.findByProjectObjectIdAndDeletedAtIsNullOrderByNumber(projectId)
+        val matched = resolveScope(key, projectId, scope, scopeIds, all)
         val blocked = dependencyService.blockedItemObjectIds(projectId) // YPJ-204(spec 0137):甘特行 blocked 标记
         val byId = all.associateBy { it.objectId }
         val statusById = statuses.findByProjectObjectIdOrderByPosition(projectId).associateBy { it.objectId }
@@ -215,6 +227,22 @@ class ProjectService(
             item.parentObjectId?.takeIf { byId.containsKey(it) }
         }
         val byParent = all.groupBy { effectiveParent(it) }
+
+        // spec 0141:keep = 命中 ∪ 全部后代 ∪ 祖先链(祖先不被过滤截断)
+        val keep = mutableSetOf<UUID>()
+        val stack = ArrayDeque(all.filter { it.objectId in matched }.map { it.objectId })
+        while (stack.isNotEmpty()) {
+            val id = stack.removeLast()
+            if (!keep.add(id)) continue
+            byParent[id]?.forEach { stack.addLast(it.objectId) }
+        }
+        all.filter { it.objectId in keep }.forEach { item ->
+            var cursor = effectiveParent(item)
+            while (cursor != null && cursor !in keep) {
+                keep.add(cursor)
+                cursor = effectiveParent(byId[cursor] ?: break)
+            }
+        }
 
         fun depthOf(item: yangzhou.persistence.Item): Int {
             var depth = 0
@@ -246,7 +274,45 @@ class ProjectService(
             listOf(row) + walk(item.objectId)
         }
 
-        return GanttDto(rows = walk(null))
+        return GanttDto(rows = walk(null).filter { it.itemId in keep })
+    }
+
+    /** spec 0141:范围 → 命中 item objectId 集;board 复用看板口径,group 多选并集,milestone/release 取挂接表。 */
+    private fun resolveScope(
+        key: String,
+        projectId: UUID,
+        scope: String,
+        scopeIds: String?,
+        all: List<yangzhou.persistence.Item>,
+    ): Set<UUID> {
+        val ids = scopeIds
+            ?.split(',')
+            ?.mapNotNull { it.trim().takeIf { s -> s.isNotEmpty() } }
+            .orEmpty()
+        val uuids = ids.map { id ->
+            runCatching { UUID.fromString(id) }.getOrElse { throw BadRequestException("scopeIds 非法 UUID:$id") }
+        }
+        return when (scope) {
+            "all" -> all.map { it.objectId }.toSet()
+            "board" -> itemGroupService.boardItemObjectIds(key)
+            "group" -> {
+                if (uuids.isEmpty()) throw BadRequestException("scope=group 需 scopeIds")
+                itemGroupService.groupMemberItemObjectIds(key, uuids)
+            }
+            "milestone" -> {
+                if (uuids.size != 1) throw BadRequestException("scope=milestone 需恰一个 scopeIds")
+                val m = milestones.findByProjectObjectIdAndObjectId(projectId, uuids[0])
+                    ?: throw NotFoundException("milestone 不存在")
+                milestoneItems.findByMilestoneObjectId(m.objectId).map { it.itemObjectId }.toSet()
+            }
+            "release" -> {
+                if (uuids.size != 1) throw BadRequestException("scope=release 需恰一个 scopeIds")
+                val r = releases.findByProjectObjectIdAndObjectId(projectId, uuids[0])
+                    ?: throw NotFoundException("release 不存在")
+                releaseItems.findByReleaseObjectId(r.objectId).map { it.itemObjectId }.toSet()
+            }
+            else -> throw BadRequestException("scope 只能是 board/group/milestone/release/all")
+        }
     }
 
     data class GanttRow(

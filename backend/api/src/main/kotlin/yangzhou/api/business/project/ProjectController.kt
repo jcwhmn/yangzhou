@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 
@@ -55,7 +56,9 @@ class ProjectController(
     @GetMapping("/projects/{key}/gantt")
     fun gantt(
         @PathVariable key: String,
-    ): ProjectService.GanttDto = service.gantt(key)
+        @RequestParam(defaultValue = "board") scope: String,
+        @RequestParam(required = false) scopeIds: String?,
+    ): ProjectService.GanttDto = service.gantt(key, scope, scopeIds)
 
     @GetMapping("/projects/{key}/export.xlsx")
     fun exportXlsx(

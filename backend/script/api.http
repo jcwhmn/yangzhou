@@ -64,8 +64,63 @@ Authorization: Bearer {{token}}
     client.global.set("statusTo", response.body.statuses[1].name);
  %}
 
-### 甘特数据(YPJ-204/spec 0137:行含 blocked/estimateValue/estimateUnit;响应不回填)
+### 甘特数据(YPJ-204/spec 0137:行含 blocked/estimateValue/estimateUnit;响应不回填;YPJ-220:缺省 scope=board)
 GET {{host}}/api/projects/{{pkey}}/gantt
+Authorization: Bearer {{token}}
+
+### 甘特范围(scope 五选;YPJ-220/spec 0141)
+GET {{host}}/api/projects/{{pkey}}/gantt?scope=all
+Authorization: Bearer {{token}}
+
+### 甘特范围——group 多选并集(handler 回填 g1/g2 为本项目前两个分组;需项目已有分组)
+GET {{host}}/api/projects/{{pkey}}/groups
+Authorization: Bearer {{token}}
+
+> {%
+    client.global.set("g1", response.body[0].groupId);
+    client.global.set("g2", response.body[1].groupId);
+ %}
+
+### 甘特范围——group 多选并集
+GET {{host}}/api/projects/{{pkey}}/gantt?scope=group&scopeIds={{g1}},{{g2}}
+Authorization: Bearer {{token}}
+
+### 甘特范围——milestone(handler 回填 ms;需项目已有里程碑)
+GET {{host}}/api/projects/{{pkey}}/milestones
+Authorization: Bearer {{token}}
+
+> {%
+    client.global.set("ms", response.body[0].milestoneId);
+ %}
+
+GET {{host}}/api/projects/{{pkey}}/gantt?scope=milestone&scopeIds={{ms}}
+Authorization: Bearer {{token}}
+
+### 甘特范围——release(handler 回填 rel;需项目已有发布)
+GET {{host}}/api/projects/{{pkey}}/releases
+Authorization: Bearer {{token}}
+
+> {%
+    client.global.set("rel", response.body[0].releaseId);
+ %}
+
+GET {{host}}/api/projects/{{pkey}}/gantt?scope=release&scopeIds={{rel}}
+Authorization: Bearer {{token}}
+
+### [预期 400] 甘特范围负例——未知 scope
+GET {{host}}/api/projects/{{pkey}}/gantt?scope=foo
+Authorization: Bearer {{token}}
+
+### [预期 400] 甘特范围负例——group 无 scopeIds
+GET {{host}}/api/projects/{{pkey}}/gantt?scope=group
+Authorization: Bearer {{token}}
+
+### [预期 400] 甘特范围负例——scopeIds 坏格式
+GET {{host}}/api/projects/{{pkey}}/gantt?scope=group&scopeIds=not-a-uuid
+Authorization: Bearer {{token}}
+
+### [预期 404] 甘特范围负例——scopeId 好格式但不存在
+GET {{host}}/api/projects/{{pkey}}/gantt?scope=group&scopeIds=00000000-0000-0000-0000-000000000000
 Authorization: Bearer {{token}}
 
 ### item 排期时刻级(YPJ-208/spec 0138:date-only 由后端按工作日界默认 09:00/18:00;datetime 原样;handler 存 pkey208)

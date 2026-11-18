@@ -40,6 +40,11 @@ class ProjectServiceUnitTest {
     private val groupTypes = mockk<ItemGroupTypeRepository>(relaxed = true)
     private val itemTypes = mockk<yangzhou.persistence.repository.ItemTypeRepository>(relaxed = true)
     private val groupWorkflow = mockk<yangzhou.api.business.itemgroup.GroupWorkflowService>(relaxed = true)
+    private val itemGroupService = mockk<yangzhou.api.business.itemgroup.ItemGroupService>(relaxed = true)
+    private val milestones = mockk<yangzhou.persistence.repository.MilestoneRepository>(relaxed = true)
+    private val milestoneItems = mockk<yangzhou.persistence.repository.MilestoneItemRepository>(relaxed = true)
+    private val releases = mockk<yangzhou.persistence.repository.ReleaseRepository>(relaxed = true)
+    private val releaseItems = mockk<yangzhou.persistence.repository.ReleaseItemRepository>(relaxed = true)
     private val dependencyService = mockk<yangzhou.api.business.dependency.DependencyService>(relaxed = true)
     private val leaderGuard = mockk<yangzhou.api.guard.LeaderGuard>(relaxed = true)
     private val service =
@@ -56,6 +61,11 @@ class ProjectServiceUnitTest {
             groupTypes,
             itemTypes,
             groupWorkflow,
+            itemGroupService,
+            milestones,
+            milestoneItems,
+            releases,
+            releaseItems,
             dependencyService,
             ObjectMapper(),
         )

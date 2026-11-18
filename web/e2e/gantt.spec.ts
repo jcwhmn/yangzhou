@@ -3,6 +3,15 @@ import { expect } from "./support/fixtures";
 import { test } from "./support/fixtures";
 import { apiAssignMe, apiCall, apiCreateItem } from "./support/helpers";
 
+/** UI 切范围(YPJ-220)。依赖缺省 board 后,旧用例需显式切「全部」复现全量语义。 */
+async function pickScope(page: import("@playwright/test").Page, label: string) {
+  await page.getByTestId("gantt-scope").click();
+  // MUI Menu 淡入期(~200ms)会吞下层点击(仓库已知陷阱),先等动画落定再点
+  await page.waitForTimeout(300);
+  await page.getByRole("option", { name: label }).click();
+  await expect(page.getByRole("listbox")).toBeHidden();
+}
+
 /** 给 item 挂父并设日期(API;POST 不带日期,子项日期走 PATCH)。 */
 async function makeChild(
   key: string,
@@ -48,6 +57,7 @@ test("甘特父汇总条 + FINAL 置灰 + 条宽含当天", async ({ page, proje
   await apiCall("PATCH", `/api/items/${c1}`, { statusItemId: finalId });
 
   await page.goto(`/p/${projectKey}/gantt`);
+  await pickScope(page, "全部");
   await expect(page.getByText("E2E 汇总父")).toBeVisible();
 
   const barArea = (n: number) =>
@@ -126,6 +136,7 @@ test("v2 数据锚定轴 + 连续缩放(YPJ-219)", async ({ page, projectKey }) 
   });
 
   await page.goto(`/p/${projectKey}/gantt`);
+  await pickScope(page, "全部");
   await expect(page.getByText("E2E 缩放条")).toBeVisible();
 
   // v2:无语义档位按钮;缩放控件 + 今日 + 日窗预设 + 视点日导航在
@@ -198,6 +209,7 @@ test("视点日导航(YPJ-219 v2)", async ({ page, projectKey }) => {
   });
 
   await page.goto(`/p/${projectKey}/gantt`);
+  await pickScope(page, "全部");
   await expect(page.getByText("E2E 时轴条")).toBeVisible();
 
   // 视点日设为明天(fillDate 三段式)
@@ -213,4 +225,146 @@ test("视点日导航(YPJ-219 v2)", async ({ page, projectKey }) => {
   await page.getByTestId("gantt-center-prev").click();
   const v2 = await group.getAttribute("data-value");
   expect(v2).not.toBe(`${y}-${md}`);
+});
+
+test("范围过滤(YPJ-220):缺省 board 祖先链 / group 多选并集 / milestone / all / 工况跨页", async ({
+  page,
+  projectKey,
+}) => {
+  const parent = await apiCreateItem(projectKey, "E2E 范围父");
+  const a = await makeChild(
+    projectKey,
+    "E2E 范围A",
+    parent,
+    "2030-01-01",
+    "2030-01-03",
+  );
+  const b = await makeChild(
+    projectKey,
+    "E2E 范围B",
+    parent,
+    "2030-02-01",
+    "2030-02-03",
+  );
+  const o = await apiCreateItem(projectKey, "E2E 圈外O");
+  await apiCall("PATCH", `/api/items/${o}`, {
+    startDate: "2030-03-01",
+    dueDate: "2030-03-03",
+  }); // 排期:不落「未排期」折叠组,可见性断言才有效
+
+  // 两个 active 组型下的 sprint 组:A∈S1,B∈S2;S1 激活
+  const g1 = (
+    await apiCall<{ groupId: string }>(
+      "POST",
+      `/api/projects/${projectKey}/groups`,
+      { typeKey: "sprint", name: "E2S1" },
+    )
+  ).groupId;
+  const g2 = (
+    await apiCall<{ groupId: string }>(
+      "POST",
+      `/api/projects/${projectKey}/groups`,
+      { typeKey: "sprint", name: "E2S2" },
+    )
+  ).groupId;
+  await apiCall("PUT", `/api/items/${a}/group-membership`, {
+    groupId: g1,
+    groupType: "sprint",
+  });
+  await apiCall("PUT", `/api/items/${b}/group-membership`, {
+    groupId: g2,
+    groupType: "sprint",
+  });
+  await apiCall(
+    "POST",
+    `/api/projects/${projectKey}/groups/${g1}/actions/start`,
+    {},
+  );
+  // 里程碑挂 A
+  const ms = (
+    await apiCall<{ milestoneId: string }>(
+      "POST",
+      `/api/projects/${projectKey}/milestones`,
+      { name: "E2M1" },
+    )
+  ).milestoneId;
+  await apiCall("PUT", `/api/projects/${projectKey}/milestones/${ms}/items`, {
+    itemIds: [a],
+  });
+
+  // 缺省 board:S1 active → A + 祖先父;B(planned 组籍)/O(backlog)不在——祖先链不截断
+  await page.goto(`/p/${projectKey}/gantt`);
+  await expect(page.getByText("E2E 范围父")).toBeVisible();
+  await expect(page.getByText("E2E 范围A")).toBeVisible();
+  await expect(page.getByText("E2E 范围B")).toBeHidden();
+  await expect(page.getByText("E2E 圈外O")).toBeHidden();
+
+  // group 多选:S1+S2 并集 → A,B + 祖先父;O 仍不在
+  await pickScope(page, "分组");
+  await page.getByPlaceholder("选择分组").click();
+  await page.getByRole("option", { name: "E2S1" }).click();
+  await page.getByRole("option", { name: "E2S2" }).click();
+  await page.keyboard.press("Escape");
+  await expect(page.getByText("E2E 范围A")).toBeVisible();
+  await expect(page.getByText("E2E 范围B")).toBeVisible();
+  await expect(page.getByText("E2E 圈外O")).toBeHidden();
+
+  // milestone:E2M1 → A + 祖先父;B 退场
+  await pickScope(page, "里程碑");
+  await page.getByTestId("gantt-scope-milestone").click();
+  await page.waitForTimeout(300); // MUI Menu 淡入期吞点击,先等落定
+  await page.getByRole("option", { name: "E2M1" }).click();
+  await expect(page.getByRole("listbox")).toBeHidden();
+  await expect(page.getByText("E2E 范围A")).toBeVisible();
+  await expect(page.getByText("E2E 范围B")).toBeHidden();
+
+  // all 兜底:O 也在
+  await pickScope(page, "全部");
+  await expect(page.getByText("E2E 圈外O")).toBeVisible();
+
+  // 工况跨页:甘特→其它页→回甘特,范围原样恢复(仍 all)
+  await page.goto(`/p/${projectKey}/backlog`);
+  await page.goto(`/p/${projectKey}/gantt`);
+  await expect(page.getByText("E2E 圈外O")).toBeVisible();
+
+  // 行标题可点进 item 详情(YPJ-220 反馈)
+  await page.getByText("E2E 范围A").click();
+  await expect(page).toHaveURL(new RegExp(`/p/${projectKey}/i/.+`));
+});
+
+test("父自有日期不撑轴(YPJ-220 反馈):轴取子孙并集,忽略父自身排期", async ({
+  page,
+  projectKey,
+}) => {
+  const parent = await apiCreateItem(projectKey, "E2E 轴父");
+  // 父自有 due 远期(若参与锚定,轴会拉到 2031);仅子项排期在 2020-01
+  await apiCall("PATCH", `/api/items/${parent}`, {
+    startDate: "2031-06-01",
+    dueDate: "2031-06-05",
+  });
+  await makeChild(projectKey, "E2E 轴子", parent, "2020-01-01", "2020-01-03");
+
+  await page.goto(`/p/${projectKey}/gantt`);
+  await pickScope(page, "全部");
+  await expect(page.getByText("E2E 轴父")).toBeVisible();
+  // 月刻度无 2031(父日期未参与锚定);子区间 2020-01 在
+  await expect(page.getByText("2031-06")).toHaveCount(0);
+  await expect(page.getByTestId("gantt-row-day")).toBeVisible();
+});
+
+test("无 due 的 item 画起点小标记,不外延到轴末端(YPJ-220 反馈)", async ({
+  page,
+  projectKey,
+}) => {
+  const item = await apiCreateItem(projectKey, "E2E 仅开始");
+  await apiCall("PATCH", `/api/items/${item}`, { startDate: "2020-03-01" });
+
+  await page.goto(`/p/${projectKey}/gantt`);
+  await pickScope(page, "全部");
+  await expect(page.getByText("E2E 仅开始")).toBeVisible();
+  // 本项目仅此一条已排期行;若仍外延到轴末端,条宽会是数百 px
+  const bar = page.locator('[data-testid^="gantt-bar-"]');
+  await expect(bar).toHaveCount(1);
+  const w = await bar.evaluate((el) => el.getBoundingClientRect().width);
+  expect(w).toBeLessThan(20);
 });

@@ -1,6 +1,16 @@
 "use client";
 
-import { Box, Button, Chip, Stack, Typography } from "@mui/material";
+import {
+  Autocomplete,
+  Box,
+  Button,
+  Chip,
+  MenuItem,
+  Select,
+  Stack,
+  TextField,
+  Typography,
+} from "@mui/material";
 import { PageShell } from "@/components/PageShell";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -51,12 +61,15 @@ export default function GanttPage() {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [showUnscheduled, setShowUnscheduled] = useState(false);
   // v2 工况:zoom(pxPerDay,null=自适应全区间)+ 视点日(日窗预设/今日的中心)+ 滚动位,sessionStorage 持久化
+  // YPJ-220:范围 scope/scopeIds 同存同恢复(旧值缺省补 board)
   const savedView = (() => {
     try {
       return JSON.parse(sessionStorage.getItem("gantt.view") ?? "{}") as {
         zoom?: number;
         center?: string;
         scroll?: number;
+        scope?: string;
+        scopeIds?: string[];
       };
     } catch {
       return {};
@@ -64,24 +77,83 @@ export default function GanttPage() {
   })();
   const [zoom, setZoom] = useState<number | null>(savedView.zoom ?? null);
   const [center, setCenter] = useState(savedView.center ?? "");
+  const [scope, setScope] = useState(savedView.scope ?? "board");
+  const [scopeIds, setScopeIds] = useState<string[]>(savedView.scopeIds ?? []);
   const [containerW, setContainerW] = useState(0); // 可视宽(内容至少撑满一屏)
   const scrollRef = useRef<HTMLDivElement>(null);
+  const loadSeqRef = useRef(0); // 响应序号守卫:切范围后慢响应晚到不覆盖新状态
+
+  // 范围二级选项(group/milestone/release;列表 API 均返回裸数组)
+  const [groupOpts, setGroupOpts] = useState<
+    { groupId: string; name: string }[]
+  >([]);
+  const [msOpts, setMsOpts] = useState<{ milestoneId: string; name: string }[]>(
+    [],
+  );
+  const [relOpts, setRelOpts] = useState<{ releaseId: string; name: string }[]>(
+    [],
+  );
 
   const load = useCallback(async () => {
-    const data = await api<{ rows: GanttRow[] }>(`/api/projects/${key}/gantt`);
+    // 未选完不发请求:group 空多选 / milestone、release 未选中 → 直接空态
+    if (
+      scope === "group"
+        ? scopeIds.length === 0
+        : (scope === "milestone" || scope === "release") &&
+          scopeIds.length !== 1
+    ) {
+      setRows([]);
+      return;
+    }
+    const qs = new URLSearchParams();
+    if (scope !== "board") qs.set("scope", scope);
+    if (scopeIds.length > 0) qs.set("scopeIds", scopeIds.join(","));
+    const seq = ++loadSeqRef.current;
+    const q = qs.toString();
+    const data = await api<{ rows: GanttRow[] }>(
+      `/api/projects/${key}/gantt${q ? `?${q}` : ""}`,
+    );
+    if (seq !== loadSeqRef.current) return; // 已有更新的范围请求,丢弃过期响应
     setRows(data.rows);
-  }, [key]);
+  }, [key, scope, scopeIds]);
 
   useEffect(() => {
     load().catch(() => setRows([]));
   }, [load]);
 
+  // 二级选项一次拉取(失败静默:选择器留空,不阻塞甘特)
+  useEffect(() => {
+    api<{ groupId: string; name: string }[]>(`/api/projects/${key}/groups`)
+      .then(setGroupOpts)
+      .catch(() => {});
+    api<{ milestoneId: string; name: string }[]>(
+      `/api/projects/${key}/milestones`,
+    )
+      .then(setMsOpts)
+      .catch(() => {});
+    api<{ releaseId: string; name: string }[]>(`/api/projects/${key}/releases`)
+      .then(setRelOpts)
+      .catch(() => {});
+  }, [key]);
+
+  const changeScope = (next: string) => {
+    setScope(next);
+    setScopeIds([]); // 切范围清空二级选择(spec 0141)
+  };
+
   // 轴(YPJ-219 spec 0140 v2):范围 = 数据锚定日界;pxPerDay 连续 ∈ [fit 全区间压一屏, MAX_PPD]
   const axis = useMemo(() => {
     const today = new Date();
-    const dates = (rows ?? []).flatMap(
-      (r) => [r.startDate, r.dueDate].filter(Boolean) as string[],
-    );
+    const rowsNow = rows ?? [];
+    // 轴数据锚定与画条同口径(spec 0139/0140):父行自有日期忽略不画,取子孙排期并集;子行取自有日期
+    const isParent = (r: GanttRow) =>
+      rowsNow.some((x) => x.parentItemId === r.itemId);
+    const dates = rowsNow.flatMap((r) => {
+      if (!isParent(r))
+        return [r.startDate, r.dueDate].filter(Boolean) as string[];
+      const s = summaryOf(r.itemId);
+      return s ? [s[0], s[1]] : [];
+    });
     const minT = dates.length
       ? Math.min(...dates.map((d) => +parseLocal(d)))
       : +today;
@@ -217,11 +289,16 @@ export default function GanttPage() {
           zoom,
           center,
           scroll: scrollRef.current.scrollLeft,
+          scope,
+          scopeIds,
         }),
       );
-  }, [zoom, center]);
+  }, [zoom, center, scope, scopeIds]);
 
-  // 滚动位置持久化
+  // 滚动位置持久化;范围/缩放/视点变化也落盘(不滚也不丢工况,YPJ-220)
+  useEffect(() => {
+    saveView();
+  }, [saveView]);
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -381,6 +458,70 @@ export default function GanttPage() {
           sx={{ ml: "auto" }}
           alignItems="center"
         >
+          {/* 范围选择器(YPJ-220):五选 + 二级对象选择 */}
+          <Select
+            size="small"
+            data-testid="gantt-scope"
+            value={scope}
+            onChange={(e) => changeScope(e.target.value)}
+            sx={{ minWidth: 96 }}
+            aria-label="范围"
+          >
+            <MenuItem value="board">看板</MenuItem>
+            <MenuItem value="group">分组</MenuItem>
+            <MenuItem value="milestone">里程碑</MenuItem>
+            <MenuItem value="release">发布</MenuItem>
+            <MenuItem value="all">全部</MenuItem>
+          </Select>
+          {scope === "group" && (
+            <Autocomplete
+              multiple
+              disableCloseOnSelect // 多选:选完一项弹层保持,继续选下一项
+              size="small"
+              data-testid="gantt-scope-groups"
+              options={groupOpts}
+              getOptionLabel={(o) => o.name}
+              isOptionEqualToValue={(a, b) => a.groupId === b.groupId}
+              value={groupOpts.filter((g) => scopeIds.includes(g.groupId))}
+              onChange={(_, v) => setScopeIds(v.map((g) => g.groupId))}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  placeholder="选择分组"
+                  sx={{ minWidth: 180 }}
+                />
+              )}
+            />
+          )}
+          {(scope === "milestone" || scope === "release") && (
+            <Select
+              size="small"
+              displayEmpty
+              data-testid={
+                scope === "milestone"
+                  ? "gantt-scope-milestone"
+                  : "gantt-scope-release"
+              }
+              value={scopeIds[0] ?? ""}
+              onChange={(e) =>
+                setScopeIds(e.target.value ? [e.target.value] : [])
+              }
+              sx={{ minWidth: 160 }}
+              aria-label="范围对象"
+            >
+              <MenuItem value="" disabled>
+                {scope === "milestone" ? "选择里程碑" : "选择发布"}
+              </MenuItem>
+              {(scope === "milestone"
+                ? msOpts.map((o) => ({ id: o.milestoneId, name: o.name }))
+                : relOpts.map((o) => ({ id: o.releaseId, name: o.name }))
+              ).map((o) => (
+                <MenuItem key={o.id} value={o.id}>
+                  {o.name}
+                </MenuItem>
+              ))}
+            </Select>
+          )}
           {/* 缩放控件(v2 连续系数):− / + ;Ctrl+滚轮亦可(锚点=鼠标) */}
           <Button
             size="small"
@@ -577,7 +718,11 @@ export default function GanttPage() {
                 const drawOwn = !hasKid(r);
                 const hasStart = drawOwn && r.startDate !== null;
                 const left = xOf(hasStart ? r.startDate : r.dueDate) ?? 0;
-                const right = xEndOf(r.dueDate) ?? axis.timelineW;
+                // due 为空不外延到轴末端(S1 遗留,YPJ-220 反馈):画起点小标记;start+estimate 推条长另票
+                const right =
+                  r.dueDate !== null
+                    ? (xEndOf(r.dueDate) ?? axis.timelineW)
+                    : left;
                 const width = Math.max(hasStart ? right - left : 1.2, 1.2);
                 const folded = collapsed.has(r.itemId);
                 return (
@@ -623,13 +768,24 @@ export default function GanttPage() {
                           variant="outlined"
                           sx={{ height: 20 }}
                         />
-                        <Typography
-                          variant="caption"
-                          noWrap
-                          sx={{ maxWidth: 120 }}
+                        {/* 标题可点进详情(条形区另有整块覆盖链接;YPJ-220 反馈补) */}
+                        <Link
+                          href={`/p/${key}/i/${r.itemId}?from=gantt`}
+                          style={{ minWidth: 0 }}
                         >
-                          {r.title}
-                        </Typography>
+                          <Typography
+                            variant="caption"
+                            noWrap
+                            sx={{
+                              maxWidth: 120,
+                              color: "text.primary",
+                              textDecoration: "underline",
+                              "&:hover": { color: "primary.main" },
+                            }}
+                          >
+                            {r.title}
+                          </Typography>
+                        </Link>
                         {r.estimateValue !== null && (
                           <Chip
                             data-testid={`gantt-est-${r.number}`}
@@ -694,6 +850,7 @@ export default function GanttPage() {
                       </Box>
                       <Box
                         data-final={isFinal ? "" : undefined}
+                        data-testid={`gantt-bar-${r.number}`}
                         sx={{
                           position: "absolute",
                           left,
@@ -782,7 +939,19 @@ export default function GanttPage() {
           variant="outlined"
           sx={{ height: 20 }}
         />
-        <Typography variant="caption">{r.title}</Typography>
+        {/* 标题列可点进详情(条形区另有整块隐形覆盖链接,YPJ-220 反馈补) */}
+        <Link href={`/p/${key}/i/${r.itemId}?from=gantt`}>
+          <Typography
+            variant="caption"
+            color="text.primary"
+            sx={{
+              textDecoration: "underline",
+              "&:hover": { color: "primary.main" },
+            }}
+          >
+            {r.title}
+          </Typography>
+        </Link>
       </Stack>
     );
   }
