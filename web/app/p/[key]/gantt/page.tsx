@@ -718,7 +718,11 @@ export default function GanttPage() {
                 const drawOwn = !hasKid(r);
                 const hasStart = drawOwn && r.startDate !== null;
                 const left = xOf(hasStart ? r.startDate : r.dueDate) ?? 0;
-                const right = xEndOf(r.dueDate) ?? axis.timelineW;
+                // due 为空不外延到轴末端(S1 遗留,YPJ-220 反馈):画起点小标记;start+estimate 推条长另票
+                const right =
+                  r.dueDate !== null
+                    ? (xEndOf(r.dueDate) ?? axis.timelineW)
+                    : left;
                 const width = Math.max(hasStart ? right - left : 1.2, 1.2);
                 const folded = collapsed.has(r.itemId);
                 return (
@@ -846,6 +850,7 @@ export default function GanttPage() {
                       </Box>
                       <Box
                         data-final={isFinal ? "" : undefined}
+                        data-testid={`gantt-bar-${r.number}`}
                         sx={{
                           position: "absolute",
                           left,

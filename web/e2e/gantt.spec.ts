@@ -351,3 +351,20 @@ test("父自有日期不撑轴(YPJ-220 反馈):轴取子孙并集,忽略父自�
   await expect(page.getByText("2031-06")).toHaveCount(0);
   await expect(page.getByTestId("gantt-row-day")).toBeVisible();
 });
+
+test("无 due 的 item 画起点小标记,不外延到轴末端(YPJ-220 反馈)", async ({
+  page,
+  projectKey,
+}) => {
+  const item = await apiCreateItem(projectKey, "E2E 仅开始");
+  await apiCall("PATCH", `/api/items/${item}`, { startDate: "2020-03-01" });
+
+  await page.goto(`/p/${projectKey}/gantt`);
+  await pickScope(page, "全部");
+  await expect(page.getByText("E2E 仅开始")).toBeVisible();
+  // 本项目仅此一条已排期行;若仍外延到轴末端,条宽会是数百 px
+  const bar = page.locator('[data-testid^="gantt-bar-"]');
+  await expect(bar).toHaveCount(1);
+  const w = await bar.evaluate((el) => el.getBoundingClientRect().width);
+  expect(w).toBeLessThan(20);
+});
