@@ -123,8 +123,9 @@ test("甘特粒度切换 + blocked 标记 + estimate 可见(YPJ-204/spec 0137)",
   await expect(page.getByTestId(`gantt-est-${projectKey}-2`)).toBeVisible();
   await expect(page.getByTestId(`gantt-blocked-${projectKey}-2`)).toBeVisible();
 
-  // v2 轴(YPJ-219):自适应 header 日行在;放大一档 → 小时行出现(梯子联动)
+  // v2 轴(YPJ-219):自适应 header 日行在;连放两次放大(ppd≈55→123)→ 12h 刻度间距≥44px,小时行出现
   await expect(page.getByTestId("gantt-row-day")).toBeVisible();
+  await page.getByTestId("gantt-zoom-in").click();
   await page.getByTestId("gantt-zoom-in").click();
   await expect(page.getByTestId("gantt-row-hour")).toBeVisible();
   await expect(row).toBeVisible();
