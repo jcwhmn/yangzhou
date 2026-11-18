@@ -1,6 +1,6 @@
 # 0142 — YPJ-229 甘特时线回归:日窗预设/今日线/零时长条
 
-> 状态:设计稿(修复票,基于 220 后现形)。关联:YPJ-229(父 219);spec 0140 v2 轴。
+> 状态:As-built(2026-11-18,PR #230 已合)。关联:YPJ-229(父 219);spec 0140 v2 轴。
 > 归因:prod 实测探针(Playwright evaluate + 截图),非猜测;e2e 全绿但手工显示问题由此复现。
 
 ## 一、需求(实锤三案)
@@ -25,3 +25,9 @@
 3. 1 日窗:今日时刻在视口中心(非 00:00);◀/▶ 移视点日后仍按日期 00:00 居中。
 4. YPJ-207(11-18 00:00 起止)在含 11-18 的窗口可见 3px 红丝条(超期)。
 5. 缩放 ±/Ctrl+滚轮:锚点不跳(回归)。
+
+## 四、As-built(2026-11-18)
+
+- 三案按 §二落地(gantt/page.tsx):`pendingWinRef` 挂起-补放、`lastCenterStartRef` 轴变化重放+今日按 `todayX` 居中、零时长条 `Math.max(...,3)`;归因与 root cause 见台账 A14,均 prod 探针实锤。
+- e2e 转正:gantt.spec 新增 3 例(挂起补放/今日时刻居中/零时长条 ≥3px),gantt/board 共 23 例全绿;`gradle build` 后端未动不涉。
+- 顺带修正(设计外,实锤后纳入):`applyDayWindow` 同时重置 `lastCenterRef` 与 `lastCenterStartRef`,使挂起补放后同视点日也能重居中(否则补放的 setCenter 同值不触发 effect)。
