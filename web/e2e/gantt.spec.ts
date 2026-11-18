@@ -117,3 +117,100 @@ test("无子的父加子不弹窗", async ({ page, projectKey }) => {
     "true",
   );
 });
+
+test("v2 数据锚定轴 + 连续缩放(YPJ-219)", async ({ page, projectKey }) => {
+  const item = await apiCreateItem(projectKey, "E2E 缩放条");
+  await apiCall("PATCH", `/api/items/${item}`, {
+    startDate: "2020-01-01",
+    dueDate: "2020-01-03",
+  });
+
+  await page.goto(`/p/${projectKey}/gantt`);
+  await expect(page.getByText("E2E 缩放条")).toBeVisible();
+
+  // v2:无语义档位按钮;缩放控件 + 今日 + 日窗预设 + 视点日导航在
+  await expect(page.getByTestId("gantt-gran-day")).toHaveCount(0);
+  for (const tid of [
+    "gantt-zoom-in",
+    "gantt-zoom-out",
+    "gantt-fit",
+    "gantt-today",
+    "gantt-win-1",
+    "gantt-win-2",
+    "gantt-win-3",
+    "gantt-win-5",
+    "gantt-center-nav",
+  ]) {
+    await expect(page.getByTestId(tid)).toBeVisible();
+  }
+
+  // 自适应 header:小时行 + 日行在(3 天区间撑满一屏 → 3 行封顶)
+  await expect(page.getByTestId("gantt-row-hour")).toBeVisible();
+  await expect(page.getByTestId("gantt-row-day")).toBeVisible();
+
+  // 默认全区间压一屏:内容撑满可视区
+  await expect
+    .poll(() =>
+      page
+        .getByTestId("gantt-scroll")
+        .evaluate(
+          (el) =>
+            (el.firstElementChild as HTMLElement).scrollWidth >=
+            el.clientWidth - 280,
+        ),
+    )
+    .toBe(true);
+
+  // 连续缩放:+ 一档 → 内容变宽
+  const before = await page
+    .getByTestId("gantt-scroll")
+    .evaluate((el) => (el.firstElementChild as HTMLElement).scrollWidth);
+  await page.getByTestId("gantt-zoom-in").click();
+  await expect
+    .poll(async () =>
+      page
+        .getByTestId("gantt-scroll")
+        .evaluate((el) => (el.firstElementChild as HTMLElement).scrollWidth),
+    )
+    .toBeGreaterThan(before);
+
+  // 1 日预设:0–24 墙钟小时刻度(视口 1000px/天 → 2h 步长,末档 22:00)
+  await page.getByTestId("gantt-win-1").click();
+  await expect(page.getByText("00:00", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("22:00", { exact: true }).first()).toBeVisible();
+
+  // 工况保持:切页再回来,日窗预设仍在(小时刻度还在)
+  await page.goto(`/p/${projectKey}/backlog`);
+  await page.goto(`/p/${projectKey}/gantt`);
+  await expect(page.getByText("00:00", { exact: true }).first()).toBeVisible();
+});
+
+test("视点日导航(YPJ-219 v2)", async ({ page, projectKey }) => {
+  const item = await apiCreateItem(projectKey, "E2E 时轴条");
+  // 排明天 10:00–12:00;数据锚定轴默认包含它
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const y = tomorrow.getFullYear();
+  const md = `${String(tomorrow.getMonth() + 1).padStart(2, "0")}-${String(tomorrow.getDate()).padStart(2, "0")}`;
+  await apiCall("PATCH", `/api/items/${item}`, {
+    startDate: `${y}-${md}T10:00`,
+    dueDate: `${y}-${md}T12:00`,
+  });
+
+  await page.goto(`/p/${projectKey}/gantt`);
+  await expect(page.getByText("E2E 时轴条")).toBeVisible();
+
+  // 视点日设为明天(fillDate 三段式)
+  const group = page.getByRole("group", { name: "视点日", exact: true });
+  await group.getByLabel("月", { exact: true }).fill(md.slice(0, 2));
+  await group.getByLabel("日", { exact: true }).fill(md.slice(3, 5));
+  await group.getByLabel("年", { exact: true }).fill(String(y));
+  await group.getByLabel("年", { exact: true }).blur();
+  const v = await group.getAttribute("data-value");
+  expect(v).toBe(`${y}-${md}`);
+
+  // ◀ 后退一天 → 视点日回到今日
+  await page.getByTestId("gantt-center-prev").click();
+  const v2 = await group.getAttribute("data-value");
+  expect(v2).not.toBe(`${y}-${md}`);
+});

@@ -43,9 +43,8 @@ test("Milestone 页——建/推进/编辑/删除 @smoke", async ({ page, projec
     page.getByTestId("milestone-row").filter({ hasText: "Beta 里程碑" }),
   ).toBeVisible();
 
-  // UI 新建(带日期)
+  // UI 新建(不带目标日期:排序 nulls last + 创建序在 Beta 后,级联轮不到它,保持 planned 供后续编辑/删除)
   await page.getByLabel("名称").fill("GA 里程碑");
-  await fillDate(page, "目标日期", "2027-06-01");
   await page.getByRole("button", { name: "新建", exact: true }).click();
   const gaRow = page
     .getByTestId("milestone-row")
@@ -59,7 +58,7 @@ test("Milestone 页——建/推进/编辑/删除 @smoke", async ({ page, projec
   await betaRow.getByRole("button", { name: /开始/ }).click();
   await expect(page.getByText(/已有进行中的 milestone/)).toBeVisible();
 
-  // 完成 A → 409 解除,B 可开始
+  // 完成 A → 接棒级联(spec 0121):排序第一的 planned(Beta,同无日期按创建序)自动开始,无 409
   const mvpRow = page
     .getByTestId("milestone-row")
     .filter({ hasText: "MVP 里程碑" });
@@ -67,7 +66,7 @@ test("Milestone 页——建/推进/编辑/删除 @smoke", async ({ page, projec
   await expect(
     mvpRow.getByRole("button", { name: /开始|完成|取消/ }),
   ).toHaveCount(0); // 终态无状态按钮
-  await betaRow.getByRole("button", { name: /开始/ }).click();
+  await expect(betaRow.getByText("▶")).toBeVisible();
   await expect(page.getByText(/已有进行中的 milestone/)).toHaveCount(0);
 
   // 编辑:行内回填改名
