@@ -155,6 +155,17 @@ Content-Type: application/json
   "startDate": "2026-11-21T14:30"
 }
 
+### PATCH due 缺省+estimate → 系统按工作日铺算(YPJ-235/spec 0146;响应 dueDate=T14:00,已有 due 亦重算覆盖)
+PATCH {{host}}/api/items/{{item208}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "startDate": "2026-11-23",
+  "estimateValue": "5",
+  "estimateUnit": "hour"
+}
+
 ### [预期 400] 非法日期格式
 PATCH {{host}}/api/items/{{item208}}
 Authorization: Bearer {{token}}

@@ -3,6 +3,7 @@ package yangzhou.api.business.item
 import jakarta.validation.constraints.NotBlank
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import yangzhou.api.business.workday.WorkdayCalculator
 import yangzhou.api.error.BadRequestException
 import yangzhou.api.error.ConflictException
 import yangzhou.api.error.NotFoundException
@@ -402,7 +403,14 @@ class ItemService(
                     .getOrElse { throw BadRequestException("$field 格式应为 yyyy-MM-dd 或 yyyy-MM-dd'T'HH:mm:$it") }
             }
             val newStart = parse(startDateText, "startDate", ws)
-            val newDue = parse(dueDateText, "dueDate", we)
+            var newDue = parse(dueDateText, "dueDate", we)
+            // YPJ-235(spec 0146,拍板案①):设 start 且 due 缺省(未携带;空串=显式清除不回填)且 estimate 有值
+            // → 系统按工作日历铺算 due,已有 due 重算覆盖(due 是果,estimate 是因;显式 due 仅作覆盖)
+            if (!startDateText.isNullOrBlank() && dueDateText == null) {
+                estimateHours(current.estimateValue, current.estimateUnit, ws, we)?.let { h ->
+                    newStart?.let { s -> newDue = WorkdayCalculator(ws, we).dueFrom(s, h) }
+                }
+            }
             val start = newStart ?: current.startDate
             val due = newDue ?: current.dueDate
             if (start != null && due != null && start > due) throw BadRequestException("开始日期不能晚于截止日期")
@@ -806,6 +814,23 @@ internal fun workdayBounds(project: yangzhou.persistence.Project): Pair<LocalTim
 /** YPJ-208(spec 0138):date-only 输入的默认工作日界(日历缺失/非法时兜底)。 */
 internal val DEFAULT_WORKDAY_START: LocalTime = LocalTime.of(9, 0)
 internal val DEFAULT_WORKDAY_END: LocalTime = LocalTime.of(18, 0)
+
+/** YPJ-235(spec 0146):estimate → WorkdayCalculator 小时;unit 缺失/未知按 hour兜底(信任边界在 EstimateInput)。 */
+internal fun estimateHours(
+    estimateValue: Double?,
+    estimateUnit: String?,
+    workdayStart: LocalTime,
+    workdayEnd: LocalTime,
+): Double? {
+    val v = estimateValue ?: return null
+    val winMin = java.time.Duration.between(workdayStart, workdayEnd).toMinutes().toDouble()
+    return when (estimateUnit ?: "hour") {
+        "hour" -> v
+        "day" -> v * winMin / 60.0
+        "week" -> v * 5 * winMin / 60.0
+        else -> v
+    }
+}
 
 internal fun isOverdue(
     due: LocalDate?,

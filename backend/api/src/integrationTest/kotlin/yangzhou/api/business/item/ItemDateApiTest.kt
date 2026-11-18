@@ -217,4 +217,61 @@ class ItemDateApiTest : AbstractApiTest() {
             .expectStatus()
             .isBadRequest()
     }
+
+    /** YPJ-235(spec 0146,拍板案①):due 缺省时系统按 estimate 工作日铺算;显式 due 覆盖;空串清除不回填。 */
+    @Test
+    fun `due 缺省按 estimate 系统算——覆盖与清除语义`() {
+        val (authed, itemId) = setup()
+
+        // estimate 5h + start date-only(无 due)→ 系统算:09:00+5h → 当日 14:00
+        authed
+            .patch()
+            .uri("/api/items/$itemId")
+            .body(mapOf("startDate" to "2026-09-01", "estimateValue" to "5", "estimateUnit" to "hour"))
+            .exchange()
+            .expectStatus()
+            .isOk()
+        assertEquals("2026-09-01T14:00", detail(authed, itemId)["dueDate"].asText())
+
+        // 显式 due → 覆盖
+        authed
+            .patch()
+            .uri("/api/items/$itemId")
+            .body(mapOf("startDate" to "2026-09-02", "dueDate" to "2026-09-30T12:00"))
+            .exchange()
+            .expectStatus()
+            .isOk()
+        assertEquals("2026-09-30T12:00", detail(authed, itemId)["dueDate"].asText())
+
+        // 再设 start 不带 due → 重算覆盖(due 是果):2026-09-02T09:00 + 5h → 14:00
+        authed
+            .patch()
+            .uri("/api/items/$itemId")
+            .body(mapOf("startDate" to "2026-09-02"))
+            .exchange()
+            .expectStatus()
+            .isOk()
+        assertEquals("2026-09-02T14:00", detail(authed, itemId)["dueDate"].asText())
+
+        // 空串清除 → null,不回填
+        authed
+            .patch()
+            .uri("/api/items/$itemId")
+            .body(mapOf("dueDate" to ""))
+            .exchange()
+            .expectStatus()
+            .isOk()
+        assertTrue(detail(authed, itemId)["dueDate"].isNull)
+
+        // 无 estimate 的 item:start 不带 due → due 保持 null(旧行为)
+        val item2Id = createItem(authed, "CHE", "z")["itemId"].asText()
+        authed
+            .patch()
+            .uri("/api/items/$item2Id")
+            .body(mapOf("startDate" to "2026-09-01"))
+            .exchange()
+            .expectStatus()
+            .isOk()
+        assertTrue(detail(authed, item2Id)["dueDate"].isNull)
+    }
 }
