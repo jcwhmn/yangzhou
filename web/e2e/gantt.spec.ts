@@ -6,6 +6,8 @@ import { apiAssignMe, apiCall, apiCreateItem } from "./support/helpers";
 /** UI 切范围(YPJ-220)。依赖缺省 board 后,旧用例需显式切「全部」复现全量语义。 */
 async function pickScope(page: import("@playwright/test").Page, label: string) {
   await page.getByTestId("gantt-scope").click();
+  // MUI Menu 淡入期(~200ms)会吞下层点击(仓库已知陷阱),先等动画落定再点
+  await page.waitForTimeout(300);
   await page.getByRole("option", { name: label }).click();
   await expect(page.getByRole("listbox")).toBeHidden();
 }
@@ -310,6 +312,7 @@ test("范围过滤(YPJ-220):缺省 board 祖先链 / group 多选并集 / milest
   // milestone:E2M1 → A + 祖先父;B 退场
   await pickScope(page, "里程碑");
   await page.getByTestId("gantt-scope-milestone").click();
+  await page.waitForTimeout(300); // MUI Menu 淡入期吞点击,先等落定
   await page.getByRole("option", { name: "E2M1" }).click();
   await expect(page.getByRole("listbox")).toBeHidden();
   await expect(page.getByText("E2E 范围A")).toBeVisible();

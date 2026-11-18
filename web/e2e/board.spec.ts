@@ -97,6 +97,7 @@ test("日期与超期标识——详情设置日期,看板红标,甘特可见", 
   // 甘特:行可见 + 未排期组存在(缺省 board 会滤掉裸 backlog item,切「全部」复现全量语义,YPJ-220)
   await page.goto(`/p/${projectKey}/gantt`);
   await page.getByTestId("gantt-scope").click();
+  await page.waitForTimeout(300); // MUI Menu 淡入期吞点击,先等落定
   await page.getByRole("option", { name: "全部" }).click();
   await expect(page.getByRole("listbox")).toBeHidden();
   await expect(page.getByText("E2E 超期 item")).toBeVisible();
@@ -123,6 +124,7 @@ test("甘特粒度切换 + blocked 标记 + estimate 可见(YPJ-204/spec 0137)",
   await page.goto(`/p/${projectKey}/gantt`);
   // 缺省 board 滤裸 item,切「全部」(YPJ-220)
   await page.getByTestId("gantt-scope").click();
+  await page.waitForTimeout(300); // MUI Menu 淡入期吞点击,先等落定
   await page.getByRole("option", { name: "全部" }).click();
   await expect(page.getByRole("listbox")).toBeHidden();
   const row = page.getByText("E2E 甘特被阻塞");
