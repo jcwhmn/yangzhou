@@ -172,7 +172,7 @@ test("v2 数据锚定轴 + 连续缩放(YPJ-219)", async ({ page, projectKey }) 
         .evaluate(
           (el) =>
             (el.firstElementChild as HTMLElement).scrollWidth >=
-            el.clientWidth - 280,
+            el.clientWidth - 2,
         ),
     )
     .toBe(true);
@@ -432,14 +432,14 @@ test("时线回归(YPJ-229):加载中点日窗补放 + 今日时刻居中 + 零�
   expect(w).toBeGreaterThanOrEqual(3);
 });
 
-test("行标题截断不叠压 + 1 日窗宽屏不夹(YPJ-230)", async ({
+test("行标题完整呈现+标题列独立横滚 + 1 日窗宽屏不夹(YPJ-230/236)", async ({
   page,
   projectKey,
 }) => {
-  // 段 1:长标题截断——220 包 Link 后 Typography 根元素变 inline,吃不到 maxWidth/overflow(YPJ-230 缺陷 A)
+  // 段 1:标题自然宽不截断,标题列超宽时自有底部横滚(YPJ-236;230 缺陷 A 的截断方案已被取代)
   const item = await apiCreateItem(
     projectKey,
-    "E2E 标题截断——超长标题应当省略号收在标题列内,而不叠压行尾标记或压入条区",
+    "E2E 标题横滚——超长标题应当完整呈现在标题列内,列底部出现横向滚动条",
   );
   await apiCall("PATCH", `/api/items/${item}`, {
     startDate: "2031-03-01T10:00",
@@ -449,21 +449,24 @@ test("行标题截断不叠压 + 1 日窗宽屏不夹(YPJ-230)", async ({
   await pickScope(page, "全部");
   const title = page
     .locator('[data-testid^="gantt-title-"]')
-    .filter({ hasText: "E2E 标题截断" });
+    .filter({ hasText: "E2E 标题横滚" });
   await expect(title).toBeVisible();
   const w = await title.evaluate((el) => el.getBoundingClientRect().width);
-  expect(w).toBeLessThanOrEqual(121); // 修复前 inline 文本画出盒 ~350px
+  expect(w).toBeGreaterThanOrEqual(200); // 自然宽呈现(230 缺陷 A 时 inline 文本画出盒/截断 120)
+  const pane = await page
+    .getByTestId("gantt-titlepane")
+    .evaluate((el) => ({ scrollW: el.scrollWidth, clientW: el.clientWidth }));
+  expect(pane.scrollW).toBeGreaterThan(pane.clientW); // 标题列自有横滚
 
   // 段 2:1920 宽屏「1日」不被 MAX_PPD 夹——修复前 pxPerDay 停在 720,显示 ~1.9 天(YPJ-230 缺陷 B)
   await page.setViewportSize({ width: 1920, height: 1080 });
   await page.getByTestId("gantt-win-1").click();
   const gap = await page.getByTestId("gantt-row-day").evaluate((el) => {
-    const rel = el.children[1] as HTMLElement;
-    const xs = [...rel.children].map((c) => (c as HTMLElement).offsetLeft);
+    const xs = [...el.children].map((c) => (c as HTMLElement).offsetLeft);
     return xs.length > 1 ? xs[1] - xs[0] : 0;
   });
   const avail = await page
     .getByTestId("gantt-scroll")
-    .evaluate((el) => el.clientWidth - 280);
+    .evaluate((el) => el.clientWidth);
   expect(Math.abs(gap - avail)).toBeLessThanOrEqual(avail * 0.05);
 });

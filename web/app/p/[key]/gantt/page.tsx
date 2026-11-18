@@ -166,7 +166,7 @@ export default function GanttPage() {
     end.setHours(0, 0, 0, 0);
     const endT = +end + DAY; // 末日 24:00
     const spanDays = Math.max((endT - +start) / DAY, 1);
-    const fit = containerW > TITLE_W ? (containerW - TITLE_W) / spanDays : 20;
+    const fit = containerW > 0 ? containerW / spanDays : 20;
     const pxPerDay = Math.min(Math.max(zoom ?? fit, fit), MAX_PPD);
     const timelineW = spanDays * pxPerDay;
     const xOfT = (t: number) => ((t - +start) / DAY) * pxPerDay;
@@ -312,7 +312,7 @@ export default function GanttPage() {
   const zoomTo = (newPpd: number, anchorClientX?: number) => {
     const el = scrollRef.current;
     if (!el) return;
-    const anchorX = (anchorClientX ?? el.clientWidth / 2 + TITLE_W) - TITLE_W;
+    const anchorX = anchorClientX ?? el.clientWidth / 2;
     const dataDays = (el.scrollLeft + anchorX) / axis.pxPerDay;
     const clamped = Math.min(Math.max(newPpd, axis.fit), MAX_PPD);
     el.scrollLeft = Math.max(0, dataDays * clamped - anchorX);
@@ -357,7 +357,7 @@ export default function GanttPage() {
       center === fmtDay(new Date())
         ? axis.todayX
         : ((+parseLocal(center) - +axis.start) / DAY) * axis.pxPerDay;
-    el.scrollLeft = Math.max(0, x - (el.clientWidth - TITLE_W) / 2);
+    el.scrollLeft = Math.max(0, x - el.clientWidth / 2);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [center, axis.pxPerDay, axis.start, axis.todayX, rows]);
 
@@ -377,19 +377,18 @@ export default function GanttPage() {
     lastCenterRef.current = ""; // 同值重设也要触发居中
     lastCenterStartRef.current = null;
     setCenter(fmtDay(target));
-    if (days !== null && containerW > TITLE_W)
-      setZoom((containerW - TITLE_W) / days);
+    if (days !== null && containerW > 0) setZoom(containerW / days);
     else if (days === null) setZoom(null);
   };
   const goToDayWindow = (days: number | null) => {
-    if (rows === null || containerW <= TITLE_W) pendingWinRef.current = days;
+    if (rows === null || containerW <= 0) pendingWinRef.current = days;
     else {
       pendingWinRef.current = undefined; // 直接生效路径清挂起,防切范围后补放旧值
       applyDayWindow(days);
     }
   };
   useEffect(() => {
-    if (rows === null || containerW <= TITLE_W) return;
+    if (rows === null || containerW <= 0) return;
     const p = pendingWinRef.current;
     if (p === undefined) return;
     pendingWinRef.current = undefined;
@@ -663,48 +662,142 @@ export default function GanttPage() {
             </Box>
           )}
 
-          {/* 时间轴视口:横滚;标题列 sticky;内容宽 = 280 + 跨度×px/天 */}
-          <Box
-            ref={scrollRef}
-            data-testid="gantt-scroll"
+          {/* 双面板(YPJ-236):标题列独立横滚+右边线+异色底;甘特区缩放横滚;纵向行对齐 */}
+          <Stack
+            direction="row"
             sx={{
-              position: "relative",
               border: "1px solid",
               borderColor: "divider",
               borderRadius: 1,
-              overflowX: "auto",
-              overflowY: "hidden",
+              overflow: "hidden",
+              alignItems: "stretch",
             }}
           >
-            <Box sx={{ width: TITLE_W + axis.timelineW, minWidth: "100%" }}>
-              {/* header 自适应 2–3 行(月/周/日/时,自上而下粗→细) */}
-              {axis.headerRows.map((row) => (
-                <Stack
-                  key={row.gran}
-                  direction="row"
-                  data-testid={`gantt-row-${row.gran}`}
-                  sx={{
-                    borderBottom: "1px solid",
-                    borderColor: "divider",
-                    bgcolor: "background.default",
-                  }}
-                >
+            {/* 标题面板:标题按自然宽呈现,超宽时列内底部横滚(YPJ-236) */}
+            <Box
+              data-testid="gantt-titlepane"
+              sx={{
+                width: TITLE_W,
+                flexShrink: 0,
+                overflowX: "auto",
+                overflowY: "hidden",
+                bgcolor: "grey.50",
+                borderRight: "1px solid",
+                borderColor: "divider",
+              }}
+            >
+              <Box sx={{ width: "max-content", minWidth: "100%" }}>
+                {/* 表头占位:与甘特区刻度行同高同边框,保证行对齐 */}
+                {axis.headerRows.map((row) => (
                   <Box
+                    key={row.gran}
                     sx={{
-                      width: TITLE_W,
-                      flexShrink: 0,
-                      position: "sticky",
-                      left: 0,
-                      zIndex: 3,
-                      bgcolor: "background.default",
+                      height: 24,
+                      borderBottom: "1px solid",
+                      borderColor: "divider",
                     }}
                   />
+                ))}
+                {scheduled.map((r) => (
                   <Box
+                    key={r.itemId}
+                    sx={{
+                      borderBottom: "1px solid",
+                      borderColor: "divider",
+                      minHeight: 44,
+                      display: "flex",
+                      alignItems: "center",
+                      "&:hover": { bgcolor: "action.hover" },
+                    }}
+                  >
+                    <Stack
+                      direction="row"
+                      spacing={0.5}
+                      alignItems="center"
+                      sx={{ pl: 1 + r.depth * 2, py: 0.5 }}
+                    >
+                      {hasKid(r) && (
+                        <Button
+                          size="small"
+                          onClick={() => toggle(r.itemId)}
+                          sx={{ minWidth: 0, px: 0.5 }}
+                        >
+                          {collapsed.has(r.itemId) ? "▶" : "▼"}
+                        </Button>
+                      )}
+                      <Chip
+                        label={r.number}
+                        size="small"
+                        variant="outlined"
+                        sx={{ height: 20 }}
+                      />
+                      {/* 标题可点进详情;自然宽不截断,列内横滚(YPJ-236) */}
+                      <Link
+                        href={`/p/${key}/i/${r.itemId}?from=gantt`}
+                        style={{ minWidth: 0 }}
+                      >
+                        {/* component=div:inline span 吃不到盒模型属性,nowrap 文字会画出盒叠压 chip(YPJ-230) */}
+                        <Typography
+                          component="div"
+                          data-testid={`gantt-title-${r.number}`}
+                          variant="caption"
+                          noWrap
+                          sx={{
+                            color: "text.primary",
+                            textDecoration: "underline",
+                            "&:hover": { color: "primary.main" },
+                          }}
+                        >
+                          {r.title}
+                        </Typography>
+                      </Link>
+                      {r.estimateValue !== null && (
+                        <Chip
+                          data-testid={`gantt-est-${r.number}`}
+                          label={`${r.estimateValue}${EST_UNIT_SHORT[r.estimateUnit ?? ""] ?? r.estimateUnit ?? ""}`}
+                          size="small"
+                          variant="outlined"
+                          sx={{ height: 18 }}
+                        />
+                      )}
+                      {r.blocked && (
+                        <Chip
+                          data-testid={`gantt-blocked-${r.number}`}
+                          label="🔗 blocked"
+                          size="small"
+                          color="warning"
+                          sx={{ height: 18 }}
+                        />
+                      )}
+                    </Stack>
+                  </Box>
+                ))}
+              </Box>
+            </Box>
+            {/* 甘特面板:缩放/横滚;今日线、条、状态章 */}
+            <Box
+              ref={scrollRef}
+              data-testid="gantt-scroll"
+              sx={{
+                position: "relative",
+                flex: 1,
+                minWidth: 0,
+                overflowX: "auto",
+                overflowY: "hidden",
+              }}
+            >
+              <Box sx={{ width: axis.timelineW, minWidth: "100%" }}>
+                {/* header 自适应 2–3 行(月/周/日/时,自上而下粗→细) */}
+                {axis.headerRows.map((row) => (
+                  <Box
+                    key={row.gran}
+                    data-testid={`gantt-row-${row.gran}`}
                     sx={{
                       position: "relative",
-                      width: axis.timelineW,
-                      flexShrink: 0,
                       height: 24,
+                      borderBottom: "1px solid",
+                      borderColor: "divider",
+                      bgcolor: "background.default",
                     }}
                   >
                     {row.ticks.map((tk) => (
@@ -723,233 +816,160 @@ export default function GanttPage() {
                       </Typography>
                     ))}
                   </Box>
-                </Stack>
-              ))}
+                ))}
 
-              {scheduled.length === 0 && (
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  sx={{ p: 2 }}
-                >
-                  暂无已排期 item——在详情页填起止日期后出现在这里。
-                </Typography>
-              )}
-
-              {scheduled.map((r) => {
-                const isFinal = r.statusType === "FINAL";
-                const summary = hasKid(r) ? summaryOf(r.itemId) : null;
-                const summaryLeft = summary ? (xOf(summary[0]) ?? 0) : 0;
-                const summaryWidth =
-                  summary !== null
-                    ? Math.max((xEndOf(summary[1]) ?? 0) - summaryLeft, 1.2)
-                    : 0;
-                // 有子孙的父行只画汇总条,不画自有条
-                const drawOwn = !hasKid(r);
-                const hasStart = drawOwn && r.startDate !== null;
-                const left = xOf(hasStart ? r.startDate : r.dueDate) ?? 0;
-                // due 为空不外延到轴末端(S1 遗留,YPJ-220 反馈):画起点小标记;start+estimate 推条长另票
-                const right =
-                  r.dueDate !== null
-                    ? (xEndOf(r.dueDate) ?? axis.timelineW)
-                    : left;
-                // 零时长条(start=due 同刻)最小 3px 可见(YPJ-229;due-only 菱形是标记不受影响)
-                const width = hasStart ? Math.max(right - left, 3) : 1.2;
-                const folded = collapsed.has(r.itemId);
-                return (
-                  <Box
-                    key={r.itemId}
-                    sx={{
-                      position: "relative",
-                      borderBottom: "1px solid",
-                      borderColor: "divider",
-                      minHeight: 44,
-                      display: "flex",
-                      alignItems: "center",
-                      "&:hover": { bgcolor: "action.hover" },
-                    }}
+                {scheduled.length === 0 && (
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ p: 2 }}
                   >
-                    {/* 行标题(左侧 sticky 固定宽) */}
-                    <Box
-                      sx={{
-                        width: TITLE_W,
-                        flexShrink: 0,
-                        position: "sticky",
-                        left: 0,
-                        zIndex: 2,
-                        bgcolor: "background.default",
-                        pl: 1 + r.depth * 2,
-                        py: 0.5,
-                        "&:hover": { bgcolor: "background.default" },
-                      }}
-                    >
-                      <Stack direction="row" spacing={0.5} alignItems="center">
-                        {hasKid(r) && (
-                          <Button
-                            size="small"
-                            onClick={() => toggle(r.itemId)}
-                            sx={{ minWidth: 0, px: 0.5 }}
-                          >
-                            {folded ? "▶" : "▼"}
-                          </Button>
-                        )}
-                        <Chip
-                          label={r.number}
-                          size="small"
-                          variant="outlined"
-                          sx={{ height: 20 }}
-                        />
-                        {/* 标题可点进详情(条形区另有整块覆盖链接;YPJ-220 反馈补) */}
-                        <Link
-                          href={`/p/${key}/i/${r.itemId}?from=gantt`}
-                          style={{ minWidth: 0 }}
-                        >
-                          {/* component=div:inline span 吃不到 maxWidth/overflow,文字画出盒叠压 chip(YPJ-230) */}
-                          <Typography
-                            component="div"
-                            data-testid={`gantt-title-${r.number}`}
-                            variant="caption"
-                            noWrap
-                            sx={{
-                              maxWidth: 120,
-                              color: "text.primary",
-                              textDecoration: "underline",
-                              "&:hover": { color: "primary.main" },
-                            }}
-                          >
-                            {r.title}
-                          </Typography>
-                        </Link>
-                        {r.estimateValue !== null && (
-                          <Chip
-                            data-testid={`gantt-est-${r.number}`}
-                            label={`${r.estimateValue}${EST_UNIT_SHORT[r.estimateUnit ?? ""] ?? r.estimateUnit ?? ""}`}
-                            size="small"
-                            variant="outlined"
-                            sx={{ height: 18 }}
-                          />
-                        )}
-                        {r.blocked && (
-                          <Chip
-                            data-testid={`gantt-blocked-${r.number}`}
-                            label="🔗 blocked"
-                            size="small"
-                            color="warning"
-                            sx={{ height: 18 }}
-                          />
-                        )}
-                      </Stack>
-                    </Box>
+                    暂无已排期 item——在详情页填起止日期后出现在这里。
+                  </Typography>
+                )}
 
-                    {/* 条区(固定像素宽) */}
+                {scheduled.map((r) => {
+                  const isFinal = r.statusType === "FINAL";
+                  const summary = hasKid(r) ? summaryOf(r.itemId) : null;
+                  const summaryLeft = summary ? (xOf(summary[0]) ?? 0) : 0;
+                  const summaryWidth =
+                    summary !== null
+                      ? Math.max((xEndOf(summary[1]) ?? 0) - summaryLeft, 1.2)
+                      : 0;
+                  // 有子孙的父行只画汇总条,不画自有条
+                  const drawOwn = !hasKid(r);
+                  const hasStart = drawOwn && r.startDate !== null;
+                  const left = xOf(hasStart ? r.startDate : r.dueDate) ?? 0;
+                  // due 为空不外延到轴末端(S1 遗留,YPJ-220 反馈):画起点小标记;start+estimate 推条长另票
+                  const right =
+                    r.dueDate !== null
+                      ? (xEndOf(r.dueDate) ?? axis.timelineW)
+                      : left;
+                  // 零时长条(start=due 同刻)最小 3px 可见(YPJ-229;due-only 菱形是标记不受影响)
+                  const width = hasStart ? Math.max(right - left, 3) : 1.2;
+                  return (
                     <Box
+                      key={r.itemId}
                       sx={{
                         position: "relative",
-                        width: axis.timelineW,
-                        flexShrink: 0,
-                        height: 44,
+                        borderBottom: "1px solid",
+                        borderColor: "divider",
+                        minHeight: 44,
+                        display: "flex",
+                        alignItems: "center",
+                        "&:hover": { bgcolor: "action.hover" },
                       }}
                     >
-                      {axis.todayX >= 0 && axis.todayX <= axis.timelineW && (
-                        <Box
-                          sx={{
-                            position: "absolute",
-                            left: axis.todayX,
-                            top: 0,
-                            bottom: 0,
-                            width: "2px",
-                            bgcolor: "info.main",
-                            opacity: 0.5,
-                          }}
-                        />
-                      )}
+                      {/* 条区(固定像素宽) */}
                       <Box
-                        data-summary={summary ? "" : undefined}
                         sx={{
-                          position: "absolute",
-                          left: summaryLeft,
-                          width: summaryWidth,
-                          top: 4,
-                          display: summary ? "block" : "none",
+                          position: "relative",
+                          width: axis.timelineW,
+                          flexShrink: 0,
+                          height: 44,
                         }}
                       >
-                        <Box
-                          sx={{
-                            height: 8,
-                            borderRadius: 1,
-                            bgcolor: "text.secondary",
-                            opacity: 0.45,
-                          }}
-                        />
-                      </Box>
-                      <Box
-                        data-final={isFinal ? "" : undefined}
-                        data-testid={`gantt-bar-${r.number}`}
-                        sx={{
-                          position: "absolute",
-                          left,
-                          width,
-                          top: 10,
-                          display: drawOwn ? "block" : "none",
-                        }}
-                      >
-                        {hasStart ? (
+                        {axis.todayX >= 0 && axis.todayX <= axis.timelineW && (
                           <Box
                             sx={{
-                              height: 14,
-                              borderRadius: 1,
-                              bgcolor: isFinal
-                                ? "text.disabled"
-                                : r.overdue
-                                  ? "error.main"
-                                  : "primary.main",
-                              opacity: isFinal ? 0.5 : 0.85,
-                            }}
-                          />
-                        ) : (
-                          <Box
-                            sx={{
-                              width: 12,
-                              height: 12,
-                              transform: "rotate(45deg)",
-                              bgcolor: isFinal
-                                ? "text.disabled"
-                                : r.overdue
-                                  ? "error.main"
-                                  : "warning.main",
-                              opacity: isFinal ? 0.5 : 1,
-                              mx: "auto",
+                              position: "absolute",
+                              left: axis.todayX,
+                              top: 0,
+                              bottom: 0,
+                              width: "2px",
+                              bgcolor: "info.main",
+                              opacity: 0.5,
                             }}
                           />
                         )}
+                        <Box
+                          data-summary={summary ? "" : undefined}
+                          sx={{
+                            position: "absolute",
+                            left: summaryLeft,
+                            width: summaryWidth,
+                            top: 4,
+                            display: summary ? "block" : "none",
+                          }}
+                        >
+                          <Box
+                            sx={{
+                              height: 8,
+                              borderRadius: 1,
+                              bgcolor: "text.secondary",
+                              opacity: 0.45,
+                            }}
+                          />
+                        </Box>
+                        <Box
+                          data-final={isFinal ? "" : undefined}
+                          data-testid={`gantt-bar-${r.number}`}
+                          sx={{
+                            position: "absolute",
+                            left,
+                            width,
+                            top: 10,
+                            display: drawOwn ? "block" : "none",
+                          }}
+                        >
+                          {hasStart ? (
+                            <Box
+                              sx={{
+                                height: 14,
+                                borderRadius: 1,
+                                bgcolor: isFinal
+                                  ? "text.disabled"
+                                  : r.overdue
+                                    ? "error.main"
+                                    : "primary.main",
+                                opacity: isFinal ? 0.5 : 0.85,
+                              }}
+                            />
+                          ) : (
+                            <Box
+                              sx={{
+                                width: 12,
+                                height: 12,
+                                transform: "rotate(45deg)",
+                                bgcolor: isFinal
+                                  ? "text.disabled"
+                                  : r.overdue
+                                    ? "error.main"
+                                    : "warning.main",
+                                opacity: isFinal ? 0.5 : 1,
+                                mx: "auto",
+                              }}
+                            />
+                          )}
+                        </Box>
+                        <Link
+                          href={`/p/${key}/i/${r.itemId}?from=gantt`}
+                          style={{
+                            position: "absolute",
+                            left: 0,
+                            top: 0,
+                            right: 0,
+                            bottom: 0,
+                            display: "block",
+                          }}
+                          aria-label={r.number}
+                        >
+                          {" "}
+                        </Link>
                       </Box>
-                      <Link
-                        href={`/p/${key}/i/${r.itemId}?from=gantt`}
-                        style={{
-                          position: "absolute",
-                          left: 0,
-                          top: 0,
-                          right: 0,
-                          bottom: 0,
-                          display: "block",
-                        }}
-                        aria-label={r.number}
-                      >
-                        {" "}
-                      </Link>
-                    </Box>
 
-                    <Chip
-                      label={r.statusName}
-                      size="small"
-                      variant="outlined"
-                      sx={{ mr: 1, height: 20, position: "sticky", right: 0 }}
-                    />
-                  </Box>
-                );
-              })}
+                      <Chip
+                        label={r.statusName}
+                        size="small"
+                        variant="outlined"
+                        sx={{ mr: 1, height: 20, position: "sticky", right: 0 }}
+                      />
+                    </Box>
+                  );
+                })}
+              </Box>
             </Box>
-          </Box>
+          </Stack>
           <Typography
             variant="caption"
             color="text.secondary"
