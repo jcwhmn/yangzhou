@@ -757,13 +757,24 @@ export default function GanttPage() {
                           variant="outlined"
                           sx={{ height: 20 }}
                         />
-                        <Typography
-                          variant="caption"
-                          noWrap
-                          sx={{ maxWidth: 120 }}
+                        {/* 标题可点进详情(条形区另有整块覆盖链接;YPJ-220 反馈补) */}
+                        <Link
+                          href={`/p/${key}/i/${r.itemId}?from=gantt`}
+                          style={{ minWidth: 0 }}
                         >
-                          {r.title}
-                        </Typography>
+                          <Typography
+                            variant="caption"
+                            noWrap
+                            sx={{
+                              maxWidth: 120,
+                              color: "text.primary",
+                              textDecoration: "underline",
+                              "&:hover": { color: "primary.main" },
+                            }}
+                          >
+                            {r.title}
+                          </Typography>
+                        </Link>
                         {r.estimateValue !== null && (
                           <Chip
                             data-testid={`gantt-est-${r.number}`}
@@ -916,7 +927,19 @@ export default function GanttPage() {
           variant="outlined"
           sx={{ height: 20 }}
         />
-        <Typography variant="caption">{r.title}</Typography>
+        {/* 标题列可点进详情(条形区另有整块隐形覆盖链接,YPJ-220 反馈补) */}
+        <Link href={`/p/${key}/i/${r.itemId}?from=gantt`}>
+          <Typography
+            variant="caption"
+            color="text.primary"
+            sx={{
+              textDecoration: "underline",
+              "&:hover": { color: "primary.main" },
+            }}
+          >
+            {r.title}
+          </Typography>
+        </Link>
       </Stack>
     );
   }

@@ -323,4 +323,8 @@ test("范围过滤(YPJ-220):缺省 board 祖先链 / group 多选并集 / milest
   await page.goto(`/p/${projectKey}/backlog`);
   await page.goto(`/p/${projectKey}/gantt`);
   await expect(page.getByText("E2E 圈外O")).toBeVisible();
+
+  // 行标题可点进 item 详情(YPJ-220 反馈)
+  await page.getByText("E2E 范围A").click();
+  await expect(page).toHaveURL(new RegExp(`/p/${projectKey}/i/.+`));
 });
