@@ -1,7 +1,12 @@
 // 甘特 S1(YPJ-218/spec 0139):父汇总条、FINAL 置灰、父时间线禁用与加子迁移拦截
 import { expect } from "./support/fixtures";
 import { test } from "./support/fixtures";
-import { apiAssignMe, apiCall, apiCreateItem } from "./support/helpers";
+import {
+  apiAssignMe,
+  apiCall,
+  apiCreateItem,
+  apiCreateSprint,
+} from "./support/helpers";
 
 /** UI 切范围(YPJ-220)。依赖缺省 board 后,旧用例需显式切「全部」复现全量语义。 */
 async function pickScope(page: import("@playwright/test").Page, label: string) {
@@ -367,4 +372,62 @@ test("无 due 的 item 画起点小标记,不外延到轴末端(YPJ-220 反馈)"
   await expect(bar).toHaveCount(1);
   const w = await bar.evaluate((el) => el.getBoundingClientRect().width);
   expect(w).toBeLessThan(20);
+});
+
+// YPJ-229 回归(转正用例):加载中点日窗 → 就绪后补放;今日=当前时刻居中
+test("时线回归(YPJ-229):加载中点日窗补放 + 今日时刻居中 + 零时长条可见", async ({
+  page,
+  projectKey,
+}) => {
+  const item = await apiCreateItem(projectKey, "E2E 时线零时长");
+  // start=due 同刻(零时长条,今天 00:00 → 在数据锚定轴内且今日窗可见)
+  const today = new Date();
+  const ymd = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  await apiCall("PATCH", `/api/items/${item}`, {
+    startDate: `${ymd}T00:00`,
+    dueDate: `${ymd}T00:00`,
+  });
+  // 建 active sprint 并挂入:缺省 board 范围内可见(否则空行不渲染轴)
+  const gid = await apiCreateSprint(projectKey, "E2S-229");
+  await apiCall(
+    "POST",
+    `/api/projects/${projectKey}/groups/${gid}/actions/start`,
+    {},
+  );
+  await apiCall("PUT", `/api/items/${item}/group-membership`, {
+    groupId: gid,
+    groupType: "sprint",
+  });
+
+  // 拦截 gantt API 延迟 1.5s,模拟慢加载;期间点 1 日
+  await page.route("**/gantt*", async (route) => {
+    await new Promise((r) => setTimeout(r, 1500));
+    await route.continue();
+  });
+  await page.goto(`/p/${projectKey}/gantt`);
+  await page.getByTestId("gantt-win-1").click(); // 数据未到,应挂起
+  // 数据到达后:小时刻度出现(1 日窗补放成功),非 fit 挤压
+  await expect(page.getByText("00:00", { exact: true }).first()).toBeVisible({
+    timeout: 10000,
+  });
+  // 今日线(2px 蓝竖线)在视口内(视点日=今日 → 当前时刻居中)
+  const todayVis = await page.evaluate(() => {
+    const scroll = document.querySelector('[data-testid="gantt-scroll"]');
+    if (!scroll) return false;
+    const lines = [...scroll.querySelectorAll("div")].filter((d) => {
+      const s = getComputedStyle(d);
+      return s.width === "2px" && s.position === "absolute";
+    });
+    return lines.some((d) => {
+      const x = (d as HTMLElement).offsetLeft - scroll.scrollLeft;
+      return x >= 0 && x <= scroll.clientWidth;
+    });
+  });
+  expect(todayVis).toBe(true);
+  // 零时长条可见(宽 ≥3px)
+  const w = await page
+    .locator('[data-testid^="gantt-bar-"]')
+    .first()
+    .evaluate((el) => el.getBoundingClientRect().width);
+  expect(w).toBeGreaterThanOrEqual(3);
 });
