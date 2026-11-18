@@ -128,30 +128,28 @@ class GanttApiTest : AbstractApiTest() {
         val b = createItem(authed, "SCO", "B", parentItemId = parent["itemId"].asText())
         createItem(authed, "SCO", "圈外O")
 
-        fun gantt(q: String) =
-            json.readTree(
-                authed
-                    .get()
-                    .uri("/api/projects/SCO/gantt$q")
-                    .exchange()
-                    .expectBody(String::class.java)
-                    .returnResult()
-                    .responseBody!!,
-            )["rows"].map { it["title"].asText() }
+        fun gantt(q: String) = json.readTree(
+            authed
+                .get()
+                .uri("/api/projects/SCO/gantt$q")
+                .exchange()
+                .expectBody(String::class.java)
+                .returnResult()
+                .responseBody!!,
+        )["rows"].map { it["title"].asText() }
 
-        fun group(name: String): String =
-            json.readTree(
-                authed
-                    .post()
-                    .uri("/api/projects/SCO/groups")
-                    .body(mapOf("typeKey" to "sprint", "name" to name))
-                    .exchange()
-                    .expectStatus()
-                    .isCreated()
-                    .expectBody(String::class.java)
-                    .returnResult()
-                    .responseBody!!,
-            )["groupId"].asText()
+        fun group(name: String): String = json.readTree(
+            authed
+                .post()
+                .uri("/api/projects/SCO/groups")
+                .body(mapOf("typeKey" to "sprint", "name" to name))
+                .exchange()
+                .expectStatus()
+                .isCreated()
+                .expectBody(String::class.java)
+                .returnResult()
+                .responseBody!!,
+        )["groupId"].asText()
 
         val g1 = group("S1")
         val g2 = group("S2")
