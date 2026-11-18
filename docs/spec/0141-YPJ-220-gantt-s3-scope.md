@@ -85,3 +85,11 @@
 7. 保存视图:存「V31 范围」→ 切到全部乱看 → 视图下拉选回 → 范围/缩放恢复;同名再存 = 覆盖;删除视图后下拉消失。
 8. 无 active group 的项目:缺省 = 非 backlog 全量(与看板根页一致)。
 9. 负例(api.http):scope=foo → 400;scopeIds=随机 UUID → 404;scope=group 无 scopeIds → 400。
+
+## 四、As-built(2026-11-18)
+
+- 后端:契约变更(缺省 board)按 §一落地;`ItemGroupService.boardItemObjectIds/groupMemberItemObjectIds`、`ProjectService.resolveScope`(keep=命中∪后代∪祖先链,树序不变)与设计一致;GanttApiTest 新用例组覆盖 board 祖先链/group 并集/milestone/all/负例,集成绿。
+- 前端(gantt/page.tsx):scope 五选 + group 多选(disableCloseOnSelect)/milestone/release 单选,未选完不发请求;工况持久化改为 state 变化即落盘(scope/scopeIds/zoom/center/scroll),并加 load 序号守卫(过期响应丢弃);轴锚定父行取子孙并集(忽略父自有日期);无 due 条不外延到轴末端(起点小标记);行内/未排期桶标题包 Link 进详情。
+- 过程修复三案(A13 台账):MUI 多选 closeOnSelect、工况只在滚动落盘、慢响应覆盖新范围;外加 MUI Menu 淡入期吞点击(e2e pickScope 等 300ms)。
+- e2e:gantt.spec 11 例(新 5:范围过滤/工况跨页/标题链接/父不撑轴/无 due 小标记)、board.spec 14 例(2 例切 scope=all),全绿。
+- 手测反馈处置:12-03 出 USSR→实锤父残日期撑轴(修)+208 数据疑点(留用户清);227 扩展已有票;排序/缺省视窗/estimate 推条长立新票。
