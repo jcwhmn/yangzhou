@@ -144,9 +144,16 @@ export default function GanttPage() {
   // 轴(YPJ-219 spec 0140 v2):范围 = 数据锚定日界;pxPerDay 连续 ∈ [fit 全区间压一屏, MAX_PPD]
   const axis = useMemo(() => {
     const today = new Date();
-    const dates = (rows ?? []).flatMap(
-      (r) => [r.startDate, r.dueDate].filter(Boolean) as string[],
-    );
+    const rowsNow = rows ?? [];
+    // 轴数据锚定与画条同口径(spec 0139/0140):父行自有日期忽略不画,取子孙排期并集;子行取自有日期
+    const isParent = (r: GanttRow) =>
+      rowsNow.some((x) => x.parentItemId === r.itemId);
+    const dates = rowsNow.flatMap((r) => {
+      if (!isParent(r))
+        return [r.startDate, r.dueDate].filter(Boolean) as string[];
+      const s = summaryOf(r.itemId);
+      return s ? [s[0], s[1]] : [];
+    });
     const minT = dates.length
       ? Math.min(...dates.map((d) => +parseLocal(d)))
       : +today;

@@ -331,3 +331,23 @@ test("范围过滤(YPJ-220):缺省 board 祖先链 / group 多选并集 / milest
   await page.getByText("E2E 范围A").click();
   await expect(page).toHaveURL(new RegExp(`/p/${projectKey}/i/.+`));
 });
+
+test("父自有日期不撑轴(YPJ-220 反馈):轴取子孙并集,忽略父自身排期", async ({
+  page,
+  projectKey,
+}) => {
+  const parent = await apiCreateItem(projectKey, "E2E 轴父");
+  // 父自有 due 远期(若参与锚定,轴会拉到 2031);仅子项排期在 2020-01
+  await apiCall("PATCH", `/api/items/${parent}`, {
+    startDate: "2031-06-01",
+    dueDate: "2031-06-05",
+  });
+  await makeChild(projectKey, "E2E 轴子", parent, "2020-01-01", "2020-01-03");
+
+  await page.goto(`/p/${projectKey}/gantt`);
+  await pickScope(page, "全部");
+  await expect(page.getByText("E2E 轴父")).toBeVisible();
+  // 月刻度无 2031(父日期未参与锚定);子区间 2020-01 在
+  await expect(page.getByText("2031-06")).toHaveCount(0);
+  await expect(page.getByTestId("gantt-row-day")).toBeVisible();
+});
