@@ -30,7 +30,8 @@ class ExcelExportService(
     fun export(key: String): ExportFile {
         val project = projects.findByKey(key) ?: throw NotFoundException("项目不存在:$key")
         val projectObjectId = project.objectId ?: error("no id")
-        val gantt = projectService.gantt(key)
+        // YPJ-240:导出=项目 item 清单,必须全量——220 后 gantt 默认 scope=board,漏传会把未上板 item 滤没(回归实锤 2026-11-19)
+        val gantt = projectService.gantt(key, scope = "all")
         val allItems = items.findByProjectObjectIdAndDeletedAtIsNullOrderByNumber(projectObjectId)
         val itemByObjectId = allItems.associateBy { it.objectId }
         val memberMap = members.findByWorkspaceObjectId(project.workspaceObjectId).associateBy { it.objectId }
