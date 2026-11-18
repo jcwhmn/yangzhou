@@ -470,3 +470,56 @@ test("行标题完整呈现+标题列独立横滚 + 1 日窗宽屏不夹(YPJ-230
     .evaluate((el) => el.clientWidth);
   expect(Math.abs(gap - avail)).toBeLessThanOrEqual(avail * 0.05);
 });
+
+test("分割线拖拽改标题列宽并记忆,双击重置(YPJ-237)", async ({
+  page,
+  projectKey,
+}) => {
+  const item = await apiCreateItem(
+    projectKey,
+    "E2E 分割线拖拽——标题列宽可调,刷新后保持",
+  );
+  await apiCall("PATCH", `/api/items/${item}`, {
+    startDate: "2031-03-01T10:00",
+    dueDate: "2031-03-02T12:00",
+  });
+  await page.goto(`/p/${projectKey}/gantt`);
+  await pickScope(page, "全部");
+  // 等数据/水合就绪再拖:goto 后立即拖有 flake(两轮实锤:down 被 late-hydration 窗口吞掉)
+  await page.locator('[data-testid^="gantt-bar-"]').first().waitFor();
+  // 1920 视口:1280 下 clamp 上限 = floor(卡片可视宽/2)≈386,拖 +100 会贴脸被夹
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  const paneW = () =>
+    page
+      .getByTestId("gantt-titlepane")
+      .evaluate((el) => el.getBoundingClientRect().width);
+  expect(await paneW()).toBeCloseTo(280, 0); // 出厂宽
+
+  // 拖拽:右移 100px → 标题列变宽(不写死目标像素,断相对变化)
+  const sp = page.getByTestId("gantt-splitter");
+  const spBox = await sp.boundingBox();
+  await page.mouse.move(
+    spBox!.x + spBox!.width / 2,
+    spBox!.y + spBox!.height / 2,
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    spBox!.x + spBox!.width / 2 + 100,
+    spBox!.y + spBox!.height / 2,
+    { steps: 5 },
+  );
+  await page.mouse.up();
+  const after = await paneW();
+  expect(after).toBeGreaterThanOrEqual(370); // 280+100(±热区中线偏移 ≤1px)
+  expect(after).toBeLessThanOrEqual(385);
+
+  // 记忆:reload 后保持(裸 item 缺省 board 不可见,先切「全部」;再等行渲染防 hydration 竞态)
+  await page.reload();
+  await pickScope(page, "全部");
+  await page.locator('[data-testid^="gantt-bar-"]').first().waitFor();
+  expect(await paneW()).toBeCloseTo(after, 0);
+
+  // 双击重置 → 280
+  await sp.dblclick();
+  expect(await paneW()).toBeCloseTo(280, 0);
+});

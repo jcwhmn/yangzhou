@@ -14,7 +14,14 @@ import {
 import { PageShell } from "@/components/PageShell";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+} from "react";
 import { api } from "@/lib/api";
 import { parseLocal } from "@/lib/dates";
 import { t } from "@/lib/texts";
@@ -39,7 +46,9 @@ type GanttRow = {
 const DAY = 24 * 60 * 60 * 1000;
 
 // YPJ-219 v2(spec 0140):轴 = 数据锚定(首日 00:00 → 末日 24:00),连续缩放,无语义档位
-const TITLE_W = 280;
+const TITLE_W_DEFAULT = 280; // 标题列默认宽(=236 出厂值;237 双击重置回落此值)
+const TITLE_W_MIN = 120;
+const TITLE_W_LS = "yz-gantt-title-w"; // 237:标题列宽 localStorage 记忆键
 const MAX_PPD = 2400; // 缩放上限:1日窗承诺在内容宽 ≤2680 成立(YPJ-230;1920 屏内容 1386 原被 720 夹成 ~1.9 天)
 const MIN_LABEL_PX = 44; // 刻度标签最小间距
 const ZOOM_STEP = 1.5; // ± 按钮步进系数
@@ -80,8 +89,51 @@ export default function GanttPage() {
   const [scope, setScope] = useState(savedView.scope ?? "board");
   const [scopeIds, setScopeIds] = useState<string[]>(savedView.scopeIds ?? []);
   const [containerW, setContainerW] = useState(0); // 可视宽(内容至少撑满一屏)
+  // 237(spec 0145):标题列宽可拖拽,localStorage 记忆;无值/越界回落默认
+  const [titleW, setTitleW] = useState(() => {
+    if (typeof window === "undefined") return TITLE_W_DEFAULT;
+    const v = Number(window.localStorage.getItem(TITLE_W_LS));
+    return Number.isFinite(v) && v >= TITLE_W_MIN ? v : TITLE_W_DEFAULT;
+  });
+  const [splitting, setSplitting] = useState(false);
+  const splitRef = useRef<{ startX: number; startW: number; w: number } | null>(
+    null,
+  );
   const scrollRef = useRef<HTMLDivElement>(null);
   const loadSeqRef = useRef(0); // 响应序号守卫:切范围后慢响应晚到不覆盖新状态
+
+  // 夹取:仅交互路径调用(此时 containerW 已实测;初值不夹 max,避免测量前误夹 120)
+  const clampTitleW = (w: number) =>
+    Math.min(
+      Math.max(w, TITLE_W_MIN),
+      Math.max(TITLE_W_MIN, Math.floor(containerW / 2)),
+    );
+  const persistTitleW = (w: number) => {
+    const c = clampTitleW(w);
+    setTitleW(c);
+    window.localStorage.setItem(TITLE_W_LS, String(c));
+  };
+  const onSplitMouseDown = (e: ReactMouseEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    splitRef.current = { startX: e.clientX, startW: titleW, w: titleW };
+    setSplitting(true);
+    const move = (ev: MouseEvent) => {
+      const s = splitRef.current;
+      if (!s) return;
+      s.w = clampTitleW(s.startW + ev.clientX - s.startX);
+      setTitleW(s.w);
+    };
+    const up = () => {
+      if (splitRef.current)
+        window.localStorage.setItem(TITLE_W_LS, String(splitRef.current.w));
+      splitRef.current = null;
+      setSplitting(false);
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", up);
+    };
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+  };
 
   // 范围二级选项(group/milestone/release;列表 API 均返回裸数组)
   const [groupOpts, setGroupOpts] = useState<
@@ -677,7 +729,7 @@ export default function GanttPage() {
             <Box
               data-testid="gantt-titlepane"
               sx={{
-                width: TITLE_W,
+                width: titleW,
                 flexShrink: 0,
                 overflowX: "auto",
                 overflowY: "hidden",
@@ -774,6 +826,45 @@ export default function GanttPage() {
                 ))}
               </Box>
             </Box>
+            {/* 237 分割线:骑在标题列右边线上的透明热区,hover/拖拽/键盘焦点显 info.main 竖线 */}
+            <Box
+              data-testid="gantt-splitter"
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="调整标题列宽度"
+              tabIndex={0}
+              onMouseDown={onSplitMouseDown}
+              onDoubleClick={() => persistTitleW(TITLE_W_DEFAULT)}
+              onKeyDown={(e) => {
+                if (e.key === "ArrowLeft") {
+                  e.preventDefault();
+                  persistTitleW(titleW - 16);
+                } else if (e.key === "ArrowRight") {
+                  e.preventDefault();
+                  persistTitleW(titleW + 16);
+                }
+              }}
+              sx={{
+                width: 9,
+                flexShrink: 0,
+                ml: "-5px", // 骑上右边线;不用 sx 数字(被 theme spacing 放大,实锤 -35px)
+                position: "relative",
+                zIndex: 1,
+                cursor: "col-resize",
+                "&::after": {
+                  content: '""',
+                  position: "absolute",
+                  top: 0,
+                  bottom: 0,
+                  left: 3.5,
+                  width: 2,
+                  bgcolor: splitting ? "info.main" : "transparent",
+                },
+                "&:hover::after, &:focus-visible::after": {
+                  bgcolor: "info.main",
+                },
+              }}
+            />
             {/* 甘特面板:缩放/横滚;今日线、条、状态章 */}
             <Box
               ref={scrollRef}
