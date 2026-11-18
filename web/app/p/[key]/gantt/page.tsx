@@ -14,7 +14,14 @@ import {
 import { PageShell } from "@/components/PageShell";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+} from "react";
 import { api } from "@/lib/api";
 import { parseLocal } from "@/lib/dates";
 import { t } from "@/lib/texts";
@@ -853,7 +860,9 @@ export default function GanttPage() {
                   width: 2,
                   bgcolor: splitting ? "info.main" : "transparent",
                 },
-                "&:hover::after, &:focus-visible::after": { bgcolor: "info.main" },
+                "&:hover::after, &:focus-visible::after": {
+                  bgcolor: "info.main",
+                },
               }}
             />
             {/* 甘特面板:缩放/横滚;今日线、条、状态章 */}
