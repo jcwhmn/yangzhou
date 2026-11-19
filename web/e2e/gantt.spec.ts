@@ -697,6 +697,26 @@ test("缺省视窗下限(YPJ-234):宽区间溢出可读 + 今日按钮只居中�
     });
   await expect.poll(inView).toBe(true);
 
+  // 按钮缩放锚点 = 视口中心(用户 2026-11-19 建议):今日线初始居中,+ 后仍应 ≈ 居中
+  await page.getByTestId("gantt-zoom-in").click();
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const scroll = document.querySelector(
+          '[data-testid="gantt-scroll"]',
+        ) as HTMLElement;
+        const lines = [...scroll.querySelectorAll("div")].filter((el) => {
+          const s = getComputedStyle(el);
+          return s.width === "2px" && s.position === "absolute";
+        });
+        return lines.some((el) => {
+          const x = (el as HTMLElement).offsetLeft - scroll.scrollLeft;
+          return Math.abs(x - scroll.clientWidth / 2) < 40;
+        });
+      }),
+    )
+    .toBe(true);
+
   // 放大两档 → 滚回最左 → 点今日:今日线居中且缩放不变(案乙:不重置缩放)
   await page.getByTestId("gantt-zoom-in").click();
   await page.getByTestId("gantt-zoom-in").click();

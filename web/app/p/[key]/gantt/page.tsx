@@ -377,10 +377,15 @@ export default function GanttPage() {
   useEffect(() => {
     saveView();
   }, [saveView]);
+  // 存档恢复只做一次(restoredRef 门,YPJ-234):原先依赖 [saveView, rows] 重跑,每次缩放/切范围后都把挂载时旧 scrollLeft 拍回去 → 缩放中心锚点失效
+  const restoredRef = useRef(false);
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    if (savedView.scroll) el.scrollLeft = savedView.scroll;
+    if (!restoredRef.current) {
+      restoredRef.current = true;
+      if (savedView.scroll) el.scrollLeft = savedView.scroll;
+    }
     el.addEventListener("scroll", saveView);
     return () => el.removeEventListener("scroll", saveView);
     // eslint-disable-next-line react-hooks/exhaustive-deps
