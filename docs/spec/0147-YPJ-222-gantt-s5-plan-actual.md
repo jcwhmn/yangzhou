@@ -153,3 +153,15 @@ checklistDone: Int?    checklistTotal: Int?   // total=0 或无清单 → 两字
 - **Q2 = 同意**:遮罩宽度 = 清单完成率 %,时间分色读法废弃。
 - **Q3 = 可**:配色重整纳入本票,按 §1.1.4 色表实现(参考图未立票,build/debug 阶段可调)。
 - **Q4 = 可**:PRD v2 加年/季/月/周档位废弃标注(219 v2 spec 0140 已废,周/月为自动门控刻度行),一笔文档改,随本票提交。
+
+## 五、As-built(2026-11-19)
+
+实现与 spec 的差异与落地细节:
+
+- **轴纳入实际日期(§2.1)保留**:逾期未完成 item 的实际条(延伸到今日线)依赖此语义;代价 = fit 视图在「老计划日期 + FINAL(now)」组合下整体压缩(A22,测试 fixture 已改近期动态日期;产品语义正确,勿回退)。
+- **今日线入视口**:落地为「每次挂载至多一次」(ref 守卫),且仅无视点日(首次打开)时生效——比 spec 的「每会话一次」更保守,不与 sessionStorage 视点日恢复冲突。
+- **偏移徽标定位**:`badgeLeft = max(计划条尾(叶)/菱形右侧(due-only), 实际条尾) + 6`;due-only 行按 §真值表不画实际条但徽标照出。
+- **后端投影**:`ChecklistCount(itemId,total,done)` 构造器投影,列别名 snake_case 经命名策略映驼峰(同 Metrics*Row 模式);history 查询 ORDER BY item,created_at,id 保证破并列序。
+- **实际条最小 3px**(与计划条同规则);actualStart=actualEnd(瞬时完成)亦 3px 可见。
+- **本票顺手修复 A24**:api/build.gradle.kts 集成编译显式依赖 test 类(坏 build cache 事故的接线补丁)。
+- 验证矩阵:`gradle build` ✓ / `integrationTest` 70 类 0 失败 ✓ / e2e 全量 113 ✓ / api.http 全绿 ✓ / 手工 11 例用户过 ✓。新增 e2e 1 例(gantt.spec.ts:实际条/偏移/遮罩 50%/折叠徽标/hover 卡)。
