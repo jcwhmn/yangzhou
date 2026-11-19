@@ -308,4 +308,48 @@ class GanttApiTest : AbstractApiTest() {
         assertTrue(rowB["checklistDone"].isNull)
         assertTrue(rowB["checklistTotal"].isNull)
     }
+
+    @Test
+    fun `YPJ-233 行排序——同级 start 升序未排期靠后创建序兑底`() {
+        val authed = bootstrapAndAuth()
+        createProject(authed, "ORD")
+
+        // 创建序故意与 start 序错开;无日期 = 未排期
+        val a = createItem(authed, "ORD", "A")
+        val b = createItem(authed, "ORD", "B")
+        val c = createItem(authed, "ORD", "C")
+        val c2 = createItem(authed, "ORD", "c2", parentItemId = c["itemId"].asText()) // C 子,未排期,先建
+        val c1 = createItem(authed, "ORD", "c1", parentItemId = c["itemId"].asText()) // C 子,后建
+        val b1 = createItem(authed, "ORD", "b1", parentItemId = b["itemId"].asText())
+
+        fun patch(id: String, date: String) {
+            authed
+                .patch()
+                .uri("/api/items/$id")
+                .body(mapOf("startDate" to date))
+                .exchange()
+                .expectStatus()
+                .isOk()
+        }
+        patch(a["itemId"].asText(), "2026-12-03")
+        patch(c["itemId"].asText(), "2026-12-01")
+        patch(c1["itemId"].asText(), "2026-12-05")
+        patch(b1["itemId"].asText(), "2026-12-04")
+
+        val rows =
+            json.readTree(
+                authed
+                    .get()
+                    .uri("/api/projects/ORD/gantt?scope=all")
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody(String::class.java)
+                    .returnResult()
+                    .responseBody!!,
+            )["rows"].map { it["title"].asText() }
+
+        // 根级:C(12-01)→ A(12-03),未排期 B 靠后;C 组内 c1(start)在前、c2(未排期)落尾;B 组内 b1 正常
+        assertEquals(listOf("C", "c1", "c2", "A", "B", "b1"), rows)
+    }
 }

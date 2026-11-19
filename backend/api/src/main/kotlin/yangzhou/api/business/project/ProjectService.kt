@@ -23,6 +23,14 @@ import yangzhou.persistence.repository.StatusRepository
 import java.time.LocalDateTime
 import java.util.UUID
 
+/** YPJ-233(拍板 2026-11-18):同级 start 升序、未排期(无 start)靠后、同 start 按创建序兜底;树每层递归生效。 */
+internal val ganttSiblingOrder: Comparator<yangzhou.persistence.Item> =
+    compareBy(
+        { it.startDate == null }, // 未排期靠后
+        { it.startDate ?: LocalDateTime.MAX }, // start 升序(未排期组内该键恒同,落回 number)
+        { it.number }, // 稳定兜底:同 start / 未排期组内按创建序
+    )
+
 /** Project = 编号(key-N)+ workflow + 视图容器(ADR-0001)。 */
 @Service
 class ProjectService(
@@ -271,7 +279,7 @@ class ProjectService(
             return depth
         }
 
-        fun walk(parent: UUID?): List<GanttRow> = (byParent[parent] ?: emptyList()).sortedBy { it.number }.flatMap { item ->
+        fun walk(parent: UUID?): List<GanttRow> = (byParent[parent] ?: emptyList()).sortedWith(ganttSiblingOrder).flatMap { item ->
             val status = statusById[item.statusObjectId]
             val hist = histories[item.objectId!!].orEmpty()
             val cc = checklistCounts[item.objectId!!]
