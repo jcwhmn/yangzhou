@@ -2,6 +2,7 @@
 
 > 票:YPJ-243(8h,sprint V31,排期 11-20 09:00~17:00)。规则源:Obsidian `projects/yangzhou/Thoughts.md` 2026-11-20 节(用户拍板:due 与 estimate 二选一互算、后写者为准、重算+警告)+ 同节完备性补遗 H1–H12。
 > **架构破坏显要标注**:本票显式推翻 spec 0146 案①的两处既有拍板——①「只改 estimate 不触发重算」→ 改为触发;②「due 显式清除生效,不回填」→ 改为 estimate 有值时铺算回填。0146 真值表作废,以本 spec §2.1 为准。其余 0146 语义(date/datetime 解析、dueFrom 铺算、显式 due 覆盖、start>due 400)不变。
+> **拍板确认(2026-11-20,用户)**:①推翻 0146 清除不回填——确认;②改 due→estimate 反推**无条件**(无预估填预估、有预估改预估);③同请求双显式=双存+冲突警告(保守默认),「后写者为准」在 UI 层由前端保证(表单对 due/estimate 后改的字段单独/后发 PATCH,spec 0151 落);④改值即警(warnings 字段+前端 toast)。
 
 ## 一、需求
 
@@ -29,10 +30,10 @@
 | start 携带 | due 携带 | estimate 携带 | 行为 |
 |---|---|---|---|
 | 任意 | 未携带(null) | **显式设置且变化**(H4) | **estimate 后写**:start(新/旧)有 → due=dueFrom(start,hours) 重算;start 无 → 只存 estimate,警告「无开始日期,due 未铺算」。原 due 被覆盖 |
-| 任意 | **显式设置且变化** | 未携带(H3) | **due 后写**:start(新/旧)有 → estimate=workHours(start,due) 反推写回(value=hours,unit=`hour`)+警告;start 无 → 只存 due,警告「无开始日期,estimate 未推算」。⚠ 行为变化:est 估为空的票改 due 会**新增** estimate(二选一原则);若体验不佳备选=仅 estimate 已存在时反推(一行门) |
+| 任意 | **显式设置且变化,且 start 未同发** | 未携带(H3,已拍板无条件) | **due 后写**:start(存量)有 → estimate=workHours(start,due) 反推写回(value=hours,unit=`hour`)+警告;start 无 → 只存 due,警告「无开始日期,estimate 未推算」。无预估→填预估;有预估→改预估(用户 2026-11-20 拍板)。**start+due 同发=排期窗口**:双存,estimate 不动(否则排期每存一次都重写预估,且 start>due 400 被 C 分支滑走失效——集成用例实锤后收窄) |
 | 显式/未携带 | 未携带 | 未携带 | 0146 既有:start+存量 estimate → due 铺算(estimate 未变,果随因) |
 | 任意 | **`""` 显式清除**(H2) | 任意 | estimate 有且 start 有 → due=dueFrom 重算回填(清除被推算覆盖)+警告;estimate 无 → due=null 生效(推翻 0146「清除不回填」) |
-| 任意 | 显式设置 | 显式设置(H1) | **双存**:两值都生效存储;若 start 有且 \|workHours(start,due)−hours\|>0.01 → 冲突警告,不互算 |
+| 任意 | 显式设置 | 显式设置(H1) | **双存**:两值都生效存储;若 start 有且 \|workHours(start,due)−hours\|>0.01 → 冲突警告,不互算。注:UI「后填者改先填者」由前端发送顺序保证(0151),API 层双显式无先后语义 |
 | 仅其他字段 | — | — | 不触发互算(现状) |
 
 - `workHours(start, due)`:WorkdayCalculator 新方法 `hoursBetween(start, due)`——dueFrom 的逆:工作时段内线性时长(逐日 `[max(start, ws), min(due, we)]` 累加;周六日照算同现状;due<start 返回 0,校验层另有 400)。

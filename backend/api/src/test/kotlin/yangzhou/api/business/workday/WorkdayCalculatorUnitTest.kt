@@ -63,4 +63,45 @@ class WorkdayCalculatorUnitTest {
             WorkdayCalculator(LocalTime.of(18, 0), LocalTime.of(9, 0))
         }
     }
+
+    // ---------- YPJ-243(spec 0150):hoursBetween(dueFrom 的逆) ----------
+
+    @Test
+    fun `hoursBetween——当日部分区间`() {
+        assertEquals(
+            5.0,
+            calc.hoursBetween(LocalDateTime.of(2026, 11, 17, 9, 0), LocalDateTime.of(2026, 11, 17, 14, 0)),
+        )
+    }
+
+    @Test
+    fun `hoursBetween——跨日累加`() {
+        assertEquals(
+            13.0, // 周二 9h(09-18)+ 周三 4h(09-13)
+            calc.hoursBetween(LocalDateTime.of(2026, 11, 17, 9, 0), LocalDateTime.of(2026, 11, 18, 13, 0)),
+        )
+    }
+
+    @Test
+    fun `hoursBetween——同刻与倒挂为 0`() {
+        val t = LocalDateTime.of(2026, 11, 17, 12, 0)
+        assertEquals(0.0, calc.hoursBetween(t, t))
+        assertEquals(0.0, calc.hoursBetween(LocalDateTime.of(2026, 11, 17, 14, 0), t))
+    }
+
+    @Test
+    fun `hoursBetween——收工后起点顺延次日起算`() {
+        assertEquals(
+            1.0, // 周二 19:00 → 周三 10:00:仅周三 09-10 计 1h
+            calc.hoursBetween(LocalDateTime.of(2026, 11, 17, 19, 0), LocalDateTime.of(2026, 11, 18, 10, 0)),
+        )
+    }
+
+    @Test
+    fun `hoursBetween——跨周末照算(周六日不跳,同 dueFrom)`() {
+        assertEquals(
+            20.0, // 周五 17-18=1h + 周六 9h + 周日 9h + 周一 09-10=1h
+            calc.hoursBetween(LocalDateTime.of(2026, 11, 20, 17, 0), LocalDateTime.of(2026, 11, 23, 10, 0)),
+        )
+    }
 }

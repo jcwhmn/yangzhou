@@ -639,15 +639,23 @@ class ItemServiceUnitTest {
         }
 
         @Test
-        fun `due 空串显式清除——不回填(逃生门)`() {
-            row = row.copy(estimateValue = 5.0, estimateUnit = "hour", dueDate = LocalDateTime.parse("2026-11-23T18:00"))
+        fun `due 空串显式清除且预估有值——铺算回填(YPJ-243 推翻 0146 清除不回填)`() {
+            row =
+                row.copy(
+                    estimateValue = 5.0,
+                    estimateUnit = "hour",
+                    startDate = LocalDateTime.parse("2026-11-23T09:00"),
+                    dueDate = LocalDateTime.parse("2026-11-23T18:00"),
+                )
 
-            service.update(
-                itemOid, title = null, description = null, type = null, statusItemId = null, parentItemId = null,
-                startDateText = "2026-11-23", dueDateText = "",
-            )
+            val dto =
+                service.update(
+                    itemOid, title = null, description = null, type = null, statusItemId = null, parentItemId = null,
+                    dueDateText = "",
+                )
 
-            assertNull(row.dueDate)
+            assertEquals(LocalDateTime.parse("2026-11-23T14:00"), row.dueDate)
+            assertTrue(dto.warnings.any { "回填" in it })
         }
 
         @Test
@@ -676,6 +684,119 @@ class ItemServiceUnitTest {
             assertFailsWith<NotFoundException> {
                 service.update(UUID.randomUUID(), title = null, description = null, type = null, statusItemId = null, parentItemId = null)
             }
+        }
+
+        // ---------- YPJ-243(spec 0150):双向互算·后写者为准 ----------
+
+        @Test
+        fun `estimate 后写——显式改预估重算 due + 警告`() {
+            row = row.copy(startDate = LocalDateTime.parse("2026-11-23T09:00"), dueDate = LocalDateTime.parse("2026-11-25T18:00"))
+
+            val dto =
+                service.update(
+                    itemOid, title = null, description = null, type = null, statusItemId = null, parentItemId = null,
+                    estimateValueText = "5", estimateUnitText = "hour",
+                )
+
+            assertEquals(LocalDateTime.parse("2026-11-23T14:00"), row.dueDate)
+            assertTrue(dto.warnings.any { "重算" in it })
+        }
+
+        @Test
+        fun `estimate 后写——无 start 只警告不铺算`() {
+            row = row.copy(startDate = null, dueDate = null)
+
+            val dto =
+                service.update(
+                    itemOid, title = null, description = null, type = null, statusItemId = null, parentItemId = null,
+                    estimateValueText = "5", estimateUnitText = "hour",
+                )
+
+            assertNull(row.dueDate)
+            assertTrue(dto.warnings.any { "无开始日期" in it })
+        }
+
+        @Test
+        fun `due 后写——显式改 due 反推 estimate(无预估填预估,YPJ-243)`() {
+            row = row.copy(startDate = LocalDateTime.parse("2026-11-23T09:00"), estimateValue = null, estimateUnit = null)
+
+            val dto =
+                service.update(
+                    itemOid, title = null, description = null, type = null, statusItemId = null, parentItemId = null,
+                    dueDateText = "2026-11-23T14:00",
+                )
+
+            assertEquals(5.0, row.estimateValue)
+            assertEquals("hour", row.estimateUnit)
+            assertTrue(dto.warnings.any { "预估已按起止重算" in it })
+        }
+
+        @Test
+        fun `due 后写——无 start 只警告不推算`() {
+            row = row.copy(startDate = null)
+
+            val dto =
+                service.update(
+                    itemOid, title = null, description = null, type = null, statusItemId = null, parentItemId = null,
+                    dueDateText = "2026-11-23T14:00",
+                )
+
+            assertNull(row.estimateValue)
+            assertTrue(dto.warnings.any { "无开始日期" in it })
+        }
+
+        @Test
+        fun `双显式冲突——双存+冲突警告不互算`() {
+            row = row.copy(startDate = LocalDateTime.parse("2026-11-23T09:00"))
+
+            val dto =
+                service.update(
+                    itemOid, title = null, description = null, type = null, statusItemId = null, parentItemId = null,
+                    dueDateText = "2026-11-24T13:00", estimateValueText = "5", estimateUnitText = "hour",
+                )
+
+            // due 13h(当日 9h+次日 4h) vs estimate 5h → 双存,不互算
+            assertEquals(LocalDateTime.parse("2026-11-24T13:00"), row.dueDate)
+            assertEquals(5.0, row.estimateValue)
+            assertTrue(dto.warnings.any { "不一致" in it })
+        }
+
+        @Test
+        fun `双显式一致——无冲突警告`() {
+            row = row.copy(startDate = LocalDateTime.parse("2026-11-23T09:00"))
+
+            val dto =
+                service.update(
+                    itemOid, title = null, description = null, type = null, statusItemId = null, parentItemId = null,
+                    dueDateText = "2026-11-23T14:00", estimateValueText = "5", estimateUnitText = "hour",
+                )
+
+            assertTrue(dto.warnings.isEmpty())
+        }
+
+        @Test
+        fun `start+due 同发=排期窗口——双存,estimate 不动(YPJ-243 收窄)`() {
+            row = row.copy(estimateValue = 3.0, estimateUnit = "hour")
+
+            val dto =
+                service.update(
+                    itemOid, title = null, description = null, type = null, statusItemId = null, parentItemId = null,
+                    startDateText = "2026-11-23", dueDateText = "2026-11-30T12:00",
+                )
+
+            assertEquals(3.0, row.estimateValue)
+            assertEquals("hour", row.estimateUnit)
+            assertTrue(dto.warnings.isEmpty())
+        }
+
+        @Test
+        fun `仅改标题——互算不触发 warnings 空`() {
+            val dto =
+                service.update(
+                    itemOid, title = "改名", description = null, type = null, statusItemId = null, parentItemId = null,
+                )
+
+            assertTrue(dto.warnings.isEmpty())
         }
     }
 

@@ -10,6 +10,7 @@ import yangzhou.persistence.repository.ItemDependencyRepository
 import yangzhou.persistence.repository.ItemRepository
 import yangzhou.persistence.repository.ProjectRepository
 import yangzhou.persistence.repository.StatusRepository
+import java.time.LocalDateTime
 import java.util.UUID
 
 /**
@@ -108,6 +109,20 @@ class DependencyService(
                 target != null && finalByObjectId[target.statusObjectId] != true
             }.map { it.itemObjectId }
             .toSet()
+    }
+
+    /** YPJ-243(spec 0150):甘特行依赖锚点——successor → 前置中最晚 due(无 due 退 start);FS 语义,供前端点定位(YPJ-244)。 */
+    fun predecessorAnchors(projectObjectId: UUID): Map<UUID, LocalDateTime> {
+        val projectItems = items.findByProjectObjectIdAndDeletedAtIsNullOrderByNumber(projectObjectId)
+        val itemById = projectItems.associateBy { it.objectId }
+        return dependencies
+            .findByItemObjectIdIn(projectItems.mapNotNull { it.objectId })
+            .mapNotNull { row ->
+                val pred = itemById[row.dependsOnItemObjectId] ?: return@mapNotNull null
+                val anchor = pred.dueDate ?: pred.startDate ?: return@mapNotNull null
+                row.itemObjectId to anchor
+            }.groupBy({ it.first }) { it.second }
+            .mapValues { (_, v) -> v.max() }
     }
 
     private fun reaches(

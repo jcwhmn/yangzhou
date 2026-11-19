@@ -104,7 +104,7 @@ Content-Type: application/json
   "startDate": "2026-11-21T14:30"
 }
 
-### PATCH due 缺省+estimate → 系统按工作日铺算(YPJ-235/spec 0146;响应 dueDate=T14:00,已有 due 亦重算覆盖)
+### PATCH estimate 显式改+start → due 按预估重算(YPJ-243/spec 0150 后写者为准;响应 dueDate=T14:00 + warnings 含「重算」)
 PATCH {{host}}/api/items/{{item208}}
 Authorization: Bearer {{token}}
 Content-Type: application/json
@@ -2700,4 +2700,127 @@ Authorization: Bearer {{token}}
 > {%
     const titles = response.body.rows.map(r => r.title).join(", ");
     client.log("行序: " + titles + " (期望 C, c1, c2, A, B, b1)");
+ %}
+
+### ============ 16. 时间双向互算(YPJ-243/spec 0150;后写者为准;依赖上文 pkey;warnings 仅 PATCH 响应携带) ============
+
+### 建 A(handler 存 item150a)
+POST {{host}}/api/projects/{{pkey}}/items
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "title": "150 互算A {{run}}" }
+
+> {%
+    client.global.set("item150a", response.body.itemId);
+ %}
+
+### A:estimate 后写——显式改预估 5h + start → due 重算(响应 dueDate=2026-11-23T14:00,warnings 含「重算」)
+PATCH {{host}}/api/items/{{item150a}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "startDate": "2026-11-23",
+  "estimateValue": "5",
+  "estimateUnit": "hour"
+}
+
+> {%
+    client.log("A due=" + response.body.dueDate + " warnings=" + JSON.stringify(response.body.warnings));
+ %}
+
+### A:due 后写——显式改 due 至 11-24T13:00 → estimate 反推 13h(9+4;响应 warnings 含「预估已按起止重算」)
+PATCH {{host}}/api/items/{{item150a}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "dueDate": "2026-11-24T13:00"
+}
+
+> {%
+    client.log("A estimate=" + response.body.estimateValue + " " + response.body.estimateUnit);
+ %}
+
+### A:清除 due 且预估有值 → 回填铺算(推翻 0146 清除不回填;响应 warnings 含「回填」,dueDate 回 2026-11-24T13:00)
+PATCH {{host}}/api/items/{{item150a}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "dueDate": ""
+}
+
+> {%
+    client.log("A 回填 due=" + response.body.dueDate + " warnings=" + JSON.stringify(response.body.warnings));
+ %}
+
+### A:[预期警告] 双显式冲突(due=11-25T13:00 与 estimate=5h 不一致)→ 双存+冲突警告,不互算
+PATCH {{host}}/api/items/{{item150a}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "dueDate": "2026-11-25T13:00",
+  "estimateValue": "5",
+  "estimateUnit": "hour"
+}
+
+> {%
+    client.log("A 双显式: due=" + response.body.dueDate + " est=" + response.body.estimateValue + " warnings=" + JSON.stringify(response.body.warnings));
+ %}
+
+### 建前置B(handler 存 item150b)
+POST {{host}}/api/projects/{{pkey}}/items
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "title": "150 前置B {{run}}" }
+
+> {%
+    client.global.set("item150b", response.body.itemId);
+ %}
+
+### 前置B:start-only(无预估不铺算,保持仅 start)
+PATCH {{host}}/api/items/{{item150b}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "startDate": "2026-11-20"
+}
+
+### 建 C(handler 存 item150c)
+POST {{host}}/api/projects/{{pkey}}/items
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "title": "150 后继C {{run}}" }
+
+> {%
+    client.global.set("item150c", response.body.itemId);
+ %}
+
+### C 依赖 A
+POST {{host}}/api/items/{{item150c}}/dependencies
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "dependsOnItemId": "{{item150a}}" }
+
+### C 依赖 B
+POST {{host}}/api/items/{{item150c}}/dependencies
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "dependsOnItemId": "{{item150b}}" }
+
+### 甘特验锚点:C 行 anchorDate = A.due(多前置取最晚 due,无 due 退 start)
+GET {{host}}/api/projects/{{pkey}}/gantt?scope=all
+Authorization: Bearer {{token}}
+
+> {%
+    const row = response.body.rows.find(r => r.title.indexOf("150 后继C") === 0);
+    client.log("C anchorDate=" + row.anchorDate + " (期望 A.due=2026-11-25T13:00)");
  %}
