@@ -633,3 +633,121 @@ test("实际条+偏移徽标+清单遮罩+折叠徽标+hover 卡(YPJ-222/spec 01
   await expect(tip).toContainText("清单:1/2");
   await expect(tip).toContainText("实际:");
 });
+
+test("缺省视窗下限(YPJ-234):宽区间溢出可读 + 今日按钮只居中不重置缩放(案乙)", async ({
+  page,
+  projectKey,
+}) => {
+  // 宽跨度 fixture(~±400 天,今日居中位):本用例专用,老日期不跨用例(A22 教训)
+  const d = (offset: number) => {
+    const t = new Date();
+    t.setDate(t.getDate() + offset);
+    return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+  };
+  const far = await apiCreateItem(projectKey, "E2E 宽窗远端");
+  await apiCall("PATCH", `/api/items/${far}`, {
+    startDate: d(-400),
+    dueDate: d(-390),
+  });
+  const nearId = await apiCreateItem(projectKey, "E2E 宽窗近端");
+  await apiCall("PATCH", `/api/items/${nearId}`, {
+    startDate: d(390),
+    dueDate: d(400),
+  });
+
+  await page.goto(`/p/${projectKey}/gantt`);
+  await pickScope(page, "全部"); // API 直建 item 不在 board,切全量口径(与其他用例同)
+  await expect(page.getByText("E2E 宽窗远端").first()).toBeVisible();
+
+  // 缺省态:fit < 3px/天 → 下限生效,内容溢出可横滚(不再压满一屏)
+  await expect
+    .poll(() =>
+      page
+        .getByTestId("gantt-scroll")
+        .evaluate(
+          (el) =>
+            (el.firstElementChild as HTMLElement).scrollWidth >
+            el.clientWidth + 100,
+        ),
+    )
+    .toBe(true);
+
+  // 条可读:任一条 ≥3px
+  const w = await page
+    .locator('[data-testid^="gantt-bar-"]')
+    .first()
+    .evaluate((el) => el.getBoundingClientRect().width);
+  expect(w).toBeGreaterThanOrEqual(3);
+
+  // 挂载:今日线入视口(0147 语义保留,每挂载至多一次)
+  const inView = () =>
+    page.evaluate(() => {
+      const scroll = document.querySelector(
+        '[data-testid="gantt-scroll"]',
+      ) as HTMLElement;
+      if (!scroll) return false;
+      const lines = [...scroll.querySelectorAll("div")].filter((el) => {
+        const s = getComputedStyle(el);
+        return s.width === "2px" && s.position === "absolute";
+      });
+      return lines.some((el) => {
+        const x = (el as HTMLElement).offsetLeft - scroll.scrollLeft;
+        return x >= 0 && x <= scroll.clientWidth;
+      });
+    });
+  await expect.poll(inView).toBe(true);
+
+  // 按钮缩放锚点 = 视口中心(用户 2026-11-19 建议):今日线初始居中,+ 后仍应 ≈ 居中
+  await page.getByTestId("gantt-zoom-in").click();
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const scroll = document.querySelector(
+          '[data-testid="gantt-scroll"]',
+        ) as HTMLElement;
+        const lines = [...scroll.querySelectorAll("div")].filter((el) => {
+          const s = getComputedStyle(el);
+          return s.width === "2px" && s.position === "absolute";
+        });
+        return lines.some((el) => {
+          const x = (el as HTMLElement).offsetLeft - scroll.scrollLeft;
+          return Math.abs(x - scroll.clientWidth / 2) < 40;
+        });
+      }),
+    )
+    .toBe(true);
+
+  // 放大两档 → 滚回最左 → 点今日:今日线居中且缩放不变(案乙:不重置缩放)
+  await page.getByTestId("gantt-zoom-in").click();
+  await page.getByTestId("gantt-zoom-in").click();
+  const contentW = await page
+    .getByTestId("gantt-scroll")
+    .evaluate((el) => (el.firstElementChild as HTMLElement).scrollWidth);
+  await page.evaluate(() => {
+    (
+      document.querySelector('[data-testid="gantt-scroll"]') as HTMLElement
+    ).scrollLeft = 0;
+  });
+  await page.getByTestId("gantt-today").click();
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const scroll = document.querySelector(
+          '[data-testid="gantt-scroll"]',
+        ) as HTMLElement;
+        const lines = [...scroll.querySelectorAll("div")].filter((el) => {
+          const s = getComputedStyle(el);
+          return s.width === "2px" && s.position === "absolute";
+        });
+        return lines.some((el) => {
+          const x = (el as HTMLElement).offsetLeft - scroll.scrollLeft;
+          return Math.abs(x - scroll.clientWidth / 2) < 40;
+        });
+      }),
+    )
+    .toBe(true);
+  const contentW2 = await page
+    .getByTestId("gantt-scroll")
+    .evaluate((el) => (el.firstElementChild as HTMLElement).scrollWidth);
+  expect(contentW2).toBe(contentW); // 缩放未被「今日」重置
+});

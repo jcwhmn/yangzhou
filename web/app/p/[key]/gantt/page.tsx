@@ -68,6 +68,7 @@ const TITLE_W_DEFAULT = 280; // 标题列默认宽(=236 出厂值;237 双击重�
 const TITLE_W_MIN = 120;
 const TITLE_W_LS = "yz-gantt-title-w"; // 237:标题列宽 localStorage 记忆键
 const MAX_PPD = 2400; // 缩放上限:1日窗承诺在内容宽 ≤2680 成立(YPJ-230;1920 屏内容 1386 原被 720 夹成 ~1.9 天)
+const GANTT_MIN_PPD = 3; // 缺省视窗 pxPerDay 下限(YPJ-234 拍板案 B 修订:宽区间不把条压没;1 天 ≈ 3px、1 月 ≈ 91px 可读;只约束缺省态,显式缩放仍可压破至 fit)
 const MIN_LABEL_PX = 44; // 刻度标签最小间距
 const ZOOM_STEP = 1.5; // ± 按钮步进系数
 
@@ -240,7 +241,11 @@ export default function GanttPage() {
     const endT = +end + DAY; // 末日 24:00
     const spanDays = Math.max((endT - +start) / DAY, 1);
     const fit = containerW > 0 ? containerW / spanDays : 20;
-    const pxPerDay = Math.min(Math.max(zoom ?? fit, fit), MAX_PPD);
+    // 缺省态(zoom=null)= fit 但带下限(YPJ-234);显式 zoom 仍 clamp [fit, MAX]
+    const pxPerDay = Math.min(
+      Math.max(zoom ?? Math.max(fit, GANTT_MIN_PPD), fit),
+      MAX_PPD,
+    );
     const timelineW = spanDays * pxPerDay;
     const xOfT = (t: number) => ((t - +start) / DAY) * pxPerDay;
 
@@ -372,10 +377,15 @@ export default function GanttPage() {
   useEffect(() => {
     saveView();
   }, [saveView]);
+  // 存档恢复只做一次(restoredRef 门,YPJ-234):原先依赖 [saveView, rows] 重跑,每次缩放/切范围后都把挂载时旧 scrollLeft 拍回去 → 缩放中心锚点失效
+  const restoredRef = useRef(false);
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    if (savedView.scroll) el.scrollLeft = savedView.scroll;
+    if (!restoredRef.current) {
+      restoredRef.current = true;
+      if (savedView.scroll) el.scrollLeft = savedView.scroll;
+    }
     el.addEventListener("scroll", saveView);
     return () => el.removeEventListener("scroll", saveView);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -477,6 +487,12 @@ export default function GanttPage() {
       pendingWinRef.current = undefined; // 直接生效路径清挂起,防切范围后补放旧值
       applyDayWindow(days);
     }
+  };
+  // YPJ-234 案乙:今日 = 只居中不重置缩放;同值重设也要触发居中(清 lastCenter refs)
+  const centerOnToday = () => {
+    lastCenterRef.current = "";
+    lastCenterStartRef.current = null;
+    setCenter(fmtDay(new Date()));
   };
   useEffect(() => {
     if (rows === null || containerW <= 0) return;
@@ -705,7 +721,7 @@ export default function GanttPage() {
           >
             +
           </Button>
-          {/* 全览:回到数据全区间(fit) */}
+          {/* 全览:回到缺省视窗(fit+下限;宽区间下不再压满一屏,YPJ-234) */}
           <Button
             size="small"
             variant="outlined"
@@ -717,12 +733,12 @@ export default function GanttPage() {
           >
             全览
           </Button>
-          {/* 今日回中 */}
+          {/* 今日回中(YPJ-234 案乙:只居中不重置缩放;回缺省缩放用「全览」) */}
           <Button
             size="small"
             variant="outlined"
             data-testid="gantt-today"
-            onClick={() => goToDayWindow(null)}
+            onClick={centerOnToday}
           >
             今日
           </Button>
