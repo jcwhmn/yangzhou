@@ -94,3 +94,10 @@ const GANTT_MIN_PPD = 3; // 缺省视窗 pxPerDay 下限(YPJ-234 拍板:宽区�
 4. 点「全览」:宽区间下回缺省窗(ppd=3)而非压满一屏;视口位置不动。
 5. 「-」到底:可压破 3 直到 fit(全部一屏),「+」到 2400 上限不变。
 6. 刷新/切 scope 回来:缩放与滚动位按存档恢复,缺省态(全览后)也恢复为 fit+下限。
+
+## 四、As-built(2026-11-19,PR #236 已合)
+
+- 实现 = 设计,零偏差:`GANTT_MIN_PPD = 3` 常量 + pxPerDay memo 缺省态带下限(`zoom ?? Math.max(fit, GANTT_MIN_PPD)`);「今日」按钮拍板**案乙**落地(`centerOnToday`:清 lastCenter refs + `setCenter`,不动 zoom);「全览」注释同步为「回缺省视窗(fit+下限)」。e2e 新用例 1 条按 §二改动 2 四断言落地(宽区间溢出可读、条形 ≥3px、挂载今日入视口、今日只居中)。
+- **搭车修复(超出 §二,显要标注):A27 缩放中点锚点 bug(main 既有)**——存档恢复 effect 原依赖 `[saveView, rows]` 重跑,每次缩放/切范围后把挂载时旧 scrollLeft 拍回去,中点锚点失效;修复 = `restoredRef` 一次性门(与 A27「恢复类 effect 与监听类分开」结论一致),锚点行为已有 e2e 断言钉死。台账 A27 已录 `docs/planning/问题处理记录.md`(连同 A26 e2e 复用旧 3002 构建,累计 A16–A27)。
+- 验证:gantt e2e 16/16 全绿;spec §三 手工验收用户 LGTM(手工验收在 prod,dev 数据太少);PR #236 squash 合入(`2e9fc2f`),票 YPJ-234 已 Done。
+- 后续钩子:亚日窗放大(R2 深化)/ R3 刻度分层归 YPJ-241 统一横轴设计,不在本票;prod 镜像重建时机待用户拍板。
