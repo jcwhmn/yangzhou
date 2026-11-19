@@ -225,4 +225,87 @@ class GanttApiTest : AbstractApiTest() {
             .expectStatus()
             .isNotFound()
     }
+
+    @Test
+    fun `YPJ-222 spec 0147 实际起止推导——清单完成率与负责人名随行下发`() {
+        val authed = bootstrapAndAuth()
+        createProject(authed, "ACT")
+
+        val meId =
+            json.readTree(
+                authed
+                    .get()
+                    .uri("/api/members")
+                    .exchange()
+                    .expectBody(String::class.java)
+                    .returnResult()
+                    .responseBody!!,
+            )[0]["memberId"].asText()
+        val statusIds =
+            json.readTree(
+                authed
+                    .get()
+                    .uri("/api/projects/ACT")
+                    .exchange()
+                    .expectBody(String::class.java)
+                    .returnResult()
+                    .responseBody!!,
+            )["statuses"].associate { it["name"].asText() to it["statusId"].asText() }
+
+        fun patchItem(id: String, body: Map<String, Any?>) {
+            authed.patch().uri("/api/items/$id").body(body).exchange().expectStatus().isOk()
+        }
+
+        // 甲:start+due → 迁 In Progress → Done;指派给我;清单 2 条完成 1 条
+        val a = createItem(authed, "ACT", "甲")["itemId"].asText()
+        patchItem(a, mapOf("startDate" to "2026-01-01", "dueDate" to "2026-01-10"))
+        authed.put().uri("/api/items/$a/assignee").body(mapOf("assigneeItemId" to meId)).exchange().expectStatus().isOk()
+        val t1 =
+            json.readTree(
+                authed
+                    .post()
+                    .uri("/api/items/$a/checklist")
+                    .body(mapOf("text" to "t1"))
+                    .exchange()
+                    .expectStatus()
+                    .isCreated()
+                    .expectBody(String::class.java)
+                    .returnResult()
+                    .responseBody!!,
+            )["checklistItemId"].asText()
+        authed.post().uri("/api/items/$a/checklist").body(mapOf("text" to "t2")).exchange().expectStatus().isCreated()
+        authed.patch().uri("/api/checklist/$t1").body(mapOf("done" to true)).exchange().expectStatus().isOk()
+        patchItem(a, mapOf("statusItemId" to statusIds["In Progress"]))
+        patchItem(a, mapOf("statusItemId" to statusIds["Done"]))
+
+        // 乙:start+due,未动(仍 To Do,无清单无负责人)
+        val b = createItem(authed, "ACT", "乙")["itemId"].asText()
+        patchItem(b, mapOf("startDate" to "2026-02-01", "dueDate" to "2026-02-10"))
+
+        val rows =
+            json.readTree(
+                authed
+                    .get()
+                    .uri("/api/projects/ACT/gantt?scope=all")
+                    .exchange()
+                    .expectBody(String::class.java)
+                    .returnResult()
+                    .responseBody!!,
+            )["rows"]
+        val rowA = rows.first { it["title"].asText() == "甲" }
+        val rowB = rows.first { it["title"].asText() == "乙" }
+
+        // 甲:两迁入史齐 → 实际起止非空;负责人名与清单计数随行
+        assertTrue(!rowA["actualStart"].isNull)
+        assertTrue(!rowA["actualEnd"].isNull)
+        assertEquals("me", rowA["assigneeName"].asText())
+        assertEquals(1, rowA["checklistDone"].asInt())
+        assertEquals(2, rowA["checklistTotal"].asInt())
+        // 乙:无迁移史/无清单/无负责人 → 全 null
+        assertTrue(rowB["actualStart"].isNull)
+        assertTrue(rowB["actualEnd"].isNull)
+        assertTrue(rowB["assigneeName"].isNull)
+        assertTrue(rowB["checklistDone"].isNull)
+        assertTrue(rowB["checklistTotal"].isNull)
+    }
 }

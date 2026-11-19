@@ -45,6 +45,10 @@ class ProjectService(
     private val releases: yangzhou.persistence.repository.ReleaseRepository,
     private val releaseItems: yangzhou.persistence.repository.ReleaseItemRepository,
     private val dependencyService: yangzhou.api.business.dependency.DependencyService,
+    // YPJ-222(spec 0147):实际起止推导 + 清单完成率 + 负责人名
+    private val historyRepo: yangzhou.persistence.repository.ItemStatusHistoryRepository,
+    private val checklists: yangzhou.persistence.repository.ChecklistItemRepository,
+    private val memberRepo: yangzhou.persistence.repository.MemberRepository,
     private val mapper: ObjectMapper,
 ) {
 
@@ -222,6 +226,19 @@ class ProjectService(
         val statusById = statuses.findByProjectObjectIdOrderByPosition(projectId).associateBy { it.objectId }
         val now = LocalDateTime.now() // YPJ-208:时刻口径(spec 0138;甘特无 Clock seam,页面级展示容忍)
 
+        // YPJ-222(spec 0147):实际起止 = status_history 首迁非 START / 首迁 FINAL;清单完成率;负责人名(均批量)
+        val startIds = statusById.values.filter { it.statusType == StatusType.START }.mapNotNull { it.objectId }.toSet()
+        val finalIds = statusById.values.filter { it.statusType == StatusType.FINAL }.mapNotNull { it.objectId }.toSet()
+        val histories = historyRepo.forProject(projectId).groupBy { it.itemObjectId }
+        val checklistCounts = checklists.countByProject(projectId).associateBy { it.itemId }
+        val assigneeIds = all.mapNotNull { it.assigneeObjectId }.toSet()
+        val assigneeNames =
+            if (assigneeIds.isEmpty()) {
+                emptyMap()
+            } else {
+                memberRepo.findAllByObjectIdIn(assigneeIds).associateBy({ it.objectId }, { it.displayName })
+            }
+
         // YPJ-218(spec 0139)B1:孤儿兑底——父已删/不存在的 item 归入根组,不消失
         val effectiveParent = { item: yangzhou.persistence.Item ->
             item.parentObjectId?.takeIf { byId.containsKey(it) }
@@ -256,6 +273,8 @@ class ProjectService(
 
         fun walk(parent: UUID?): List<GanttRow> = (byParent[parent] ?: emptyList()).sortedBy { it.number }.flatMap { item ->
             val status = statusById[item.statusObjectId]
+            val hist = histories[item.objectId!!].orEmpty()
+            val cc = checklistCounts[item.objectId!!]
             val row = GanttRow(
                 itemId = item.objectId,
                 parentItemId = item.parentObjectId,
@@ -270,6 +289,11 @@ class ProjectService(
                 estimateValue = item.estimateValue,
                 estimateUnit = item.estimateUnit,
                 depth = depthOf(item),
+                actualStart = hist.firstOrNull { it.toStatusObjectId !in startIds }?.createdAt?.toString(),
+                actualEnd = hist.firstOrNull { it.toStatusObjectId in finalIds }?.createdAt?.toString(),
+                assigneeName = item.assigneeObjectId?.let { assigneeNames[it] },
+                checklistDone = cc?.done?.toInt(),
+                checklistTotal = cc?.total?.toInt(),
             )
             listOf(row) + walk(item.objectId)
         }
@@ -329,6 +353,12 @@ class ProjectService(
         val estimateValue: Double?,
         val estimateUnit: String?,
         val depth: Int,
+        // YPJ-222(spec 0147):实际条/偏移量/hover 卡/进度遮罩;Instant 串(UTC),前端 parseLocal 兼容
+        val actualStart: String? = null,
+        val actualEnd: String? = null,
+        val assigneeName: String? = null,
+        val checklistDone: Int? = null,
+        val checklistTotal: Int? = null,
     )
 
     data class GanttDto(val rows: List<GanttRow>)

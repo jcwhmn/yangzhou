@@ -109,6 +109,15 @@ interface ItemStatusHistoryRepository : CrudRepository<ItemStatusHistory, Long> 
     fun findByItemObjectIdOrderByCreatedAtAsc(item_object_id: UUID): List<ItemStatusHistory>
 
     fun countByActorMemberObjectId(actorMemberObjectId: UUID?): Long
+
+    /** YPJ-222(spec 0147):项目内全部状态迁移行(软删 item 排除),供甘特实际起止推导;序即破并列序。 */
+    @Query(
+        """SELECT h.* FROM item_status_history h
+            JOIN item i ON i.object_id = h.item_object_id
+            WHERE i.project_object_id = :projectId AND i.deleted_at IS NULL
+            ORDER BY h.item_object_id, h.created_at, h.id""",
+    )
+    fun forProject(projectId: UUID): List<ItemStatusHistory>
 }
 
 interface AttributeDefinitionRepository : CrudRepository<AttributeDefinition, Long> {
@@ -352,7 +361,25 @@ interface ChecklistItemRepository : CrudRepository<ChecklistItem, Long> {
     fun findByObjectId(objectId: UUID): ChecklistItem?
 
     fun deleteByObjectId(objectId: UUID)
+
+    /** YPJ-222(spec 0147):项目内各 item 清单完成计数,供甘特进度遮罩;无清单的 item 不在结果里。 */
+    @Query(
+        """SELECT ci.item_object_id AS item_id, COUNT(*) AS total,
+            SUM(CASE WHEN ci.done THEN 1 ELSE 0 END) AS done
+            FROM checklist_item ci
+            JOIN item i ON i.object_id = ci.item_object_id
+            WHERE i.project_object_id = :projectId AND i.deleted_at IS NULL
+            GROUP BY ci.item_object_id""",
+    )
+    fun countByProject(projectId: UUID): List<ChecklistCount>
 }
+
+/** ChecklistItemRepository.countByProject 出参投影(别名 snake_case 经命名策略映到驼峰,同 Metrics*Row)。 */
+data class ChecklistCount(
+    val itemId: UUID,
+    val total: Long,
+    val done: Long,
+)
 
 interface ItemDependencyRepository : CrudRepository<ItemDependency, Long> {
     fun findByItemObjectId(itemObjectId: UUID): List<ItemDependency>
