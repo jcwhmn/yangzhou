@@ -9,6 +9,7 @@ import {
   Select,
   Stack,
   TextField,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import { PageShell } from "@/components/PageShell";
@@ -41,9 +42,26 @@ type GanttRow = {
   estimateValue: number | null;
   estimateUnit: string | null;
   depth: number;
+  actualStart: string | null;
+  actualEnd: string | null;
+  assigneeName: string | null;
+  checklistDone: number | null;
+  checklistTotal: number | null;
 };
 
 const DAY = 24 * 60 * 60 * 1000;
+
+// YPJ-222(spec 0147):偏移量 = (实际结束 ?? 今天) 与 due 的日历日差(FINAL 冻结于 actualEnd,未完成随今天;无 due 不标)
+function offsetDays(r: GanttRow): number | null {
+  if (!r.dueDate) return null;
+  const endT = r.actualEnd ? +parseLocal(r.actualEnd) : Date.now();
+  const day0 = (t: number) => {
+    const d = new Date(t);
+    d.setHours(0, 0, 0, 0);
+    return +d;
+  };
+  return Math.round((day0(endT) - day0(+parseLocal(r.dueDate))) / DAY);
+}
 
 // YPJ-219 v2(spec 0140):轴 = 数据锚定(首日 00:00 → 末日 24:00),连续缩放,无语义档位
 const TITLE_W_DEFAULT = 280; // 标题列默认宽(=236 出厂值;237 双击重置回落此值)
@@ -201,8 +219,11 @@ export default function GanttPage() {
     const isParent = (r: GanttRow) =>
       rowsNow.some((x) => x.parentItemId === r.itemId);
     const dates = rowsNow.flatMap((r) => {
+      // YPJ-222(spec 0147):轴范围纳入实际起止——实际条超出计划区间时不被裁出画面
       if (!isParent(r))
-        return [r.startDate, r.dueDate].filter(Boolean) as string[];
+        return [r.startDate, r.dueDate, r.actualStart, r.actualEnd].filter(
+          Boolean,
+        ) as string[];
       const s = summaryOf(r.itemId);
       return s ? [s[0], s[1]] : [];
     });
@@ -413,6 +434,24 @@ export default function GanttPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [center, axis.pxPerDay, axis.start, axis.todayX, rows]);
 
+  // YPJ-222(spec 0147):今日线入视口——仅无视点日(首次打开)且今日线在视口外时滚至中部;每次挂载至多一次,不抢用户视点
+  const didAutoScrollRef = useRef(false);
+  useEffect(() => {
+    if (didAutoScrollRef.current) return;
+    if (rows === null || containerW <= 0) return;
+    didAutoScrollRef.current = true;
+    if (center) return;
+    const tx = axis.todayX;
+    if (tx < 0 || tx > axis.timelineW) return;
+    const el = scrollRef.current;
+    if (!el) return;
+    if (tx < el.scrollLeft || tx > el.scrollLeft + el.clientWidth) {
+      el.scrollLeft = Math.max(0, tx - el.clientWidth / 2);
+      setTimeout(saveView, 0);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, containerW, center, axis.todayX, axis.timelineW]);
+
   const fmtDay = (d: Date) =>
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   const shiftCenter = (days: number) => {
@@ -496,6 +535,50 @@ export default function GanttPage() {
           new Date(min).toISOString().slice(0, 10),
           new Date(max).toISOString().slice(0, 10),
         ];
+  }
+
+  // YPJ-222(spec 0147):折叠徽标 N = 该父的全部后代数(任一深度)
+  function descendantsOf(itemId: string): number {
+    let n = 0;
+    const visit = (id: string) => {
+      for (const x of rows ?? []) {
+        if (x.parentItemId !== id) continue;
+        n++;
+        visit(x.itemId);
+      }
+    };
+    visit(itemId);
+    return n;
+  }
+
+  // YPJ-222(spec 0147):条上 hover 详情卡
+  function hoverCard(r: GanttRow) {
+    return (
+      <Stack spacing={0.25}>
+        <Typography variant="caption" sx={{ fontWeight: 600 }}>
+          {r.number} {r.title}
+        </Typography>
+        <Typography variant="caption">
+          {r.statusName}
+          {r.assigneeName ? ` · ${r.assigneeName}` : ""}
+        </Typography>
+        <Typography variant="caption">
+          计划:{r.startDate?.slice(0, 10) ?? "?"} →{" "}
+          {r.dueDate?.slice(0, 10) ?? "?"}
+        </Typography>
+        {r.actualStart && (
+          <Typography variant="caption">
+            实际:{r.actualStart.slice(0, 10)} →{" "}
+            {r.actualEnd ? r.actualEnd.slice(0, 10) : "进行中"}
+          </Typography>
+        )}
+        {r.checklistTotal ? (
+          <Typography variant="caption">
+            清单:{r.checklistDone ?? 0}/{r.checklistTotal}
+          </Typography>
+        ) : null}
+      </Stack>
+    );
   }
 
   function toggle(itemId: string) {
@@ -938,6 +1021,31 @@ export default function GanttPage() {
                       : left;
                   // 零时长条(start=due 同刻)最小 3px 可见(YPJ-229;due-only 菱形是标记不受影响)
                   const width = hasStart ? Math.max(right - left, 3) : 1.2;
+                  // YPJ-222(spec 0147):实际条(叶+有迁出史;due-only 行不画)+ 清单遮罩 + 偏移徽标
+                  const act = drawOwn && hasStart && r.actualStart !== null;
+                  const actLeft = act ? (xOf(r.actualStart) ?? 0) : 0;
+                  const actRight = act
+                    ? Math.max(
+                        r.actualEnd
+                          ? (xEndOf(r.actualEnd) ?? actLeft)
+                          : Math.max(axis.todayX, actLeft),
+                        actLeft,
+                      )
+                    : 0;
+                  const actWidth = act ? Math.max(actRight - actLeft, 3) : 0;
+                  const actPct =
+                    r.checklistTotal && r.checklistDone !== null
+                      ? Math.min(
+                          Math.round(
+                            (r.checklistDone / r.checklistTotal) * 100,
+                          ),
+                          100,
+                        )
+                      : null;
+                  const off = offsetDays(r);
+                  const badgeLeft =
+                    Math.max(hasStart ? right : left + 12, act ? actRight : 0) +
+                    6;
                   return (
                     <Box
                       key={r.itemId}
@@ -987,11 +1095,26 @@ export default function GanttPage() {
                             sx={{
                               height: 8,
                               borderRadius: 1,
-                              bgcolor: "text.secondary",
-                              opacity: 0.45,
+                              bgcolor: "warning.main", // YPJ-222:配色重整——汇总条灰→橙(spec 0147 Q3)
+                              opacity: 0.75,
                             }}
                           />
                         </Box>
+                        {/* 折叠聚合徽标(YPJ-222) */}
+                        {summary && collapsed.has(r.itemId) && (
+                          <Chip
+                            label={`+${descendantsOf(r.itemId)} 子任务`}
+                            size="small"
+                            data-testid={`gantt-collapsed-${r.number}`}
+                            sx={{
+                              position: "absolute",
+                              left: summaryLeft + summaryWidth + 4,
+                              top: 0,
+                              height: 16,
+                              fontSize: 10,
+                            }}
+                          />
+                        )}
                         <Box
                           data-final={isFinal ? "" : undefined}
                           data-testid={`gantt-bar-${r.number}`}
@@ -999,14 +1122,14 @@ export default function GanttPage() {
                             position: "absolute",
                             left,
                             width,
-                            top: 10,
+                            top: 5,
                             display: drawOwn ? "block" : "none",
                           }}
                         >
                           {hasStart ? (
                             <Box
                               sx={{
-                                height: 14,
+                                height: 12,
                                 borderRadius: 1,
                                 bgcolor: isFinal
                                   ? "text.disabled"
@@ -1033,6 +1156,64 @@ export default function GanttPage() {
                             />
                           )}
                         </Box>
+                        {/* 实际条:双行下条(案 B)+ 清单完成率遮罩(YPJ-222;未完成延伸到今日线) */}
+                        {act && (
+                          <Box
+                            data-testid={`gantt-actual-${r.number}`}
+                            sx={{
+                              position: "absolute",
+                              left: actLeft,
+                              width: actWidth,
+                              top: 24,
+                            }}
+                          >
+                            <Box
+                              sx={{
+                                position: "relative",
+                                height: 12,
+                                borderRadius: 1,
+                                bgcolor: isFinal
+                                  ? "text.disabled"
+                                  : "success.main",
+                                opacity: isFinal ? 0.5 : 0.85,
+                              }}
+                            >
+                              {actPct !== null && (
+                                <Box
+                                  sx={{
+                                    position: "absolute",
+                                    left: 0,
+                                    top: 0,
+                                    height: "100%",
+                                    width: `${actPct}%`,
+                                    borderRadius: 1,
+                                    bgcolor: isFinal
+                                      ? "text.secondary"
+                                      : "success.dark",
+                                  }}
+                                />
+                              )}
+                            </Box>
+                          </Box>
+                        )}
+                        {/* 偏移徽标:延期红/提前绿/0 不显(YPJ-222) */}
+                        {off !== null && (
+                          <Typography
+                            variant="caption"
+                            data-testid={`gantt-offset-${r.number}`}
+                            sx={{
+                              position: "absolute",
+                              left: badgeLeft,
+                              top: 24,
+                              lineHeight: "12px",
+                              fontWeight: 600,
+                              color: off > 0 ? "error.main" : "success.main",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {off > 0 ? `+${off}d` : `${off}d`}
+                          </Typography>
+                        )}
                         <Link
                           href={`/p/${key}/i/${r.itemId}?from=gantt`}
                           style={{
@@ -1045,7 +1226,46 @@ export default function GanttPage() {
                           }}
                           aria-label={r.number}
                         >
-                          {" "}
+                          {/* hover 详情卡命中区 = 条矩形(YPJ-222;其余区域仍整块直进详情) */}
+                          {drawOwn && (hasStart || r.dueDate !== null) && (
+                            <Tooltip title={hoverCard(r)}>
+                              <Box
+                                sx={{
+                                  position: "absolute",
+                                  left,
+                                  top: 5,
+                                  width: Math.max(width, 12),
+                                  height: 12,
+                                }}
+                              />
+                            </Tooltip>
+                          )}
+                          {act && (
+                            <Tooltip title={hoverCard(r)}>
+                              <Box
+                                sx={{
+                                  position: "absolute",
+                                  left: actLeft,
+                                  top: 24,
+                                  width: actWidth,
+                                  height: 12,
+                                }}
+                              />
+                            </Tooltip>
+                          )}
+                          {summary && (
+                            <Tooltip title={hoverCard(r)}>
+                              <Box
+                                sx={{
+                                  position: "absolute",
+                                  left: summaryLeft,
+                                  top: 4,
+                                  width: summaryWidth,
+                                  height: 8,
+                                }}
+                              />
+                            </Tooltip>
+                          )}
                         </Link>
                       </Box>
 
@@ -1067,8 +1287,9 @@ export default function GanttPage() {
             sx={{ mt: 1, display: "block" }}
           >
             蓝竖线 = 今天 · 菱形 = 里程碑(只有截止日期) · 红色 = 超期 · 灰 =
-            已完成 · 灰横条 = 父汇总(子孙并集) · Ctrl+滚轮或 ± 缩放 ·
-            「今日」回中今天
+            已完成 · 橙横条 = 父汇总(子孙并集,折叠显 +N 子任务) · 上条 = 计划 /
+            下条 = 实际(绿,深色 = 清单完成率) · ±Nd = 偏移(实际/今天 vs due) ·
+            悬停条看详情 · Ctrl+滚轮或 ± 缩放 · 「今日」回中今天
           </Typography>
         </>
       )}
