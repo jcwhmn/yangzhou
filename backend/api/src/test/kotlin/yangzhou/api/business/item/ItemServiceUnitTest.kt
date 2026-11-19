@@ -32,6 +32,7 @@ import yangzhou.persistence.repository.RequirementRepository
 import yangzhou.persistence.repository.StatusRepository
 import java.time.Clock
 import java.time.Instant
+import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.util.UUID
 import kotlin.test.Test
@@ -586,6 +587,86 @@ class ItemServiceUnitTest {
                 }
 
             assertEquals("开始日期不能晚于截止日期", e.message)
+        }
+
+        // ---------- YPJ-235(spec 0146):due 缺省时按 estimate 工作日铺算 ----------
+
+        @Test
+        fun `due 缺省且 estimate 有值——系统算当日 5h 到 14 点`() {
+            row = row.copy(estimateValue = 5.0, estimateUnit = "hour")
+
+            service.update(
+                itemOid, title = null, description = null, type = null, statusItemId = null, parentItemId = null,
+                startDateText = "2026-11-23", // 周一,date-only → 09:00(默认工作日窗 09:00-18:00)
+            )
+
+            assertEquals(LocalDateTime.parse("2026-11-23T14:00"), row.dueDate)
+        }
+
+        @Test
+        fun `due 缺省——13h 跨日铺到次日 13 点`() {
+            row = row.copy(estimateValue = 13.0, estimateUnit = "hour")
+
+            service.update(
+                itemOid, title = null, description = null, type = null, statusItemId = null, parentItemId = null,
+                startDateText = "2026-11-23",
+            )
+
+            // 当日铺 9h(09:00-18:00),余 4h → 次日 09:00+4h
+            assertEquals(LocalDateTime.parse("2026-11-24T13:00"), row.dueDate)
+        }
+
+        @Test
+        fun `due 缺省且已有 due——重算覆盖(due 是果)`() {
+            row = row.copy(estimateValue = 13.0, estimateUnit = "hour", dueDate = LocalDateTime.parse("2026-11-23T18:00"))
+
+            service.update(
+                itemOid, title = null, description = null, type = null, statusItemId = null, parentItemId = null,
+                startDateText = "2026-11-23T09:00",
+            )
+
+            assertEquals(LocalDateTime.parse("2026-11-24T13:00"), row.dueDate)
+        }
+
+        @Test
+        fun `无 estimate——due 缺省时保持 null(旧行为)`() {
+            service.update(
+                itemOid, title = null, description = null, type = null, statusItemId = null, parentItemId = null,
+                startDateText = "2026-11-23",
+            )
+
+            assertNull(row.dueDate)
+        }
+
+        @Test
+        fun `due 空串显式清除——不回填(逃生门)`() {
+            row = row.copy(estimateValue = 5.0, estimateUnit = "hour", dueDate = LocalDateTime.parse("2026-11-23T18:00"))
+
+            service.update(
+                itemOid, title = null, description = null, type = null, statusItemId = null, parentItemId = null,
+                startDateText = "2026-11-23", dueDateText = "",
+            )
+
+            assertNull(row.dueDate)
+        }
+
+        @Test
+        fun `day 与 week 单位换算——按工作日窗铺`() {
+            row = row.copy(estimateValue = 2.0, estimateUnit = "day")
+            service.update(
+                itemOid, title = null, description = null, type = null, statusItemId = null, parentItemId = null,
+                startDateText = "2026-11-23",
+            )
+            // 2 day = 2×540min:当日铺满后恰好在次日收工时结束
+            assertEquals(LocalDateTime.parse("2026-11-24T18:00"), row.dueDate)
+
+            row = row.copy(estimateValue = 1.0, estimateUnit = "week")
+            service.update(
+                itemOid, title = null, description = null, type = null, statusItemId = null, parentItemId = null,
+                startDateText = "2026-11-23",
+            )
+            // 1 week = 5 工作日(周一→周五收工)
+            assertEquals(LocalDateTime.parse("2026-11-27T18:00"), row.dueDate)
         }
 
         @Test
