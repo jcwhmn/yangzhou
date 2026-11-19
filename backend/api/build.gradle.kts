@@ -84,11 +84,18 @@ tasks.test {
     }
 }
 
+// fake storage(AttachmentApiTest 等)住在单测侧,integrationTest classpath 复用 test output;
+// 目录挂靠不自动产生任务依赖,必须显式先编 test 类,否则 test 产物缺失时集成编译炸(A24,2026-11-19)
+tasks.named("compileIntegrationTestKotlin") {
+    dependsOn(tasks.named("compileTestKotlin"))
+}
+
 val integrationTest by tasks.registering(Test::class) {
     group = "verification"
     description = "Integration tests (Spring Boot + Testcontainers, needs Docker; spec 0014/0078)"
     testClassesDirs = sourceSets["integrationTest"].output.classesDirs
     classpath = sourceSets["integrationTest"].runtimeClasspath
+    dependsOn(tasks.named("testClasses"))
     useJUnitPlatform()
     shouldRunAfter(tasks.test)
     // 集成串行:共享 Testcontainers 容器 + 清表节奏,不并行

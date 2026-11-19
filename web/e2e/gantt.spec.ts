@@ -49,14 +49,15 @@ test("甘特父汇总条 + FINAL 置灰 + 条宽含当天", async ({ page, proje
   const finalId = statuses[statuses.length - 1].statusId;
 
   const parent = await apiCreateItem(projectKey, "E2E 汇总父");
-  const c1 = await makeChild(
-    projectKey,
-    "E2E 子一",
-    parent,
-    "2020-01-01",
-    "2020-01-03",
-  );
-  await makeChild(projectKey, "E2E 子二", parent, "2020-01-20", "2020-01-25");
+  // 日期用近期动态值(2026-11-19 定):FINAL 子的 actualEnd=now 会把 fit 轴拉到 planned→now,
+  // 固定 2020 老日期会把 span 拉爆到 ~2500 天、fit 下所有条压成 3px(spec 0147 轴纳入实际日期的合法结果)
+  const d = (offset: number) => {
+    const t = new Date();
+    t.setDate(t.getDate() + offset);
+    return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+  };
+  const c1 = await makeChild(projectKey, "E2E 子一", parent, d(-10), d(-8));
+  await makeChild(projectKey, "E2E 子二", parent, d(-4), d(-1));
   // FINAL 行置灰:子二走到终态(终态迁移需有主)
   await apiAssignMe(c1);
   await apiCall("PATCH", `/api/items/${c1}`, { statusItemId: finalId });
@@ -522,4 +523,113 @@ test("分割线拖拽改标题列宽并记忆,双击重置(YPJ-237)", async ({
   // 双击重置 → 280
   await sp.dblclick();
   expect(await paneW()).toBeCloseTo(280, 0);
+});
+
+test("实际条+偏移徽标+清单遮罩+折叠徽标+hover 卡(YPJ-222/spec 0147)", async ({
+  page,
+  projectKey,
+}) => {
+  const statuses = (
+    await apiCall<{ statuses: { statusId: string; name: string }[] }>(
+      "GET",
+      `/api/projects/${projectKey}`,
+    )
+  ).statuses;
+  const wipId = statuses.find((s) => s.name === "In Progress")!.statusId;
+  const finalId = statuses[statuses.length - 1].statusId;
+
+  // 甲(#1):start+due → 迁 In Progress → Done;清单 2 完 1;指派 me(FINAL/迁状态需有主)
+  // 日期用近期动态值:actualEnd=now 纳入轴范围(spec 0147),老日期会把 fit 轴拉爆
+  const d = (offset: number) => {
+    const t = new Date();
+    t.setDate(t.getDate() + offset);
+    return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+  };
+  const a = await apiCreateItem(projectKey, "E2E 实际甲");
+  await apiCall("PATCH", `/api/items/${a}`, {
+    startDate: d(-4),
+    dueDate: d(-1),
+  });
+  await apiAssignMe(a);
+  const t1 = await apiCall<{ checklistItemId: string }>(
+    "POST",
+    `/api/items/${a}/checklist`,
+    { text: "t1" },
+  );
+  await apiCall("POST", `/api/items/${a}/checklist`, { text: "t2" });
+  await apiCall("PATCH", `/api/checklist/${t1.checklistItemId}`, {
+    done: true,
+  });
+  await apiCall("PATCH", `/api/items/${a}`, { statusItemId: wipId });
+  await apiCall("PATCH", `/api/items/${a}`, { statusItemId: finalId });
+
+  // 乙(#2):start+due 在近过去,迁 In Progress 未完成 → 实际条延伸到今日线,徽标延期
+  const b = await apiCreateItem(projectKey, "E2E 实际乙");
+  await apiCall("PATCH", `/api/items/${b}`, {
+    startDate: d(-6),
+    dueDate: d(-2),
+  });
+  await apiAssignMe(b);
+  await apiCall("PATCH", `/api/items/${b}`, { statusItemId: wipId });
+
+  // 父(#3)+ 两个子(#4/#5):折叠徽标 +2 子任务(日期同样近期,防轴拉爆)
+  const parent = await apiCreateItem(projectKey, "E2E 折叠父");
+  await makeChild(projectKey, "E2E 折叠子1", parent, d(-10), d(-8));
+  await makeChild(projectKey, "E2E 折叠子2", parent, d(-4), d(-1));
+
+  await page.goto(`/p/${projectKey}/gantt`);
+  await pickScope(page, "全部");
+
+  const row = (n: number) =>
+    page.locator(`a[aria-label="${projectKey}-${n}"]`).locator("xpath=..");
+
+  // 甲:实际条在(FINAL → 止于 actualEnd),偏移徽标正(延期),遮罩 50%
+  await expect(
+    row(1).getByTestId(`gantt-actual-${projectKey}-1`),
+  ).toBeVisible();
+  await expect(row(1).getByTestId(`gantt-offset-${projectKey}-1`)).toHaveText(
+    /^\+\d+d$/,
+  );
+  // 遮罩宽 = 清单完成率 50%(宽度走 emotion class,inline style 拿不到——仓库已知陷阱,读几何比值)
+  const pct = await row(1)
+    .getByTestId(`gantt-actual-${projectKey}-1`)
+    .evaluate((el) => {
+      const inner = el.firstElementChild as HTMLElement;
+      const overlay = inner.firstElementChild as HTMLElement | null;
+      if (!overlay) return null;
+      const w = inner.getBoundingClientRect().width;
+      const ow = overlay.getBoundingClientRect().width;
+      return w > 0 ? Math.round((ow / w) * 100) : null;
+    });
+  expect(pct).toBe(50);
+
+  // 乙:实际条延伸到今日线(未完成),徽标延期
+  await expect(
+    row(2).getByTestId(`gantt-actual-${projectKey}-2`),
+  ).toBeVisible();
+  await expect(row(2).getByTestId(`gantt-offset-${projectKey}-2`)).toHaveText(
+    /^\+\d+d$/,
+  );
+
+  // 折叠父 → 徽标 +2 子任务;展开 → 消失(折叠钮在标题列面板;工具栏还有个 ▶,须收窄到 titlepane)
+  const titlePane = page.getByTestId("gantt-titlepane");
+  await titlePane.getByRole("button", { name: "▼", exact: true }).click();
+  await expect(
+    row(3).getByTestId(`gantt-collapsed-${projectKey}-3`),
+  ).toHaveText("+2 子任务");
+  await expect(row(4)).toBeHidden();
+  await titlePane.getByRole("button", { name: "▶", exact: true }).click();
+  await expect(
+    row(3).getByTestId(`gantt-collapsed-${projectKey}-3`),
+  ).toHaveCount(0);
+
+  // hover 甲计划条 → 详情卡(含清单计数与实际行)
+  const bb = await row(1)
+    .getByTestId(`gantt-bar-${projectKey}-1`)
+    .boundingBox();
+  await page.mouse.move(bb!.x + bb!.width / 2, bb!.y + bb!.height / 2);
+  const tip = page.locator(".MuiTooltip-tooltip");
+  await expect(tip).toContainText("E2E 实际甲");
+  await expect(tip).toContainText("清单:1/2");
+  await expect(tip).toContainText("实际:");
 });
