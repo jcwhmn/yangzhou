@@ -2596,3 +2596,108 @@ Content-Type: application/json
   "estimateValue": "0",
   "estimateUnit": "hour"
 }
+
+### ============ spec 0148(YPJ-233):甘特行排序(本节自含:自带项目,变量带 233 后缀;先跑「登录」即可单跑本节) ============
+
+### 0148 专用项目
+POST {{host}}/api/projects
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+ "key": "P233{{run}}",
+ "name": "行排序手测 {{run}}"
+}
+
+> {%
+ client.global.set("pkey233", response.body.key);
+%}
+
+### 乱序建根 item A(后补 start 12-03)
+POST {{host}}/api/projects/{{pkey233}}/items
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "title": "A" }
+
+> {% client.global.set("a233", response.body.itemId); %}
+
+### 乱序建根 item B(保持未排期)
+POST {{host}}/api/projects/{{pkey233}}/items
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "title": "B" }
+
+> {% client.global.set("b233", response.body.itemId); %}
+
+### 乱序建根 item C(后补 start 12-01)
+POST {{host}}/api/projects/{{pkey233}}/items
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "title": "C" }
+
+> {% client.global.set("c233", response.body.itemId); %}
+
+### C 子 c2(未排期,先建)
+POST {{host}}/api/projects/{{pkey233}}/items
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "title": "c2", "parentItemId": "{{c233}}" }
+
+### C 子 c1(后补 start 12-05,后建)
+POST {{host}}/api/projects/{{pkey233}}/items
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "title": "c1", "parentItemId": "{{c233}}" }
+
+> {% client.global.set("c1_233", response.body.itemId); %}
+
+### B 子 b1(后补 start 12-04)
+POST {{host}}/api/projects/{{pkey233}}/items
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "title": "b1", "parentItemId": "{{b233}}" }
+
+> {% client.global.set("b1_233", response.body.itemId); %}
+
+### 补日期:A=12-03 / C=12-01 / c1=12-05 / b1=12-04(创建序与 start 序错开)
+PATCH {{host}}/api/items/{{a233}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "startDate": "2026-12-03" }
+
+### PATCH C
+PATCH {{host}}/api/items/{{c233}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "startDate": "2026-12-01" }
+
+### PATCH c1
+PATCH {{host}}/api/items/{{c1_233}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "startDate": "2026-12-05" }
+
+### PATCH b1
+PATCH {{host}}/api/items/{{b1_233}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "startDate": "2026-12-04" }
+
+### 行序验证:期望 C, c1, c2, A, B, b1(同级 start 升序;未排期 B/c2 靠后;组内同规则)
+GET {{host}}/api/projects/{{pkey233}}/gantt?scope=all
+Authorization: Bearer {{token}}
+
+> {%
+    const titles = response.body.rows.map(r => r.title).join(", ");
+    client.log("行序: " + titles + " (期望 C, c1, c2, A, B, b1)");
+ %}
