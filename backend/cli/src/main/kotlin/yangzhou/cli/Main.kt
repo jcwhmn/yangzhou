@@ -41,7 +41,7 @@ private fun usage() {
           items create <KEY> <标题> [--desc 文本] [--sprint 名称|UUID] [--req 属性[>=N]]... [--json]   建 item(需求可分级)
           items list <KEY> [--json]                    项目 item 列表
           items move <ITEM_ID> <状态名>                改状态(经 workflow 校验)
-          items schedule <KEY-N> <start> [--due <due>]  排期(yyyy-MM-dd 或 yyyy-MM-dd'T'HH:mm;date-only 由后端按工作日界默认 09:00/18:00)
+          items schedule <KEY-N> <start> [--due <due>]  排期(yyyy-MM-dd 或 yyyy-MM-dd'T'HH:mm;date-only 由后端按工作日界缺省:start 00:00、due 当日日末 23:59:59(SRS v4 24h 全天窗))
           items comment <KEY-N|itemId> <文本...>        给 item 加评论
           items show <KEY-N|itemId> [--json]            单票详情
           items comments <KEY-N|itemId>                 列 item 评论
