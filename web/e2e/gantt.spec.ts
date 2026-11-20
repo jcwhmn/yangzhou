@@ -751,3 +751,89 @@ test("缺省视窗下限(YPJ-234):宽区间溢出可读 + 今日按钮只居中�
     .evaluate((el) => (el.firstElementChild as HTMLElement).scrollWidth);
   expect(contentW2).toBe(contentW); // 缩放未被「今日」重置
 });
+
+// YPJ-244(spec 0151)切片1:工时填充(案A)+ 完成点(H5)+ 依赖锚点位(H6)+ 实际层解耦
+test("工时填充+完成点+依赖锚点+实际层解耦(YPJ-244)", async ({
+  page,
+  projectKey,
+}) => {
+  const statuses = (
+    await apiCall<{ statuses: { statusId: string; name: string }[] }>(
+      "GET",
+      `/api/projects/${projectKey}`,
+    )
+  ).statuses;
+  const wipId = statuses.find((s) => s.name === "In Progress")!.statusId;
+  const finalId = statuses[statuses.length - 1].statusId;
+  // 日期动态值(仓库惯例:老日期把 fit 轴拉爆)
+  const d = (offset: number) => {
+    const t = new Date();
+    t.setDate(t.getDate() + offset);
+    return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+  };
+
+  // 甲(#1):start=d(-4) due=d(6) 进行中 → 计划条 + 琥珀填充(未过期 → 部分填充)
+  const a = await apiCreateItem(projectKey, "E2E 填充甲");
+  await apiCall("PATCH", `/api/items/${a}`, {
+    startDate: d(-4),
+    dueDate: d(6),
+  });
+  await apiAssignMe(a);
+  await apiCall("PATCH", `/api/items/${a}`, { statusItemId: wipId });
+
+  // 乙(#2):直建 FINAL(actualEnd 有而 actualStart 无)→ 完成点(终态迁移需有主)
+  const b = await apiCreateItem(projectKey, "E2E 完成点乙");
+  await apiAssignMe(b);
+  await apiCall("PATCH", `/api/items/${b}`, { statusItemId: finalId });
+
+  // 丙(#3):无 start 无 due,依赖甲(甲有 due)→ 锚点位画点(H6)
+  const c = await apiCreateItem(projectKey, "E2E 锚点丙");
+  await apiCall("POST", `/api/items/${c}/dependencies`, {
+    dependsOnItemId: a,
+  });
+
+  // 丁(#4):无 start 无 due 进行中 → 计划层点在 actualStart + 实际条(H5 解耦)
+  const e = await apiCreateItem(projectKey, "E2E 解耦丁");
+  await apiAssignMe(e);
+  await apiCall("PATCH", `/api/items/${e}`, { statusItemId: wipId });
+
+  await page.goto(`/p/${projectKey}/gantt`);
+  await pickScope(page, "全部");
+  await expect(page.getByText("E2E 填充甲").first()).toBeVisible();
+
+  const row = (n: number) =>
+    page.locator(`a[aria-label="${projectKey}-${n}"]`).locator("xpath=..");
+
+  // 甲:填充在,且是部分填充(今天在 start~due 之间,填充比 ∈ (0,1))
+  const fillRatio = await row(1)
+    .getByTestId(`gantt-fill-${projectKey}-1`)
+    .evaluate((el) => {
+      const bar = el.parentElement as HTMLElement;
+      const w = bar.getBoundingClientRect().width;
+      const f = el.getBoundingClientRect().width;
+      return w > 0 ? f / w : null;
+    });
+  expect(fillRatio).not.toBeNull();
+  expect(fillRatio!).toBeGreaterThan(0.05);
+  expect(fillRatio!).toBeLessThan(0.95);
+
+  // 乙:直建 FINAL——后端迁移史语义:一次 TODO→FINAL 迁移同时记 actualStart/actualEnd(同刻),
+  // 渲染为零宽实际条(3px 最小宽);completeDot(实际起点无而终点有)形态在现后端不可达,
+  // 分支保留作防御(台账 A30 记录 spec 0151 与后端 hist 语义的偏差)
+  await expect(
+    row(2).getByTestId(`gantt-actual-${projectKey}-2`),
+  ).toBeVisible();
+
+  // 丙:锚点位画点(无 start 无 due 有 anchorDate)
+  await expect(
+    row(3).getByTestId(`gantt-anchor-${projectKey}-3`),
+  ).toBeVisible();
+
+  // 丁:计划层点在 actualStart(H5:无计划日期进行中)+ 实际条照画
+  await expect(
+    row(4).getByTestId(`gantt-plandot-${projectKey}-4`),
+  ).toBeVisible();
+  await expect(
+    row(4).getByTestId(`gantt-actual-${projectKey}-4`),
+  ).toBeVisible();
+});

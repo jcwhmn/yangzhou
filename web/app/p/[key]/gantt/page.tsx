@@ -44,6 +44,7 @@ type GanttRow = {
   depth: number;
   actualStart: string | null;
   actualEnd: string | null;
+  anchorDate: string | null; // YPJ-244(spec 0151):依赖锚点=多前置最晚 due(无 due 退 start);null=无可用前置时间
   assigneeName: string | null;
   checklistDone: number | null;
   checklistTotal: number | null;
@@ -222,9 +223,13 @@ export default function GanttPage() {
     const dates = rowsNow.flatMap((r) => {
       // YPJ-222(spec 0147):轴范围纳入实际起止——实际条超出计划区间时不被裁出画面
       if (!isParent(r))
-        return [r.startDate, r.dueDate, r.actualStart, r.actualEnd].filter(
-          Boolean,
-        ) as string[];
+        return [
+          r.startDate,
+          r.dueDate,
+          r.actualStart,
+          r.actualEnd,
+          r.anchorDate, // YPJ-244:锚点位纳入轴范围,不被裁出画面
+        ].filter(Boolean) as string[];
       const s = summaryOf(r.itemId);
       return s ? [s[0], s[1]] : [];
     });
@@ -588,6 +593,11 @@ export default function GanttPage() {
             {r.actualEnd ? r.actualEnd.slice(0, 10) : "进行中"}
           </Typography>
         )}
+        {r.anchorDate && (
+          <Typography variant="caption">
+            锚点:{r.anchorDate.slice(0, 10)}(依赖落位)
+          </Typography>
+        )}
         {r.checklistTotal ? (
           <Typography variant="caption">
             清单:{r.checklistDone ?? 0}/{r.checklistTotal}
@@ -618,14 +628,20 @@ export default function GanttPage() {
   }
 
   const visible = (rows ?? []).filter((r) => !hiddenByCollapse(r));
-  // 有子孙的父归入已排期(靠汇总条画);真未排期 = 无日期且无子
+  // 有子孙的父归入已排期(靠汇总条画);锚点行(YPJ-244:依赖落位画点)与进行中行(actualStart 有,画计划点/实际条)也归已排期;真未排期 = 无日期无子无锚无 actual
   const hasKid = (r: GanttRow) =>
     (rows ?? []).some((x) => x.parentItemId === r.itemId);
   const unscheduled = visible.filter(
-    (r) => !r.startDate && !r.dueDate && !hasKid(r),
+    (r) =>
+      !r.startDate &&
+      !r.dueDate &&
+      !hasKid(r) &&
+      !r.anchorDate &&
+      !r.actualStart,
   );
   const scheduled = visible.filter(
-    (r) => r.startDate || r.dueDate || hasKid(r),
+    (r) =>
+      r.startDate || r.dueDate || hasKid(r) || r.anchorDate || r.actualStart,
   );
 
   return (
@@ -1029,7 +1045,12 @@ export default function GanttPage() {
                   // 有子孙的父行只画汇总条,不画自有条
                   const drawOwn = !hasKid(r);
                   const hasStart = drawOwn && r.startDate !== null;
-                  const left = xOf(hasStart ? r.startDate : r.dueDate) ?? 0;
+                  const left =
+                    xOf(
+                      hasStart
+                        ? r.startDate
+                        : (r.dueDate ?? r.anchorDate ?? r.actualStart),
+                    ) ?? 0;
                   // due 为空不外延到轴末端(S1 遗留,YPJ-220 反馈):画起点小标记;start+estimate 推条长另票
                   const right =
                     r.dueDate !== null
@@ -1038,7 +1059,8 @@ export default function GanttPage() {
                   // 零时长条(start=due 同刻)最小 3px 可见(YPJ-229;due-only 菱形是标记不受影响)
                   const width = hasStart ? Math.max(right - left, 3) : 1.2;
                   // YPJ-222(spec 0147):实际条(叶+有迁出史;due-only 行不画)+ 清单遮罩 + 偏移徽标
-                  const act = drawOwn && hasStart && r.actualStart !== null;
+                  // YPJ-244(spec 0151)H5:实际层与计划 start 解耦——actualStart 有即画
+                  const act = drawOwn && r.actualStart !== null;
                   const actLeft = act ? (xOf(r.actualStart) ?? 0) : 0;
                   const actRight = act
                     ? Math.max(
@@ -1058,6 +1080,27 @@ export default function GanttPage() {
                           100,
                         )
                       : null;
+                  // YPJ-244(spec 0151)案A 工时填充:进行中(有始无终)在计划条上叠「已流逝」段,末端=min(今天, due);
+                  // 周六日照算现状下日历时间位置等价工时比例;双休日历(H8)落地时改 hoursBetween 比例换算
+                  const fillW =
+                    hasStart &&
+                    r.actualStart !== null &&
+                    r.actualEnd === null &&
+                    r.dueDate !== null
+                      ? Math.min(
+                          Math.max(
+                            Math.min(
+                              axis.todayX,
+                              xEndOf(r.dueDate) ?? axis.todayX,
+                            ) - left,
+                            0,
+                          ),
+                          width,
+                        )
+                      : 0;
+                  // YPJ-244(spec 0151)H5:直建 FINAL(actualComplete 有而 actualStart 无)→ 完成点
+                  const completeDot =
+                    drawOwn && r.actualStart === null && r.actualEnd !== null;
                   const off = offsetDays(r);
                   const badgeLeft =
                     Math.max(hasStart ? right : left + 12, act ? actRight : 0) +
@@ -1145,6 +1188,7 @@ export default function GanttPage() {
                           {hasStart ? (
                             <Box
                               sx={{
+                                position: "relative",
                                 height: 12,
                                 borderRadius: 1,
                                 bgcolor: isFinal
@@ -1154,8 +1198,25 @@ export default function GanttPage() {
                                     : "primary.main",
                                 opacity: isFinal ? 0.5 : 0.85,
                               }}
-                            />
-                          ) : (
+                            >
+                              {fillW > 0 && (
+                                <Box
+                                  data-testid={`gantt-fill-${r.number}`}
+                                  sx={{
+                                    position: "absolute",
+                                    left: 0,
+                                    top: 0,
+                                    height: "100%",
+                                    width: fillW,
+                                    borderRadius:
+                                      fillW >= width ? 1 : "4px 0 0 4px",
+                                    bgcolor: "warning.main",
+                                    opacity: 0.9,
+                                  }}
+                                />
+                              )}
+                            </Box>
+                          ) : r.dueDate ? (
                             <Box
                               sx={{
                                 width: 12,
@@ -1170,7 +1231,21 @@ export default function GanttPage() {
                                 mx: "auto",
                               }}
                             />
-                          )}
+                          ) : r.anchorDate ||
+                            (r.actualStart !== null && r.actualEnd === null) ? (
+                            // YPJ-244(spec 0151):H6 依赖锚点位 / Thoughts 进行中分支(无计划日期点在 actualStart),同 start 点形态
+                            <Box
+                              data-testid={`gantt-${r.anchorDate ? "anchor" : "plandot"}-${r.number}`}
+                              sx={{
+                                width: 3,
+                                height: 12,
+                                borderRadius: 1,
+                                bgcolor: isFinal
+                                  ? "text.disabled"
+                                  : "primary.main",
+                              }}
+                            />
+                          ) : null}
                         </Box>
                         {/* 实际条:双行下条(案 B)+ 清单完成率遮罩(YPJ-222;未完成延伸到今日线) */}
                         {act && (
@@ -1212,6 +1287,24 @@ export default function GanttPage() {
                             </Box>
                           </Box>
                         )}
+                        {/* YPJ-244(spec 0151)H5:完成点(actualComplete 有而 actualStart 无) */}
+                        {completeDot && (
+                          <Box
+                            data-testid={`gantt-complete-${r.number}`}
+                            sx={{
+                              position: "absolute",
+                              left: (xEndOf(r.actualEnd) ?? 0) - 5,
+                              top: 26,
+                              width: 10,
+                              height: 10,
+                              borderRadius: "50%",
+                              bgcolor: isFinal
+                                ? "text.disabled"
+                                : "success.main",
+                              opacity: isFinal ? 0.5 : 0.85,
+                            }}
+                          />
+                        )}
                         {/* 偏移徽标:延期红/提前绿/0 不显(YPJ-222) */}
                         {off !== null && (
                           <Typography
@@ -1243,19 +1336,24 @@ export default function GanttPage() {
                           aria-label={r.number}
                         >
                           {/* hover 详情卡命中区 = 条矩形(YPJ-222;其余区域仍整块直进详情) */}
-                          {drawOwn && (hasStart || r.dueDate !== null) && (
-                            <Tooltip title={hoverCard(r)}>
-                              <Box
-                                sx={{
-                                  position: "absolute",
-                                  left,
-                                  top: 5,
-                                  width: Math.max(width, 12),
-                                  height: 12,
-                                }}
-                              />
-                            </Tooltip>
-                          )}
+                          {drawOwn &&
+                            (hasStart ||
+                              r.dueDate !== null ||
+                              r.anchorDate !== null ||
+                              (r.actualStart !== null &&
+                                r.actualEnd === null)) && (
+                              <Tooltip title={hoverCard(r)}>
+                                <Box
+                                  sx={{
+                                    position: "absolute",
+                                    left,
+                                    top: 5,
+                                    width: Math.max(width, 12),
+                                    height: 12,
+                                  }}
+                                />
+                              </Tooltip>
+                            )}
                           {act && (
                             <Tooltip title={hoverCard(r)}>
                               <Box
@@ -1304,8 +1402,10 @@ export default function GanttPage() {
           >
             蓝竖线 = 今天 · 菱形 = 里程碑(只有截止日期) · 红色 = 超期 · 灰 =
             已完成 · 橙横条 = 父汇总(子孙并集,折叠显 +N 子任务) · 上条 = 计划 /
-            下条 = 实际(绿,深色 = 清单完成率) · ±Nd = 偏移(实际/今天 vs due) ·
-            悬停条看详情 · Ctrl+滚轮或 ± 缩放 · 「今日」回中今天
+            下条 = 实际(绿,深色 = 清单完成率) · 琥珀填充 = 已流逝(进行中, 今天
+            vs due) · 蓝点 = 依赖锚点落位(无 start 无 due) · ±Nd = 偏移
+            (实际/今天 vs due) · 悬停条看详情 · Ctrl+滚轮或 ± 缩放 ·
+            「今日」回中今天
           </Typography>
         </>
       )}
