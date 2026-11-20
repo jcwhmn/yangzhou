@@ -868,8 +868,11 @@ data class UpdateItemRequest(
 internal fun workdayBounds(project: yangzhou.persistence.Project): Pair<LocalTime, LocalTime> {
     val ws = runCatching { LocalTime.parse(project.workdayStart) }.getOrElse { DEFAULT_WORKDAY_START }
     // "24:00"=全天窗终点(SRS v4 §3.2,2026-11-21 拍板);LocalTime.parse 不认 24:00,显式拦截
-    val we = if (project.workdayEnd.trim() == "24:00") LocalTime.MIDNIGHT
-        else runCatching { LocalTime.parse(project.workdayEnd) }.getOrElse { DEFAULT_WORKDAY_END }
+    val we = if (project.workdayEnd.trim() == "24:00") {
+        LocalTime.MIDNIGHT
+    } else {
+        runCatching { LocalTime.parse(project.workdayEnd) }.getOrElse { DEFAULT_WORKDAY_END }
+    }
     return ws to we
 }
 
@@ -878,9 +881,11 @@ internal val DEFAULT_WORKDAY_START: LocalTime = LocalTime.MIDNIGHT
 internal val DEFAULT_WORKDAY_END: LocalTime = LocalTime.MIDNIGHT
 
 /** 每日窗分钟数(单点;两端 00:00 = 全天 1440,与 WorkdayCalculator.isFullDay 同口径)。 */
-internal fun workdayWindowMinutes(ws: LocalTime, we: LocalTime): Long =
-    if (ws == LocalTime.MIDNIGHT && we == LocalTime.MIDNIGHT) 1440L
-    else java.time.Duration.between(ws, we).toMinutes()
+internal fun workdayWindowMinutes(ws: LocalTime, we: LocalTime): Long = if (ws == LocalTime.MIDNIGHT && we == LocalTime.MIDNIGHT) {
+    1440L
+} else {
+    java.time.Duration.between(ws, we).toMinutes()
+}
 
 /** YPJ-235(spec 0146):estimate → WorkdayCalculator 小时;unit 缺失/未知按 hour兜底(信任边界在 EstimateInput)。 */
 // YPJ-243(spec 0150):互算警告文案集中(中文,前端 toast 原文展示)

@@ -180,8 +180,7 @@ data class Project(
     val estimateScales: String? = null,
     /** V60:立票必须填预估(item 写入侧强制在 YPJ-186 接)。 */
     val estimateRequired: Boolean = false,
-    /** YPJ-208(spec 0138 切片 b):工作日历(HH:mm);date-only 默认填充与时长换算用。 */
-    // SRS v4 §3.2(2026-11-21 拍板):工作制缺省 24h 全天窗("24:00"=全天终点,WorkdayCalculator 同口径)
+    /** YPJ-208(spec 0138 切片 b):工作日历(HH:mm);date-only 默认填充与时长换算用。SRS v4 §3.2(2026-11-21 拍板):缺省 24h 全天窗,"24:00"=全天终点(WorkdayCalculator 同口径)。 */
     val workdayStart: String = "00:00",
     val workdayEnd: String = "24:00",
     @CreatedDate

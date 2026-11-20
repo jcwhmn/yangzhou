@@ -186,6 +186,7 @@ class ProjectService(
         if (we != null && we.trim() != "24:00") runCatching { java.time.LocalTime.parse(we) }.getOrElse { throw BadRequestException("workdayEnd 格式应为 HH:mm 或 24:00:$we") }
         val newWs = ws ?: project.workdayStart
         val newWe = we ?: project.workdayEnd
+
         // 分钟数比较:“24:00”=1440(当日终点);两端 00:00 = 全天窗合法,其余仍须 start<end
         fun endMinutes(s: String): Long = if (s.trim() == "24:00") 1440L else java.time.LocalTime.parse(s).toSecondOfDay() / 60L
         val fullDay = newWs == "00:00" && newWe == "24:00"
@@ -323,18 +324,18 @@ class ProjectService(
         }
 
         fun walk(parent: UUID?): List<GanttRow> = ganttWalkOrder(
-                byParent[parent].orEmpty(),
-                { id -> byParent[id].orEmpty() },
-            ) { item ->
-                // 状态史 createdAt 为 Instant,排序锚取本地墙钟(与前端渲染同口径)
-                // actualStart=首次迁出 START;actualEnd=迁入 FINAL(多次返工取最近一次,SRS §3.4/§6.6——0150 首次口径核对入 YPJ-245)
-                val hist = histories[item.objectId].orEmpty()
-                val aS = hist.firstOrNull { h -> h.toStatusObjectId !in startIds }?.createdAt
-                    ?.let { LocalDateTime.ofInstant(it, java.time.ZoneId.systemDefault()) }
-                val aE = hist.lastOrNull { h -> h.toStatusObjectId in finalIds }?.createdAt
-                    ?.let { LocalDateTime.ofInstant(it, java.time.ZoneId.systemDefault()) }
-                aS to aE
-            }.flatMap { item ->
+            byParent[parent].orEmpty(),
+            { id -> byParent[id].orEmpty() },
+        ) { item ->
+            // 状态史 createdAt 为 Instant,排序锚取本地墙钟(与前端渲染同口径)
+            // actualStart=首次迁出 START;actualEnd=迁入 FINAL(多次返工取最近一次,SRS §3.4/§6.6——0150 首次口径核对入 YPJ-245)
+            val hist = histories[item.objectId].orEmpty()
+            val aS = hist.firstOrNull { h -> h.toStatusObjectId !in startIds }?.createdAt
+                ?.let { LocalDateTime.ofInstant(it, java.time.ZoneId.systemDefault()) }
+            val aE = hist.lastOrNull { h -> h.toStatusObjectId in finalIds }?.createdAt
+                ?.let { LocalDateTime.ofInstant(it, java.time.ZoneId.systemDefault()) }
+            aS to aE
+        }.flatMap { item ->
             val status = statusById[item.statusObjectId]
             val hist = histories[item.objectId!!].orEmpty()
             val cc = checklistCounts[item.objectId!!]

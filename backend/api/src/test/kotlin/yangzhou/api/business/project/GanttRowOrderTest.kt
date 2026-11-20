@@ -22,8 +22,7 @@ class GanttRowOrderTest {
 
     private val noActual: (Item) -> Pair<LocalDateTime?, LocalDateTime?> = { null to null }
 
-    private fun actualOf(target: Int, aS: LocalDateTime?, aE: LocalDateTime?): (Item) -> Pair<LocalDateTime?, LocalDateTime?> =
-        { if (it.number == target) aS to aE else null to null }
+    private fun actualOf(target: Int, aS: LocalDateTime?, aE: LocalDateTime?): (Item) -> Pair<LocalDateTime?, LocalDateTime?> = { if (it.number == target) aS to aE else null to null }
 
     @Test
     fun `start 升序且无排期靠后`() {

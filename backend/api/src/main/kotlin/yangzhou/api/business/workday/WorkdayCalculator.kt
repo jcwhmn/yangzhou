@@ -25,8 +25,7 @@ class WorkdayCalculator(
     }
 
     /** 当日窗终点:全天窗 = 次日零点,否则当日 workdayEnd。 */
-    private fun dayEndOf(day: java.time.LocalDate): LocalDateTime =
-        if (isFullDay) day.plusDays(1).atStartOfDay() else day.atTime(workdayEnd)
+    private fun dayEndOf(day: java.time.LocalDate): LocalDateTime = if (isFullDay) day.plusDays(1).atStartOfDay() else day.atTime(workdayEnd)
 
     fun dueFrom(
         start: LocalDateTime,
