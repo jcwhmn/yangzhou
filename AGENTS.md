@@ -76,6 +76,10 @@ docs/      adr/ · spec/ · architecture/(puml 类图) · requirement/(PRD) · p
 
 写/改后端测试、新建迁移、动 AbstractApiTest、跑 gradle 验证 → **先读 skill `.agents/skills/backend-testing/SKILL.md`**(双轨/单元与集成边界/新表同步 cleanDatabase 清单/需求矩阵/Clock 注入/跑法)。速记硬规则:**单元 `src/test` 与集成 `src/integrationTest` 物理二分(YPJ-100/spec 0078),目录即边界**;唯一 seam = REST API 黑盒,集成必须 extends `AbstractApiTest`;CI 只跑单元,集成 merge 前本人本地 `gradle integrationTest`(nightly 兜底);`gradle build` 不跑集成(已与 check 解耦)。
 
+## 手工测试用例(落档维护)
+
+除一眼可见的冒烟验证,**每个任务(票)的手工测试用例必须落档到 `docs/testing/manual-test-cases.md` 并维护**(2026-11-20 定,YPJ-244 验收复盘):开工时立节,交付用户时给勾选清单,验收逐条勾(`[ ]`未验/`[x]`过/`[!]`红未解,红例记台账),As-built 同步结果;历史用例不删留作回归。环境 dev 3001;验收前先确认 dev 容器跑的是含目标票代码的镜像(容器 Image sha 对比 `docker images` 最新,曾实锤旧镜像导致误报)。
+
 ## E2E(web/;Playwright,并行按用例隔离)
 
 - 后端跑 **test 容器**(库 yangzhou_test):`script/app-infra.ps1 up test`(api http://localhost:8082);调试改码可换 bootRun test profile,须 `--server.port=8082`;前端由 webServer 拉起 prod server(`next build && next start`,独立构建目录 .next-e2e,不踩日常 dev 的 .next);凭证与地址在 `web/e2e/.env`(模板 `.env.example`),不硬编码不提交。
