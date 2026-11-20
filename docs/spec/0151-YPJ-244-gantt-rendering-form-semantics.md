@@ -136,3 +136,20 @@
 - 轴映射:xOf/xOfT/xEndOf/todayX = 24h 钟表线性((t-start)/DAY);小时刻度梯 0–24 墙钟。
 - **行序:排序锚=渲染锚(0148 修订,后端 ganttWalkOrder)**:叶行自有 startDate(due-only 仍落未排期组);父行取严格子孙并集最早端(子孙逐点以 startDate ?? dueDate 贡献,含中间层父行自有日期,与 0139 汇总条同口径)——207 自有 11-18 但 208 子孙起 11-15,修前 207 误居首;217 借中间层 219 自有 11-18 09:00 锚定。单测 GanttRowOrderTest 7 例 + 集成 GanttApiTest 排序用例同步更新。
 - 色:下条 doing=warning.main / final=success.main;填充 warning.main;遮罩同态;菱形/汇总条/偏移徽标不变。
+
+## 六、As-built(2026-11-21,PR #238 squash d7f0969 合入 main)
+
+> 验收:用户 prod 实测 integrationTest / e2e / api.http 全过,甘特现状图无功能错误(视觉微调项遗留 245)。自动化:全量 integrationTest 绿(af084b9)、build 绿、单测 438 绿、e2e board+gantt 30/30。
+
+**⚠ 范围演进标注:原 spec 定「纯前端,后端零改动」,终态含后端语义统一**(演进经 SRS v4 拍板驱动,逐 commit 有绿点,非静默扩张):
+
+- 切片 1+2 按 §二落地;渲染整体被 §五 v2(12 格真值表+三色)推翻重做——以 §五为准。
+- 轴:工作窗轴(d3e5229)→ 用户终拍回退 **24h 钟表线性轴**(d71233b,夜间排期票 237/240 折叠 3px 否决);条长∝钟表跨度,estimate 铺算仍按工作窗。
+- 后端(§五 5.3「后端零改动」不再成立):
+  - 工作制缺省 24h 全天窗:V67 迁移(workday 列缺省 00:00/24:00,存值不动)+ 设置校验(0a4dba3)。
+  - ganttWalkOrder 后端纯函数:父行排序锚=子孙并集最早端,自有 start 作废(7fbf331,GanttRowOrderTest 10 例)。
+  - date-only 缺省:start→00:00、due→**日末秒精度 23:59:59**——LocalTime.MAX 纳秒被 timestamp(6) 进位次日零点(9cd8f6f,A36);ItemDateApiTest/GanttApiTest 期望按新语义重写(A38)。
+- 工时填充=案 A(前端琥珀覆盖, testid);表单后写者为准=双 dirty 拆 PATCH+warnings toast(2529f0a)。
+- 配套落档:手测用例总档 (制度性新增,12d27d4)+ 手测清单按 SRS v4 更新(fe83dda);台账 A30–A38。
+- **验收遗留(视觉微调,用户「看着不太舒服」,无功能错误)→ 归 245 甘特语义统一**:徽标 h/d 三档分级、超期表示形态(红线 vs cell 底色)、汇总条颜色(SRS 灰蓝 vs 代码橙)、图例文案陈旧、双汇总条观感。
+- 流程留痕:本地分支  保留(af084b9,过程考古);远程已删。
