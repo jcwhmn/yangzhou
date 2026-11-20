@@ -408,7 +408,10 @@ class ItemService(
             val newStart = parse(startDateText, "startDate", ws)
             val dueCleared = dueDateText != null && dueDateText.trim().isEmpty()
             val dueExplicit = dueDateText != null && !dueCleared
-            val newDueExplicit = parse(dueDateText, "dueDate", we)
+            // date-only due 默认时刻 = 工作窗终点;全天窗(终点=次日零点)取当日 23:59:59.999999
+            // (截止=当日日末,避免"当天到期即逾期"伪问题;UI 时间输入可表达,评审复检 2026-11-21)
+            val dueDefaultTime = if (we == LocalTime.MIDNIGHT) LocalTime.MAX else we
+            val newDueExplicit = parse(dueDateText, "dueDate", dueDefaultTime)
             var due = when {
                 dueDateText == null -> current.dueDate
                 dueCleared -> null

@@ -604,10 +604,12 @@ test("实际条+偏移徽标+清单遮罩+折叠徽标+hover 卡(YPJ-222/spec 01
     });
   expect(pct).toBe(50);
 
-  // 乙:实际条延伸到今日线(未完成),徽标延期
+  // 乙:进行中单条覆盖模型(SRS v4 §6.2,2026-11-21 拍板)——有计划条 → 无下条实际条;
+  // 黄覆盖=条内已流逝段(已过期→满条),徽标延期(进行中徽标 244 保留,FINAL-only 归 YPJ-245)
   await expect(
     row(2).getByTestId(`gantt-actual-${projectKey}-2`),
-  ).toBeVisible();
+  ).toHaveCount(0);
+  await expect(row(2).getByTestId(`gantt-fill-${projectKey}-2`)).toBeVisible();
   await expect(row(2).getByTestId(`gantt-offset-${projectKey}-2`)).toHaveText(
     /^\+\d+d$/,
   );
