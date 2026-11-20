@@ -874,8 +874,9 @@ test("表单后写者为准:due 后发覆盖 estimate + warnings toast(YPJ-244)"
     page.getByTestId("item-warnings").locator(".MuiAlert-root"),
   ).toBeVisible();
 
-  // estimate 被反推(≠2,unit=hour;date-only 窗口 09:00→18:00 两天 = 18h)
+  // estimate 被反推(≠2;date-only 窗口两天 >18h)——用 toHaveValue 重试等 load() 刷新表单
+  // (直接 inputValue 有竞态:toast 可见≠load 完成,全量负载下单跑碰巧绿的假阳性,台账 A32)
+  await expect(page.getByLabel("数值")).not.toHaveValue("2");
   const est = await page.getByLabel("数值").inputValue();
-  expect(est).not.toBe("2");
   expect(Number(est)).toBeGreaterThan(0);
 });
