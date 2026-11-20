@@ -1400,11 +1400,11 @@ export default function GanttPage() {
             color="text.secondary"
             sx={{ mt: 1, display: "block" }}
           >
-            蓝竖线 = 今天 · 菱形 = 里程碑(只有截止日期) · 红色 = 超期 · 灰 =
-            已完成 · 橙横条 = 父汇总(子孙并集,折叠显 +N 子任务) · 上条 = 计划 /
-            下条 = 实际(绿,深色 = 清单完成率) · 琥珀填充 = 已流逝(进行中, 今天
-            vs due) · 蓝点 = 依赖锚点落位(无 start 无 due) · ±Nd = 偏移
-            (实际/今天 vs due) · 悬停条看详情 · Ctrl+滚轮或 ± 缩放 ·
+            蓝竖线 = 今天 · 菱形 = 里程碑(只有截止日期) · 红色 = 超期 · 橙横条 =
+            父汇总(子孙并集,折叠显 +N 子任务) · 上条 = 计划(蓝) / 下条 = 实际
+            (绿,深色 = 清单完成率) · 绿填充 = 已流逝(进行中,今天 vs due,用实际
+            色覆盖计划) · 蓝点 = 依赖锚点落位(无 start 无 due) · ±Nd =
+            偏移(实际/ 今天 vs due) · 悬停条看详情 · Ctrl+滚轮或 ± 缩放 ·
             「今日」回中今天
           </Typography>
         </>
@@ -1426,6 +1426,7 @@ export default function GanttPage() {
           <Typography
             variant="caption"
             color="text.primary"
+            noWrap
             sx={{
               textDecoration: "underline",
               "&:hover": { color: "primary.main" },
