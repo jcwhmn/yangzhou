@@ -96,3 +96,39 @@
 5. 无 start 的进行中 item(estimate 未强制项目,actualStart 有)→ 下条绿条照画(H5,现状不画)。
 6. 表单:先改 estimate=4h 再改 due=后天,保存 → 详情 estimate 显示按 start→due 反推的小时数(后改 due 为准)+ toast 警告;反向先改 due 后改 estimate → estimate=4h 生效、due 重算。
 7. 清 due 保存 → due 回填 + toast(0150 H2 消费)。
+
+## 五、渲染规则 v2(2026-11-20,用户 Obsidian 追加节;本节推翻 §二 部分渲染设计)
+
+> 规则源:Obsidian Thoughts.md 2026-11-20 追加(用户原文)。分型 2×2(有无 estimate × 有无可确认开始时间[startDate 或依赖锚])× 3 状态(未开始/进行中/final)× 3 色(蓝=计划 / 黄=进行中实际 / 绿=完成实际)。
+
+### 5.1 真值表(12 格)
+
+| case | 未开始(蓝) | 进行中(蓝+黄) | final(蓝+绿) |
+|---|---|---|---|
+| 1 三无(无 est 无锚) | group 开始时间圆点 | 黄条 actualStart→今天 | 绿条 actualStart→actualEnd(仅一条) |
+| 2 有 est 无锚 | 蓝条 @ group 开始,长=estimate 铺算 | 蓝条 @ actualStart(estimate 铺算长)+黄覆盖;下条黄 | 上蓝条 @ actualStart(estimate 长)+下绿条 actual 长 |
+| 3 无 est 有锚 | 蓝点 @ start/锚 | 蓝点 @ start/锚 + 黄条 actualStart→今天 | 蓝点 @ start/锚 + 绿条 actualStart→actualEnd |
+| 4 有 est 有锚 | 蓝条 start→due | 蓝条 start→due + 黄覆盖(已流逝);下条黄 | 蓝条 start→due + 绿条 actualStart→actualEnd |
+
+补充判定(与 0150 语义衔接):
+- 计划条长度权威序:due 显式 > estimate 铺算;有长度来源(due 或 estimate)→ 条,仅锚无长度 → 点(否则 start+due 无 estimate 的存量行会被误画成点)。
+- due-only 行(无 start 有 due,里程碑)保留菱形,不进本矩阵。
+- 真未排期 = case1 且全链(父链)无 group 开始锚。
+
+### 5.2 完备性分析(用户要求)
+
+- 12 格全覆盖,分型互斥完备 ✓。
+- 5 处含糊/缺口,读法如下(**⚠请复核**):
+  1. 「group 开始时间」=父链上溯最近祖先的 startDate;全链无 → 真未排期(折叠区)。
+  2. 进行中/final case2 的蓝条锚=actualStart(无计划锚借实际锚,长度=estimate 按工作日历铺算)。
+  3. 进行中 case3 除黄条外保留计划位蓝点(用户字面只提黄线段;蓝点=start 计划位延续)。
+  4. **下条(实际条)进行中恒画黄、final 恒画绿**——用户 case2/4 进行中字面只描述上条(蓝+覆盖),下条由「颜色2=工作中实际工作时间」定义隐含;若意图=进行中单条覆盖模型(下条取消),验收时说一声即改。
+  5. final 的 diff 徽标(±Nd)**建议保留**(实际完成 vs due 一眼量偏差);待用户拍板,默认保留。
+- estimate 铺算前端复刻:dueFromJs(每日窗线性,周六日照算,无午休;窗取 project API workdayStart/End,默认 09:00-18:00);estimateHours 口径 hour=v / day=v×窗 / week=v×5×窗(与后端 estimateHours 同源)。
+
+### 5.3 实现(纯前端,后端零改动)
+
+- `groupStartOf`:rows 树内父链上溯;`dueFromJs`/`estimateHoursOf` 模块级 JS 移植。
+- gantt 页 load 并行拉 GET /api/projects/{key} 取 workday 配置。
+- 分流:case1/2 借 group 锚 → scheduled;轴锚定加 gStart/estimate 铺算末端。
+- 色:下条 doing=warning.main / final=success.main;填充 warning.main;遮罩同态;菱形/汇总条/偏移徽标不变。

@@ -778,6 +778,8 @@ test("工时填充+完成点+依赖锚点+实际层解耦(YPJ-244)", async ({
   await apiCall("PATCH", `/api/items/${a}`, {
     startDate: d(-4),
     dueDate: d(6),
+    estimateValue: 8,
+    estimateUnit: "hour",
   });
   await apiAssignMe(a);
   await apiCall("PATCH", `/api/items/${a}`, { statusItemId: wipId });
@@ -830,12 +832,58 @@ test("工时填充+完成点+依赖锚点+实际层解耦(YPJ-244)", async ({
     row(3).getByTestId(`gantt-anchor-${projectKey}-3`),
   ).toBeVisible();
 
-  // 丁:计划层点在 actualStart(H5:无计划日期进行中)+ 实际条照画
-  await expect(
-    row(4).getByTestId(`gantt-plandot-${projectKey}-4`),
-  ).toBeVisible();
+  // 丁:三无进行中(case1)=黄条 actualStart→今天(§五 颜色2),无计划层点
   await expect(
     row(4).getByTestId(`gantt-actual-${projectKey}-4`),
+  ).toBeVisible();
+  await expect(row(4).getByTestId(`gantt-plandot-${projectKey}-4`)).toHaveCount(
+    0,
+  );
+});
+
+// YPJ-244(spec 0151 §五):case1/2 借 group 开始锚——三无=group 点;有 estimate 无锚=group 起铺算条
+test("group 锚:case1 group 点 + case2 group 起铺算条(YPJ-244)", async ({
+  page,
+  projectKey,
+}) => {
+  const d = (offset: number) => {
+    const t = new Date();
+    t.setDate(t.getDate() + offset);
+    return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+  };
+  const parent = await apiCreateItem(projectKey, "E2E group 父");
+  await apiCall("PATCH", `/api/items/${parent}`, { startDate: d(-2) });
+  // C1(#2):有 estimate 无 start 无依赖(case2 未开始)→ 蓝条 @ group 开始,长=4h 铺算
+  const c1 = await apiCall<{ itemId: string }>(
+    "POST",
+    `/api/projects/${projectKey}/items`,
+    { title: "E2E 估无锚子", parentItemId: parent },
+  ).then((r) => r.itemId);
+  await apiCall("PATCH", `/api/items/${c1}`, {
+    estimateValue: 4,
+    estimateUnit: "hour",
+  });
+  // C2(#3):三无(case1 未开始)→ 蓝点 @ group 开始
+  await apiCall("POST", `/api/projects/${projectKey}/items`, {
+    title: "E2E 三无子",
+    parentItemId: parent,
+  });
+
+  await page.goto(`/p/${projectKey}/gantt`);
+  await pickScope(page, "全部");
+  await expect(page.getByText("E2E group 父").first()).toBeVisible();
+
+  const row = (n: number) =>
+    page.locator(`a[aria-label="${projectKey}-${n}"]`).locator("xpath=..");
+
+  // C1:铺算条在(宽度=4h 工作窗铺算,>3px 非零点)
+  const w = await row(2)
+    .getByTestId(`gantt-bar-${projectKey}-2`)
+    .evaluate((el) => (el.firstElementChild as HTMLElement).offsetWidth);
+  expect(w).toBeGreaterThan(3);
+  // C2:group 点在
+  await expect(
+    row(3).getByTestId(`gantt-grouppoint-${projectKey}-3`),
   ).toBeVisible();
 });
 
