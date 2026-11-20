@@ -35,3 +35,18 @@
 - [ ] B4 未排期票(无 start)只改 due 保存 → toast「无开始日期,预估未推算」
 - [ ] B5 estimate 强制项目:填 start 不填 estimate 保存 → 400 拦截(既有)
 - [ ] B6 预估下拉从「未填」直接选「自定义」→ 数值框出现可填(A31 修复:原死锁)
+
+### D. 渲染规则 v2(2026-11-20 用户 Obsidian 追加;spec 0151 §五)
+
+> 真值表见 spec §5.1;5 处读法标注见 §5.2(⚠请复核,尤其④下条存废、⑤diff 保留)。
+
+- [ ] D1 case1 未开始:三无票(父有 startDate)→ 甘特蓝点画在**父 group 开始时间**;全链无 group 开始 → 仍在「未排期」折叠区
+- [ ] D2 case2 未开始:有 estimate(如 4h)无 start 无 due → 蓝条从 **group 开始时间**起,长=estimate 工作窗铺算(09:00-18:00 窗)
+- [ ] D3 case3 未开始:无 estimate 有 start(或依赖锚)→ 蓝点(无 due 无 est 时点;有 due → 条 start→due)
+- [ ] D4 case4 未开始:start+due → 蓝条;due 缺省由 estimate 铺算
+- [ ] D5 进行中 case1:三无票迁 In Progress → **黄条** actualStart→今天,无计划层点
+- [ ] D6 进行中 case2:有 estimate 无锚迁进行中 → 蓝条(actualStart 起,estimate 铺算长)+ **黄覆盖**;下条黄
+- [ ] D7 进行中 case4:start+due+estimate 进行中 → 蓝条 + **黄覆盖**(已流逝比例,今天≥due 填满);下条黄
+- [ ] D8 final 全 case:实际条转**绿**(进行中黄→完成绿);case1 仅一条绿;case2 上蓝(estimate 长)+下绿(actual 长);case3 蓝点+绿条;case4 双条(现状)
+- [ ] D9 偏移徽标 ±Nd 在 final 行仍显示(读法⑤待拍板:保留/隐藏/改显示方式)
+- [ ] D10 灰色彻底消失(FINAL 行计划蓝+实际绿,补上轮未落地项,台账 A33)
