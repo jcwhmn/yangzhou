@@ -23,13 +23,42 @@ import yangzhou.persistence.repository.StatusRepository
 import java.time.LocalDateTime
 import java.util.UUID
 
-/** YPJ-233(拍板 2026-11-18):同级 start 升序、未排期(无 start)靠后、同 start 按创建序兜底;树每层递归生效。 */
-internal val ganttSiblingOrder: Comparator<yangzhou.persistence.Item> =
-    compareBy(
-        { it.startDate == null }, // 未排期靠后
-        { it.startDate ?: LocalDateTime.MAX }, // start 升序(未排期组内该键恒同,落回 number)
-        { it.number }, // 稳定兜底:同 start / 未排期组内按创建序
+/** YPJ-233(spec 0148)+ YPJ-244 修订:排序锚 = 渲染锚——叶行取自有 startDate(due-only 仍落未排期组,0148 字面);
+ *  父行取严格子孙并集最早端(每个子孙以自有 startDate ?? dueDate 贡献,含中间层父行自有日期,与 0139 汇总条 visit 同口径);
+ *  未排靠后,number 兜底。纯函数直测(GanttRowOrderTest)。 */
+internal fun ganttWalkOrder(
+    siblings: List<yangzhou.persistence.Item>,
+    childrenOf: (UUID) -> List<yangzhou.persistence.Item>,
+): List<yangzhou.persistence.Item> {
+    val memo = HashMap<UUID, LocalDateTime?>()
+    fun subtreeMinOf(item: yangzhou.persistence.Item): LocalDateTime? {
+        val id = item.objectId!!
+        if (memo.containsKey(id)) return memo[id]
+        val a = childrenOf(id)
+            .mapNotNull { c -> listOfNotNull(c.startDate ?: c.dueDate, subtreeMinOf(c)).minOrNull() }
+            .minOrNull()
+        memo[id] = a
+        return a
+    }
+    siblings.forEach { subtreeMinOf(it) }
+    fun isUnscheduled(item: yangzhou.persistence.Item) = if (childrenOf(item.objectId!!).isEmpty()) {
+        item.startDate == null
+    } else {
+        memo[item.objectId!!] == null
+    }
+    fun anchorOf(item: yangzhou.persistence.Item) = if (childrenOf(item.objectId!!).isEmpty()) {
+        item.startDate
+    } else {
+        memo[item.objectId!!]
+    }
+    return siblings.sortedWith(
+        compareBy(
+            { isUnscheduled(it) }, // 未排期靠后
+            { anchorOf(it) ?: LocalDateTime.MAX }, // 锚升序
+            { it.number }, // 稳定兑底:同锚 / 未排期组内按创建序
+        ),
     )
+}
 
 /** Project = 编号(key-N)+ workflow + 视图容器(ADR-0001)。 */
 @Service
@@ -280,7 +309,7 @@ class ProjectService(
             return depth
         }
 
-        fun walk(parent: UUID?): List<GanttRow> = (byParent[parent] ?: emptyList()).sortedWith(ganttSiblingOrder).flatMap { item ->
+        fun walk(parent: UUID?): List<GanttRow> = ganttWalkOrder(byParent[parent].orEmpty()) { id -> byParent[id].orEmpty() }.flatMap { item ->
             val status = statusById[item.statusObjectId]
             val hist = histories[item.objectId!!].orEmpty()
             val cc = checklistCounts[item.objectId!!]

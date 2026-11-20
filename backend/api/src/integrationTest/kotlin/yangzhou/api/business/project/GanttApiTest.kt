@@ -349,8 +349,9 @@ class GanttApiTest : AbstractApiTest() {
                     .responseBody!!,
             )["rows"].map { it["title"].asText() }
 
-        // 根级:C(12-01)→ A(12-03),未排期 B 靠后;C 组内 c1(start)在前、c2(未排期)落尾;B 组内 b1 正常
-        assertEquals(listOf("C", "c1", "c2", "A", "B", "b1"), rows)
+        // 根级按渲染锚(YPJ-244 修订:父行排序锚=子孙并集最早端,自有 start 忽略):A 组锚=b1(12-04)→ C 组锚=c1(12-05);
+        // C 组内 c1(start)在前、c2(未排期)落尾;B 组内 b1 正常
+        assertEquals(listOf("A", "B", "b1", "C", "c1", "c2"), rows)
     }
 
     @Test

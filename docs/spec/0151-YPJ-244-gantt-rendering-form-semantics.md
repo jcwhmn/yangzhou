@@ -134,4 +134,5 @@
 - 分流:case1/2 借 group 锚 → scheduled;轴锚定加 gStart/estimate 铺算末端。
 - hover 卡:起止 fmtDateTime(含时分);预估/实际工时按小时(实际=状态史 actualStart→actualEnd 时长)。
 - 轴映射:xOf/xOfT/xEndOf/todayX = 24h 钟表线性((t-start)/DAY);小时刻度梯 0–24 墙钟。
+- **行序:排序锚=渲染锚(0148 修订,后端 ganttWalkOrder)**:叶行自有 startDate(due-only 仍落未排期组);父行取严格子孙并集最早端(子孙逐点以 startDate ?? dueDate 贡献,含中间层父行自有日期,与 0139 汇总条同口径)——207 自有 11-18 但 208 子孙起 11-15,修前 207 误居首;217 借中间层 219 自有 11-18 09:00 锚定。单测 GanttRowOrderTest 7 例 + 集成 GanttApiTest 排序用例同步更新。
 - 色:下条 doing=warning.main / final=success.main;填充 warning.main;遮罩同态;菱形/汇总条/偏移徽标不变。
