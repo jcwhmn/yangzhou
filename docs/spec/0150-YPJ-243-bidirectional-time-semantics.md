@@ -69,3 +69,12 @@
 4. 表单同时改 due+estimate(值冲突)→ 双存 + 冲突警告;值一致 → 无警告。
 5. estimate 强制项目建票不填 estimate → 400(既有);填 start 不填 due → 条必有(数据驱动)。
 6. 甘特 API(本票):行含 anchorDate;前端点定位等票 244 完成后验。
+
+## 四、As-built(2026-11-20,PR #237,main `6673e9c`)
+
+实现与 §二 真值表/设计零偏差;落点与两处微调:
+
+- **落点**:`ItemService` 日期块按真值表分支重构,警告文案 5 常量集中文件底部(`W_DUE_FROM_ESTIMATE`/`W_NO_START_ESTIMATE`/`W_DUE_CLEAR_BACKFILL`/`W_NO_START_DUE`/`W_CONFLICT`);`ItemDto.warnings` 仅 PATCH 响应填充,查询恒空;`WorkdayCalculator.hoursBetween`(倒挂返 0,跨周末照算同 dueFrom);`DependencyService.predecessorAnchors` 批量 Map(`findByItemObjectIdIn` 单查,无 N+1);`GanttRow.anchorDate`;`api.http` 互算正例 2 + 负例区 3。
+- **微调 1**:logActivity 未另立 `estimate_recalc`/`due_recalc` 动作,复用既有 `estimate_changed`/`dates_changed`(语义已覆盖,不增动作枚举)。
+- **微调 2**:锚点聚合 helper 落 `DependencyService`(依赖查询本归该文件),`ProjectService` 装配处调用——非设计预写的「ProjectService 内聚合」。
+- **验证**:集成真值表 8 例(estimate 后写×2 / due 后写×2 / 双显式×2 / 排期窗口收窄×1 / 清除回填 / 仅改标题不触发)+ 甘特锚点 2 例;单元 hoursBetween 5 例边界。单测+集成+build+ktlintFormat 全绿;用户验收通过(2026-11-20,「所有测试都已过了」;页面无变化属预期——本票纯后端,渲染消费在 YPJ-244)。
