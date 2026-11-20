@@ -791,6 +791,16 @@ class ItemServiceUnitTest {
         }
 
         @Test
+        fun `date-only due——全天窗缺省当日日末秒精度 235959(防纳秒常量被 timestamp 六位微秒进位成次日零点)`() {
+            service.update(
+                itemOid, title = null, description = null, type = null, statusItemId = null, parentItemId = null,
+                dueDateText = "2026-11-23",
+            )
+
+            assertEquals(LocalDateTime.parse("2026-11-23T23:59:59"), row.dueDate)
+        }
+
+        @Test
         fun `仅改标题——互算不触发 warnings 空`() {
             val dto =
                 service.update(

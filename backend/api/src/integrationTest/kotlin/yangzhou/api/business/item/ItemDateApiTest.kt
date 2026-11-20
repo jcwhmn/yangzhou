@@ -42,8 +42,8 @@ class ItemDateApiTest : AbstractApiTest() {
             .exchange()
             .expectStatus()
             .isOk()
-        assertEquals("2026-09-01T09:00", detail(authed, itemId)["startDate"].asText())
-        assertEquals("2026-09-30T18:00", detail(authed, itemId)["dueDate"].asText())
+        assertEquals("2026-09-01T00:00", detail(authed, itemId)["startDate"].asText()) // date-only → 窗起点 00:00(V67 24h 缺省)
+        assertEquals("2026-09-30T23:59:59", detail(authed, itemId)["dueDate"].asText()) // date-only due → 当日日末(秒精度,防 timestamp(6) 进位成次日零点)
 
         // 不传日期字段 → 保持不变
         authed
@@ -53,7 +53,7 @@ class ItemDateApiTest : AbstractApiTest() {
             .exchange()
             .expectStatus()
             .isOk()
-        assertEquals("2026-09-30T18:00", detail(authed, itemId)["dueDate"].asText())
+        assertEquals("2026-09-30T23:59:59", detail(authed, itemId)["dueDate"].asText())
 
         // start > due → 400
         authed
@@ -223,7 +223,7 @@ class ItemDateApiTest : AbstractApiTest() {
     fun `双向互算——铺算、反推、清除回填、警告(YPJ-243,推翻 0146 清除不回填)`() {
         val (authed, itemId) = setup()
 
-        // 1) estimate 5h + start date-only(无 due)→ 系统算:09:00+5h → 当日 14:00(0146 既有果随因)
+        // 1) estimate 5h + start date-only(无 due)→ 系统算:00:00+5h → 当日 05:00(24h 全天窗,V67 缺省;0146 既有果随因)
         authed
             .patch()
             .uri("/api/items/$itemId")
@@ -231,9 +231,9 @@ class ItemDateApiTest : AbstractApiTest() {
             .exchange()
             .expectStatus()
             .isOk()
-        assertEquals("2026-09-01T14:00", detail(authed, itemId)["dueDate"].asText())
+        assertEquals("2026-09-01T05:00", detail(authed, itemId)["dueDate"].asText())
 
-        // 2) 显式 due(单独发,后写者为准)→ estimate 反推:存量 start 09-01T09:00 → 09-30T12:00 = 264 工作小时(9h/日,周六日照算)
+        // 2) 显式 due(单独发,后写者为准)→ estimate 反推:存量 start 09-01T00:00 → 09-30T12:00 = 708h(24h 全天窗=纯钟表跨度)
         val dueWin =
             authed
                 .patch()
@@ -246,12 +246,12 @@ class ItemDateApiTest : AbstractApiTest() {
                 .returnResult()
                 .responseBody!!
         val dueTree = json.readTree(dueWin)
-        assertEquals(264.0, dueTree["estimateValue"].asDouble(), 0.01)
+        assertEquals(708.0, dueTree["estimateValue"].asDouble(), 0.01)
         assertEquals("hour", dueTree["estimateUnit"].asText())
         assertTrue(dueTree["warnings"].any { "预估已按起止重算" in it.asText() })
         assertEquals("2026-09-30T12:00", detail(authed, itemId)["dueDate"].asText())
 
-        // 3) 再设 start 不带 due → 按新 estimate 重算覆盖:264h 从 09-02T09:00 铺到 10-01T12:00
+        // 3) 再设 start 不带 due → 按新 estimate 重算覆盖:708h 从 09-02T00:00 铺到 10-01T12:00
         authed
             .patch()
             .uri("/api/items/$itemId")
