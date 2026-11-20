@@ -8,3 +8,11 @@ export function fmtDate(iso: string | null | undefined): string {
 export function parseLocal(iso: string): Date {
   return new Date(/^\d{4}-\d{2}-\d{2}$/.test(iso) ? `${iso}T00:00` : iso);
 }
+
+// YPJ-244:甘特 hover 卡展示时分(数据含时分,不再裁成 date-only);date-only 入参回退为 00:00
+export function fmtDateTime(iso: string): string {
+  const d = parseLocal(iso);
+  if (isNaN(+d)) return iso;
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}

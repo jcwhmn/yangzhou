@@ -632,6 +632,9 @@ test("实际条+偏移徽标+清单遮罩+折叠徽标+hover 卡(YPJ-222/spec 01
   const tip = page.locator(".MuiTooltip-tooltip");
   await expect(tip).toContainText("E2E 实际甲");
   await expect(tip).toContainText("清单:1/2");
+  // 起止含时分、工时按小时(YPJ-244:数据含时分;实际行含「· 工时 x.xh」)
+  await expect(tip).toContainText(/\d{2}:\d{2}/);
+  await expect(tip).toContainText(/工时 \d+(\.\d+)?h/);
   await expect(tip).toContainText("实际:");
 });
 

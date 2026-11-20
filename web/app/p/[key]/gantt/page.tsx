@@ -24,7 +24,7 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from "react";
 import { api } from "@/lib/api";
-import { parseLocal } from "@/lib/dates";
+import { parseLocal, fmtDateTime } from "@/lib/dates";
 import { t } from "@/lib/texts";
 import { DateInput } from "@/components/DateInput";
 
@@ -673,8 +673,22 @@ export default function GanttPage() {
     return n;
   }
 
-  // YPJ-222(spec 0147):条上 hover 详情卡
+  // YPJ-222(spec 0147):条上 hover 详情卡;起止显时分、工时按小时(YPJ-244:数据含时分)
   function hoverCard(r: GanttRow) {
+    const estH = estimateHoursOf(
+      r.estimateValue,
+      r.estimateUnit,
+      wd?.[0] ?? 540,
+      wd?.[1] ?? 1080,
+    );
+    const actH =
+      r.actualStart && r.actualEnd
+        ? Math.max(
+            0,
+            (+parseLocal(r.actualEnd) - +parseLocal(r.actualStart)) / 3600000,
+          )
+        : null;
+    const fmtH = (h: number) => `${+h.toFixed(1)}h`;
     return (
       <Stack spacing={0.25}>
         <Typography variant="caption" sx={{ fontWeight: 600 }}>
@@ -685,18 +699,22 @@ export default function GanttPage() {
           {r.assigneeName ? ` · ${r.assigneeName}` : ""}
         </Typography>
         <Typography variant="caption">
-          计划:{r.startDate?.slice(0, 10) ?? "?"} →{" "}
-          {r.dueDate?.slice(0, 10) ?? "?"}
+          计划:{r.startDate ? fmtDateTime(r.startDate) : "?"} →{" "}
+          {r.dueDate ? fmtDateTime(r.dueDate) : "?"}
         </Typography>
+        {estH !== null && (
+          <Typography variant="caption">预估工时:{fmtH(estH)}</Typography>
+        )}
         {r.actualStart && (
           <Typography variant="caption">
-            实际:{r.actualStart.slice(0, 10)} →{" "}
-            {r.actualEnd ? r.actualEnd.slice(0, 10) : "进行中"}
+            实际:{fmtDateTime(r.actualStart)} →{" "}
+            {r.actualEnd ? fmtDateTime(r.actualEnd) : "进行中"}
+            {actH !== null ? ` · 工时 ${fmtH(actH)}` : ""}
           </Typography>
         )}
         {r.anchorDate && (
           <Typography variant="caption">
-            锚点:{r.anchorDate.slice(0, 10)}(依赖落位)
+            锚点:{fmtDateTime(r.anchorDate)}(依赖落位)
           </Typography>
         )}
         {r.checklistTotal ? (
