@@ -230,6 +230,7 @@ class ProjectService(
         val all = items.findByProjectObjectIdAndDeletedAtIsNullOrderByNumber(projectId)
         val matched = resolveScope(key, projectId, scope, scopeIds, all)
         val blocked = dependencyService.blockedItemObjectIds(projectId) // YPJ-204(spec 0137):甘特行 blocked 标记
+        val anchors = dependencyService.predecessorAnchors(projectId) // YPJ-243(spec 0150):依赖锚点(前端点定位,YPJ-244)
         val byId = all.associateBy { it.objectId }
         val statusById = statuses.findByProjectObjectIdOrderByPosition(projectId).associateBy { it.objectId }
         val now = LocalDateTime.now() // YPJ-208:时刻口径(spec 0138;甘特无 Clock seam,页面级展示容忍)
@@ -300,6 +301,7 @@ class ProjectService(
                 actualStart = hist.firstOrNull { it.toStatusObjectId !in startIds }?.createdAt?.toString(),
                 actualEnd = hist.firstOrNull { it.toStatusObjectId in finalIds }?.createdAt?.toString(),
                 assigneeName = item.assigneeObjectId?.let { assigneeNames[it] },
+                anchorDate = anchors[item.objectId]?.toString(),
                 checklistDone = cc?.done?.toInt(),
                 checklistTotal = cc?.total?.toInt(),
             )
@@ -365,6 +367,7 @@ class ProjectService(
         val actualStart: String? = null,
         val actualEnd: String? = null,
         val assigneeName: String? = null,
+        val anchorDate: String? = null, // YPJ-243(spec 0150):依赖锚点=多前置最晚 due(无 due 退 start);null=无可用前置时间
         val checklistDone: Int? = null,
         val checklistTotal: Int? = null,
     )

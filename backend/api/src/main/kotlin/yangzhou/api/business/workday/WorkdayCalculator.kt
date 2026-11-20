@@ -46,4 +46,21 @@ class WorkdayCalculator(
         }
         return cursor
     }
+
+    /** YPJ-243(spec 0150):dueFrom 的逆——[start, due] 落在工作时段内的时长(逐日 [max(start,开工), min(due,收工)] 累加);due<=start 返回 0;周六日照算同 dueFrom。 */
+    fun hoursBetween(
+        start: LocalDateTime,
+        due: LocalDateTime,
+    ): Double {
+        if (!due.isAfter(start)) return 0.0
+        var day = start.toLocalDate()
+        var totalMin = 0L
+        while (day <= due.toLocalDate()) {
+            val s = maxOf(start, day.atTime(workdayStart))
+            val e = minOf(due, day.atTime(workdayEnd))
+            if (e.isAfter(s)) totalMin += Duration.between(s, e).toMinutes()
+            day = day.plusDays(1)
+        }
+        return totalMin / 60.0
+    }
 }

@@ -352,4 +352,62 @@ class GanttApiTest : AbstractApiTest() {
         // 根级:C(12-01)→ A(12-03),未排期 B 靠后;C 组内 c1(start)在前、c2(未排期)落尾;B 组内 b1 正常
         assertEquals(listOf("C", "c1", "c2", "A", "B", "b1"), rows)
     }
+
+    @Test
+    fun `甘特行 anchorDate——多前置取最晚 due,无前置 null(YPJ-243)`() {
+        val authed = bootstrapAndAuth()
+        createProject(authed, "ANC")
+
+        val predA = createItem(authed, "ANC", "前置A")
+        authed
+            .patch()
+            .uri("/api/items/${predA["itemId"].asText()}")
+            .body(mapOf("startDate" to "2026-09-01", "dueDate" to "2026-09-30T12:00"))
+            .exchange()
+            .expectStatus()
+            .isOk()
+        val predB = createItem(authed, "ANC", "前置B")
+        authed
+            .patch()
+            .uri("/api/items/${predB["itemId"].asText()}")
+            .body(mapOf("startDate" to "2026-09-05"))
+            .exchange()
+            .expectStatus()
+            .isOk()
+        val succ = createItem(authed, "ANC", "后继")
+
+        // succ 依赖 A 与 B → anchor = max(A.due 09-30T12:00, B.start 09-05T09:00)
+        authed
+            .post()
+            .uri("/api/items/${succ["itemId"].asText()}/dependencies")
+            .body(mapOf("dependsOnItemId" to predA["itemId"].asText()))
+            .exchange()
+            .expectStatus()
+            .isCreated()
+        authed
+            .post()
+            .uri("/api/items/${succ["itemId"].asText()}/dependencies")
+            .body(mapOf("dependsOnItemId" to predB["itemId"].asText()))
+            .exchange()
+            .expectStatus()
+            .isCreated()
+
+        val rows =
+            json.readTree(
+                authed
+                    .get()
+                    .uri("/api/projects/ANC/gantt?scope=all")
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody(String::class.java)
+                    .returnResult()
+                    .responseBody!!,
+            )["rows"]
+
+        val byTitle = rows.associateBy { it["title"].asText() }
+        assertEquals("2026-09-30T12:00", byTitle["后继"]!!["anchorDate"].asText())
+        assertTrue(byTitle["前置A"]!!["anchorDate"].isNull)
+        assertTrue(byTitle["前置B"]!!["anchorDate"].isNull)
+    }
 }

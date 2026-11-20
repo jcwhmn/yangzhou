@@ -113,6 +113,7 @@ class ItemService(
         val sprintName: String? = null,
         val onBoard: Boolean = false,
         val autoAssignedSprintName: String? = null, // YPJ-120 仅 PATCH 触发自动挂载时非空
+        val warnings: List<String> = emptyList(), // YPJ-243(spec 0150):互算警告,仅 PATCH 响应携带
         /** 票 2(US-M7):gate 多归属回显,仅详情回填(列表批量代价高)。 */
         val milestoneIds: List<UUID> = emptyList(),
         /** YPJ-182(spec 0130):时间合计(分钟),仅列表填充;口径同 minutesOf。 */
@@ -383,14 +384,16 @@ class ItemService(
 
         // YPJ-186(spec 0128):预估三态合并(required 项目禁显式清除;同值跳过不记日志)
         val withEstimate = applyEstimate(current, estimateValueText, estimateUnitText, project.estimateRequired)
-        if (withEstimate !== current) {
+        val estimateChanged = withEstimate !== current
+        if (estimateChanged) {
             val old = estimateText(current.estimateValue, current.estimateUnit)
             current = itemRepo.save(withEstimate)
             logActivity(current.objectId!!, "estimate_changed", old, estimateText(current.estimateValue, current.estimateUnit), actorId)
         }
 
         // V8-S1 日期:参数 null = 不变;空串 = 清除;ISO 文本 = 设置。start<=due 由 DB CHECK + 此处双保险
-        if (startDateText != null || dueDateText != null) {
+        val warnings = mutableListOf<String>() // YPJ-243(spec 0150):互算警告,仅本次 PATCH 响应携带
+        if (startDateText != null || dueDateText != null || estimateChanged) {
             // YPJ-208(spec 0138 切片 b):date-only → 项目工作日界默认时刻;datetime 原样
             val (ws, we) = workdayBounds(project)
             fun parse(
@@ -403,24 +406,77 @@ class ItemService(
                     .getOrElse { throw BadRequestException("$field 格式应为 yyyy-MM-dd 或 yyyy-MM-dd'T'HH:mm:$it") }
             }
             val newStart = parse(startDateText, "startDate", ws)
-            var newDue = parse(dueDateText, "dueDate", we)
-            // YPJ-235(spec 0146,拍板案①):设 start 且 due 缺省(未携带;空串=显式清除不回填)且 estimate 有值
-            // → 系统按工作日历铺算 due,已有 due 重算覆盖(due 是果,estimate 是因;显式 due 仅作覆盖)
-            if (!startDateText.isNullOrBlank() && dueDateText == null) {
-                estimateHours(current.estimateValue, current.estimateUnit, ws, we)?.let { h ->
-                    newStart?.let { s -> newDue = WorkdayCalculator(ws, we).dueFrom(s, h) }
-                }
+            val dueCleared = dueDateText != null && dueDateText.trim().isEmpty()
+            val dueExplicit = dueDateText != null && !dueCleared
+            val newDueExplicit = parse(dueDateText, "dueDate", we)
+            var due = when {
+                dueDateText == null -> current.dueDate
+                dueCleared -> null
+                else -> newDueExplicit
             }
             val start = newStart ?: current.startDate
-            val due = newDue ?: current.dueDate
+            val estHours = estimateHours(current.estimateValue, current.estimateUnit, ws, we)
+            val calc = WorkdayCalculator(ws, we)
+            // YPJ-243(spec 0150)双向互算·后写者为准(真值表见 spec §2.1;推翻 0146 两处,用户 2026-11-20 拍板)
+            when {
+                // estimate 后写(显式改预估且变化;due 未显式携带)→ due 按预估重算;无 start 只警告
+                estimateChanged && estHours != null && dueDateText == null -> {
+                    if (start != null) {
+                        val recalc = calc.dueFrom(start, estHours)
+                        if (recalc != due) {
+                            due = recalc
+                            warnings += W_DUE_FROM_ESTIMATE
+                        }
+                    } else {
+                        warnings += W_NO_START_ESTIMATE
+                    }
+                }
+                // due 显式清除且预估有值 → 铺算回填(H2,推翻 0146「清除不回填」)
+                dueCleared && estHours != null && start != null -> {
+                    due = calc.dueFrom(start, estHours)
+                    warnings += W_DUE_CLEAR_BACKFILL
+                }
+                // due 后写(显式改 due 且变化;start 未同发——start+due 同发=排期窗口,双存不动 estimate;预估本次未变)
+                // → estimate 按起止反推(H3 已拍板:无预估填/有预估改)
+                dueExplicit && newStart == null && due != current.dueDate && !estimateChanged -> {
+                    if (start != null) {
+                        val h = calc.hoursBetween(start, due!!)
+                        if (h > 0) {
+                            var value = h
+                            if (value > 999.0) {
+                                value = 999.0
+                                warnings += W_EST_CLAMP
+                            }
+                            if (current.estimateValue != value || current.estimateUnit != "hour") {
+                                val old = estimateText(current.estimateValue, current.estimateUnit)
+                                current = itemRepo.save(current.copy(estimateValue = value, estimateUnit = "hour"))
+                                logActivity(current.objectId!!, "estimate_changed", old, estimateText(value, "hour"), actorId)
+                                warnings += String.format(W_EST_FROM_DATES, estimateText(value, "hour"))
+                            }
+                        }
+                    } else {
+                        warnings += W_NO_START_DUE
+                    }
+                }
+                // 双显式(H1):due+estimate 同请求都变 → 双存不互算;冲突仅警告(后写者为准由前端发送顺序保证)
+                estimateChanged && dueExplicit && start != null && estHours != null -> {
+                    val h = calc.hoursBetween(start, due!!)
+                    if (kotlin.math.abs(h - estHours) > 0.01) warnings += W_CONFLICT
+                }
+                // 0146 既有:start 显式、due 未携带、预估未变 → due 按存量预估铺算(果随因)
+                newStart != null && dueDateText == null && estHours != null && !estimateChanged -> {
+                    val recalc = calc.dueFrom(newStart, estHours)
+                    if (recalc != due) due = recalc
+                }
+            }
             if (start != null && due != null && start > due) throw BadRequestException("开始日期不能晚于截止日期")
-            if (newStart != current.startDate || newDue != current.dueDate) {
+            if (newStart != current.startDate || due != current.dueDate) {
                 val old = "${current.startDate ?: "—"} ~ ${current.dueDate ?: "—"}"
-                current = itemRepo.save(current.copy(startDate = newStart, dueDate = newDue))
-                logActivity(current.objectId!!, "dates_changed", old, "${newStart ?: "—"} ~ ${newDue ?: "—"}", actorId)
+                current = itemRepo.save(current.copy(startDate = newStart, dueDate = due))
+                logActivity(current.objectId!!, "dates_changed", old, "${newStart ?: "—"} ~ ${due ?: "—"}", actorId)
             }
         }
-        return get(current.objectId).copy(autoAssignedSprintName = autoSprintName) // YPJ-120
+        return get(current.objectId).copy(autoAssignedSprintName = autoSprintName, warnings = warnings) // YPJ-120
     }
 
     /** 需求整表替换(同 transitions 语义);供 item 详情编辑用。 */
@@ -816,6 +872,15 @@ internal val DEFAULT_WORKDAY_START: LocalTime = LocalTime.of(9, 0)
 internal val DEFAULT_WORKDAY_END: LocalTime = LocalTime.of(18, 0)
 
 /** YPJ-235(spec 0146):estimate → WorkdayCalculator 小时;unit 缺失/未知按 hour兜底(信任边界在 EstimateInput)。 */
+// YPJ-243(spec 0150):互算警告文案集中(中文,前端 toast 原文展示)
+private const val W_DUE_FROM_ESTIMATE = "截止时间已按预估重算"
+private const val W_NO_START_ESTIMATE = "无开始日期,截止时间未铺算"
+private const val W_DUE_CLEAR_BACKFILL = "截止时间已按预估回填(清除被推算覆盖)"
+private const val W_EST_FROM_DATES = "预估已按起止重算:%s"
+private const val W_NO_START_DUE = "无开始日期,预估未推算"
+private const val W_EST_CLAMP = "预估超出上限 999,已钳制"
+private const val W_CONFLICT = "起止时长与预估不一致,已按双值保存"
+
 internal fun estimateHours(
     estimateValue: Double?,
     estimateUnit: String?,

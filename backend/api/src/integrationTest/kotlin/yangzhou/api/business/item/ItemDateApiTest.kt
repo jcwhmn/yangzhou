@@ -220,10 +220,10 @@ class ItemDateApiTest : AbstractApiTest() {
 
     /** YPJ-235(spec 0146,拍板案①):due 缺省时系统按 estimate 工作日铺算;显式 due 覆盖;空串清除不回填。 */
     @Test
-    fun `due 缺省按 estimate 系统算——覆盖与清除语义`() {
+    fun `双向互算——铺算、反推、清除回填、警告(YPJ-243,推翻 0146 清除不回填)`() {
         val (authed, itemId) = setup()
 
-        // estimate 5h + start date-only(无 due)→ 系统算:09:00+5h → 当日 14:00
+        // 1) estimate 5h + start date-only(无 due)→ 系统算:09:00+5h → 当日 14:00(0146 既有果随因)
         authed
             .patch()
             .uri("/api/items/$itemId")
@@ -233,17 +233,25 @@ class ItemDateApiTest : AbstractApiTest() {
             .isOk()
         assertEquals("2026-09-01T14:00", detail(authed, itemId)["dueDate"].asText())
 
-        // 显式 due → 覆盖
-        authed
-            .patch()
-            .uri("/api/items/$itemId")
-            .body(mapOf("startDate" to "2026-09-02", "dueDate" to "2026-09-30T12:00"))
-            .exchange()
-            .expectStatus()
-            .isOk()
+        // 2) 显式 due(单独发,后写者为准)→ estimate 反推:存量 start 09-01T09:00 → 09-30T12:00 = 264 工作小时(9h/日,周六日照算)
+        val dueWin =
+            authed
+                .patch()
+                .uri("/api/items/$itemId")
+                .body(mapOf("dueDate" to "2026-09-30T12:00"))
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(String::class.java)
+                .returnResult()
+                .responseBody!!
+        val dueTree = json.readTree(dueWin)
+        assertEquals(264.0, dueTree["estimateValue"].asDouble(), 0.01)
+        assertEquals("hour", dueTree["estimateUnit"].asText())
+        assertTrue(dueTree["warnings"].any { "预估已按起止重算" in it.asText() })
         assertEquals("2026-09-30T12:00", detail(authed, itemId)["dueDate"].asText())
 
-        // 再设 start 不带 due → 重算覆盖(due 是果):2026-09-02T09:00 + 5h → 14:00
+        // 3) 再设 start 不带 due → 按新 estimate 重算覆盖:264h 从 09-02T09:00 铺到 10-01T12:00
         authed
             .patch()
             .uri("/api/items/$itemId")
@@ -251,19 +259,24 @@ class ItemDateApiTest : AbstractApiTest() {
             .exchange()
             .expectStatus()
             .isOk()
-        assertEquals("2026-09-02T14:00", detail(authed, itemId)["dueDate"].asText())
+        assertEquals("2026-10-01T12:00", detail(authed, itemId)["dueDate"].asText())
 
-        // 空串清除 → null,不回填
-        authed
-            .patch()
-            .uri("/api/items/$itemId")
-            .body(mapOf("dueDate" to ""))
-            .exchange()
-            .expectStatus()
-            .isOk()
-        assertTrue(detail(authed, itemId)["dueDate"].isNull)
+        // 4) 空串清除 → 预估有值,回填铺算(H2,推翻 0146「清除不回填」)
+        val clearWin =
+            authed
+                .patch()
+                .uri("/api/items/$itemId")
+                .body(mapOf("dueDate" to ""))
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(String::class.java)
+                .returnResult()
+                .responseBody!!
+        assertTrue(json.readTree(clearWin)["warnings"].any { "回填" in it.asText() })
+        assertEquals("2026-10-01T12:00", detail(authed, itemId)["dueDate"].asText())
 
-        // 无 estimate 的 item:start 不带 due → due 保持 null(旧行为)
+        // 5) 无 estimate 的 item:start 不带 due → due 保持 null
         val item2Id = createItem(authed, "CHE", "z")["itemId"].asText()
         authed
             .patch()
