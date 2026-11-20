@@ -71,8 +71,9 @@ test("日期与超期标识——详情设置日期,看板红标,甘特可见", 
   const saveResp = page.waitForResponse(
     (r) => r.url().includes("/api/items/") && r.request().method() === "PATCH",
   );
-  // 保存成功后前端 load() 回拉 item(date-only 会被后端按日历填 T18:00 并回填时刻框),
-  // 必须等回填已渲染(时刻框=18:00)再录时刻,否则回填覆盖 fill(A10 同款竞态,2026-11-18 实锤)
+  // 保存成功后前端 load() 回拉 item(date-only 会被后端按日历填日末时刻并回填时刻框;
+  // SRS v4 24h 全天窗缺省 → 日末=23:59:59.999999,时刻框显 23:59),
+  // 必须等回填已渲染再录时刻,否则回填覆盖 fill(A10 同款竞态,2026-11-18 实锤)
   const reloadResp = page.waitForResponse(
     (r) =>
       r.url().includes(`/api/items/${itemId}`) &&
@@ -83,7 +84,7 @@ test("日期与超期标识——详情设置日期,看板红标,甘特可见", 
   await reloadResp;
   await expectDate(page, "开始日期", "2020-01-01");
   // YPJ-208 切片 c:时刻字段在,可录并随保存发出 datetime;先等回填渲染落地再覆盖
-  await expect(page.getByLabel("截止时刻")).toHaveValue("18:00");
+  await expect(page.getByLabel("截止时刻")).toHaveValue("23:59");
   await page.getByLabel("截止时刻").fill("12:30");
   const patchBody = page.waitForRequest(
     (r) => r.url().includes("/api/items/") && r.method() === "PATCH",

@@ -10,6 +10,34 @@ import kotlin.test.assertFailsWith
 class WorkdayCalculatorUnitTest {
     private val calc = WorkdayCalculator(LocalTime.of(9, 0), LocalTime.of(18, 0))
 
+    // ---------- SRS v4 §3.2(2026-11-21 拍板):24h 全天窗(两端 00:00)----------
+
+    private val fullDay = WorkdayCalculator(LocalTime.MIDNIGHT, LocalTime.MIDNIGHT)
+
+    @Test
+    fun `全天窗 dueFrom 等于钟表加法——跨零点不折断`() {
+        assertEquals(
+            LocalDateTime.of(2026, 11, 18, 0, 30),
+            fullDay.dueFrom(LocalDateTime.of(2026, 11, 17, 14, 30), 10.0),
+        )
+    }
+
+    @Test
+    fun `全天窗 hoursBetween 等于钟表差`() {
+        assertEquals(
+            10.0,
+            fullDay.hoursBetween(LocalDateTime.of(2026, 11, 17, 14, 30), LocalDateTime.of(2026, 11, 18, 0, 30)),
+        )
+    }
+
+    @Test
+    fun `全天窗恰好整日——返回次日零点`() {
+        assertEquals(
+            LocalDateTime.of(2026, 11, 18, 0, 0),
+            fullDay.dueFrom(LocalDateTime.of(2026, 11, 17, 0, 0), 24.0),
+        )
+    }
+
     @Test
     fun `当日装得下——从开工起算`() {
         assertEquals(

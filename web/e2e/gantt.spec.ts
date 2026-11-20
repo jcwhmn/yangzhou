@@ -6,6 +6,7 @@ import {
   apiCall,
   apiCreateItem,
   apiCreateSprint,
+  fillDate,
 } from "./support/helpers";
 
 /** UI 切范围(YPJ-220)。依赖缺省 board 后,旧用例需显式切「全部」复现全量语义。 */
@@ -191,7 +192,7 @@ test("v2 数据锚定轴 + 连续缩放(YPJ-219)", async ({ page, projectKey }) 
     )
     .toBeGreaterThan(before);
 
-  // 1 日预设:0–24 墙钟小时刻度(视口 1000px/天 → 2h 步长,末档 22:00)
+  // 1 日预设:0–24 墙钟小时刻度(视口 1000px/天 → 2h 步长,末档 22:00;2026-11-20 拍板钟表轴)
   await page.getByTestId("gantt-win-1").click();
   await expect(page.getByText("00:00", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("22:00", { exact: true }).first()).toBeVisible();
@@ -603,10 +604,12 @@ test("实际条+偏移徽标+清单遮罩+折叠徽标+hover 卡(YPJ-222/spec 01
     });
   expect(pct).toBe(50);
 
-  // 乙:实际条延伸到今日线(未完成),徽标延期
+  // 乙:进行中单条覆盖模型(SRS v4 §6.2,2026-11-21 拍板)——有计划条 → 无下条实际条;
+  // 黄覆盖=条内已流逝段(已过期→满条),徽标延期(进行中徽标 244 保留,FINAL-only 归 YPJ-245)
   await expect(
     row(2).getByTestId(`gantt-actual-${projectKey}-2`),
-  ).toBeVisible();
+  ).toHaveCount(0);
+  await expect(row(2).getByTestId(`gantt-fill-${projectKey}-2`)).toBeVisible();
   await expect(row(2).getByTestId(`gantt-offset-${projectKey}-2`)).toHaveText(
     /^\+\d+d$/,
   );
@@ -631,6 +634,9 @@ test("实际条+偏移徽标+清单遮罩+折叠徽标+hover 卡(YPJ-222/spec 01
   const tip = page.locator(".MuiTooltip-tooltip");
   await expect(tip).toContainText("E2E 实际甲");
   await expect(tip).toContainText("清单:1/2");
+  // 起止含时分、工时按小时(YPJ-244:数据含时分;实际行含「· 工时 x.xh」)
+  await expect(tip).toContainText(/\d{2}:\d{2}/);
+  await expect(tip).toContainText(/工时 \d+(\.\d+)?h/);
   await expect(tip).toContainText("实际:");
 });
 
@@ -750,4 +756,216 @@ test("缺省视窗下限(YPJ-234):宽区间溢出可读 + 今日按钮只居中�
     .getByTestId("gantt-scroll")
     .evaluate((el) => (el.firstElementChild as HTMLElement).scrollWidth);
   expect(contentW2).toBe(contentW); // 缩放未被「今日」重置
+});
+
+// YPJ-244(spec 0151)切片1:工时填充(案A)+ 完成点(H5)+ 依赖锚点位(H6)+ 实际层解耦
+test("工时填充+完成点+依赖锚点+实际层解耦(YPJ-244)", async ({
+  page,
+  projectKey,
+}) => {
+  const statuses = (
+    await apiCall<{ statuses: { statusId: string; name: string }[] }>(
+      "GET",
+      `/api/projects/${projectKey}`,
+    )
+  ).statuses;
+  const wipId = statuses.find((s) => s.name === "In Progress")!.statusId;
+  const finalId = statuses[statuses.length - 1].statusId;
+  // 日期动态值(仓库惯例:老日期把 fit 轴拉爆)
+  const d = (offset: number) => {
+    const t = new Date();
+    t.setDate(t.getDate() + offset);
+    return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+  };
+
+  // 甲(#1):start=d(-4) due=d(6) 进行中 → 计划条 + 琥珀填充(未过期 → 部分填充)
+  const a = await apiCreateItem(projectKey, "E2E 填充甲");
+  await apiCall("PATCH", `/api/items/${a}`, {
+    startDate: d(-4),
+    dueDate: d(6),
+    estimateValue: 8,
+    estimateUnit: "hour",
+  });
+  await apiAssignMe(a);
+  await apiCall("PATCH", `/api/items/${a}`, { statusItemId: wipId });
+
+  // 乙(#2):直建 FINAL(actualEnd 有而 actualStart 无)→ 完成点(终态迁移需有主)
+  const b = await apiCreateItem(projectKey, "E2E 完成点乙");
+  await apiAssignMe(b);
+  await apiCall("PATCH", `/api/items/${b}`, { statusItemId: finalId });
+
+  // 丙(#3):无 start 无 due,依赖甲(甲有 due)→ 锚点位画点(H6)
+  const c = await apiCreateItem(projectKey, "E2E 锚点丙");
+  await apiCall("POST", `/api/items/${c}/dependencies`, {
+    dependsOnItemId: a,
+  });
+
+  // 丁(#4):无 start 无 due 进行中 → 计划层点在 actualStart + 实际条(H5 解耦)
+  const e = await apiCreateItem(projectKey, "E2E 解耦丁");
+  await apiAssignMe(e);
+  await apiCall("PATCH", `/api/items/${e}`, { statusItemId: wipId });
+
+  await page.goto(`/p/${projectKey}/gantt`);
+  await pickScope(page, "全部");
+  await expect(page.getByText("E2E 填充甲").first()).toBeVisible();
+
+  const row = (n: number) =>
+    page.locator(`a[aria-label="${projectKey}-${n}"]`).locator("xpath=..");
+
+  // 甲:填充在,且是部分填充(今天在 start~due 之间,填充比 ∈ (0,1))
+  const fillRatio = await row(1)
+    .getByTestId(`gantt-fill-${projectKey}-1`)
+    .evaluate((el) => {
+      const bar = el.parentElement as HTMLElement;
+      const w = bar.getBoundingClientRect().width;
+      const f = el.getBoundingClientRect().width;
+      return w > 0 ? f / w : null;
+    });
+  expect(fillRatio).not.toBeNull();
+  expect(fillRatio!).toBeGreaterThan(0.05);
+  expect(fillRatio!).toBeLessThan(0.95);
+
+  // 乙:直建 FINAL——后端迁移史语义:一次 TODO→FINAL 迁移同时记 actualStart/actualEnd(同刻),
+  // 渲染为零宽实际条(3px 最小宽);completeDot(实际起点无而终点有)形态在现后端不可达,
+  // 分支保留作防御(台账 A30 记录 spec 0151 与后端 hist 语义的偏差)
+  await expect(
+    row(2).getByTestId(`gantt-actual-${projectKey}-2`),
+  ).toBeVisible();
+
+  // 丙:锚点位画点(无 start 无 due 有 anchorDate)
+  await expect(
+    row(3).getByTestId(`gantt-anchor-${projectKey}-3`),
+  ).toBeVisible();
+
+  // 丁:三无进行中(case1)=黄条 actualStart→今天(§五 颜色2),无计划层点
+  await expect(
+    row(4).getByTestId(`gantt-actual-${projectKey}-4`),
+  ).toBeVisible();
+  await expect(row(4).getByTestId(`gantt-plandot-${projectKey}-4`)).toHaveCount(
+    0,
+  );
+});
+
+// YPJ-244(spec 0151 §五):case1/2 借 group 开始锚——三无=group 点;有 estimate 无锚=group 起铺算条
+test("group 锚:case1 group 点 + case2 group 起铺算条(YPJ-244)", async ({
+  page,
+  projectKey,
+}) => {
+  const d = (offset: number) => {
+    const t = new Date();
+    t.setDate(t.getDate() + offset);
+    return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+  };
+  const parent = await apiCreateItem(projectKey, "E2E group 父");
+  await apiCall("PATCH", `/api/items/${parent}`, { startDate: d(-2) });
+  // C1(#2):有 estimate 无 start 无依赖(case2 未开始)→ 蓝条 @ group 开始,长=4h 铺算
+  const c1 = await apiCall<{ itemId: string }>(
+    "POST",
+    `/api/projects/${projectKey}/items`,
+    { title: "E2E 估无锚子", parentItemId: parent },
+  ).then((r) => r.itemId);
+  await apiCall("PATCH", `/api/items/${c1}`, {
+    estimateValue: 4,
+    estimateUnit: "hour",
+  });
+  // C2(#3):三无(case1 未开始)→ 蓝点 @ group 开始
+  await apiCall("POST", `/api/projects/${projectKey}/items`, {
+    title: "E2E 三无子",
+    parentItemId: parent,
+  });
+
+  await page.goto(`/p/${projectKey}/gantt`);
+  await pickScope(page, "全部");
+  await expect(page.getByText("E2E group 父").first()).toBeVisible();
+
+  const row = (n: number) =>
+    page.locator(`a[aria-label="${projectKey}-${n}"]`).locator("xpath=..");
+
+  // C1:铺算条在(宽度=4h 工作窗铺算,>3px 非零点)
+  const w = await row(2)
+    .getByTestId(`gantt-bar-${projectKey}-2`)
+    .evaluate((el) => (el.firstElementChild as HTMLElement).offsetWidth);
+  expect(w).toBeGreaterThan(3);
+  // C2:group 点在
+  await expect(
+    row(3).getByTestId(`gantt-grouppoint-${projectKey}-3`),
+  ).toBeVisible();
+});
+
+// 钟表轴线性(2026-11-20 拍板):同起点 8h vs 4h,计划条宽 2:1
+test("条长∝钟表跨度:同起点 8h vs 4h 计划条宽 2:1(A28)", async ({
+  page,
+  projectKey,
+}) => {
+  const start = "2031-01-06T09:00"; // 周一 09:00(窗起点)
+  const a = await apiCreateItem(projectKey, "E2E 工时比例 8h");
+  await apiCall("PATCH", `/api/items/${a}`, {
+    startDate: start,
+    estimateValue: 8,
+    estimateUnit: "hour",
+  });
+  const b = await apiCreateItem(projectKey, "E2E 工时比例 4h");
+  await apiCall("PATCH", `/api/items/${b}`, {
+    startDate: start,
+    estimateValue: 4,
+    estimateUnit: "hour",
+  });
+
+  await page.goto(`/p/${projectKey}/gantt`);
+  await pickScope(page, "全部");
+  await expect(page.getByText("E2E 工时比例 8h")).toBeVisible();
+
+  const wOf = (n: number) =>
+    page
+      .locator(`a[aria-label="${projectKey}-${n}"]`)
+      .locator("xpath=..")
+      .getByTestId(`gantt-bar-${projectKey}-${n}`)
+      .evaluate((el) => (el.firstElementChild as HTMLElement).offsetWidth);
+  const w8 = await wOf(1);
+  const w4 = await wOf(2);
+  // 8h = 8/9 列,4h = 4/9 列 → 2:1(±容差)
+  expect(w8 / w4).toBeGreaterThan(1.8);
+  expect(w8 / w4).toBeLessThan(2.2);
+});
+
+// YPJ-244(spec 0151)切片2:表单后写者为准——先改 estimate 后改 due,保存 → due 后发为准,estimate 反推 + warnings toast
+test("表单后写者为准:due 后发覆盖 estimate + warnings toast(YPJ-244)", async ({
+  page,
+  projectKey,
+}) => {
+  const d = (offset: number) => {
+    const t = new Date();
+    t.setDate(t.getDate() + offset);
+    return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+  };
+  const a = await apiCreateItem(projectKey, "E2E 后写者为准");
+  await apiCall("PATCH", `/api/items/${a}`, { startDate: d(-1) });
+
+  await page.goto(`/p/${projectKey}/i/${a}`);
+  // 详情页 title 在标题输入框 value 里(getByText 匹配不到),等表单就绪信号
+  await expect(
+    page.getByRole("button", { name: "保存", exact: true }),
+  ).toBeVisible();
+
+  // 先改 estimate(自定义 2 小时)→ estDirty, lastEdited=est
+  await page.getByLabel("预估").click();
+  await page.waitForTimeout(300); // MUI Menu 淡出陷阱
+  await page.getByRole("option", { name: "自定义" }).click();
+  await expect(page.getByRole("listbox")).toBeHidden();
+  await page.getByLabel("数值").fill("2");
+
+  // 后改 due(明天)→ dueDirty, lastEdited=due;保存 → PATCH1{estimate} → PATCH2{due}
+  await fillDate(page, "截止日期", d(1));
+  await page.getByRole("button", { name: "保存", exact: true }).click();
+
+  // warnings toast(后端 due 后写反推警告)
+  await expect(
+    page.getByTestId("item-warnings").locator(".MuiAlert-root"),
+  ).toBeVisible();
+
+  // estimate 被反推(≠2;date-only 窗口两天 >18h)——用 toHaveValue 重试等 load() 刷新表单
+  // (直接 inputValue 有竞态:toast 可见≠load 完成,全量负载下单跑碰巧绿的假阳性,台账 A32)
+  await expect(page.getByLabel("数值")).not.toHaveValue("2");
+  const est = await page.getByLabel("数值").inputValue();
+  expect(Number(est)).toBeGreaterThan(0);
 });

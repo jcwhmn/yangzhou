@@ -23,13 +23,52 @@ import yangzhou.persistence.repository.StatusRepository
 import java.time.LocalDateTime
 import java.util.UUID
 
-/** YPJ-233(拍板 2026-11-18):同级 start 升序、未排期(无 start)靠后、同 start 按创建序兜底;树每层递归生效。 */
-internal val ganttSiblingOrder: Comparator<yangzhou.persistence.Item> =
-    compareBy(
-        { it.startDate == null }, // 未排期靠后
-        { it.startDate ?: LocalDateTime.MAX }, // start 升序(未排期组内该键恒同,落回 number)
-        { it.number }, // 稳定兜底:同 start / 未排期组内按创建序
+/** YPJ-233(spec 0148)+ YPJ-244/SRS v4 修订(2026-11-21 拍板;第三方评审 P0-2/P1-1 修订):排序锚 = 渲染锚——
+ *  叶行锚 = min(计划层左端(startDate ?? dueDate), 实际层左端(actualStart ?? actualEnd 完成点))——行序与可见条最左端一致;
+ *  父行 = 子孙**叶节点**渲染元素并集最早端(叶贡献 startDate ?? dueDate 与 actualStart ?? actualEnd);
+ *  各级父行自有日期与自有状态史作废,不参与(SRS §4.3)。
+ *  未排期 = 叶行计划层与实际层均无任何可渲染元素(start/due/actualStart/actualEnd 全空,SRS §5.4);
+ *  未排靠后,number 兜底。纯函数直测(GanttRowOrderTest)。 */
+internal fun ganttWalkOrder(
+    siblings: List<yangzhou.persistence.Item>,
+    childrenOf: (UUID) -> List<yangzhou.persistence.Item>,
+    actualOf: (yangzhou.persistence.Item) -> Pair<LocalDateTime?, LocalDateTime?>,
+): List<yangzhou.persistence.Item> {
+    val memo = HashMap<UUID, LocalDateTime?>()
+    fun subtreeMinOf(item: yangzhou.persistence.Item): LocalDateTime? {
+        val id = item.objectId!!
+        if (memo.containsKey(id)) return memo[id]
+        val kids = childrenOf(id)
+        val (aS, aE) = actualOf(item)
+        val own = if (kids.isEmpty()) {
+            // 叶行:计划左端(start??due)与实际左端(start??完成点)全部参与(SRS §7.2 渲染元素口径)
+            listOfNotNull(item.startDate ?: item.dueDate, aS ?: aE)
+        } else {
+            emptyList() // 父行自有日期与状态史作废(SRS §4.3):包络只由叶节点贡献
+        }
+        val a = (own + kids.mapNotNull { c -> subtreeMinOf(c) }).minOrNull()
+        memo[id] = a
+        return a
+    }
+    siblings.forEach { subtreeMinOf(it) }
+    fun isUnscheduled(item: yangzhou.persistence.Item): Boolean {
+        if (childrenOf(item.objectId!!).isNotEmpty()) return memo[item.objectId!!] == null
+        val (aS, aE) = actualOf(item)
+        return item.startDate == null && item.dueDate == null && aS == null && aE == null
+    }
+    fun anchorOf(item: yangzhou.persistence.Item): LocalDateTime? {
+        if (childrenOf(item.objectId!!).isNotEmpty()) return memo[item.objectId!!]
+        val (aS, aE) = actualOf(item)
+        return listOfNotNull(item.startDate ?: item.dueDate, aS ?: aE).minOrNull()
+    }
+    return siblings.sortedWith(
+        compareBy(
+            { isUnscheduled(it) }, // 未排期靠后
+            { anchorOf(it) ?: LocalDateTime.MAX }, // 锚升序
+            { it.number }, // 稳定兜底:同锚 / 未排期组内按创建序
+        ),
     )
+}
 
 /** Project = 编号(key-N)+ workflow + 视图容器(ADR-0001)。 */
 @Service
@@ -140,14 +179,18 @@ class ProjectService(
         request: UpdateProjectSettingsRequest,
     ): ProjectDto {
         val project = projects.findByKey(key) ?: throw NotFoundException("项目不存在:$key")
-        // YPJ-208 切片 b:工作日历校验(格式 + start<end;null=不改)
+        // YPJ-208 切片 b + SRS v4 §3.2:工作日历校验(格式 + start<end;全天窗 00:00–24:00 合法;null=不改)
         val ws = request.workdayStart
         val we = request.workdayEnd
         if (ws != null) runCatching { java.time.LocalTime.parse(ws) }.getOrElse { throw BadRequestException("workdayStart 格式应为 HH:mm:$ws") }
-        if (we != null) runCatching { java.time.LocalTime.parse(we) }.getOrElse { throw BadRequestException("workdayEnd 格式应为 HH:mm:$we") }
+        if (we != null && we.trim() != "24:00") runCatching { java.time.LocalTime.parse(we) }.getOrElse { throw BadRequestException("workdayEnd 格式应为 HH:mm 或 24:00:$we") }
         val newWs = ws ?: project.workdayStart
         val newWe = we ?: project.workdayEnd
-        if (java.time.LocalTime.parse(newWs) >= java.time.LocalTime.parse(newWe)) {
+
+        // 分钟数比较:“24:00”=1440(当日终点);两端 00:00 = 全天窗合法,其余仍须 start<end
+        fun endMinutes(s: String): Long = if (s.trim() == "24:00") 1440L else java.time.LocalTime.parse(s).toSecondOfDay() / 60L
+        val fullDay = newWs == "00:00" && newWe == "24:00"
+        if (!fullDay && java.time.LocalTime.parse(newWs).toSecondOfDay() / 60L >= endMinutes(newWe)) {
             throw BadRequestException("workdayStart 必须早于 workdayEnd($newWs >= $newWe)")
         }
         val saved =
@@ -280,7 +323,19 @@ class ProjectService(
             return depth
         }
 
-        fun walk(parent: UUID?): List<GanttRow> = (byParent[parent] ?: emptyList()).sortedWith(ganttSiblingOrder).flatMap { item ->
+        fun walk(parent: UUID?): List<GanttRow> = ganttWalkOrder(
+            byParent[parent].orEmpty(),
+            { id -> byParent[id].orEmpty() },
+        ) { item ->
+            // 状态史 createdAt 为 Instant,排序锚取本地墙钟(与前端渲染同口径)
+            // actualStart=首次迁出 START;actualEnd=迁入 FINAL(多次返工取最近一次,SRS §3.4/§6.6——0150 首次口径核对入 YPJ-245)
+            val hist = histories[item.objectId].orEmpty()
+            val aS = hist.firstOrNull { h -> h.toStatusObjectId !in startIds }?.createdAt
+                ?.let { LocalDateTime.ofInstant(it, java.time.ZoneId.systemDefault()) }
+            val aE = hist.lastOrNull { h -> h.toStatusObjectId in finalIds }?.createdAt
+                ?.let { LocalDateTime.ofInstant(it, java.time.ZoneId.systemDefault()) }
+            aS to aE
+        }.flatMap { item ->
             val status = statusById[item.statusObjectId]
             val hist = histories[item.objectId!!].orEmpty()
             val cc = checklistCounts[item.objectId!!]
@@ -299,7 +354,8 @@ class ProjectService(
                 estimateUnit = item.estimateUnit,
                 depth = depthOf(item),
                 actualStart = hist.firstOrNull { it.toStatusObjectId !in startIds }?.createdAt?.toString(),
-                actualEnd = hist.firstOrNull { it.toStatusObjectId in finalIds }?.createdAt?.toString(),
+                // SRS §3.4/§6.6:actualEnd = 最近一次迁入 FINAL(多次返工取最近;0150 首次口径修订 2026-11-21 评审 P1-4)
+                actualEnd = hist.lastOrNull { it.toStatusObjectId in finalIds }?.createdAt?.toString(),
                 assigneeName = item.assigneeObjectId?.let { assigneeNames[it] },
                 anchorDate = anchors[item.objectId]?.toString(),
                 checklistDone = cc?.done?.toInt(),

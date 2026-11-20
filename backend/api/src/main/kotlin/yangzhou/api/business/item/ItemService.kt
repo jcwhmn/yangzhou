@@ -408,7 +408,11 @@ class ItemService(
             val newStart = parse(startDateText, "startDate", ws)
             val dueCleared = dueDateText != null && dueDateText.trim().isEmpty()
             val dueExplicit = dueDateText != null && !dueCleared
-            val newDueExplicit = parse(dueDateText, "dueDate", we)
+            // date-only due 默认时刻 = 工作窗终点;全天窗取当日 23:59:59(秒精度日末)——
+            // LocalTime.MAX 是纳秒精度,Postgres timestamp(6) 微秒入库四舍五入进位成次日 00:00(2026-11-21 实锤);
+            // 截止=当日日末,避免"当天到期即逾期"伪问题
+            val dueDefaultTime = if (we == LocalTime.MIDNIGHT) LocalTime.of(23, 59, 59) else we
+            val newDueExplicit = parse(dueDateText, "dueDate", dueDefaultTime)
             var due = when {
                 dueDateText == null -> current.dueDate
                 dueCleared -> null
@@ -860,16 +864,28 @@ data class UpdateItemRequest(
 )
 
 /** dueSoon/overdue 纯函数(时钟纪律:today 由注入 Clock 提供,可测;spec 0051)。 */
-/** YPJ-208(spec 0138 切片 b):解析项目工作日历(非法存值兑退默认 09:00/18:00,信任边界在 settings 写入)。 */
+/** YPJ-208(spec 0138 切片 b):解析项目工作日历(非法存值兑退缺省;SRS v4 §3.2 缺省全天窗,信任边界在 settings 写入)。 */
 internal fun workdayBounds(project: yangzhou.persistence.Project): Pair<LocalTime, LocalTime> {
     val ws = runCatching { LocalTime.parse(project.workdayStart) }.getOrElse { DEFAULT_WORKDAY_START }
-    val we = runCatching { LocalTime.parse(project.workdayEnd) }.getOrElse { DEFAULT_WORKDAY_END }
+    // "24:00"=全天窗终点(SRS v4 §3.2,2026-11-21 拍板);LocalTime.parse 不认 24:00,显式拦截
+    val we = if (project.workdayEnd.trim() == "24:00") {
+        LocalTime.MIDNIGHT
+    } else {
+        runCatching { LocalTime.parse(project.workdayEnd) }.getOrElse { DEFAULT_WORKDAY_END }
+    }
     return ws to we
 }
 
-/** YPJ-208(spec 0138):date-only 输入的默认工作日界(日历缺失/非法时兜底)。 */
-internal val DEFAULT_WORKDAY_START: LocalTime = LocalTime.of(9, 0)
-internal val DEFAULT_WORKDAY_END: LocalTime = LocalTime.of(18, 0)
+/** date-only 输入的默认工作日界(日历缺失/非法时兜底;SRS v4:00:00/24:00 全天窗)。 */
+internal val DEFAULT_WORKDAY_START: LocalTime = LocalTime.MIDNIGHT
+internal val DEFAULT_WORKDAY_END: LocalTime = LocalTime.MIDNIGHT
+
+/** 每日窗分钟数(单点;两端 00:00 = 全天 1440,与 WorkdayCalculator.isFullDay 同口径)。 */
+internal fun workdayWindowMinutes(ws: LocalTime, we: LocalTime): Long = if (ws == LocalTime.MIDNIGHT && we == LocalTime.MIDNIGHT) {
+    1440L
+} else {
+    java.time.Duration.between(ws, we).toMinutes()
+}
 
 /** YPJ-235(spec 0146):estimate → WorkdayCalculator 小时;unit 缺失/未知按 hour兜底(信任边界在 EstimateInput)。 */
 // YPJ-243(spec 0150):互算警告文案集中(中文,前端 toast 原文展示)
@@ -888,11 +904,12 @@ internal fun estimateHours(
     workdayEnd: LocalTime,
 ): Double? {
     val v = estimateValue ?: return null
-    val winMin = java.time.Duration.between(workdayStart, workdayEnd).toMinutes().toDouble()
+    val winMin = workdayWindowMinutes(workdayStart, workdayEnd).toDouble()
     return when (estimateUnit ?: "hour") {
         "hour" -> v
         "day" -> v * winMin / 60.0
-        "week" -> v * 5 * winMin / 60.0
+        // SRS v4 §3.3(2026-11-21 拍板):week = 7 天(无 weekend 休息日语义;旧 5×窗废止)
+        "week" -> v * 7 * winMin / 60.0
         else -> v
     }
 }

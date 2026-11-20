@@ -592,19 +592,19 @@ class ItemServiceUnitTest {
         // ---------- YPJ-235(spec 0146):due 缺省时按 estimate 工作日铺算 ----------
 
         @Test
-        fun `due 缺省且 estimate 有值——系统算当日 5h 到 14 点`() {
+        fun `due 缺省且 estimate 有值——全天窗下 date-only 起当日零点加 5h`() {
             row = row.copy(estimateValue = 5.0, estimateUnit = "hour")
 
             service.update(
                 itemOid, title = null, description = null, type = null, statusItemId = null, parentItemId = null,
-                startDateText = "2026-11-23", // 周一,date-only → 09:00(默认工作日窗 09:00-18:00)
+                startDateText = "2026-11-23", // 周一,date-only → 00:00(SRS v4 缺省 24h 全天窗)
             )
 
-            assertEquals(LocalDateTime.parse("2026-11-23T14:00"), row.dueDate)
+            assertEquals(LocalDateTime.parse("2026-11-23T05:00"), row.dueDate)
         }
 
         @Test
-        fun `due 缺省——13h 跨日铺到次日 13 点`() {
+        fun `due 缺省——13h 全天窗当日零点起铺完(不再跨日)`() {
             row = row.copy(estimateValue = 13.0, estimateUnit = "hour")
 
             service.update(
@@ -612,8 +612,8 @@ class ItemServiceUnitTest {
                 startDateText = "2026-11-23",
             )
 
-            // 当日铺 9h(09:00-18:00),余 4h → 次日 09:00+4h
-            assertEquals(LocalDateTime.parse("2026-11-24T13:00"), row.dueDate)
+            // 24h 全天窗:00:00 + 13h 当日完成(铺算=钟表加法)
+            assertEquals(LocalDateTime.parse("2026-11-23T13:00"), row.dueDate)
         }
 
         @Test
@@ -625,7 +625,8 @@ class ItemServiceUnitTest {
                 startDateText = "2026-11-23T09:00",
             )
 
-            assertEquals(LocalDateTime.parse("2026-11-24T13:00"), row.dueDate)
+            // 24h 全天窗:09:00 + 13h 当日 22:00
+            assertEquals(LocalDateTime.parse("2026-11-23T22:00"), row.dueDate)
         }
 
         @Test
@@ -659,22 +660,22 @@ class ItemServiceUnitTest {
         }
 
         @Test
-        fun `day 与 week 单位换算——按工作日窗铺`() {
+        fun `day 与 week 单位换算——24h 全天窗(SRS v4)`() {
             row = row.copy(estimateValue = 2.0, estimateUnit = "day")
             service.update(
                 itemOid, title = null, description = null, type = null, statusItemId = null, parentItemId = null,
                 startDateText = "2026-11-23",
             )
-            // 2 day = 2×540min:当日铺满后恰好在次日收工时结束
-            assertEquals(LocalDateTime.parse("2026-11-24T18:00"), row.dueDate)
+            // 1 day = 24h:2 day = 48h → 11-25 00:00
+            assertEquals(LocalDateTime.parse("2026-11-25T00:00"), row.dueDate)
 
             row = row.copy(estimateValue = 1.0, estimateUnit = "week")
             service.update(
                 itemOid, title = null, description = null, type = null, statusItemId = null, parentItemId = null,
                 startDateText = "2026-11-23",
             )
-            // 1 week = 5 工作日(周一→周五收工)
-            assertEquals(LocalDateTime.parse("2026-11-27T18:00"), row.dueDate)
+            // 1 week = 7×24h = 168h(无 weekend 休息日)→ 11-30 00:00
+            assertEquals(LocalDateTime.parse("2026-11-30T00:00"), row.dueDate)
         }
 
         @Test
@@ -787,6 +788,16 @@ class ItemServiceUnitTest {
             assertEquals(3.0, row.estimateValue)
             assertEquals("hour", row.estimateUnit)
             assertTrue(dto.warnings.isEmpty())
+        }
+
+        @Test
+        fun `date-only due——全天窗缺省当日日末秒精度 235959(防纳秒常量被 timestamp 六位微秒进位成次日零点)`() {
+            service.update(
+                itemOid, title = null, description = null, type = null, statusItemId = null, parentItemId = null,
+                dueDateText = "2026-11-23",
+            )
+
+            assertEquals(LocalDateTime.parse("2026-11-23T23:59:59"), row.dueDate)
         }
 
         @Test

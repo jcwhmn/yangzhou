@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Alert,
   Box,
   Button,
   Chip,
@@ -9,6 +10,7 @@ import {
   DialogContent,
   DialogTitle,
   IconButton,
+  Snackbar,
   Stack,
   Tab,
   Tabs,
@@ -382,6 +384,12 @@ export default function ItemDetailPage() {
 
   const [error, setError] = useState("");
 
+  // YPJ-244(spec 0151)切片2:due/estimate 后写者为准——本编辑会话 dirty 跟踪,保存时后改字段后发 PATCH
+  const [dueDirty, setDueDirty] = useState(false);
+  const [estDirty, setEstDirty] = useState(false);
+  const [lastEdited, setLastEdited] = useState<"due" | "est" | null>(null);
+  const [warnMsg, setWarnMsg] = useState<string | null>(null); // PATCH 响应 warnings toast(0150 通道消费)
+
   const [memberNames, setMemberNames] = useState<Map<string, string>>(
     new Map(),
   );
@@ -528,6 +536,9 @@ export default function ItemDetailPage() {
     setPriority(it.priority ?? "");
     setEstValue(it.estimateValue != null ? String(it.estimateValue) : "");
     setEstUnit(it.estimateUnit ?? "");
+    setDueDirty(false);
+    setEstDirty(false);
+    setLastEdited(null);
 
     setStatuses(project.statuses);
     setEstScales(project.estimateScales ?? []);
@@ -654,25 +665,45 @@ export default function ItemDetailPage() {
 
   async function saveBasics() {
     if (estInvalid) return;
-    try {
-      await api(`/api/items/${itemId}`, {
+    // YPJ-244(spec 0151):due 与 estimate 都被改时,后改字段后发 PATCH(API 后写者为准;
+    // 单改/未改维持单 PATCH——同值重发不触发互算,0150 通用门)。start 恒随第一个 PATCH。
+    const base = {
+      title,
+      description: description || null,
+      type,
+      startDate: startDate
+        ? startTime
+          ? `${startDate}T${startTime}`
+          : startDate
+        : "",
+      priority,
+    };
+    const duePart = {
+      dueDate: dueDate ? (dueTime ? `${dueDate}T${dueTime}` : dueDate) : "",
+    };
+    const estPart = { estimateValue: estValue, estimateUnit: estUnit };
+    const patch = (body: object) =>
+      api<{ warnings?: string[] }>(`/api/items/${itemId}`, {
         method: "PATCH",
-
-        body: JSON.stringify({
-          title,
-          description: description || null,
-          type,
-          startDate: startDate
-            ? startTime
-              ? `${startDate}T${startTime}`
-              : startDate
-            : "",
-          dueDate: dueDate ? (dueTime ? `${dueDate}T${dueTime}` : dueDate) : "",
-          priority,
-          estimateValue: estValue,
-          estimateUnit: estUnit,
-        }),
+        body: JSON.stringify(body),
       });
+    const collect = (rs: { warnings?: string[] }[]) => {
+      const msgs = rs.flatMap((r) => r.warnings ?? []);
+      if (msgs.length > 0) setWarnMsg(msgs.join("\n"));
+    };
+    try {
+      const rs: { warnings?: string[] }[] = [];
+      if (dueDirty && estDirty && lastEdited === "est") {
+        rs.push(await patch({ ...base, ...duePart }));
+        rs.push(await patch(estPart));
+      } else if (dueDirty && estDirty) {
+        rs.push(await patch({ ...base, ...estPart }));
+        rs.push(await patch(duePart));
+      } else {
+        rs.push(await patch({ ...base, ...duePart, ...estPart }));
+      }
+
+      collect(rs);
 
       await load();
 
@@ -1140,7 +1171,11 @@ export default function ItemDetailPage() {
                 label="截止日期"
                 size="small"
                 value={dueDate}
-                onChange={setDueDate}
+                onChange={(v) => {
+                  setDueDate(v);
+                  setDueDirty(true);
+                  setLastEdited("due");
+                }}
                 sx={{ width: 200 }}
                 disabled={timelineLocked}
               />
@@ -1150,7 +1185,11 @@ export default function ItemDetailPage() {
                 size="small"
                 type="time"
                 value={dueTime}
-                onChange={(e) => setDueTime(e.target.value)}
+                onChange={(e) => {
+                  setDueTime(e.target.value);
+                  setDueDirty(true);
+                  setLastEdited("due");
+                }}
                 sx={{ width: 130 }}
                 slotProps={{ inputLabel: { shrink: true } }}
                 disabled={timelineLocked}
@@ -1342,6 +1381,8 @@ export default function ItemDetailPage() {
                 onChange={(v, u) => {
                   setEstValue(v);
                   setEstUnit(u);
+                  setEstDirty(true);
+                  setLastEdited("est");
                 }}
               />
             </Stack>
@@ -2278,6 +2319,16 @@ export default function ItemDetailPage() {
           </Button>
         </DialogActions>
       </Dialog>
+      <Snackbar
+        open={warnMsg !== null}
+        autoHideDuration={8000}
+        onClose={() => setWarnMsg(null)}
+        data-testid="item-warnings"
+      >
+        <Alert severity="warning" onClose={() => setWarnMsg(null)}>
+          <span style={{ whiteSpace: "pre-line" }}>{warnMsg}</span>
+        </Alert>
+      </Snackbar>
     </PageShell>
   );
 }

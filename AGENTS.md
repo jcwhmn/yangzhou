@@ -8,8 +8,10 @@
 - **实现引擎、实体关系或输出形态前** → `D:\obsidian\projects\yangzhou\DOMAIN.md`(判定 5 形态、绿黄红聚合规则、领域规则 6 条)
 - **实现某张票时** → YPJ item(票自带验收清单;版本 spec 对应 `docs/spec/00NN`;历史 Linear 票号 JCW-* 仅作 spec 内引用锚点,Linear 已冻结只读)
 - **做 ItemGroup/视图/导航类功能前** → `docs/requirement/ItemGroup PRD.md`(§28.2 Phase 划分;原 requirement.md 随笔已迁 Obsidian Thoughts.md)
+- **做甘特图功能前** → `docs/requirement/甘特图 SRS.md`(v4 开发基线;渲染真值表/包络/排序/徽标/互算全分支)
 - **动 schema 或架构前** → `docs/adr/`(0001 三层容器 / 0002 Item 同质树 / 0003 统一属性 / 0004 monorepo 与工具链)
 - **写调研/对标类文档前** → 放 `D:\obsidian\projects\yangzhou\`(Obsidian vault),repo 不存(2026-10-14 定;plane_functions/Metrics Chart 已迁出)
+- **需求类文档一律 SRS 格式**(2026-11-21 定,甘特图 SRS v4 起):目的与范围/术语/数据语义/分支真值表/验收标准/开放决策清单,单一真相源不与旧格式并存;已拍板项并入正文,开放项集中清单,不得伪装成已定
 
 ## 布局(ADR-0004)
 
@@ -75,6 +77,10 @@ docs/      adr/ · spec/ · architecture/(puml 类图) · requirement/(PRD) · p
 ## 测试
 
 写/改后端测试、新建迁移、动 AbstractApiTest、跑 gradle 验证 → **先读 skill `.agents/skills/backend-testing/SKILL.md`**(双轨/单元与集成边界/新表同步 cleanDatabase 清单/需求矩阵/Clock 注入/跑法)。速记硬规则:**单元 `src/test` 与集成 `src/integrationTest` 物理二分(YPJ-100/spec 0078),目录即边界**;唯一 seam = REST API 黑盒,集成必须 extends `AbstractApiTest`;CI 只跑单元,集成 merge 前本人本地 `gradle integrationTest`(nightly 兜底);`gradle build` 不跑集成(已与 check 解耦)。
+
+## 手工测试用例(落档维护)
+
+除一眼可见的冒烟验证,**每个任务(票)的手工测试用例必须落档到 `docs/testing/manual-test-cases.md` 并维护**(2026-11-20 定,YPJ-244 验收复盘):开工时立节,交付用户时给勾选清单,验收逐条勾(`[ ]`未验/`[x]`过/`[!]`红未解,红例记台账),As-built 同步结果;历史用例不删留作回归。环境 dev 3001;验收前先确认 dev 容器跑的是含目标票代码的镜像(容器 Image sha 对比 `docker images` 最新,曾实锤旧镜像导致误报)。
 
 ## E2E(web/;Playwright,并行按用例隔离)
 
