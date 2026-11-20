@@ -132,5 +132,6 @@
 - `groupStartOf`:rows 树内父链上溯;`dueFromJs`/`estimateHoursOf` 模块级 JS 移植。
 - gantt 页 load 并行拉 GET /api/projects/{key} 取 workday 配置。
 - 分流:case1/2 借 group 锚 → scheduled;轴锚定加 gStart/estimate 铺算末端。
+- hover 卡:起止 fmtDateTime(含时分);预估/实际工时按小时(实际=状态史 actualStart→actualEnd 时长)。
 - 轴映射:xOf/xOfT/xEndOf/todayX = 24h 钟表线性((t-start)/DAY);小时刻度梯 0–24 墙钟。
 - 色:下条 doing=warning.main / final=success.main;填充 warning.main;遮罩同态;菱形/汇总条/偏移徽标不变。
