@@ -6,6 +6,7 @@ import {
   apiCall,
   apiCreateItem,
   apiCreateSprint,
+  fillDate,
 } from "./support/helpers";
 
 /** UI 切范围(YPJ-220)。依赖缺省 board 后,旧用例需显式切「全部」复现全量语义。 */
@@ -836,4 +837,45 @@ test("工时填充+完成点+依赖锚点+实际层解耦(YPJ-244)", async ({
   await expect(
     row(4).getByTestId(`gantt-actual-${projectKey}-4`),
   ).toBeVisible();
+});
+
+// YPJ-244(spec 0151)切片2:表单后写者为准——先改 estimate 后改 due,保存 → due 后发为准,estimate 反推 + warnings toast
+test("表单后写者为准:due 后发覆盖 estimate + warnings toast(YPJ-244)", async ({
+  page,
+  projectKey,
+}) => {
+  const d = (offset: number) => {
+    const t = new Date();
+    t.setDate(t.getDate() + offset);
+    return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+  };
+  const a = await apiCreateItem(projectKey, "E2E 后写者为准");
+  await apiCall("PATCH", `/api/items/${a}`, { startDate: d(-1) });
+
+  await page.goto(`/p/${projectKey}/i/${a}`);
+  // 详情页 title 在标题输入框 value 里(getByText 匹配不到),等表单就绪信号
+  await expect(
+    page.getByRole("button", { name: "保存", exact: true }),
+  ).toBeVisible();
+
+  // 先改 estimate(自定义 2 小时)→ estDirty, lastEdited=est
+  await page.getByLabel("预估").click();
+  await page.waitForTimeout(300); // MUI Menu 淡出陷阱
+  await page.getByRole("option", { name: "自定义" }).click();
+  await expect(page.getByRole("listbox")).toBeHidden();
+  await page.getByLabel("数值").fill("2");
+
+  // 后改 due(明天)→ dueDirty, lastEdited=due;保存 → PATCH1{estimate} → PATCH2{due}
+  await fillDate(page, "截止日期", d(1));
+  await page.getByRole("button", { name: "保存", exact: true }).click();
+
+  // warnings toast(后端 due 后写反推警告)
+  await expect(
+    page.getByTestId("item-warnings").locator(".MuiAlert-root"),
+  ).toBeVisible();
+
+  // estimate 被反推(≠2,unit=hour;date-only 窗口 09:00→18:00 两天 = 18h)
+  const est = await page.getByLabel("数值").inputValue();
+  expect(est).not.toBe("2");
+  expect(Number(est)).toBeGreaterThan(0);
 });

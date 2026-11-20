@@ -24,8 +24,9 @@ export function EstimateField({
   onChange: (value: string, unit: string) => void;
   size?: "small" | "medium";
 }) {
+  // YPJ-244(spec 0151):unit 非空也算自定义态——未填直接选「自定义」时数值框才出现(原判定 value!=="" 导致无档位项目无法录预估,台账 A31)
   const custom =
-    value !== "" &&
+    (value !== "" || unit !== "") &&
     !scales.some((s) => String(s.value) === value && s.unit === unit);
   const selectValue =
     value === "" ? "" : custom ? "__custom" : `${value}|${unit}`;
@@ -85,7 +86,7 @@ export function EstimateField({
           </TextField>
         </>
       )}
-      {value !== "" && !required && (
+      {(value !== "" || unit !== "") && !required && (
         <Button size="small" onClick={() => onChange("", "")}>
           {t.estimate.clear}
         </Button>
