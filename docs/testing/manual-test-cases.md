@@ -14,6 +14,8 @@
 
 ## YPJ-244 甘特渲染+表单后写者为准(spec 0151)
 
+> **验收环境 = prod 3000**(2026-11-20 用户定:dev 数据过稀,甘特需求全在 prod 验;本次 prod 镜像自 244 分支重建,代码未合并)。镜像核对:`docker inspect yz-prod-web-1 --format {{.Image}}` 对比 `docker images` 最新 sha。注意:B 节建票/改票用例会在 prod 真实库留测试数据,验后自行删票或改 dev 验。
+
 ### A. 甘特渲染(切片 1)
 
 - [ ] A1 建票:start=今天 09:00、estimate=8h(不填 due)→ 登记工时(actualStart=今天)→ 甘特:蓝计划条上有**绿色填充**,末端=今天位置
