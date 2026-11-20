@@ -8,8 +8,10 @@
 - **实现引擎、实体关系或输出形态前** → `D:\obsidian\projects\yangzhou\DOMAIN.md`(判定 5 形态、绿黄红聚合规则、领域规则 6 条)
 - **实现某张票时** → YPJ item(票自带验收清单;版本 spec 对应 `docs/spec/00NN`;历史 Linear 票号 JCW-* 仅作 spec 内引用锚点,Linear 已冻结只读)
 - **做 ItemGroup/视图/导航类功能前** → `docs/requirement/ItemGroup PRD.md`(§28.2 Phase 划分;原 requirement.md 随笔已迁 Obsidian Thoughts.md)
+- **做甘特图功能前** → `docs/requirement/甘特图 SRS.md`(v4 开发基线;渲染真值表/包络/排序/徽标/互算全分支)
 - **动 schema 或架构前** → `docs/adr/`(0001 三层容器 / 0002 Item 同质树 / 0003 统一属性 / 0004 monorepo 与工具链)
 - **写调研/对标类文档前** → 放 `D:\obsidian\projects\yangzhou\`(Obsidian vault),repo 不存(2026-10-14 定;plane_functions/Metrics Chart 已迁出)
+- **需求类文档一律 SRS 格式**(2026-11-21 定,甘特图 SRS v4 起):目的与范围/术语/数据语义/分支真值表/验收标准/开放决策清单,单一真相源不与旧格式并存;已拍板项并入正文,开放项集中清单,不得伪装成已定
 
 ## 布局(ADR-0004)
 
