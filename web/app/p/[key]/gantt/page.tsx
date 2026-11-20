@@ -345,23 +345,35 @@ export default function GanttPage() {
       MAX_PPD,
     );
     const timelineW = spanDays * pxPerDay;
-    const xOfT = (t: number) => ((t - +start) / DAY) * pxPerDay;
+    // YPJ-244(五)A28(用户拍板「条长∝工时」):列=工作窗,轴线性于累计工作分钟;夜窗折叠(窗外时刻 clamp 到窗缘)
+    const winMin = Math.max(wem - wsm, 1);
+    const xOfT = (t: number) => {
+      const d = new Date(t);
+      const dayIdx = Math.round(
+        (+new Date(t).setHours(0, 0, 0, 0) - +start) / DAY,
+      );
+      const mod = d.getHours() * 60 + d.getMinutes();
+      const frac = Math.min(Math.max(mod - wsm, 0), winMin) / winMin;
+      return (dayIdx + frac) * pxPerDay;
+    };
 
-    // 两级刻度:细刻度(小时梯子 1/2/3/6/12h,取间距≥MIN_LABEL_PX 的最小步长);粗行(月/周/日)按段宽门控
+    // 两级刻度:细刻度(窗内小时梯子 1/2/3/6/12h,取间距≥MIN_LABEL_PX 的最小步长);粗行(月/周/日)按段宽门控
     const rowsOut: HeaderRow[] = [];
-    const pxPerHour = pxPerDay / 24;
-    // 小时行:梯子取最小步长使间距≥MIN_LABEL_PX;无解(极度缩小时)整行丢弃,不吐过密标签
+    const pxPerHour = (pxPerDay / winMin) * 60;
+    // 小时行:仅窗内时刻有刻度(夜窗折叠无钟表意义);无解(极度缩小时)整行丢弃,不吐过密标签
     const stepH = [1, 2, 3, 6, 12].find((s) => s * pxPerHour >= MIN_LABEL_PX);
     if (pxPerDay >= MIN_LABEL_PX && stepH) {
       const ticks: Tick[] = [];
-      for (let h = 0; h <= spanDays * 24; h += stepH) {
-        const d = new Date(+start + (h * DAY) / 24);
-        const label = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-        ticks.push({
-          x: xOfT(+d),
-          label,
-          key: `h${h}`,
-        });
+      for (let dayMs = +start; dayMs < endT; dayMs += DAY) {
+        for (let m = wsm; m < wem; m += stepH * 60) {
+          const d = new Date(dayMs);
+          d.setHours(Math.floor(m / 60), m % 60, 0, 0);
+          ticks.push({
+            x: xOfT(+d),
+            label: `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`,
+            key: `h${dayMs}-${m}`,
+          });
+        }
       }
       rowsOut.push({ gran: "hour", ticks });
     }
@@ -601,25 +613,29 @@ export default function GanttPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, containerW]);
 
+  // YPJ-244(五)A28(用户拍板「条长∝工时」):列=工作窗,夜窗折叠(窗外时刻 clamp 到窗缘)——与轴刻度同口径
+  const wpxOfT = (t: number) => {
+    const ws = wd?.[0] ?? 540;
+    const we = wd?.[1] ?? 1080;
+    const win = Math.max(we - ws, 1);
+    const d = new Date(t);
+    const dayIdx = Math.round(
+      (+new Date(t).setHours(0, 0, 0, 0) - +axis.start) / DAY,
+    );
+    const mod = d.getHours() * 60 + d.getMinutes();
+    const frac = Math.min(Math.max(mod - ws, 0), win) / win;
+    return (dayIdx + frac) * axis.pxPerDay;
+  };
+
   const xOf = (date: string | null) =>
     date === null
       ? null
-      : Math.min(
-          axis.timelineW,
-          Math.max(
-            0,
-            ((+parseLocal(date) - +axis.start) / DAY) * axis.pxPerDay,
-          ),
-        );
+      : Math.min(axis.timelineW, Math.max(0, wpxOfT(+parseLocal(date))));
 
   // YPJ-244(五):ms 时间戳版 x 坐标(estimate 铺算末端/group 锚等非字符串时刻)
-  const xOfT = (t: number) =>
-    Math.min(
-      axis.timelineW,
-      Math.max(0, ((t - +axis.start) / DAY) * axis.pxPerDay),
-    );
+  const xOfT = (t: number) => Math.min(axis.timelineW, Math.max(0, wpxOfT(t)));
 
-  // YPJ-218(spec 0139)B3:条宽含当天——仅 date-only +1 天;datetime 右端=精确 due
+  // YPJ-218(spec 0139)B3:条宽含当天——仅 date-only +1 天(夜窗折叠下=当日窗缘,即整列);datetime 右端=精确 due
   const xEndOf = (due: string | null) =>
     due === null
       ? null
@@ -627,11 +643,9 @@ export default function GanttPage() {
           axis.timelineW,
           Math.max(
             0,
-            ((+parseLocal(due) +
-              (/^\d{4}-\d{2}-\d{2}$/.test(due) ? DAY : 0) -
-              +axis.start) /
-              DAY) *
-              axis.pxPerDay,
+            wpxOfT(
+              +parseLocal(due) + (/^\d{4}-\d{2}-\d{2}$/.test(due) ? DAY : 0),
+            ),
           ),
         );
 
@@ -1230,7 +1244,7 @@ export default function GanttPage() {
                       : null;
                   // YPJ-244(五)黄覆盖:进行中在计划条上叠「已流逝」段(末端=min(今天, 条尾));
                   // 覆盖条件=计划条存在且有 estimate(due 显式无 est 不覆盖,同用户 case3 字面);
-                  // 周六日照算现状下日历时间位置等价工时比例;双休日历(H8)落地时改 hoursBetween 比例换算
+                  // 轴=工作窗(条长∝工时)后,覆盖比例天然=工时流逝比例;双休日历(H8)落地时轴/铺算随窗自动生效
                   const fillW =
                     doing && planIsBar && estH !== null
                       ? Math.min(
@@ -1533,11 +1547,11 @@ export default function GanttPage() {
             sx={{ mt: 1, display: "block" }}
           >
             蓝竖线 = 今天 · 菱形 = 里程碑(只有截止日期) · 红色 = 超期 · 橙横条 =
-            父汇总(子孙并集,折叠显 +N 子任务) · 上条 = 计划(蓝) / 下条 = 实际
-            (绿,深色 = 清单完成率) · 绿填充 = 已流逝(进行中,今天 vs due,用实际
-            色覆盖计划) · 蓝点 = 依赖锚点落位(无 start 无 due) · ±Nd =
-            偏移(实际/ 今天 vs due) · 悬停条看详情 · Ctrl+滚轮或 ± 缩放 ·
-            「今日」回中今天
+            父汇总(子孙并集,折叠显 +N 子任务) · 列 = 工作日历窗(条长 ∝
+            工时,夜窗折叠) · 上条 = 计划(蓝) / 下条 = 实际 (绿,深色 =
+            清单完成率) · 绿填充 = 已流逝(进行中,今天 vs due,用实际 色覆盖计划)
+            · 蓝点 = 依赖锚点落位(无 start 无 due) · ±Nd = 偏移(实际/ 今天 vs
+            due) · 悬停条看详情 · Ctrl+滚轮或 ± 缩放 · 「今日」回中今天
           </Typography>
         </>
       )}

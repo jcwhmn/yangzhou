@@ -192,15 +192,16 @@ test("v2 数据锚定轴 + 连续缩放(YPJ-219)", async ({ page, projectKey }) 
     )
     .toBeGreaterThan(before);
 
-  // 1 日预设:0–24 墙钟小时刻度(视口 1000px/天 → 2h 步长,末档 22:00)
+  // 1 日预设:窗内小时刻度(视口 1000px/天,窗 9h → 1h 步长);夜窗折叠,无 00:00/22:00 墙钟刻度(A28 工作窗轴)
   await page.getByTestId("gantt-win-1").click();
-  await expect(page.getByText("00:00", { exact: true }).first()).toBeVisible();
-  await expect(page.getByText("22:00", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("09:00", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("17:00", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("00:00", { exact: true })).toHaveCount(0);
 
-  // 工况保持:切页再回来,日窗预设仍在(小时刻度还在)
+  // 工况保持:切页再回来,日窗预设仍在(窗内小时刻度还在)
   await page.goto(`/p/${projectKey}/backlog`);
   await page.goto(`/p/${projectKey}/gantt`);
-  await expect(page.getByText("00:00", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("09:00", { exact: true }).first()).toBeVisible();
 });
 
 test("视点日导航(YPJ-219 v2)", async ({ page, projectKey }) => {
@@ -408,8 +409,8 @@ test("时线回归(YPJ-229):加载中点日窗补放 + 今日时刻居中 + 零�
   });
   await page.goto(`/p/${projectKey}/gantt`);
   await page.getByTestId("gantt-win-1").click(); // 数据未到,应挂起
-  // 数据到达后:小时刻度出现(1 日窗补放成功),非 fit 挤压
-  await expect(page.getByText("00:00", { exact: true }).first()).toBeVisible({
+  // 数据到达后:窗内小时刻度出现(1 日窗补放成功),非 fit 挤压(工作窗轴:00:00 已折叠)
+  await expect(page.getByText("09:00", { exact: true }).first()).toBeVisible({
     timeout: 10000,
   });
   // 今日线(2px 蓝竖线)在视口内(视点日=今日 → 当前时刻居中)
@@ -885,6 +886,42 @@ test("group 锚:case1 group 点 + case2 group 起铺算条(YPJ-244)", async ({
   await expect(
     row(3).getByTestId(`gantt-grouppoint-${projectKey}-3`),
   ).toBeVisible();
+});
+
+// A28 工作窗轴:条长 ∝ 工时——同起点 8h vs 4h,计划条宽 2:1(列=工作窗,夜窗折叠,跨夜不再拉宽)
+test("条长∝工时:同起点 8h vs 4h 计划条宽 2:1(A28 工作窗轴)", async ({
+  page,
+  projectKey,
+}) => {
+  const start = "2031-01-06T09:00"; // 周一 09:00(窗起点)
+  const a = await apiCreateItem(projectKey, "E2E 工时比例 8h");
+  await apiCall("PATCH", `/api/items/${a}`, {
+    startDate: start,
+    estimateValue: 8,
+    estimateUnit: "hour",
+  });
+  const b = await apiCreateItem(projectKey, "E2E 工时比例 4h");
+  await apiCall("PATCH", `/api/items/${b}`, {
+    startDate: start,
+    estimateValue: 4,
+    estimateUnit: "hour",
+  });
+
+  await page.goto(`/p/${projectKey}/gantt`);
+  await pickScope(page, "全部");
+  await expect(page.getByText("E2E 工时比例 8h")).toBeVisible();
+
+  const wOf = (n: number) =>
+    page
+      .locator(`a[aria-label="${projectKey}-${n}"]`)
+      .locator("xpath=..")
+      .getByTestId(`gantt-bar-${projectKey}-${n}`)
+      .evaluate((el) => (el.firstElementChild as HTMLElement).offsetWidth);
+  const w8 = await wOf(1);
+  const w4 = await wOf(2);
+  // 8h = 8/9 列,4h = 4/9 列 → 2:1(±容差)
+  expect(w8 / w4).toBeGreaterThan(1.8);
+  expect(w8 / w4).toBeLessThan(2.2);
 });
 
 // YPJ-244(spec 0151)切片2:表单后写者为准——先改 estimate 后改 due,保存 → due 后发为准,estimate 反推 + warnings toast
