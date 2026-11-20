@@ -192,16 +192,15 @@ test("v2 数据锚定轴 + 连续缩放(YPJ-219)", async ({ page, projectKey }) 
     )
     .toBeGreaterThan(before);
 
-  // 1 日预设:窗内小时刻度(视口 1000px/天,窗 9h → 1h 步长);夜窗折叠,无 00:00/22:00 墙钟刻度(A28 工作窗轴)
+  // 1 日预设:0–24 墙钟小时刻度(视口 1000px/天 → 2h 步长,末档 22:00;2026-11-20 拍板钟表轴)
   await page.getByTestId("gantt-win-1").click();
-  await expect(page.getByText("09:00", { exact: true }).first()).toBeVisible();
-  await expect(page.getByText("17:00", { exact: true }).first()).toBeVisible();
-  await expect(page.getByText("00:00", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("00:00", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("22:00", { exact: true }).first()).toBeVisible();
 
-  // 工况保持:切页再回来,日窗预设仍在(窗内小时刻度还在)
+  // 工况保持:切页再回来,日窗预设仍在(小时刻度还在)
   await page.goto(`/p/${projectKey}/backlog`);
   await page.goto(`/p/${projectKey}/gantt`);
-  await expect(page.getByText("09:00", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("00:00", { exact: true }).first()).toBeVisible();
 });
 
 test("视点日导航(YPJ-219 v2)", async ({ page, projectKey }) => {
@@ -409,8 +408,8 @@ test("时线回归(YPJ-229):加载中点日窗补放 + 今日时刻居中 + 零�
   });
   await page.goto(`/p/${projectKey}/gantt`);
   await page.getByTestId("gantt-win-1").click(); // 数据未到,应挂起
-  // 数据到达后:窗内小时刻度出现(1 日窗补放成功),非 fit 挤压(工作窗轴:00:00 已折叠)
-  await expect(page.getByText("09:00", { exact: true }).first()).toBeVisible({
+  // 数据到达后:小时刻度出现(1 日窗补放成功),非 fit 挤压
+  await expect(page.getByText("00:00", { exact: true }).first()).toBeVisible({
     timeout: 10000,
   });
   // 今日线(2px 蓝竖线)在视口内(视点日=今日 → 当前时刻居中)
@@ -888,8 +887,8 @@ test("group 锚:case1 group 点 + case2 group 起铺算条(YPJ-244)", async ({
   ).toBeVisible();
 });
 
-// A28 工作窗轴:条长 ∝ 工时——同起点 8h vs 4h,计划条宽 2:1(列=工作窗,夜窗折叠,跨夜不再拉宽)
-test("条长∝工时:同起点 8h vs 4h 计划条宽 2:1(A28 工作窗轴)", async ({
+// 钟表轴线性(2026-11-20 拍板):同起点 8h vs 4h,计划条宽 2:1
+test("条长∝钟表跨度:同起点 8h vs 4h 计划条宽 2:1(A28)", async ({
   page,
   projectKey,
 }) => {

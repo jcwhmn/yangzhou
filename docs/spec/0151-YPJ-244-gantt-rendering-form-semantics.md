@@ -125,12 +125,12 @@
   4. **下条(实际条)进行中恒画黄、final 恒画绿**——用户 case2/4 进行中字面只描述上条(蓝+覆盖),下条由「颜色2=工作中实际工作时间」定义隐含;若意图=进行中单条覆盖模型(下条取消),验收时说一声即改。
   5. final 的 diff 徽标(±Nd)**建议保留**(实际完成 vs due 一眼量偏差);待用户拍板,默认保留。
 - estimate 铺算前端复刻:dueFromJs(每日窗线性,周六日照算,无午休;窗取 project API workdayStart/End,默认 09:00-18:00);estimateHours 口径 hour=v / day=v×窗 / week=v×5×窗(与后端 estimateHours 同源)。
-- **轴刻度 = 工作窗轴(A28,2026-11-20 用户拍板「按比例就这么简单」)**:列刻度线性于累计工作分钟(列=工作日历窗 9h,夜窗折叠,窗外时刻 clamp 到窗缘)→ 条长严格 ∝ 工时;铺算存量票自动得比例条,无需存量重排;跨夜条不再被夜窗拉宽。小时刻度梯只落窗内(无 00:00/22:00 墙钟刻度);date-only due 的「含当天 +1 天」在折叠语义下 = 整列;黄覆盖比例天然=工时流逝比例。e2e 20 绿(新增 8h:4h=2:1 用例)。
+- **轴刻度 = 24h 钟表线性(A28,2026-11-20 用户拍板「满辐 48h、8h=1/6」;同日曾试工作窗轴,实锤夜间排期票(237 02:00–05:00/240 05:00–06:00)整条被折叠成 3px 而否决回退)**:条长 ∝ start→due 钟表跨度,全部条随缩放线性增长;跨夜条含夜间钟表时长(用户接受);estimate 铺算仍按工作窗算 due(铺算语义不变)。e2e 20 绿(新增同起点 8h:4h=2:1 用例——钟表轴下同样成立)。
 
 ### 5.3 实现(纯前端,后端零改动)
 
 - `groupStartOf`:rows 树内父链上溯;`dueFromJs`/`estimateHoursOf` 模块级 JS 移植。
 - gantt 页 load 并行拉 GET /api/projects/{key} 取 workday 配置。
 - 分流:case1/2 借 group 锚 → scheduled;轴锚定加 gStart/estimate 铺算末端。
-- 轴映射:xOf/xOfT/xEndOf/todayX 统一走累计工作分钟(夜窗折叠);小时刻度梯窗内生成(步长按窗内像素密度)。
+- 轴映射:xOf/xOfT/xEndOf/todayX = 24h 钟表线性((t-start)/DAY);小时刻度梯 0–24 墙钟。
 - 色:下条 doing=warning.main / final=success.main;填充 warning.main;遮罩同态;菱形/汇总条/偏移徽标不变。
