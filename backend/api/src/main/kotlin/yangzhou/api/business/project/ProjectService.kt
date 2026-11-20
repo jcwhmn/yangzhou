@@ -23,31 +23,38 @@ import yangzhou.persistence.repository.StatusRepository
 import java.time.LocalDateTime
 import java.util.UUID
 
-/** YPJ-233(spec 0148)+ YPJ-244 修订:排序锚 = 渲染锚——叶行取自有 startDate(due-only 仍落未排期组,0148 字面);
- *  父行取严格子孙并集最早端(每个子孙以自有 startDate ?? dueDate 贡献,含中间层父行自有日期,与 0139 汇总条 visit 同口径);
- *  未排靠后,number 兜底。纯函数直测(GanttRowOrderTest)。 */
+/** YPJ-233(spec 0148)+ YPJ-244/SRS v4 修订(2026-11-21 拍板):排序锚 = 渲染锚——
+ *  叶行锚 = startDate ?? actualStart(SRS §8.2;仅 actual 的行按可见实际起点排,不垫尾);
+ *  父行 = 子孙**叶节点**并集最早端:逐叶 startDate ?? dueDate(含中间层之下的叶),actualStart 并入(SRS §7.2 左端);
+ *  各级父行自有日期与自有状态史作废,不参与(SRS §4.3)。
+ *  未排期 = 叶行无 start 且无 actual(SRS §5.4/§8.2);未排靠后,number 兜底。纯函数直测(GanttRowOrderTest)。 */
 internal fun ganttWalkOrder(
     siblings: List<yangzhou.persistence.Item>,
     childrenOf: (UUID) -> List<yangzhou.persistence.Item>,
+    actualStartOf: (yangzhou.persistence.Item) -> LocalDateTime?,
 ): List<yangzhou.persistence.Item> {
     val memo = HashMap<UUID, LocalDateTime?>()
     fun subtreeMinOf(item: yangzhou.persistence.Item): LocalDateTime? {
         val id = item.objectId!!
         if (memo.containsKey(id)) return memo[id]
-        val a = childrenOf(id)
-            .mapNotNull { c -> listOfNotNull(c.startDate ?: c.dueDate, subtreeMinOf(c)).minOrNull() }
-            .minOrNull()
+        val kids = childrenOf(id)
+        val own = if (kids.isEmpty()) {
+            listOfNotNull(item.startDate ?: item.dueDate, actualStartOf(item))
+        } else {
+            emptyList() // 父行自有日期与状态史作废(SRS §4.3):包络只由叶节点贡献
+        }
+        val a = (own + kids.mapNotNull { c -> subtreeMinOf(c) }).minOrNull()
         memo[id] = a
         return a
     }
     siblings.forEach { subtreeMinOf(it) }
     fun isUnscheduled(item: yangzhou.persistence.Item) = if (childrenOf(item.objectId!!).isEmpty()) {
-        item.startDate == null
+        item.startDate == null && actualStartOf(item) == null
     } else {
         memo[item.objectId!!] == null
     }
     fun anchorOf(item: yangzhou.persistence.Item) = if (childrenOf(item.objectId!!).isEmpty()) {
-        item.startDate
+        item.startDate ?: actualStartOf(item)
     } else {
         memo[item.objectId!!]
     }
@@ -55,7 +62,7 @@ internal fun ganttWalkOrder(
         compareBy(
             { isUnscheduled(it) }, // 未排期靠后
             { anchorOf(it) ?: LocalDateTime.MAX }, // 锚升序
-            { it.number }, // 稳定兑底:同锚 / 未排期组内按创建序
+            { it.number }, // 稳定兜底:同锚 / 未排期组内按创建序
         ),
     )
 }
@@ -169,14 +176,17 @@ class ProjectService(
         request: UpdateProjectSettingsRequest,
     ): ProjectDto {
         val project = projects.findByKey(key) ?: throw NotFoundException("项目不存在:$key")
-        // YPJ-208 切片 b:工作日历校验(格式 + start<end;null=不改)
+        // YPJ-208 切片 b + SRS v4 §3.2:工作日历校验(格式 + start<end;全天窗 00:00–24:00 合法;null=不改)
         val ws = request.workdayStart
         val we = request.workdayEnd
         if (ws != null) runCatching { java.time.LocalTime.parse(ws) }.getOrElse { throw BadRequestException("workdayStart 格式应为 HH:mm:$ws") }
-        if (we != null) runCatching { java.time.LocalTime.parse(we) }.getOrElse { throw BadRequestException("workdayEnd 格式应为 HH:mm:$we") }
+        if (we != null && we.trim() != "24:00") runCatching { java.time.LocalTime.parse(we) }.getOrElse { throw BadRequestException("workdayEnd 格式应为 HH:mm 或 24:00:$we") }
         val newWs = ws ?: project.workdayStart
         val newWe = we ?: project.workdayEnd
-        if (java.time.LocalTime.parse(newWs) >= java.time.LocalTime.parse(newWe)) {
+        // 分钟数比较:“24:00”=1440(当日终点);两端 00:00 = 全天窗合法,其余仍须 start<end
+        fun endMinutes(s: String): Long = if (s.trim() == "24:00") 1440L else java.time.LocalTime.parse(s).toSecondOfDay() / 60L
+        val fullDay = newWs == "00:00" && newWe == "24:00"
+        if (!fullDay && java.time.LocalTime.parse(newWs).toSecondOfDay() / 60L >= endMinutes(newWe)) {
             throw BadRequestException("workdayStart 必须早于 workdayEnd($newWs >= $newWe)")
         }
         val saved =
@@ -309,7 +319,11 @@ class ProjectService(
             return depth
         }
 
-        fun walk(parent: UUID?): List<GanttRow> = ganttWalkOrder(byParent[parent].orEmpty()) { id -> byParent[id].orEmpty() }.flatMap { item ->
+        fun walk(parent: UUID?): List<GanttRow> = ganttWalkOrder(byParent[parent].orEmpty(), { id -> byParent[id].orEmpty() }) { item ->
+                // 状态史 createdAt 为 Instant,排序锚取本地墙钟(与前端渲染同口径)
+                histories[item.objectId]?.firstOrNull { h -> h.toStatusObjectId !in startIds }?.createdAt
+                    ?.let { LocalDateTime.ofInstant(it, java.time.ZoneId.systemDefault()) }
+            }.flatMap { item ->
             val status = statusById[item.statusObjectId]
             val hist = histories[item.objectId!!].orEmpty()
             val cc = checklistCounts[item.objectId!!]
