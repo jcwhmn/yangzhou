@@ -57,8 +57,8 @@ class GanttApiTest : AbstractApiTest() {
         assertEquals("子任务", rows[1]["title"].asText())
         assertEquals(rows[0]["itemId"].asText(), rows[1]["parentItemId"].asText())
         // 日期与超期(2020 due，非终态)+ estimate + blocked(依赖未终态子项)
-        assertEquals("2020-01-01T09:00", rows[0]["startDate"].asText())
-        assertEquals("2020-01-31T18:00", rows[0]["dueDate"].asText())
+        assertEquals("2020-01-01T00:00", rows[0]["startDate"].asText()) // date-only start → 当日零点(V67 全天窗)
+        assertEquals("2020-01-31T23:59:59", rows[0]["dueDate"].asText()) // date-only due → 当日日末秒精度(9cd8f6f)
         assertTrue(rows[0]["overdue"].asBoolean())
         assertEquals(2.0, rows[0]["estimateValue"].asDouble())
         assertEquals("hour", rows[0]["estimateUnit"].asText())
@@ -377,7 +377,7 @@ class GanttApiTest : AbstractApiTest() {
             .isOk()
         val succ = createItem(authed, "ANC", "后继")
 
-        // succ 依赖 A 与 B → anchor = max(A.due 09-30T12:00, B.start 09-05T09:00)
+        // succ 依赖 A 与 B → anchor = max(A.due 09-30T12:00, B.start 09-05T00:00)
         authed
             .post()
             .uri("/api/items/${succ["itemId"].asText()}/dependencies")
