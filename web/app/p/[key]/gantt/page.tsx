@@ -99,7 +99,7 @@ function estimateHoursOf(
     : unit === "day"
       ? v * winH
       : unit === "week"
-        ? v * 5 * winH
+        ? v * 7 * winH // SRS v4 §3.3(2026-11-21 拍板):week = 7 天(无 weekend 休息日语义)
         : v;
 }
 
@@ -295,8 +295,8 @@ export default function GanttPage() {
     // 轴数据锚定与画条同口径(spec 0139/0140):父行自有日期忽略不画,取子孙排期并集;子行取自有日期
     const isParent = (r: GanttRow) =>
       rowsNow.some((x) => x.parentItemId === r.itemId);
-    const wsm = wd?.[0] ?? 540;
-    const wem = wd?.[1] ?? 1080;
+    const wsm = wd?.[0] ?? 0; // SRS v4 §3.2:缺省 24h 全天窗
+    const wem = wd?.[1] ?? 1440;
     const dates = rowsNow.flatMap((r) => {
       // YPJ-222(spec 0147):轴范围纳入实际起止——实际条超出计划区间时不被裁出画面
       if (!isParent(r)) {
@@ -636,27 +636,61 @@ export default function GanttPage() {
           ),
         );
 
-  // YPJ-218(spec 0139):父汇总条 = 全部子孙排期区间的并集;父自有日期忽略不画
+  // SRS v4 §7.2(2026-11-21 拍板;第三方评审 P0-1 修订):父汇总条 = 当前过滤后可见子孙**叶行**
+  // 渲染元素(计划条/计划点/实际条/实际点)的时间并集——从渲染结果反推,不从字段拼凑:
+  //   计划条 = 锚(start/依赖锚/group 借锚)→(due 端[date-only 含当天] ?? 锚+Estimate 钟表长);仅锚无长度 → 计划点(零宽)
+  //   实际条 = actualStart→(actualEnd ?? 今天);仅 actualEnd → 完成点(零宽,直建 FINAL)
+  // 各级父行自有日期与自有状态史作废(§4.3),只继续下探;与排序锚/fit 同源口径(§7.3)。
   function summaryOf(itemId: string): [string, string] | null {
     let min: number | null = null;
     let max: number | null = null;
+    const consider = (l: number, r: number) => {
+      if (min === null || l < min) min = l;
+      if (max === null || r > max) max = r;
+    };
     const visit = (id: string) => {
       for (const x of rows ?? []) {
         if (x.parentItemId !== id) continue;
-        const s = x.startDate ?? x.dueDate;
-        const e = x.dueDate ?? x.startDate;
-        if (s && +parseLocal(s) < (min ?? Infinity)) min = +parseLocal(s);
-        if (e && +parseLocal(e) > (max ?? -Infinity)) max = +parseLocal(e);
-        visit(x.itemId);
+        if ((rows ?? []).some((k) => k.parentItemId === x.itemId)) {
+          visit(x.itemId);
+          continue;
+        }
+        const wsm = wd?.[0] ?? 0;
+        const wem = wd?.[1] ?? 1440;
+        const estH = estimateHoursOf(x.estimateValue, x.estimateUnit, wsm, wem);
+        // 计划层元素
+        const anchorRaw = x.startDate ?? x.anchorDate ?? groupStartOf(x);
+        if (anchorRaw !== null) {
+          const a = +parseLocal(anchorRaw);
+          const dueEnd =
+            x.dueDate !== null
+              ? +parseLocal(x.dueDate) +
+                (/^\d{4}-\d{2}-\d{2}$/.test(x.dueDate) ? DAY : 0)
+              : null;
+          const estEnd =
+            estH !== null ? dueFromJs(a, estH, wsm, wem) : null;
+          if (dueEnd !== null || estEnd !== null) consider(a, Math.max(a, dueEnd ?? estEnd!));
+          else consider(a, a); // 计划点:零宽(case1 借锚点 / case3b)
+        } else if (x.dueDate !== null) {
+          // due-only 菱形(历史数据,Q11 废除后无新增):零宽点位参与包络
+          const d = +parseLocal(x.dueDate);
+          consider(d, d);
+        }
+        // 实际层元素
+        if (x.actualStart !== null) {
+          const s = +parseLocal(x.actualStart);
+          const e = x.actualEnd !== null ? +parseLocal(x.actualEnd) : Date.now();
+          consider(s, Math.max(s, e));
+        } else if (x.actualEnd !== null) {
+          const e = +parseLocal(x.actualEnd);
+          consider(e, e); // 完成点:零宽(直建 FINAL,SRS §6.4)
+        }
       }
     };
     visit(itemId);
     return min === null || max === null
       ? null
-      : [
-          new Date(min).toISOString().slice(0, 10),
-          new Date(max).toISOString().slice(0, 10),
-        ];
+      : [new Date(min).toISOString(), new Date(max).toISOString()];
   }
 
   // YPJ-222(spec 0147):折叠徽标 N = 该父的全部后代数(任一深度)
@@ -678,8 +712,8 @@ export default function GanttPage() {
     const estH = estimateHoursOf(
       r.estimateValue,
       r.estimateUnit,
-      wd?.[0] ?? 540,
-      wd?.[1] ?? 1080,
+      wd?.[0] ?? 0,
+      wd?.[1] ?? 1440,
     );
     const actH =
       r.actualStart && r.actualEnd
@@ -751,6 +785,7 @@ export default function GanttPage() {
   const hasKid = (r: GanttRow) =>
     (rows ?? []).some((x) => x.parentItemId === r.itemId);
   // 五:case1/2 借 group 开始锚也归已排期;真未排期 = 全链无锚无 actual 叶行
+  // SRS v4 §5.4(评审 P0-2 修订):计划层与实际层均无任何可渲染元素才入未排期组(actualEnd 也要查——直建 FINAL 完成点须在主面板渲染)
   const unscheduled = visible.filter(
     (r) =>
       !r.startDate &&
@@ -758,6 +793,7 @@ export default function GanttPage() {
       !hasKid(r) &&
       !r.anchorDate &&
       !r.actualStart &&
+      !r.actualEnd &&
       !groupStartOf(r),
   );
   const scheduled = visible.filter(
@@ -1171,8 +1207,8 @@ export default function GanttPage() {
                   // 有子孙的父行只画汇总条,不画自有条
                   const drawOwn = !hasKid(r);
                   // YPJ-244(spec 0151 五):渲染规则 v2——case 2×2 分型 × 3 状态(用户 Obsidian 2026-11-20)
-                  const wsm = wd?.[0] ?? 540;
-                  const wem = wd?.[1] ?? 1080;
+                  const wsm = wd?.[0] ?? 0;
+                  const wem = wd?.[1] ?? 1440;
                   const estH = estimateHoursOf(
                     r.estimateValue,
                     r.estimateUnit,
@@ -1250,8 +1286,10 @@ export default function GanttPage() {
                   // YPJ-244(五)黄覆盖:进行中在计划条上叠「已流逝」段(末端=min(今天, 条尾));
                   // 覆盖条件=计划条存在且有 estimate(due 显式无 est 不覆盖,同用户 case3 字面);
                   // 周六日照算现状下日历时间位置等价工时比例;双休日历(H8)落地时改 hoursBetween 比例换算
+                  // SRS v4 §6.2(2026-11-21 拍板:进行中单条覆盖模型):凡有计划条的进行中行都画
+                  // 黄覆盖(条内已流逝段,start→min(今天,条尾),方案 A 口径);无第二条实际条
                   const fillW =
-                    doing && planIsBar && estH !== null
+                    doing && planIsBar
                       ? Math.min(
                           Math.max(Math.min(axis.todayX, right) - left, 0),
                           width,
@@ -1279,13 +1317,13 @@ export default function GanttPage() {
                         "&:hover": { bgcolor: "action.hover" },
                       }}
                     >
-                      {/* 条区(固定像素宽) */}
+                      {/* 条区(固定像素宽;高度 flex:1 随行 minHeight 44,自身不撑行——行对齐,SRS §10.2) */}
                       <Box
                         sx={{
                           position: "relative",
                           width: axis.timelineW,
                           flexShrink: 0,
-                          height: 44,
+                          flex: 1,
                         }}
                       >
                         {axis.todayX >= 0 && axis.todayX <= axis.timelineW && (
@@ -1373,7 +1411,21 @@ export default function GanttPage() {
                                     bgcolor: "warning.main",
                                     opacity: 0.9,
                                   }}
-                                />
+                                >
+                                  {/* 清单完成率遮罩:画在黄覆盖段上(基准=覆盖段宽,SRS §6.5) */}
+                                  {actPct !== null && (
+                                    <Box
+                                      sx={{
+                                        position: "absolute",
+                                        left: 0,
+                                        top: 0,
+                                        height: "100%",
+                                        width: `${actPct}%`,
+                                        bgcolor: "warning.dark",
+                                      }}
+                                    />
+                                  )}
+                                </Box>
                               )}
                             </Box>
                           ) : dueOnly ? (
@@ -1402,8 +1454,9 @@ export default function GanttPage() {
                             />
                           )}
                         </Box>
-                        {/* 实际条:双行下条(案 B)+ 清单完成率遮罩(YPJ-222;未完成延伸到今日线) */}
-                        {act && (
+                        {/* 实际条(下条):仅 无计划条的进行中(case1/3b 黄条)/ 完成(绿条)/ 返工 渲染;
+                            有计划条的进行中行 = 单条覆盖模型,不再画第二条(SRS v4 §6.2,2026-11-21 用户拍板) */}
+                        {act && !(doing && planIsBar) && (
                           <Box
                             data-testid={`gantt-actual-${r.number}`}
                             sx={{

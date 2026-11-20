@@ -6,9 +6,9 @@ import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/** YPJ-233(spec 0148)+ YPJ-244/SRS v4 修订(排序锚=渲染锚,2026-11-21 拍板):
- *  叶锚 = startDate ?? actualStart;父行 = 子孙叶并集最早端(父行自有日期/状态史作废,SRS 4-3);
- *  未排期 = 叶无 start 且无 actual。纯函数直测(不动 DB)。 */
+/** YPJ-233(spec 0148)+ YPJ-244/SRS v4 修订(排序锚=渲染锚,2026-11-21 拍板+评审 P0-2/P1-1 修订):
+ *  叶锚 = min(计划左端 start??due, 实际左端 actualStart??完成点);父行 = 叶子孙并集最早端(父行自有作废,SRS 4-3);
+ *  未排期 = 计划与实际均无元素。纯函数直测(不动 DB)。 */
 class GanttRowOrderTest {
     private fun dt(day: Int, hour: Int = 9, minute: Int = 0) = LocalDateTime.of(2026, 12, day, hour, minute)
 
@@ -20,7 +20,10 @@ class GanttRowOrderTest {
         startDate = start,
     )
 
-    private val noActual: (Item) -> LocalDateTime? = { null }
+    private val noActual: (Item) -> Pair<LocalDateTime?, LocalDateTime?> = { null to null }
+
+    private fun actualOf(target: Int, aS: LocalDateTime?, aE: LocalDateTime?): (Item) -> Pair<LocalDateTime?, LocalDateTime?> =
+        { if (it.number == target) aS to aE else null to null }
 
     @Test
     fun `start 升序且无排期靠后`() {
@@ -43,17 +46,35 @@ class GanttRowOrderTest {
 
     @Test
     fun `叶行仅 actual——按实际起点排,不垫尾(SRS 8-2,YPJ-206 案例)`() {
-        val research = item(206) // 三无,仅 actual 12-10
+        val research = item(206) // 三无,仅 actualStart 12-10
         val dated = item(207, dt(18))
-        val ordered = ganttWalkOrder(listOf(dated, research), { emptyList() }, { if (it.number == 206) dt(10) else null })
+        val ordered = ganttWalkOrder(listOf(dated, research), { emptyList() }, actualOf(206, dt(10), null))
         assertEquals(listOf(206, 207), ordered.map { it.number })
     }
 
     @Test
-    fun `due-only 有 due 无 start 落未排期组(存量兼容,Q11 废除后无新增)`() {
-        val diamond = item(1, null).copy(dueDate = dt(5))
-        val late = item(2, dt(9))
-        assertEquals(listOf(2, 1), ganttWalkOrder(listOf(diamond, late), { emptyList() }, noActual).map { it.number })
+    fun `完成行实际早于计划——按可见最左端排(评审 P1-1,final actual 12-08 早于 start 12-10)`() {
+        val early = item(1, dt(10)) // 计划 12-10,实际 12-08 完成
+        val rival = item(2, dt(9))
+        // rival 12-09 介于实际 12-08 与计划 12-10 之间 → 按可见最左端(实际 12-08)应排最前
+        val ordered = ganttWalkOrder(listOf(early, rival), { emptyList() }, actualOf(1, null, dt(8)))
+        assertEquals(listOf(1, 2), ordered.map { it.number })
+    }
+
+    @Test
+    fun `直建 FINAL(actualEnd 点)参与排序且不入未排期组(评审 P0-2)`() {
+        val point = item(1) // 无任何计划字段,仅 actualEnd 12-12(完成点)
+        val unsched = item(2) // 全空 → 未排期
+        val dated = item(3, dt(15))
+        val ordered = ganttWalkOrder(listOf(unsched, dated, point), { emptyList() }, actualOf(1, null, dt(12)))
+        assertEquals(listOf(1, 3, 2), ordered.map { it.number })
+    }
+
+    @Test
+    fun `due-only 以 due 为可见锚位排(SRS 8-2 拍板 Q6-B,数据由 Q11 契约杜绝新增)`() {
+        val diamond = item(1, null).copy(dueDate = dt(16))
+        val late = item(2, dt(18))
+        assertEquals(listOf(1, 2), ganttWalkOrder(listOf(late, diamond), { emptyList() }, noActual).map { it.number })
     }
 
     @Test
@@ -77,31 +98,17 @@ class GanttRowOrderTest {
     }
 
     @Test
-    fun `子孙 due-only 以 due 参与父锚,due-only 叶自身仍落未排期组`() {
-        val parent = item(1, dt(20))
-        val dueOnlyChild = item(2, null).copy(dueDate = dt(16))
-        val leaf = item(3, dt(18))
-        val kids = mapOf(parent.objectId!! to listOf(dueOnlyChild))
-        val ordered = ganttWalkOrder(listOf(parent, leaf, dueOnlyChild), { kids[it] ?: emptyList() }, noActual)
-        assertEquals(listOf(1, 3, 2), ordered.map { it.number })
-    }
-
-    @Test
     fun `父行包络左端并入子孙 actualStart(YPJ-217-218 案例,SRS 7-2)`() {
         val p217 = item(217) // 三无父行
-        val c218 = item(218) // 叶,仅 actual 12-17 13:21
+        val c218 = item(218) // 叶,仅 actualStart 12-17 13:21
         val c219 = item(219, dt(18, 9)) // 叶,start 12-18 09:00
         val kids = mapOf(p217.objectId!! to listOf(c218, c219))
         val rival = item(207, dt(18)) // 叶,start 12-18
-        val ordered = ganttWalkOrder(
-            listOf(p217, rival),
-            { kids[it] ?: emptyList() },
-            { if (it.number == 218) dt(17, 13, 21) else null },
-        )
+        val a218 = actualOf(218, dt(17, 13, 21), null)
+        val ordered = ganttWalkOrder(listOf(p217, rival), { kids[it] ?: emptyList() }, a218)
         // 217 包络 = min(218 actual 12-17 13:21, 219 12-18 09:00) = 12-17 13:21 → 先于 207
         assertEquals(listOf(217, 207), ordered.map { it.number })
-        // 217 子树内:218(12-17 13:21)先于 219(12-18 09:00)
-        val inner = ganttWalkOrder(kids[p217.objectId!!]!!, { emptyList() }, { if (it.number == 218) dt(17, 13, 21) else null })
+        val inner = ganttWalkOrder(kids[p217.objectId!!]!!, { emptyList() }, a218)
         assertEquals(listOf(218, 219), inner.map { it.number })
     }
 

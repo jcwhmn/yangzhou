@@ -23,23 +23,26 @@ import yangzhou.persistence.repository.StatusRepository
 import java.time.LocalDateTime
 import java.util.UUID
 
-/** YPJ-233(spec 0148)+ YPJ-244/SRS v4 修订(2026-11-21 拍板):排序锚 = 渲染锚——
- *  叶行锚 = startDate ?? actualStart(SRS §8.2;仅 actual 的行按可见实际起点排,不垫尾);
- *  父行 = 子孙**叶节点**并集最早端:逐叶 startDate ?? dueDate(含中间层之下的叶),actualStart 并入(SRS §7.2 左端);
+/** YPJ-233(spec 0148)+ YPJ-244/SRS v4 修订(2026-11-21 拍板;第三方评审 P0-2/P1-1 修订):排序锚 = 渲染锚——
+ *  叶行锚 = min(计划层左端(startDate ?? dueDate), 实际层左端(actualStart ?? actualEnd 完成点))——行序与可见条最左端一致;
+ *  父行 = 子孙**叶节点**渲染元素并集最早端(叶贡献 startDate ?? dueDate 与 actualStart ?? actualEnd);
  *  各级父行自有日期与自有状态史作废,不参与(SRS §4.3)。
- *  未排期 = 叶行无 start 且无 actual(SRS §5.4/§8.2);未排靠后,number 兜底。纯函数直测(GanttRowOrderTest)。 */
+ *  未排期 = 叶行计划层与实际层均无任何可渲染元素(start/due/actualStart/actualEnd 全空,SRS §5.4);
+ *  未排靠后,number 兜底。纯函数直测(GanttRowOrderTest)。 */
 internal fun ganttWalkOrder(
     siblings: List<yangzhou.persistence.Item>,
     childrenOf: (UUID) -> List<yangzhou.persistence.Item>,
-    actualStartOf: (yangzhou.persistence.Item) -> LocalDateTime?,
+    actualOf: (yangzhou.persistence.Item) -> Pair<LocalDateTime?, LocalDateTime?>,
 ): List<yangzhou.persistence.Item> {
     val memo = HashMap<UUID, LocalDateTime?>()
     fun subtreeMinOf(item: yangzhou.persistence.Item): LocalDateTime? {
         val id = item.objectId!!
         if (memo.containsKey(id)) return memo[id]
         val kids = childrenOf(id)
+        val (aS, aE) = actualOf(item)
         val own = if (kids.isEmpty()) {
-            listOfNotNull(item.startDate ?: item.dueDate, actualStartOf(item))
+            // 叶行:计划左端(start??due)与实际左端(start??完成点)全部参与(SRS §7.2 渲染元素口径)
+            listOfNotNull(item.startDate ?: item.dueDate, aS ?: aE)
         } else {
             emptyList() // 父行自有日期与状态史作废(SRS §4.3):包络只由叶节点贡献
         }
@@ -48,15 +51,15 @@ internal fun ganttWalkOrder(
         return a
     }
     siblings.forEach { subtreeMinOf(it) }
-    fun isUnscheduled(item: yangzhou.persistence.Item) = if (childrenOf(item.objectId!!).isEmpty()) {
-        item.startDate == null && actualStartOf(item) == null
-    } else {
-        memo[item.objectId!!] == null
+    fun isUnscheduled(item: yangzhou.persistence.Item): Boolean {
+        if (childrenOf(item.objectId!!).isNotEmpty()) return memo[item.objectId!!] == null
+        val (aS, aE) = actualOf(item)
+        return item.startDate == null && item.dueDate == null && aS == null && aE == null
     }
-    fun anchorOf(item: yangzhou.persistence.Item) = if (childrenOf(item.objectId!!).isEmpty()) {
-        item.startDate ?: actualStartOf(item)
-    } else {
-        memo[item.objectId!!]
+    fun anchorOf(item: yangzhou.persistence.Item): LocalDateTime? {
+        if (childrenOf(item.objectId!!).isNotEmpty()) return memo[item.objectId!!]
+        val (aS, aE) = actualOf(item)
+        return listOfNotNull(item.startDate ?: item.dueDate, aS ?: aE).minOrNull()
     }
     return siblings.sortedWith(
         compareBy(
@@ -319,10 +322,18 @@ class ProjectService(
             return depth
         }
 
-        fun walk(parent: UUID?): List<GanttRow> = ganttWalkOrder(byParent[parent].orEmpty(), { id -> byParent[id].orEmpty() }) { item ->
+        fun walk(parent: UUID?): List<GanttRow> = ganttWalkOrder(
+                byParent[parent].orEmpty(),
+                { id -> byParent[id].orEmpty() },
+            ) { item ->
                 // 状态史 createdAt 为 Instant,排序锚取本地墙钟(与前端渲染同口径)
-                histories[item.objectId]?.firstOrNull { h -> h.toStatusObjectId !in startIds }?.createdAt
+                // actualStart=首次迁出 START;actualEnd=迁入 FINAL(多次返工取最近一次,SRS §3.4/§6.6——0150 首次口径核对入 YPJ-245)
+                val hist = histories[item.objectId].orEmpty()
+                val aS = hist.firstOrNull { h -> h.toStatusObjectId !in startIds }?.createdAt
                     ?.let { LocalDateTime.ofInstant(it, java.time.ZoneId.systemDefault()) }
+                val aE = hist.lastOrNull { h -> h.toStatusObjectId in finalIds }?.createdAt
+                    ?.let { LocalDateTime.ofInstant(it, java.time.ZoneId.systemDefault()) }
+                aS to aE
             }.flatMap { item ->
             val status = statusById[item.statusObjectId]
             val hist = histories[item.objectId!!].orEmpty()
@@ -342,7 +353,8 @@ class ProjectService(
                 estimateUnit = item.estimateUnit,
                 depth = depthOf(item),
                 actualStart = hist.firstOrNull { it.toStatusObjectId !in startIds }?.createdAt?.toString(),
-                actualEnd = hist.firstOrNull { it.toStatusObjectId in finalIds }?.createdAt?.toString(),
+                // SRS §3.4/§6.6:actualEnd = 最近一次迁入 FINAL(多次返工取最近;0150 首次口径修订 2026-11-21 评审 P1-4)
+                actualEnd = hist.lastOrNull { it.toStatusObjectId in finalIds }?.createdAt?.toString(),
                 assigneeName = item.assigneeObjectId?.let { assigneeNames[it] },
                 anchorDate = anchors[item.objectId]?.toString(),
                 checklistDone = cc?.done?.toInt(),
