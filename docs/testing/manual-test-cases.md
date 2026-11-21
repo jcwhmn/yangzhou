@@ -183,3 +183,39 @@
 ### H. 自动化
 - [x] H1 e2e 全量绿(用户跑,test 容器 8082;2026-11-21 用户确认)
 - [ ] H2 `npm run format` 绿(CI format check)
+
+## YPJ-253 看板页重构:913 行拆组件/hooks(spec 0156;纯结构零语义)
+
+> **基线 = prod 3000(重构前代码)**,重构分支 dev 3001 对照(容器重建含 253 代码的镜像后验,核对 sha)。纯搬家票:所有用例本质 = 「与 prod 行为一致」。automation:e2e 全量即回归闸。
+
+### A. 加载/渲染
+- [ ] A1 标题+刷新钮+快速添加 portal(placeholder/EstimateField 按 estRequired/estScales 形态);loading skeleton;error Alert;空列文案
+
+### B. 快速添加 S-flow 全支
+- [ ] B1 S1 单 active 直挂
+- [ ] B2 S1m 多 active → 选组弹窗
+- [ ] B3 S2 有 planned → 激活并放入(确认弹窗,取消=放弃创建 D6)
+- [ ] B4 S3 无 active 无 planned + 有 level-1 → 新建组默认名「N 号」+撞名递增
+- [ ] B5 S0 无 level-1 → 直接上板(0101 铁律)
+
+### C. 拉入/移出
+- [ ] C1 拉入钮→backlog 多选→确认逐条 PUT→看板刷新
+- [ ] C2 非终态卡移出钮(终态不显示)→列刷新
+
+### D. 拖拽
+- [ ] D1 跨列拖放→乐观更新+PATCH;触发 autoAssignedSprintName → 轻提示 6s 消失
+- [ ] D2 拖放失败回滚(错误 Alert+数据回拉)
+
+### E. 过滤
+- [ ] E1 all/unassigned/blocked/member chips 与 prod 行为一致;memberOptions 由 items 派生
+
+### F. 无 active 提示条
+- [ ] F1 两文案态(无组/有组无 active)+ planned Dropdown 一键开始 → 看板收窄
+
+### G. 刷新链路
+- [ ] G1 30s 自动刷新仍在(hook 化后时序不变)+ 手刷钮
+- [ ] G2 `yz:project-changed` 广播重拉 + last-project 记忆(V11-S1)
+
+### H. 自动化
+- [ ] H1 e2e 全量绿(用户跑,test 容器 8082)
+- [ ] H2 `npm run format` 绿(CI format check)
