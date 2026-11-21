@@ -97,3 +97,33 @@ web/app/p/[key]/i/[itemId]/
 - [ ] C. 子条目:添加(编号/新建/迁移策略弹窗)/展开对照,直排区块置页签栏上方不变
 - [ ] D. 八页签逐块:评论增删;日志计时开停+建议登记+手记;判定渲染;需求保存;依赖增删+清单勾选;工时表;属性 AttrEditor 保存;GitHub commits 展示 + 建分支弹窗
 - [ ] E. e2e 全量绿(用户跑)+ `npm run format` 绿
+
+## 四、As-built(PR #241 squash 8691cbb 合入后补,2026-11-21)
+
+### 交付形态
+
+```text
+web/app/p/[key]/i/[itemId]/  共 3203 行
+├── page.tsx               1398 行(入口:路由解析+load 统一加载+主表单+状态动作群+全局提示/弹窗)
+├── types.ts               231
+└── components/ ×13        CommentsTab 108 · ActivityTab 39 · FeasibilityTab 41 · RequirementsTab 49
+                           DependenciesTab 204 · TimeLogTab 213 · AttributesTab 37 · GithubTab 231
+                           SubitemsBlock 142(+策略弹窗随迁)· AttrEditor 115 · RequirementsDialog 138
+                           CreateBranchDialog 190 · DependencyAddForm 67
+```
+
+### As-built 偏差(目标形态 → 实拆)
+
+- **page 1398 行 > 目标 ≤~300**:差距 = 主表单 JSX ~370 + 状态群 ~165 + 跨区块动作群 ~440 + 字典/load/提示 ~200。拍板③明文主表单态+跨区块动作留 page;「再拆动语义,不硬拆」逃生 hatch 适用(249 同例 364 行先例),如实记偏差。
+- **拍板执行断言(①/②张力消解)**:②主导数据归属——load() 首屏拉取的 comments/timeLog/deps/depBlocked/checklist/suggestions/subitems 全部留 page(props 下发、动作回调上行),保证「一进 detail 即全量拉」零时序漂移;①落地于按钮触发纯区块态——commits 群/branchOpen 内置 GithubTab、depAddOpen 内置 DependenciesTab。①态清单中的 comments/timeLog 若随组件内置,tab 条件渲染下 tab 往返即重取/重置 = 时序漂移,与②冲突,故不照搬。
+- reqOpen 跨 tab2/tab3(tab2 按钮置位、tab3 弹窗读),留 page;**RequirementsDialog 渲染留 page 层 tab 条件外**(原样)——若进 RequirementsTab,tab2 开弹窗时 tab3 未挂载即行为变化。
+- 已知微差:depAddOpen 开合态 tab 往返复位(原 page 态存活;纯 UI 态,不在 e2e/手测覆盖面)。
+- runningEntry 派生随迁 TimeLogTab;page 死态清理(branchOpen/commits×3);输入框态(newComment/manualMinutes/manualNote/newCheckText/newSubTitle)被 page 动作读取,留 page 走受控 props——零动作体改动,全部动作函数逐字节保留。
+- **切片停点表作废**:新节奏(2026-11-21 拍板:先设计→停等 review→一次 coding→停等 e2e)取代切片 A-D 停点表。实际执行:B1/B2/B3/C/D 五绿点 tsc+prettier 绿就地 commit、零中途停;停等仅 e2e 一轮;PR squash 后 main 单提交(8691cbb)。
+
+### 验证快照
+
+- tsc --noEmit 0 错(每绿点);prettier + `npm run format` 绿;testid 全集对账一致(item-milestone-chip / item-warnings / sub-policy-ignore / sub-policy-migrate)
+- e2e 全量(test 容器)用户跑,绿(新节奏单轮)
+- 手测冒烟 A-E 清单落档 docs/testing/manual-test-cases.md YPJ-251 节(逐条勾档留用户;e2e 全量绿为闸)
+- CI main:date-tag 绿、e2e 合并回合时点在跑;本地分支 refactor/YPJ-251-detail-page-split 永久保留(过程考古)
