@@ -252,27 +252,27 @@
 - [x] H1 e2e 全量绿(用户跑,test 容器 8082;2026-11-21 用户确认)
 - [ ] H2 `npm run format` 绿(CI format check)
 
-## YPJ-221 甘特 S4:Milestone/Release 泳道(spec 0158)
+## YPJ-221 甘特 S4:Milestone/Release 时点上图(竖线+旗标;spec 0158 r2)
 
-前提:dev 实例(3001),项目含已排期 item;按 spec 0158 §七执行。
+前提:dev 实例(3001),项目含已排期 item;按 spec 0158 r2 §七执行。
 
-### A. 里程碑泳道
-- [ ] M1 纯 planned 里程碑(targetDate 未来)→ 灰描边菱形+名称,x 位对齐日期
-- [ ] M2 in_progress 里程碑 → 蓝实心高亮+粗体标签
-- [ ] M3 gate 型里程碑(挂 2/5 FINAL)→ 章「2/5」;零 gate 站里程碑无章
-- [ ] M4 planned 且 targetDate 已过 → 红描边(overdue)
+### A. 里程碑线+旗标
+- [ ] M1 planned 里程碑(targetDate 未来)→ 灰虚线+旗标,x 位对齐日期
+- [ ] M2 in_progress 里程碑 → 蓝虚线+旗标粗体(高亮)
+- [ ] M3 gate 型里程碑(挂 2/5 FINAL)→ 旗标含「2/5」;零 gate 站无章
+- [ ] M4 planned 且 targetDate 已过 → 红虚线
 
-### B. 发布泳道
-- [ ] R1 planned release(targetDate 未来)→ 蓝描边菱形
-- [ ] R2 released release → releasedDate 处绿实心菱形;tooltip 含 targetDate+releasedDate
+### B. 发布线+旗标
+- [ ] R1 planned release → targetDate 蓝虚线
+- [ ] R2 released release → releasedDate 绿实线+旗标;targetDate 无线;tooltip 含两日期
 
 ### C. 边界
-- [ ] E1 无里程碑/发布的新项目 → 两条泳道都不渲染,行序不错位
-- [ ] E2 两 marker 同日 → 后者标签隐藏、菱形仍在,tooltip 可读
+- [ ] E1 无里程碑/发布的项目 → 旗标带不渲染,行位/表头不受影响
+- [ ] E2 两线同日 → 旗标上下层错位;4 个同日 marker → 第 4 面旗不渲染仅 tooltip
 
 ### D. 交互
-- [ ] I1 点击 marker → 跳对应管理页;hover → tooltip 全信息
-- [ ] I2 泳道与 item 行横滚同步;标题列纵向对齐不错位
+- [ ] I1 点旗标 → 跳对应管理页;hover → tooltip 全信息;线本身不可点不拦 hover
+- [ ] I2 条盖线(条段处线不可见,间隙露线);横滚同步;已完成组展开后线延伸到底
 
 ### E. 自动化
 - [ ] E3 e2e 全量绿(用户跑,test 容器 8082)
