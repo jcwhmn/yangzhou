@@ -23,21 +23,20 @@ import { DialogActions, Tooltip } from "@mui/material";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
-import { useProjectToolbarSlot } from "@/components/ProjectToolbar";
+import { useProjectToolbarSlot } from "@/components/ProjectToolbar"; // CP2 保留:portal 表单态留 page,CP3 随 BoardHeader 迁走
 import { EstimateField } from "@/components/EstimateField";
 import { fmtDate } from "@/lib/dates";
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { api } from "@/lib/api";
 import { t } from "@/lib/texts";
-import { EstimateScale, estimateText } from "@/lib/estimate";
+import { estimateText } from "@/lib/estimate";
 import {
-  listSprints,
   sprintAction,
-  assignSprint,
   createSprint,
   level1Type,
   syncCurrentParent,
 } from "@/lib/sprints";
+import useBoardData from "./hooks/useBoardData";
 import { AssignPopover } from "@/components/AssignPopover";
 import PullDialog from "./components/PullDialog";
 import type { Filter, Item, SprintLite, Status } from "./types";
@@ -45,22 +44,27 @@ import type { Filter, Item, SprintLite, Status } from "./types";
 export default function BoardPage() {
   const { key } = useParams<{ key: string }>();
   const router = useRouter();
-  const [statuses, setStatuses] = useState<Status[]>([]);
+  const {
+    statuses,
+    items,
+    setItems,
+    activeSprints,
+    sprints,
+    estScales,
+    estRequired,
+    loading,
+    error,
+    setError,
+    load,
+  } = useBoardData(key);
   const { slotRef } = useProjectToolbarSlot();
-  const [items, setItems] = useState<Item[]>([]);
   const [newTitle, setNewTitle] = useState("");
   const [newEstValue, setNewEstValue] = useState(""); // YPJ-186 预估表单态(成对空串=未填)
   const [newEstUnit, setNewEstUnit] = useState("");
   const [pendingEst, setPendingEst] = useState({ value: "", unit: "" }); // S2/S3 对话框路径的快照(同 pendingTitle)
-  const [estScales, setEstScales] = useState<EstimateScale[]>([]);
-  const [estRequired, setEstRequired] = useState(false);
   const [dragOver, setDragOver] = useState<string | null>(null);
-  const [error, setError] = useState("");
   const [sprintInfo, setSprintInfo] = useState(""); // YPJ-120:开始动作自动入 sprint 的轻提示
-  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<Filter>("all");
-  const [activeSprints, setActiveSprints] = useState<SprintLite[]>([]);
-  const [sprints, setSprints] = useState<SprintLite[]>([]);
   const [sprintPickOpen, setSprintPickOpen] = useState(false);
   const [pendingTitle, setPendingTitle] = useState("");
   const [pullOpen, setPullOpen] = useState(false);
@@ -71,62 +75,6 @@ export default function BoardPage() {
   );
   const [launchPick, setLaunchPick] = useState("");
   const [launchName, setLaunchName] = useState("");
-
-  // V9-Q3:看板 30s 自动刷新(手刷按钮同函数)
-  useEffect(() => {
-    // V11-S1:记录最后访问的项目
-    const token = localStorage.getItem("yz-token");
-    if (token && key) {
-      fetch(`/api/members/me/last-project`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ key: String(key) }),
-      }).catch(() => {});
-    }
-  }, [key]);
-  useEffect(() => {
-    const t = setInterval(() => load(), 30000);
-    return () => clearInterval(t);
-  }, []);
-
-  const load = useCallback(async () => {
-    try {
-      const project = await api<{
-        statuses: Status[];
-        estimateScales: EstimateScale[];
-        estimateRequired: boolean;
-      }>(`/api/projects/${key}`);
-      setStatuses(project.statuses);
-      setEstScales(project.estimateScales ?? []);
-      setEstRequired(project.estimateRequired ?? false);
-      // V9-S1:item 列表自带 feasSignal 冗余,不再单 feasibility 调用
-      // YPJ-29:看板数据范围由后端决定(active sprint 的 items;无 active → 全量)
-      const board = await api<{ activeGroups: SprintLite[]; items: Item[] }>(
-        `/api/projects/${key}/board`,
-      );
-      setActiveSprints(board.activeGroups ?? []);
-      setItems(board.items);
-      setSprints(await listSprints(key));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "加载失败");
-    } finally {
-      setLoading(false);
-    }
-  }, [key]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  // 项目级面板(工作流/成员)改动 → 刷新本页数据(面板已上移至 layout,YPJ-13)
-  useEffect(() => {
-    const h = () => load();
-    window.addEventListener("yz:project-changed", h);
-    return () => window.removeEventListener("yz:project-changed", h);
-  }, [load]);
 
   async function setBoardItem(itemId: string, on: boolean) {
     await api(`/api/items/${itemId}/board-membership`, {
