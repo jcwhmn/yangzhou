@@ -39,6 +39,7 @@
 - release `released` → **只画 releasedDate 实线**(r1 拍板沿用;targetDate 属历史不画,tooltip 可见)。
 - 全空(无可上图对象)→ 旗标带不渲染,行位不受影响。
 - 数据新鲜度:沿用「二级选项一次拉取」口径,挂载时拉一次;跨标签页新建刷新即得,不另拉。
+- **轴纳入 marker 日期**(e2e 设计发现的真缺口,CP2b):轴=item 日期锚定,marker 在窗外会被 xOf 钳边成假位移(YPJ 自身 completed 里程碑 10-18 即在窗外);markerDatesOf(ms,rel) 与组件渲染同规则,page 传 useTimelineScale 并入 min/max(「全览」语义=全部内容入画;宽区间走 GANTT_MIN_PPD 下限+横滚兜底)。
 
 ## 三、渲染真值表(状态 × 线型/色/旗标)
 

@@ -237,3 +237,20 @@ export function MilestoneLines({
     </>
   );
 }
+
+/** 上图 marker 的日期集(轴纳入用,与组件渲染同一规则)。
+ * YPJ-221 CP2b:轴 = item 日期锚定,marker 在窗外会被 xOf 钳边(假位移)——轴必须纳入 marker 日期。 */
+export function markerDatesOf(
+  ms: MilestoneMarker[],
+  rel: ReleaseMarker[],
+): string[] {
+  const out: string[] = [];
+  for (const m of ms) {
+    if (m.status !== "cancelled" && m.targetDate) out.push(m.targetDate);
+  }
+  for (const r of rel) {
+    const d = r.status === "released" ? r.releasedDate : r.targetDate;
+    if (d) out.push(d);
+  }
+  return out;
+}

@@ -23,6 +23,7 @@ import { Splitter, TitleColumn } from "./components/TitleColumn";
 import { UnscheduledGroup } from "./components/UnscheduledGroup";
 import { ZOOM_STEP } from "./types";
 import { GanttChart } from "./GanttChart";
+import { markerDatesOf } from "./components/MilestoneLines";
 /** 单项目树形甘特(只读)。条 = start→due;只有 due 画里程碑菱形;今日线;未排期折叠组。 */
 export default function GanttPage() {
   const { key } = useParams<{ key: string }>();
@@ -104,6 +105,7 @@ export default function GanttPage() {
     groupStartOf,
     summaryOf,
     saveView,
+    markerDates: markerDatesOf(msOpts, relOpts),
   });
 
   const changeScope = (next: string) => {

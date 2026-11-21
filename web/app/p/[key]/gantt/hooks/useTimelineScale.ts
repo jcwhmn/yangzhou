@@ -28,6 +28,8 @@ export function useTimelineScale(opts: {
   groupStartOf: (r: GanttRow) => string | null;
   summaryOf: (itemId: string) => [string, string] | null;
   saveView: () => void;
+  /** YPJ-221 CP2b:ms/rel marker 日期(轴纳入,避免出界钳边假位移) */
+  markerDates: string[];
 }) {
   const {
     rows,
@@ -41,6 +43,7 @@ export function useTimelineScale(opts: {
     groupStartOf,
     summaryOf,
     saveView,
+    markerDates,
   } = opts;
   // 轴(YPJ-219 spec 0140 v2):范围 = 数据锚定日界;pxPerDay 连续 ∈ [fit 全区间压一屏, MAX_PPD]
   const axis = useMemo(() => {
@@ -80,12 +83,12 @@ export function useTimelineScale(opts: {
       const s = summaryOf(r.itemId);
       return s ? [s[0], s[1]] : [];
     });
-    const minT = dates.length
-      ? Math.min(...dates.map((d) => +parseLocal(d)))
-      : +today;
-    const maxT = dates.length
-      ? Math.max(...dates.map((d) => +parseLocal(d)))
-      : +today;
+    const allT = [
+      ...dates.map((d) => +parseLocal(d)),
+      ...markerDates.map((d) => +parseLocal(d)),
+    ];
+    const minT = allT.length ? Math.min(...allT) : +today;
+    const maxT = allT.length ? Math.max(...allT) : +today;
     const start = new Date(minT);
     start.setHours(0, 0, 0, 0);
     const end = new Date(maxT);
@@ -200,7 +203,7 @@ export function useTimelineScale(opts: {
       headerRows: rowsOut,
       todayX: xOfT(+today),
     };
-  }, [rows, zoom, containerW, wd, groupStartOf]);
+  }, [rows, zoom, containerW, wd, groupStartOf, markerDates]);
 
   // 缩放:锚点(anchorClientX,视口坐标)下的数据时刻保持不动;null 锚 = 视口中心
   const zoomTo = (newPpd: number, anchorClientX?: number) => {
