@@ -99,6 +99,8 @@ test("列头排序:单击追加多列(循环 升/降/移除),Shift 仅此列", a
 });
 
 test("分页页 20 两页,翻页/改页大小生效", async ({ page, projectKey }) => {
+  // F9(台账):21 连发建 item(全文件最重)+ 已知 40P01 并发死锁重试,常态 ~24.8s 贴 30s 默认线,负载下穿线(复现 2/3)——按 A46 先例给独立预算;治本=后端死锁排查票(shortcut 既有约定)
+  test.setTimeout(90_000);
   // 默认页大小 20:21 条 → 两页(20+1)
   for (let i = 1; i <= 21; i++)
     await createItemResilient(projectKey, `TB ${i}`);
