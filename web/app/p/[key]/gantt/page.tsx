@@ -29,6 +29,11 @@ import { HoverCard } from "./components/HoverCard";
 import { Splitter, TitleColumn } from "./components/TitleColumn";
 import { TimelineHeader } from "./components/TimelineHeader";
 import { UnscheduledGroup } from "./components/UnscheduledGroup";
+import { TodayLine } from "./components/TodayLine";
+import { SummaryBar } from "./components/SummaryBar";
+import { PlanBar } from "./components/PlanBar";
+import { ActualBar } from "./components/ActualBar";
+import { OffsetBadge } from "./components/OffsetBadge";
 import {
   dueFromJs,
   estimateHoursOf,
@@ -246,199 +251,39 @@ export default function GanttPage() {
             alignSelf: "stretch",
           }}
         >
-          {axis.todayX >= 0 && axis.todayX <= axis.timelineW && (
-            <Box
-              sx={{
-                position: "absolute",
-                left: axis.todayX,
-                top: 0,
-                bottom: 0,
-                width: "2px",
-                bgcolor: "info.main",
-                opacity: 0.5,
-              }}
-            />
-          )}
-          <Box
-            data-summary={summary ? "" : undefined}
-            sx={{
-              position: "absolute",
-              left: summaryLeft,
-              width: summaryWidth,
-              top: 4,
-              display: summary ? "block" : "none",
-            }}
-          >
-            <Box
-              sx={{
-                height: 8,
-                borderRadius: 1,
-                bgcolor: "warning.main", // YPJ-222:配色重整——汇总条灰→橙(spec 0147 Q3)
-                opacity: 0.75,
-              }}
-            />
-          </Box>
-          {/* 折叠聚合徽标(YPJ-222) */}
-          {summary && collapsed.has(r.itemId) && (
-            <Chip
-              label={`+${descendantsOf(r.itemId)} 子任务`}
-              size="small"
-              data-testid={`gantt-collapsed-${r.number}`}
-              sx={{
-                position: "absolute",
-                left: summaryLeft + summaryWidth + 4,
-                top: 0,
-                height: 16,
-                fontSize: 10,
-              }}
-            />
-          )}
-          <Box
-            data-final={isFinal ? "" : undefined}
-            data-testid={`gantt-bar-${r.number}`}
-            sx={{
-              position: "absolute",
-              left,
-              width,
-              top: 5,
-              display: drawOwn && planT !== null ? "block" : "none",
-            }}
-          >
-            {planIsBar ? (
-              <Box
-                sx={{
-                  position: "relative",
-                  height: 12,
-                  borderRadius: 1,
-                  bgcolor: r.overdue ? "error.main" : "primary.main",
-                  opacity: 0.85,
-                }}
-              >
-                {fillW > 0 && (
-                  <Box
-                    data-testid={`gantt-fill-${r.number}`}
-                    sx={{
-                      position: "absolute",
-                      left: 0,
-                      top: 0,
-                      height: "100%",
-                      width: fillW,
-                      borderRadius: fillW >= width ? 1 : "4px 0 0 4px",
-                      bgcolor: "warning.main",
-                      opacity: 0.9,
-                    }}
-                  >
-                    {/* 清单完成率遮罩:画在黄覆盖段上(基准=覆盖段宽,SRS §6.5) */}
-                    {actPct !== null && (
-                      <Box
-                        sx={{
-                          position: "absolute",
-                          left: 0,
-                          top: 0,
-                          height: "100%",
-                          width: `${actPct}%`,
-                          bgcolor: "warning.dark",
-                        }}
-                      />
-                    )}
-                  </Box>
-                )}
-              </Box>
-            ) : dueOnly ? (
-              <Box
-                sx={{
-                  width: 12,
-                  height: 12,
-                  transform: "rotate(45deg)",
-                  bgcolor: r.overdue ? "error.main" : "warning.main",
-                  opacity: 1,
-                  mx: "auto",
-                }}
-              />
-            ) : (
-              // spec 0151 五:case1/3 计划层圆点——位置=group 开始(case1 未开始)/ start 或依赖锚(case3)
-              <Box
-                data-testid={`gantt-${caseNo === 1 ? "grouppoint" : r.anchorDate && r.startDate === null ? "anchor" : "plandot"}-${r.number}`}
-                sx={{
-                  width: 3,
-                  height: 12,
-                  borderRadius: 1,
-                  bgcolor: "primary.main",
-                }}
-              />
-            )}
-          </Box>
-          {/* 实际条(下条):仅 无计划条的进行中(case1/3b 黄条)/ 完成(绿条)/ 返工 渲染;
-                            有计划条的进行中行 = 单条覆盖模型,不再画第二条(SRS v4 §6.2,2026-11-21 用户拍板) */}
-          {act && !(doing && planIsBar) && (
-            <Box
-              data-testid={`gantt-actual-${r.number}`}
-              sx={{
-                position: "absolute",
-                left: actLeft,
-                width: actWidth,
-                top: 24,
-              }}
-            >
-              <Box
-                sx={{
-                  position: "relative",
-                  height: 12,
-                  borderRadius: 1,
-                  bgcolor: actColor,
-                  opacity: 0.85,
-                }}
-              >
-                {actPct !== null && (
-                  <Box
-                    sx={{
-                      position: "absolute",
-                      left: 0,
-                      top: 0,
-                      height: "100%",
-                      width: `${actPct}%`,
-                      borderRadius: 1,
-                      bgcolor: isFinal ? "success.dark" : "warning.dark",
-                    }}
-                  />
-                )}
-              </Box>
-            </Box>
-          )}
-          {/* YPJ-244(spec 0151)H5:完成点(actualComplete 有而 actualStart 无) */}
-          {completeDot && (
-            <Box
-              data-testid={`gantt-complete-${r.number}`}
-              sx={{
-                position: "absolute",
-                left: (xEndOf(r.actualEnd) ?? 0) - 5,
-                top: 26,
-                width: 10,
-                height: 10,
-                borderRadius: "50%",
-                bgcolor: isFinal ? "text.disabled" : "success.main",
-                opacity: isFinal ? 0.5 : 0.85,
-              }}
-            />
-          )}
-          {/* 偏移徽标:仅 FINAL;On time 中性 / ±Nh / ±Nd,提前绿/延期红(SRS §11.1,YPJ-245) */}
-          {badge !== null && (
-            <Typography
-              variant="caption"
-              data-testid={`gantt-offset-${r.number}`}
-              sx={{
-                position: "absolute",
-                left: badgeLeft,
-                top: 24,
-                lineHeight: "12px",
-                fontWeight: 600,
-                color: badge.color,
-                whiteSpace: "nowrap",
-              }}
-            >
-              {badge.label}
-            </Typography>
-          )}
+          <TodayLine todayX={axis.todayX} timelineW={axis.timelineW} />
+          <SummaryBar
+            summary={summary}
+            summaryLeft={summaryLeft}
+            summaryWidth={summaryWidth}
+            collapsed={collapsed.has(r.itemId)}
+            descendants={descendantsOf(r.itemId)}
+            number={r.number}
+          />
+          <PlanBar
+            r={r}
+            visible={drawOwn && planT !== null}
+            isFinal={isFinal}
+            left={left}
+            width={width}
+            planIsBar={planIsBar}
+            dueOnly={dueOnly}
+            caseNo={caseNo}
+            fillW={fillW}
+            actPct={actPct}
+          />
+          <ActualBar
+            visible={act && !(doing && planIsBar)}
+            left={actLeft}
+            width={actWidth}
+            color={actColor}
+            actPct={actPct}
+            isFinal={isFinal}
+            completeDot={completeDot}
+            completeLeft={(xEndOf(r.actualEnd) ?? 0) - 5}
+            number={r.number}
+          />
+          <OffsetBadge badge={badge} left={badgeLeft} number={r.number} />
           <Link
             href={`/p/${key}/i/${r.itemId}?from=gantt`}
             style={{
