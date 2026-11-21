@@ -217,5 +217,5 @@
 - [ ] G2 `yz:project-changed` 广播重拉 + last-project 记忆(V11-S1)
 
 ### H. 自动化
-- [ ] H1 e2e 全量绿(用户跑,test 容器 8082)
+- [x] H1 e2e 全量绿(用户跑,test 容器 8082;2026-11-21 用户确认)
 - [ ] H2 `npm run format` 绿(CI format check)
