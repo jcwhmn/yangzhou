@@ -19,8 +19,6 @@ import {
   Select,
   Stack,
   Table,
-  ToggleButton,
-  ToggleButtonGroup,
   TableBody,
   TableCell,
   TableContainer,
@@ -29,10 +27,9 @@ import {
   Typography,
 } from "@mui/material";
 import { PageShell } from "@/components/PageShell";
-import { LineChart } from "@mui/x-charts/LineChart";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { api } from "@/lib/api";
 import { t } from "@/lib/texts";
 import {
@@ -54,6 +51,7 @@ import {
 } from "./types";
 import { ChartBy } from "./components/ChartBy";
 import { useSprintData } from "./hooks/useSprintData";
+import { SprintChartSection } from "./components/SprintChartSection";
 
 /**
  * V12-S3 Sprint 落地页(spec 0010,grill 裁决 1/2):
@@ -96,15 +94,6 @@ export default function SprintPage() {
     pick: string;
     newName: string;
   }>(null);
-  // YPJ-73:图表视图切换(燃専数据不足时显示空态而非整块消失)
-  const [chartView, setChartView] = useState<
-    "burndown" | "byStatus" | "byAssignee"
-  >("burndown");
-  // YPJ-46:burndown(剩余 vs 理想线);端点要求 sprint 有起止日期
-  const [bd, setBd] = useState<{
-    ideal: { date: string; remaining: number }[];
-    actual: { date: string; remaining: number }[];
-  } | null>(null);
 
   async function changeStatus(status: string) {
     if (!sprint) return;
@@ -355,19 +344,6 @@ export default function SprintPage() {
     setConfirmFlow(null);
   }
 
-  useEffect(() => {
-    let alive = true;
-    api<{
-      ideal: { date: string; remaining: number }[];
-      actual: { date: string; remaining: number }[];
-    }>(`/api/projects/${key}/metrics/burndown?groupId=${id}`)
-      .then((r) => alive && setBd({ ideal: r.ideal, actual: r.actual }))
-      .catch(() => alive && setBd(null));
-    return () => {
-      alive = false;
-    };
-  }, [key, id]);
-
   // V13-S3:拉入/移出同一对话框——列出非终态 item 多选,确认后逐条走既有 PUT /items/{id}/sprint
   async function openAdd() {
     try {
@@ -571,65 +547,12 @@ export default function SprintPage() {
             </Typography>
           )}
 
-          <Stack direction="row" justifyContent="flex-end" sx={{ mb: 1 }}>
-            <ToggleButtonGroup
-              size="small"
-              exclusive
-              value={chartView}
-              onChange={(_, v) => v && setChartView(v)}
-            >
-              <ToggleButton value="burndown">
-                {t.sprintCharts.burndown}
-              </ToggleButton>
-              <ToggleButton value="byStatus">
-                {t.sprintCharts.byStatus}
-              </ToggleButton>
-              <ToggleButton value="byAssignee">
-                {t.sprintCharts.byAssignee}
-              </ToggleButton>
-            </ToggleButtonGroup>
-          </Stack>
-          {chartView === "burndown" &&
-            (bd && bd.actual.length > 1 ? (
-              <LineChart
-                height={260}
-                xAxis={[
-                  {
-                    scaleType: "time",
-                    data: bd.actual.map((p) => new Date(p.date)),
-                  },
-                ]}
-                series={[
-                  {
-                    label: t.flow.remaining,
-                    data: bd.actual.map((p) => p.remaining),
-                    showMark: false,
-                  },
-                  {
-                    label: t.flow.ideal,
-                    data: bd.ideal.map((p) => p.remaining),
-                    showMark: false,
-                  },
-                ]}
-                sx={{ mb: 2 }}
-              />
-            ) : (
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                sx={{ display: "block", mb: 2 }}
-              >
-                {t.sprintCharts.burndownEmpty}
-              </Typography>
-            ))}
-          {chartView !== "burndown" && items !== null && items.length > 0 && (
-            <ChartBy
-              view={chartView}
-              items={items}
-              statusOrder={statuses.map((s) => s.name)}
-              sx={{ mb: 2 }}
-            />
-          )}
+          <SprintChartSection
+            projectKey={key}
+            groupId={id}
+            items={items}
+            statusOrder={statuses.map((s) => s.name)}
+          />
 
           {items !== null && items.length > 0 && (
             <TableContainer>
