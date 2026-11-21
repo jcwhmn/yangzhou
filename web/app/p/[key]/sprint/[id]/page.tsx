@@ -1,20 +1,6 @@
 "use client";
 
-import {
-  Box,
-  Button,
-  Checkbox,
-  TextField,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  List,
-  ListItem,
-  ListItemText,
-  Stack,
-  Typography,
-} from "@mui/material";
+import { Button, Stack, Typography } from "@mui/material";
 import { PageShell } from "@/components/PageShell";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
@@ -34,10 +20,14 @@ import {
   type Sprint,
   type Status,
   type TypeWorkflow,
+  type Disp,
 } from "./types";
 import { ChartBy } from "./components/ChartBy";
 import { useSprintData } from "./hooks/useSprintData";
 import { SprintChartSection } from "./components/SprintChartSection";
+import { AddMembersDialog } from "./components/AddMembersDialog";
+import { ConfirmFlowDialog } from "./components/ConfirmFlowDialog";
+import { DispositionDialog } from "./components/DispositionDialog";
 import { SprintHeader } from "./components/SprintHeader";
 import { SprintItemsTable } from "./components/SprintItemsTable";
 
@@ -74,14 +64,7 @@ export default function SprintPage() {
     null | "start" | "complete" | "reopen"
   >(null);
   // 0106:组完成后的非终态成员处置(rows 默认全转入目标组,逐行可覆写回 Backlog;D2/D3)
-  const [disp, setDisp] = useState<null | {
-    rows: { itemId: string; title: string; toBacklog: boolean }[];
-    actives: Sprint[];
-    planned: Sprint[];
-    typeName: string;
-    pick: string;
-    newName: string;
-  }>(null);
+  const [disp, setDisp] = useState<Disp | null>(null);
 
   async function changeStatus(status: string) {
     if (!sprint) return;
@@ -234,26 +217,6 @@ export default function SprintPage() {
     setBusy(false);
   }
 
-  function targetLabel(d: typeof disp): string {
-    if (!d) return "";
-    if (d.actives.length > 1 || d.planned.length > 1)
-      return t.sprintPage.dispPickTitle;
-    if (d.actives.length === 1) return `转入进行中的「${d.actives[0].name}」`;
-    if (d.planned.length === 1)
-      return `将激活计划中的「${d.planned[0].name}」并转入`;
-    return `将新建组「${d.newName}」并激活,转入`;
-  }
-  // 摘要行用:目标组名(多选时取 pick,与 confirmDisposition 落库一致)
-  function targetGroupName(d: NonNullable<typeof disp>): string {
-    if (d.actives.length > 0)
-      return (d.actives.find((s) => s.sprintId === d.pick) ?? d.actives[0])
-        .name;
-    if (d.planned.length > 0)
-      return (d.planned.find((s) => s.sprintId === d.pick) ?? d.planned[0])
-        .name;
-    return d.newName;
-  }
-
   /** 0110:「进 Backlog」——全部非终态成员显式回池,随完成同事务落库(旧行清理由 replaceMembership 承担)。 */
   async function doBacklogAll() {
     if (!disp || busy) return;
@@ -361,6 +324,34 @@ export default function SprintPage() {
     }
   }
 
+  const toggleCandidate = (itemId: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(itemId)) next.delete(itemId);
+      else next.add(itemId);
+      return next;
+    });
+  const pickDisp = (sprintId: string) => {
+    if (disp) setDisp({ ...disp, pick: sprintId });
+  };
+  const renameDisp = (newName: string) => {
+    if (disp) setDisp({ ...disp, newName });
+  };
+  const toggleRowDisp = (idx: number) => {
+    if (!disp) return;
+    const r = disp.rows[idx];
+    setDisp({
+      ...disp,
+      rows: disp.rows.toSpliced(idx, 1, { ...r, toBacklog: !r.toBacklog }),
+    });
+  };
+  const closeDisp = () => setDisp(null);
+  const confirmFlowConfirm = () => {
+    if (confirmFlow === "start") void doStart();
+    else if (confirmFlow === "reopen") void doReopen();
+    else void completeEmpty();
+  };
+
   // 页内错误态:未知 sprint id 等;给返回按钮,不依赖浏览器后退(用户反馈)
   if (gone) {
     return (
@@ -421,214 +412,38 @@ export default function SprintPage() {
               }
             />
           )}
-          <Dialog
+          <AddMembersDialog
             open={addOpen}
+            candidates={candidates}
+            selected={selected}
+            busy={busy}
+            onToggle={toggleCandidate}
             onClose={() => setAddOpen(false)}
-            maxWidth="sm"
-            fullWidth
-          >
-            <DialogTitle>拉入 item</DialogTitle>
-            <DialogContent dividers sx={{ maxHeight: 480 }}>
-              <List dense disablePadding>
-                {candidates.map((it) => (
-                  <ListItem key={it.itemId} dense disableGutters>
-                    <Checkbox
-                      size="small"
-                      checked={selected.has(it.itemId)}
-                      onChange={() =>
-                        setSelected((prev) => {
-                          const next = new Set(prev);
-                          if (next.has(it.itemId)) next.delete(it.itemId);
-                          else next.add(it.itemId);
-                          return next;
-                        })
-                      }
-                    />
-                    <ListItemText
-                      primary={`${it.number} · ${it.title}`}
-                      secondary={[
-                        it.status,
-                        it.assignee ? `👤 ${it.assignee}` : null,
-                      ]
-                        .filter(Boolean)
-                        .join(" · ")}
-                    />
-                  </ListItem>
-                ))}
-                {candidates.length === 0 && (
-                  <Typography variant="caption" color="text.secondary">
-                    项目里没有可拉入的非终态 item。
-                  </Typography>
-                )}
-              </List>
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={() => setAddOpen(false)}>取消</Button>
-              <Button
-                variant="contained"
-                onClick={applyMembership}
-                disabled={busy}
-              >
-                完成
-              </Button>
-            </DialogActions>
-          </Dialog>
-          <Dialog
-            open={confirmFlow !== null}
+            onApply={applyMembership}
+          />
+          <ConfirmFlowDialog
+            confirmFlow={confirmFlow}
+            groupId={id}
+            typeName={typeName}
+            sprint={sprint}
+            groups={groups}
+            items={items}
+            statuses={statuses}
             onClose={() => setConfirmFlow(null)}
-            maxWidth="xs"
-            fullWidth
-          >
-            <DialogTitle>
-              {confirmFlow === "start"
-                ? `开始 ${typeName ?? sprint.typeKey}`
-                : confirmFlow === "reopen"
-                  ? "重开组"
-                  : `完成 ${typeName ?? sprint.typeKey}`}
-            </DialogTitle>
-            <DialogContent>
-              <Typography>
-                {confirmFlow === "start"
-                  ? `项目已有进行中的 ${typeName ?? sprint.typeKey}「${groups.find((s) => s.typeKey === sprint.typeKey && s.status === "active" && s.sprintId !== id)?.name ?? ""}」,允许同时存在多个进行中。仍要开始本 ${typeName ?? sprint.typeKey}?`
-                  : confirmFlow === "reopen"
-                    ? t.sprintPage.reopenConfirm
-                    : `完成后,${(items ?? []).filter((it) => !(statuses.find((st) => st.name === it.status)?.statusType === "FINAL")).length} 个未完成 item 将进入处置(选定去向);已完成 item 保留在本页历史。`}
-              </Typography>
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={() => setConfirmFlow(null)}>取消</Button>
-              <Button
-                variant="contained"
-                onClick={
-                  confirmFlow === "start"
-                    ? doStart
-                    : confirmFlow === "reopen"
-                      ? doReopen
-                      : completeEmpty
-                }
-              >
-                {confirmFlow === "start"
-                  ? "仍要开始"
-                  : confirmFlow === "reopen"
-                    ? "确认重开"
-                    : "确认完成"}
-              </Button>
-            </DialogActions>
-          </Dialog>
+            onConfirm={confirmFlowConfirm}
+          />
           {/* 0106:非终态成员处置——目标组决策树 + 逐行覆写回 Backlog(D2/D3);0107 行内显式按钮 + 提交前摘要(方案A,消除 checkbox 误勾事故) */}
-          <Dialog open={disp !== null} maxWidth="sm" fullWidth>
-            <DialogTitle>
-              完成「{sprint?.name ?? ""}」——{disp?.rows.length ?? 0} 个未完成
-              item 待处置
-            </DialogTitle>
-            <DialogContent>
-              <Typography sx={{ mt: 1, mb: 1, fontWeight: 600 }}>
-                {targetLabel(disp)}
-              </Typography>
-              {disp && (disp.actives.length > 1 || disp.planned.length > 1) && (
-                <Stack spacing={1} sx={{ mb: 1 }}>
-                  {[...disp.actives, ...disp.planned].map((sp) => (
-                    <Button
-                      key={sp.sprintId}
-                      variant={
-                        disp.pick === sp.sprintId ? "contained" : "outlined"
-                      }
-                      onClick={() => setDisp({ ...disp, pick: sp.sprintId })}
-                    >
-                      {sp.name}
-                    </Button>
-                  ))}
-                </Stack>
-              )}
-              {disp &&
-                disp.actives.length === 0 &&
-                disp.planned.length === 0 && (
-                  <TextField
-                    label={t.board.newGroupName}
-                    value={disp.newName}
-                    onChange={(e) =>
-                      setDisp({ ...disp, newName: e.target.value })
-                    }
-                    fullWidth
-                    sx={{ mb: 1 }}
-                  />
-                )}
-              {disp?.rows.map((r, idx) => (
-                <Box
-                  key={r.itemId}
-                  sx={{ display: "flex", alignItems: "center", gap: 1 }}
-                >
-                  <Box
-                    sx={{
-                      flex: 1,
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      color: r.toBacklog ? "warning.dark" : "text.primary",
-                    }}
-                  >
-                    {r.title}
-                  </Box>
-                  {r.toBacklog && (
-                    <Typography
-                      variant="body2"
-                      color="warning.dark"
-                      fontWeight={600}
-                    >
-                      {t.sprintPage.dispRowMarked}
-                    </Typography>
-                  )}
-                  <Button
-                    size="small"
-                    variant={r.toBacklog ? "contained" : "text"}
-                    color={r.toBacklog ? "warning" : "inherit"}
-                    aria-label={`${r.toBacklog ? t.sprintPage.dispRowUndo : t.sprintPage.dispRowBacklog} ${r.title}`}
-                    onClick={() =>
-                      setDisp({
-                        ...disp,
-                        rows: disp.rows.toSpliced(idx, 1, {
-                          ...r,
-                          toBacklog: !r.toBacklog,
-                        }),
-                      })
-                    }
-                  >
-                    {r.toBacklog
-                      ? t.sprintPage.dispRowUndo
-                      : t.sprintPage.dispRowBacklog}
-                  </Button>
-                </Box>
-              ))}
-              {disp && disp.rows.length > 0 && (
-                <Typography
-                  variant="body2"
-                  sx={{ mt: 1 }}
-                  color={
-                    disp.rows.some((r) => r.toBacklog)
-                      ? "warning.dark"
-                      : "text.secondary"
-                  }
-                >
-                  {`${t.sprintPage.dispSummaryMove}「${targetGroupName(disp)}」 ${disp.rows.filter((r) => !r.toBacklog).length} ${t.sprintPage.dispSummaryBack} ${disp.rows.filter((r) => r.toBacklog).length} ${t.sprintPage.dispSummaryTail}`}
-                </Typography>
-              )}
-            </DialogContent>
-            <DialogActions>
-              {/* 0110:取消|进 Backlog|进「组名」三钮(用户拍板一次弹出) */}
-              <Button onClick={() => setDisp(null)} disabled={busy}>
-                "取消"
-              </Button>
-              <Button onClick={doBacklogAll} disabled={busy}>
-                {t.sprintPage.dispGoBacklog}
-              </Button>
-              <Button
-                variant="contained"
-                onClick={confirmDisposition}
-                disabled={busy}
-              >
-                {disp && `进「${targetGroupName(disp)}」`}
-              </Button>
-            </DialogActions>
-          </Dialog>
+          <DispositionDialog
+            disp={disp}
+            sprintName={sprint?.name ?? ""}
+            busy={busy}
+            onClose={closeDisp}
+            onPick={pickDisp}
+            onNewName={renameDisp}
+            onToggleRow={toggleRowDisp}
+            onBacklogAll={doBacklogAll}
+            onConfirm={confirmDisposition}
+          />
         </>
       )}
     </PageShell>

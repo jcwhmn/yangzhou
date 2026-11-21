@@ -39,3 +39,12 @@ export type Candidate = {
   status: string;
   assignee: string | null;
 };
+// 0106:组完成后的非终态成员处置(rows 默认全转入目标组,逐行可覆写回 Backlog;D2/D3)
+export type Disp = {
+  rows: { itemId: string; title: string; toBacklog: boolean }[];
+  actives: Sprint[];
+  planned: Sprint[];
+  typeName: string;
+  pick: string;
+  newName: string;
+};
