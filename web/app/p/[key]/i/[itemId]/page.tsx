@@ -9,7 +9,6 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  IconButton,
   Snackbar,
   Stack,
   Tab,
@@ -22,15 +21,11 @@ import { PageShell } from "@/components/PageShell";
 
 import { Dropdown } from "@/components/Dropdown";
 
-import DeleteIcon from "@mui/icons-material/Delete";
-
-import AddIcon from "@mui/icons-material/Add";
-
 import Link from "next/link";
 
 import { useParams, useRouter } from "next/navigation";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { api } from "@/lib/api";
 
@@ -39,12 +34,7 @@ import { resolveBack } from "@/lib/back";
 import { t } from "@/lib/texts";
 import { listSprints, sprintAction, assignSprint } from "@/lib/sprints";
 
-import {
-  SignalChip,
-  VerdictLine,
-  type Signal,
-  type Verdict,
-} from "@/components/Verdict";
+import { SignalChip } from "@/components/Verdict";
 
 import { AssignPopover } from "@/components/AssignPopover";
 
@@ -58,23 +48,30 @@ import {
   type Item,
   type SprintLite,
   type MilestoneLite,
-  type Repo,
   type Attribute,
   type Feasibility,
-  type CommitBlock,
   type Activity,
   type ReqRow,
   type AttrRow,
   type CommentDto,
   type Dep,
-  type ChecklistEntry,
   type Checklist,
   type TimeEntry,
   type SuggestedEntry,
   type SearchHit,
-  activityLabel,
   UUID_RE,
 } from "./types";
+
+import { RequirementsDialog } from "./components/RequirementsDialog";
+import { CommentsTab } from "./components/CommentsTab";
+import { ActivityTab } from "./components/ActivityTab";
+import { FeasibilityTab } from "./components/FeasibilityTab";
+import { RequirementsTab } from "./components/RequirementsTab";
+import { DependenciesTab } from "./components/DependenciesTab";
+import { TimeLogTab } from "./components/TimeLogTab";
+import { AttributesTab } from "./components/AttributesTab";
+import { GithubTab } from "./components/GithubTab";
+import { SubitemsBlock } from "./components/SubitemsBlock";
 
 export default function ItemDetailPage() {
   const { key, itemId: paramId } = useParams<{ key: string; itemId: string }>();
@@ -1399,17 +1396,3 @@ export default function ItemDetailPage() {
     </PageShell>
   );
 }
-
-import { AttrEditor } from "./components/AttrEditor";
-import { RequirementsDialog } from "./components/RequirementsDialog";
-import { CreateBranchDialog } from "./components/CreateBranchDialog";
-import { DependencyAddForm } from "./components/DependencyAddForm";
-import { SubitemsBlock } from "./components/SubitemsBlock";
-import { TimeLogTab } from "./components/TimeLogTab";
-import { AttributesTab } from "./components/AttributesTab";
-import { GithubTab } from "./components/GithubTab";
-import { RequirementsTab } from "./components/RequirementsTab";
-import { DependenciesTab } from "./components/DependenciesTab";
-import { CommentsTab } from "./components/CommentsTab";
-import { ActivityTab } from "./components/ActivityTab";
-import { FeasibilityTab } from "./components/FeasibilityTab";
