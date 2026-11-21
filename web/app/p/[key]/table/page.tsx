@@ -1,37 +1,14 @@
 "use client";
 
-import {
-  Box,
-  LinearProgress,
-  Button,
-  Chip,
-  InputAdornment,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TablePagination,
-  TableContainer,
-  TableHead,
-  TableRow,
-  TableSortLabel,
-  TextField,
-  Typography,
-} from "@mui/material";
+import { Button, LinearProgress, Stack, Typography } from "@mui/material";
 import { PageShell } from "@/components/PageShell";
 import TableFilterBar from "./components/TableFilterBar";
 import TableToolbar from "./components/TableToolbar";
 import ViewNameDialog from "./components/ViewNameDialog";
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { t } from "@/lib/texts";
-import { estimateText } from "@/lib/estimate";
 import {
   compareField,
   COLUMN_DEFS,
@@ -52,8 +29,7 @@ import {
   type Status,
   type ViewDto,
 } from "./shared";
-import { AssignPopover } from "@/components/AssignPopover";
-import SearchIcon from "@mui/icons-material/Search";
+import ItemsTable from "./components/ItemsTable";
 
 /** V10-S4 表格视图;YPJ-47 视图配置(spec 0045):筛选(客户端)+ 视图保存/切换 + 列配置 Popover(YPJ-28 合并)。 */
 export default function TableViewPage() {
@@ -447,162 +423,22 @@ export default function TableViewPage() {
       )}
       {items !== null && items.length > 0 && (
         <>
-          <TableContainer sx={{ maxHeight: "calc(100vh - 280px)" }}>
-            <Table size="small" stickyHeader>
-              <TableHead>
-                <TableRow>
-                  {visibleCols.map((c) => {
-                    const idx = sorts.findIndex((k) => k.field === c.id);
-                    return (
-                      <TableCell
-                        key={c.id}
-                        sortDirection={idx >= 0 ? sorts[idx].dir : false}
-                      >
-                        <TableSortLabel
-                          active={idx >= 0}
-                          title={t.view.sortHint}
-                          direction={idx >= 0 ? sorts[idx].dir : "asc"}
-                          onClick={(e) => toggleSort(c.id, e.shiftKey)}
-                          sx={{
-                            // MUI 默认非激活列 hover 才见箭头,可发现性差;常显(半透明,激活实色)
-                            ".MuiTableSortLabel-icon": { opacity: 0.3 },
-                            "&:hover .MuiTableSortLabel-icon": { opacity: 0.6 },
-                            "&.Mui-active .MuiTableSortLabel-icon": {
-                              opacity: 1,
-                            },
-                          }}
-                        >
-                          {c.label}
-                          {sorts.length > 1 && idx >= 0 && (
-                            <Typography
-                              component="span"
-                              variant="caption"
-                              sx={{ ml: 0.5, opacity: 0.6 }}
-                            >
-                              {idx + 1}
-                            </Typography>
-                          )}
-                        </TableSortLabel>
-                      </TableCell>
-                    );
-                  })}
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {paged.map((it) => (
-                  <TableRow key={it.itemId} hover>
-                    {visibleCols.map((c) => (
-                      <TableCell key={c.id}>
-                        {c.id === "number" ? (
-                          <Link href={`/p/${key}/i/${it.itemId}?from=table`}>
-                            <Typography
-                              variant="body2"
-                              sx={{ whiteSpace: "nowrap" }}
-                            >
-                              {(it.parentNumber
-                                ? it.parentNumber + " › "
-                                : "") + it.number}
-                            </Typography>
-                          </Link>
-                        ) : c.id === "title" ? (
-                          <Link href={`/p/${key}/i/${it.itemId}?from=table`}>
-                            <Typography variant="body2">{it.title}</Typography>
-                          </Link>
-                        ) : c.id === "status" ? (
-                          it.status
-                        ) : c.id === "priority" ? (
-                          (it.priority ?? "")
-                        ) : c.id === "estimate" ? (
-                          estimateText(it.estimateValue, it.estimateUnit)
-                        ) : c.id === "timesheet" ? (
-                          it.totalMinutes > 0 ? (
-                            t.time.fmt(it.totalMinutes)
-                          ) : (
-                            "—"
-                          )
-                        ) : c.id === "assignee" ? (
-                          <AssignPopover
-                            itemId={it.itemId}
-                            assignee={it.assignee}
-                            onChanged={load}
-                          >
-                            {(onClick) => (
-                              <Chip
-                                size="small"
-                                variant="outlined"
-                                label={
-                                  it.assignee
-                                    ? `👤 ${it.assignee}`
-                                    : t.assign.none
-                                }
-                                onClick={onClick}
-                                sx={it.assignee ? undefined : { opacity: 0.55 }}
-                              />
-                            )}
-                          </AssignPopover>
-                        ) : c.id === "startDate" ? (
-                          (it.startDate ?? "")
-                        ) : c.id === "dueDate" ? (
-                          <span
-                            style={{
-                              color: it.overdue
-                                ? "red"
-                                : it.dueSoon
-                                  ? "orange"
-                                  : "inherit",
-                            }}
-                          >
-                            {it.dueDate ?? ""}
-                          </span>
-                        ) : c.id === "overdue" ? (
-                          it.overdue ? (
-                            "是"
-                          ) : (
-                            "否"
-                          )
-                        ) : c.id === "feasSignal" ? (
-                          it.feasSignal ? (
-                            t.signal[it.feasSignal]
-                          ) : (
-                            ""
-                          )
-                        ) : c.id === "sprint" ? (
-                          (it.sprintName ?? (
-                            <Typography variant="body2" sx={{ opacity: 0.5 }}>
-                              {t.view.backlog}
-                            </Typography>
-                          ))
-                        ) : c.id === "blocked" ? (
-                          it.blocked ? (
-                            "⛔"
-                          ) : (
-                            ""
-                          )
-                        ) : (
-                          ""
-                        )}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-          <TablePagination
-            rowsPerPageOptions={PAGE_SIZES}
+          <ItemsTable
+            visibleCols={visibleCols}
+            paged={paged}
+            sorts={sorts}
+            onToggleSort={toggleSort}
+            projectKey={key}
+            onAssigneeChanged={load}
             count={sorted.length}
             page={safePage}
-            onPageChange={(_, p) => setPage(p)}
+            onPageChange={setPage}
             rowsPerPage={rowsPerPage}
             onRowsPerPageChange={(e) => {
               setRowsPerPage(Number(e.target.value));
               setPage(0);
               localStorage.setItem("yz-table-page-size", e.target.value);
             }}
-            labelRowsPerPage={t.view.perPage}
-            labelDisplayedRows={({ from, to, count }) =>
-              `${from}-${to} / ${count}`
-            }
           />
         </>
       )}
