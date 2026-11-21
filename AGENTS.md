@@ -1,140 +1,80 @@
-# yangzhou — 仓库指南(给 agent)
+# yangzhou — 仓库宪法(给 agent)
 
-开源项目管理系统。核心:**匹配引擎**(Requirement × Capability → 单人输出可行性/技能差距,团队输出分配建议)。API-first:CLI 与 Web 都是 OpenAPI 契约的瘦客户端。栈:Kotlin + Spring Boot 4 / Postgres + JSONB / Next.js + MUI + TS / AGPL-3.0。
+> 本文件 = 宪法 + 按需加载索引。操作细节按 §真相源 触发读专项文档(`docs/agent/`);规则分级:§硬约束(MUST,违反=事故)> §原则(默认,例外需理由)> 专项文档(参考,按需查)。
 
-## 真相源(动笔前按触发条件读)
+## 项目
 
-- **命名实体或写用户可见文案前** → 词汇表 `D:\obsidian\projects\yangzhou\CONTEXT.md`(**Item** 不是 Task;Workspace/Project/Team/Member/Attribute/**Requirement**/**Capability**)
-- **实现引擎、实体关系或输出形态前** → `D:\obsidian\projects\yangzhou\DOMAIN.md`(判定 5 形态、绿黄红聚合规则、领域规则 6 条)
-- **实现某张票时** → YPJ item(票自带验收清单;版本 spec 对应 `docs/spec/00NN`;历史 Linear 票号 JCW-* 仅作 spec 内引用锚点,Linear 已冻结只读)
-- **做 ItemGroup/视图/导航类功能前** → `docs/requirement/ItemGroup PRD.md`(§28.2 Phase 划分;原 requirement.md 随笔已迁 Obsidian Thoughts.md)
-- **做甘特图功能前** → `docs/requirement/甘特图 SRS.md`(v4 开发基线;渲染真值表/包络/排序/徽标/互算全分支)
-- **动 schema 或架构前** → `docs/adr/`(0001 三层容器 / 0002 Item 同质树 / 0003 统一属性 / 0004 monorepo 与工具链)
-- **写调研/对标类文档前** → 放 `D:\obsidian\projects\yangzhou\`(Obsidian vault),repo 不存(2026-10-14 定;plane_functions/Metrics Chart 已迁出)
-- **需求类文档一律 SRS 格式**(2026-11-21 定,甘特图 SRS v4 起):目的与范围/术语/数据语义/分支真值表/验收标准/开放决策清单,单一真相源不与旧格式并存;已拍板项并入正文,开放项集中清单,不得伪装成已定
+开源项目管理系统。核心:**匹配引擎**(Requirement × Capability → 单人输出可行性/技能差距,团队输出分配建议)。API-first:CLI 与 Web 都是 OpenAPI 契约的瘦客户端。栈:Kotlin + Spring Boot 4 / Postgres + JSONB / Next.js + MUI + TS / AGPL-3.0。main 干线开发,原型留 `prototype/*`;每张功能票 = 一个 YPJ item(dogfood)。
 
 ## 布局(ADR-0004)
 
 ```
 backend/   Gradle 多模块:domain(纯 Kotlin,零 Spring)· api(REST 薄层)· persistence(Postgres)· cli(fat-jar)
 web/       Next.js + MUI + TS,瘦客户端
-docs/      adr/ · spec/ · architecture/(puml 类图) · requirement/(PRD) · planning/
+docs/      adr/ · spec/ · architecture/ · requirement/ · planning/ · agent/ · testing/
 ```
 
-## 领域硬规则
+## 真相源(动笔前按触发条件读)
 
-- `domain` 零 Spring/DB 依赖——引擎是纯函数,从 prototype 抬来(分支 `prototype/matching-engine-output`)。注意:这是独立 Gradle 模块,与 chess 单体应用"禁止 domain 包"的约定不同,属有意为之(ADR-0002/0003 的物理形态)。
-- 角色永不进匹配输入(ADR-0003);等级刻度 1–4;presence 需求为默认,min-level 只用于关键路径。
-- 用户可见文案中文优先,文案外置。
+**领域与需求:**
 
-## 类图
+- **命名实体或写用户可见文案前** → 词汇表 `D:\obsidian\projects\yangzhou\CONTEXT.md`(**Item** 不是 Task;Workspace/Project/Team/Member/Attribute/**Requirement**/**Capability**)
+- **实现引擎、实体关系或输出形态前** → `D:\obsidian\projects\yangzhou\DOMAIN.md`(判定 5 形态、绿黄红聚合规则、领域规则 6 条)
+- **实现某张票时** → YPJ item(票自带验收清单;spec 对应 `docs/spec/00NN`)
+- **做 ItemGroup/视图/导航类功能前** → `docs/requirement/ItemGroup PRD.md`(§28.2 Phase 划分)
+- **做甘特图功能前** → `docs/requirement/甘特图 SRS.md`(v4 开发基线;渲染真值表/包络/排序/徽标/互算全分支)
+- **动 schema 或架构前** → `docs/adr/`(0001 三层容器 / 0002 Item 同质树 / 0003 统一属性 / 0004 monorepo 与工具链)
+- **写调研/对标类文档前** → 放 `D:\obsidian\projects\yangzhou\`(Obsidian vault),repo 不存(2026-10-14 定)
+- **需求类文档一律 SRS 格式**(2026-11-21 定,甘特图 SRS v4 起):目的与范围/术语/数据语义/分支真值表/验收标准/开放决策清单,单一真相源不与旧格式并存
 
-- 领域类图 = PlantUML 源码 `docs/architecture/domain.puml`(引擎模型)。**改 `backend/domain` 的实体或引擎签名后必须同步更新它**。
-- 实体概念图 = `docs/architecture/entities.puml`(persistence/schema,只画领域字段,parentId 反转为父侧 children)。**改 Flyway schema 后必须同步更新它**。
-- 两图真相源都是代码/表结构,图是缓存;不同步即过期。**顶部一律加 `hide empty members`**。不提交生成图片;用 VSCode PlantUML 插件或 plantuml.com 渲染预览。
+**流程与操作(docs/agent/,按触发必读):**
 
-## 过程(chess 实战约定平移)
+- **开票/推进状态/指派/排期/分支/PR/合并/sprint 收口前** → `docs/agent/workflow.md`
+- **写 spec/设计/实现/交付/验收/诊断前** → `docs/agent/development.md`
+- **写或跑任何测试(单元/集成/E2E/api.http)或手工验收前** → `docs/agent/testing.md`;写/改后端测试、新建迁移、动 AbstractApiTest、跑 gradle 验证另必读 skill `.agents/skills/backend-testing/SKILL.md`
+- **起停容器/查端口/动数据库/杀进程/CLI 中文乱码** → `docs/agent/environment.md`
+- **测试红/bug/异常行为,处理前** → `docs/agent/troubleshooting.md`(处理后必记台账)
 
-- 票即计划:实现前读 YPJ 票 + spec 对应故事,不凭记忆。
-- 切票边界自查(结论 ≤2 行):本票收尾干净?下一步依赖本会话推理?handoff 会不会复述 AGENTS/Linear 已有内容?→ clear / compact / handoff 三选一,自包含默认 clear。
-- sprint 收口(全部票 Done)时,主动提醒用户做 handoff(由用户执行)。
-- 外科手术式改动,不顺手重构无关代码。
-- 格式化走工具链(YPJ-121):backend `gradle ktlintFormat`、web `npm run format`;CI 有 format check,格式不对 build 红。行尾纪律真相源 = `.gitattributes`(默认 LF,ps1/bat/cmd CRLF)。
-- 最简可行实现,不加投机抽象。
-- 非平凡行为变更必须带测试。
-- 声称完成前跑通相关验证;后端以 `./gradlew build` + `./gradlew integrationTest` 绿 + bootRun 能启动为准(临时端口验证,起后即停;integrationTest 需 Docker,CI 兕底 nightly)。
-- 大输出/多命令优先 context-mode 批处理工具,Bash 仅琐碎命令。
-- `api` 模块:业务垂直切片收敛 `yangzhou.api.business.<slice>`(project / item / attribute / …,实体+DTO+service+controller 同包);非业务归位 `config`(装配)/ `security` / `general` / `error`(ADR-0007)。
+## 架构与领域硬约束(MUST)
 
-## Issue 工作流(PR 模式;票在 YPJ 项目,2026-10-06 起 Linear 冻结只读)
-
-1. 开工:`git checkout main && git pull --ff-only`(分支经 yz 创建,见下);同时 `yz assign YPJ-{N} me && yz items move YPJ-{N} "In Progress"`(开工须有主,未 assign 会被 move 409 拒);开工票**必须挂当前 sprint**(`yz items assign YPJ-{N} <当前sprint>`;立票可不挂留 backlog,但开工动作必须含挂 sprint——不允许悬空票:sprint 过程零痕迹=回顾漏计,YPJ-174 裸闭案例,2026-11-13 用户定,废除 10-24「不自动挂」口径);**分支经 yz 创建并关联 item**(2026-10-12 定,YPJ-27 起 CLI 直建:`yz items branch YPJ-{N} <type>/YPJ-{N}[-依赖票号][-英文slug] --base main`,命名=spec 0036 v2(`cwjiang/` 前缀规则已废弃,2026-10-16 用户纠正);`yz log` 依赖该关联;本地对应 `git fetch && git switch` 跟踪远端新分支)
-2. 实现带测试,跑全相关验证
-3. PR:`gh pr create --base main --title "YPJ-{N}: ..."`;开出后 `yz items move YPJ-{N} "In Review"`
-4. **停**,等用户审阅合并
-5. 合并后同回合完成:`git checkout main && git pull --ff-only` → 删远程分支(`git push origin --delete <branch>`;**本地分支永久保留不删**,2026-11-01 定,过程考古走 `git log <本地分支>`;`gh pr merge --delete-branch` 连本地一起删,**禁用**;GitHub 侧 refs/pull/N/head 仍可回溯,YPJ-69)→ **YPJ 移 Done**(`yz items move YPJ-{N} "Done"`,非可选)→ 扫父 item:子票全 Done 则父票 Done,否则 In Progress。PR 已合而 item 停在 In Progress = 流程破损态。
-
-## Kotlin 风格
-
-- 尽量 `val`;实体/DTO 用不可变 data class
-- 更新用 `copy(...)` + save,用返回实例
-- 小切片的 DTO/请求/响应放同一文件,吵了再拆
-
-## 命名分层
-
-- **domain**(引擎模型)与 **persistence**(DB 行)共用裸名(Item/Member/Capability/Requirement/…),包即命名空间;同文件两用时用 import 别名(`import yangzhou.domain.Item as DomainItem`)
-- API 线型(wire)一律语义后缀(`XxxRequest` / `XxxResponse`),不复用裸名——裸名永无三义
-
-## 持久层(ADR-0004;chess 实战约定平移)
-
-- **永不用 JDBC client(JdbcTemplate/JdbcOperations)**——跨表/投影/批量/级联一律 repository `@Query`/`@Modifying`(Repositories.kt,ADR-0004 唯一授权扩展点;2026-10-17 定)
+- `domain` 零 Spring/DB 依赖——引擎是纯函数(独立 Gradle 模块,与 chess 单体「禁止 domain 包」约定不同,属有意为之,ADR-0002/0003 的物理形态)
+- 角色永不进匹配输入(ADR-0003);等级刻度 1–4;presence 需求为默认,min-level 只用于关键路径
+- 用户可见文案中文优先,文案外置
+- **永不用 JDBC client**(JdbcTemplate/JdbcOperations)——跨表/投影/批量/级联一律 repository `@Query`/`@Modifying`(Repositories.kt,ADR-0004 唯一授权扩展点)
 - Spring Data JDBC + Flyway;禁 JPA/Hibernate/Exposed/BaseEntity 继承
-- 实体主构造直接声明 `id` / `objectId` / `createdAt` / `updatedAt`;`objectId` 在 Kotlin 生成
-- 对外只暴露公共 ID(`projectId` / `itemId`),永不暴露内部数字 id;FK 用 `object_id` UUID 列
+- 实体主构造直接声明 `id`/`objectId`/`createdAt`/`updatedAt`;`objectId` 在 Kotlin 生成
+- 对外只暴露公共 ID(`projectId`/`itemId`),永不暴露内部数字 id;FK 用 `object_id` UUID 列
 - migration 用 SQL identity + 命名约束;枚举 = Kotlin enum + VARCHAR + CHECK 约束
-- **基础设施两分法(2026-10-24 拍板,废除旧「不建项目本地 compose」约定)**:**postgres = 外部共享实例**(提供方 `F:/code/docker-compose/postgresql`,localhost:5432 不变,库 `yangzhou`/`yangzhou_test`)——多项目共用,**不在本项目 compose 定义**;**项目独用服务**(rustfs,及后续 redis/prometheus/grafana)定义进 `infra/compose/docker-compose.yaml`,起停用 `script/dev-infra.ps1`(up/down/status,postgres 不归它管);测试库 `yangzhou_test`
+- 改 `backend/domain` 实体/引擎签名 → 同步 `docs/architecture/domain.puml`;改 Flyway schema → 同步 `entities.puml`(只画领域字段,parentId 反转为父侧 children);两图顶部一律 `hide empty members`,不提交生成图片
 
-## 测试
+## 代码与契约(MUST)
 
-写/改后端测试、新建迁移、动 AbstractApiTest、跑 gradle 验证 → **先读 skill `.agents/skills/backend-testing/SKILL.md`**(双轨/单元与集成边界/新表同步 cleanDatabase 清单/需求矩阵/Clock 注入/跑法)。速记硬规则:**单元 `src/test` 与集成 `src/integrationTest` 物理二分(YPJ-100/spec 0078),目录即边界**;唯一 seam = REST API 黑盒,集成必须 extends `AbstractApiTest`;CI 只跑单元,集成 merge 前本人本地 `gradle integrationTest`(nightly 兜底);`gradle build` 不跑集成(已与 check 解耦)。
-
-## 手工测试用例(落档维护)
-
-除一眼可见的冒烟验证,**每个任务(票)的手工测试用例必须落档到 `docs/testing/manual-test-cases.md` 并维护**(2026-11-20 定,YPJ-244 验收复盘):开工时立节,交付用户时给勾选清单,验收逐条勾(`[ ]`未验/`[x]`过/`[!]`红未解,红例记台账),As-built 同步结果;历史用例不删留作回归。环境 dev 3001;验收前先确认 dev 容器跑的是含目标票代码的镜像(容器 Image sha 对比 `docker images` 最新,曾实锤旧镜像导致误报)。
-
-## E2E(web/;Playwright,并行按用例隔离)
-
-- 后端跑 **test 容器**(库 yangzhou_test):`script/app-infra.ps1 up test`(api http://localhost:8082);调试改码可换 bootRun test profile,须 `--server.port=8082`;前端由 webServer 拉起 prod server(`next build && next start`,独立构建目录 .next-e2e,不踩日常 dev 的 .next);凭证与地址在 `web/e2e/.env`(模板 `.env.example`),不硬编码不提交。
-- 标准全量跑法(web/ 下):`E2E_FRONT_PORT=3002 E2E_BASE_URL=http://localhost:3002 E2E_API_URL=http://127.0.0.1:8082 BACKEND_URL=http://127.0.0.1:8082 npx playwright test`;globalSetup 自带**清测试库**(残渣 flake 解法;Fast Refresh 类由 prod server 根除,spec 0021 As-built),勿绕过;BACKEND_URL 必须 8082(test 容器;指 8080 会打 prod 容器、污染 PM 库);手动清库 `npm run db:reset`
-- CI e2e.yml 只跑 **@smoke 冒烟**(`npx playwright test --grep "@smoke"`;grep 不作用于依赖项目,auth 3 例全跑提供登录前提,实跑 ~12 例);完整套件 = merge 前本地全量,跑法不变(spec 0015)
-- 用例按模块分文件(一个功能域一个 `*.spec.ts`),`fullyParallel`;每用例经 fixture 独享唯一 key 项目(API 预置),**不依赖其它用例留下的状态,可单跑**。
-- 用例内只对被测行为走 UI;数据准备走 API helpers(`e2e/support/helpers.ts`)。MUI 对话框淡出期(~200ms)会吞下层点击,断言/点下层前先 `expect(dialog).toBeHidden()`。
-
-## 错误与契约
-
+- 尽量 `val`;实体/DTO 用不可变 data class;更新用 `copy(...)` + save,用返回实例
+- 命名分层:domain 与 persistence 共用裸名(包即命名空间,同文件两用时 import 别名);API 线型一律语义后缀(`XxxRequest`/`XxxResponse`),裸名永无三义
+- `api` 模块业务垂直切片收敛 `yangzhou.api.business.<slice>`(project / item / attribute / …,实体+DTO+service+controller 同包);非业务归位 `config`(装配)/ `security` / `general` / `error`(ADR-0007)
 - service fail-fast 抛业务异常;HTTP 映射集中 GlobalExceptionHandler;统一错误形状(code/message/path/可选 fields);请求校验用 Bean Validation
-- OpenAPI + Scalar(不用 Swagger UI/Knife4j);注解最少(controller @Tag + 偶尔摘要),字段级只在生成文档误导时补
-- 改 REST API(新增/改参数/删端点)必须同步手测脚本 `backend/script/api.http`:新端点按序号入对应区块,约束类行为补进末尾「负例区」,变量靠响应 handler 回填
-- Controller 统一格式:类级 `@RequestMapping("/api")` 只扛 API 前缀(未来 /api/v1 一次替换),资源段(/projects、/items…)全在方法级
-- 日志:默认 SLF4J/Logback,YAML 配级别;不加 MDC/关联 ID/自定义 logback 除非新决策
-- 不加 mapstruct;slice 内手写小 mapper
+- OpenAPI + Scalar(不用 Swagger UI/Knife4j);Controller 类级 `@RequestMapping("/api")` 只扛 API 前缀,资源段全在方法级
+- **改 REST API(新增/改参数/删端点)必须同步手测脚本 `backend/script/api.http`**
+- 不加 mapstruct,slice 内手写小 mapper;日志默认 SLF4J/Logback,YAML 配级别,不加 MDC/关联 ID/自定义 logback 除非新决策
 
-## 构建与运行
+## 开发与交付原则(默认,细则见 `docs/agent/development.md`)
 
-- JDK 25(LTS)。后端在 `backend/`:`gradle build`(单元测试,不含集成)/ `gradle integrationTest`(集成,需 Docker)/ `gradle :domain:run`(引擎 Demo,输出与 prototype S1–S7 可比对)。
-- `./gradlew` 同效;首次需下载发行包,国内网络慢属已知,用本地 gradle 即可。
-- CI(GitHub Actions):`backend.yml` 跑 `gradle test`(纯单元,免 Docker;spec 0014);`nightly.yml` 每日全量兜底(含集成,红了必修);`e2e.yml` web/backend 变更起 bootRun + Playwright 整跑 E2E
-- 本机开发库:`yangzhou`/`yangzhou_dev`/`yangzhou_test`(外部共享 postgres,已建)。**三 profile 常驻容器化**(YPJ-118,spec 0087):`script/app-infra.ps1 <build|rebuild|up|down|status> <prod|dev|test>`——prod=web3000+api8080 / dev=web3001+api8081 / test=api8082(仅 api,E2E 用);镜像 2 个(api/web),build 先宿主 `bootJar` 再 docker build。rustfs 起停仍 `script/dev-infra.ps1`。调试改码走 IDE/gradle bootRun,但 test profile 须 `--server.port=8082` 且 test 容器已停(8080/8081 归容器)。
-- **不要猜前端或后端是否已运行,需要运行环境的,告知需要的运行环境,命令,从我这里确认**。
-- **三 profile 与端口格局**(2026-10-30 重排,YPJ-118 容器化):**3000(web)+8080 = prod / PM 日常**(default profile,库 `yangzhou`,dogfood 项目 YPJ,真实数据);**3001(web)+8081 = dev**(dev profile,库 `yangzhou_dev`,**仅手工 UI 测试**:含准真实数据,禁止自动清库,自动化测试不得指 dev;空库首启用 `POST /api/auth/bootstrap` 引导);**8082 = test**(test profile,库 `yangzhou_test`,**唯一自动化主场——e2e 与 api.http 都只在这里跑**,globalSetup 会清库属预期;无前端,E2E 前端由 Playwright 拉起;2026-11-08 用户拍板)。常驻起停 `script/app-infra.ps1 <build|rebuild|up|down|status> <prod|dev|test>`;CLI `yz` 的 session(`~/.yangzhou/session.json`)指向谁就写谁的库——动 PM 数据前确认 server 指向 prod(api 8080)。
-- PM 实例部署形态(已拍板):本机常驻即可;Postgres 备份手工期(`pg_dump`),自动化另票。
-- **⚠ 前端命令必须在 `web/` 目录下执行**:`cd /d/code/yangzhou/web && npx next build` / `npm run dev` / `npx playwright test` 等。agent 的 shell CWD 每次重置到 repo 根,漏 cd 会在错误目录跑命令导致 `.next` 污染或路径找不到。
+- 票即计划;无 spec 不开工;外科手术式改动,不顺手重构无关代码
+- 最简可行实现,不加投机抽象;非平凡行为变更必须带测试
+- 格式化走工具链(backend `gradle ktlintFormat`、web `npm run format`;CI 有 format check)
+- 声称完成前跑通相关验证(后端 = `gradle build` + `integrationTest` 绿 + bootRun 能启动);**agent 本地验证 ≠ 用户环境验收**——功能+测试代码写完即停,等用户 build/debug,过了再 PR
+- **架构破坏必须显要标注**:凡偏离 ADR/既定架构处,在 spec/PR/报告中专节置顶 + 加粗,不得混在设计细节里带过(2026-10-17 定)
+- 每验证绿点就地 commit(消息带票号);PR squash 进 main,本地分支永久保留不删
 
-## 进程管理(本机实操)
+## 环境红线(MUST,细则见 `docs/agent/environment.md`)
 
-- **严禁 `taskkill /IM node.exe`**——pi 本体就是 node 进程,按进程名杀会自杀;也慎杀全部 java.exe(gradle daemon 可杀,但用完再起更省)。停开发服务一律**按端口找 PID**:`netstat -ano | findstr :3000` → `taskkill /PID <pid> /F`。
-- context-mode 批处理工具实际跑 PowerShell——`&&`、`find`、`/dev/null` 语法会挂;简单命令直接用 Bash。
-- headroom 压缩开启时:被压缩的读取输出不可当编辑锚点(原文会被搅坏);大文件读改一律 python 原地处理。
-- CLI/脚本中文输出在 PowerShell 显示乱码(UTF-8 被按 GBK 解码):先 `chcp 65001` 或改用 Git Bash。
-- **api.http/测试环境纪律(2026-11-08 拍板,0113 三轮复盘,详见 docs/planning/2026-11-08-apihttp-0113-复盘.md)**:api.http 与 e2e 等自动化只在 test(8082)跑;dev 只做手工 UI 测试,含准真实数据,禁自动清、禁自动化指 dev。api.http 新增节必须自含(节内自建前置,变量后缀隔离)或文件头声明整文件按序跑;交付用户前先脚本逐请求复刻全绿。用户报错先确认「哪个入口/环境/有无新产物」再归因;e2e 归因纪律(2026-11-08 升格,元因见复盘文档):红例必须**读 trace + 查库实锤**后才许下结论——单跑绿不能当「漂移」证据(负载型问题单跑永远复现不了),error-context 的 DOM 快照可能是陈旧帧;**flake 桶只作记录不作结案**,条目带复现计数,同用例跨会话累计第 3 次红即强制 root-cause(project-settings 覆盖竞态在桶里躺了多届、YPJ-147 board-membership 同案,均为真 bug)。
+- 三 profile:**3000(web)+8080 = prod/PM 真实数据 · 3001(web)+8081 = dev 仅手工测试、禁自动化 · 8082 = test 唯一自动化主场(库 `yangzhou_test`)**
+- e2e/api.http 等自动化**只打 8082**;动 PM 数据前确认 yz session 指 prod(api 8080)
+- **不要猜前端或后端是否已运行**——需要运行环境的,告知所需环境、命令,向用户确认
+- 前端命令必须在 `web/` 目录下执行;停服务按端口找 PID,**严禁 `taskkill /IM node.exe`**
+- context-mode 批处理实跑 PowerShell(`&&`、`find`、`/dev/null` 会挂;简单命令直接 Bash)
 
-## 工作流
+## 验收纪律(MUST,七规全文见 `docs/agent/development.md` §诊断交付七规)
 
-- **票卡排期纪律(2026-11-17 定,用户拍板)**:① 每个新 item 建票必带预估时长(estimateValue+estimateUnit);② item 进 sprint(backlog 拉入或建票直挂)必设预计开始时间,结束时间 = 开始 + 预估工作时长换算(DATE 粒度:不足一天=当天,跨天进一);③ 这是 dogfood 流程纪律兼未来系统强约束的先行版(甘特计划线需要,PRD 见 docs/requirement/甘特图 PRD.md R2);④ CLI 缺口(建票 --estimate、items 排期命令)见 YPJ-207,补齐前用 API 直调设置,不得留空。
-
-main 干线开发;原型留 `prototype/*` 分支;每张票 = 一个 YPJ item(dogfood),验收清单全绿才关票。
-
-- **架构破坏必须显要标注**:凡偏离 ADR/既定架构处,在 spec/PR/报告中专节置顶 + 加粗,不得混在设计细节里带过(2026-10-17 定;起因:0046/0048 的 jdbc client 用法埋在细节未标破坏)
-- **spec 文件是版本必须项**:开工前立 `docs/spec/00NN-YPJ-MMM-slug.md`(增量节,概要设计;**文件名必带 item code**,一票多 spec 时主票号+关联票号,2026-11-13 定;此前的 `00NN-vNN-slug` 旧名不追溯),完工后补 As-built;无 spec 不开工(2026-10-08 定,V16 系补录见 0013)。Linear 已冻结只读(历史存档),不再开新票。
-- **每票实现前三件套**(2026-10-09 立):spec 增量节含 ①需求(写细,含范围/非目标)②详细设计(代码级修改计划:改哪些文件、怎么改、否决的备选)③手工测试用例(供用户 build/debug 阶段执行);用户过目后才编码。**凡涉前端设计,②必须附「操作流程(状态×动作真值表)+ 页面示意图(ASCII,贴合实况)」**(2026-11-09 定,自 YPJ-164/spec 0115 起)。
-- **编码完成后停**:功能代码+测试代码写完即停,等用户 build/debug,通过后再 PR。
-- **问题必记台账(2026-11-13 定,YPJ-172 会话)**:凡遇到问题(测试红、bug、异常行为),无论大小,处理后必须记入 `docs/planning/问题处理记录.md`:症状、root cause(实锤才准写「根因」,未实锤标假设)、修复方法、预防,各一句;与 e2e 归因纪律衔接——实锤前只进「flake 桶」作记录。
-- **过程档案(2026-11-01 立,YPJ-131 复盘)**:每个验证绿点就地 commit(消息带票号+绿点说明),不攒「一票一提交」;PR squash 不变——main 干线干净、本地分支留全程细粒度历史;handoff 换届将 `CURRENT.md` 挪 `.scratch/handoff/archive/YYYY-MM-DD-YPJ-N.md`,不覆盖。
-- **诊断交付七规(2026-11-01 立,YPJ-131 复盘,P0+P1,违反=流程事故)**:
-  1. 验收 = **用户主路径**测试绿,不是实现路径绿;测试先按用户实际操作路径写。
-  2. 用户报 N 个症状,交付前逐条标注「已解释/已修复/仍开放」,禁止打包「都修好了」。
-  3. 归因必须实锤(查库/直调 API);未实锤的归因标「假设」,禁入「勿走回头路」与 handoff 结论。
-  4. 每个结论先设计反证探针——明确「什么证据能推翻它」,证实与证伪都做。
-  5. UI 双路径/状态相关行为(保存/另存、点击语义)必须写「状态×动作→行为」真值表进 spec;结果级描述不算设计完成。
-  6. 品味型交互(两可设计如点击语义)动工前摆两方案给用户拍板或给可点原型,agent 不代选。
-  7. 交用户复验前,agent 先做最小数据探针(查库/直调确认写入已发生);「测试绿」≠「数据落了」。
+- 验收 = **用户主路径**测试绿;归因必须实锤(查库/直调),未实锤只标假设
+- 品味型两可设计动工前摆方案给用户拍板,不代选;交用户复验前先做最小数据探针
