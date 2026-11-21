@@ -17,7 +17,6 @@ import {
   EMPTY_FILTERS,
   matches,
   normalizeOrder,
-  PAGE_SIZES,
   readPageSize,
   readQuery,
   readSelectedView,
