@@ -4,13 +4,9 @@ import {
   Alert,
   Box,
   Button,
-  Card,
-  CardContent,
-  Chip,
   Dialog,
   DialogContent,
   DialogTitle,
-  IconButton,
   Skeleton,
   Stack,
   TextField,
@@ -19,15 +15,12 @@ import {
 import { Dropdown } from "@/components/Dropdown";
 import BoardHeader from "./components/BoardHeader";
 import FilterChips from "./components/FilterChips";
-import UndoOutlined from "@mui/icons-material/UndoOutlined";
-import { DialogActions, Tooltip } from "@mui/material";
-import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
-import { fmtDate } from "@/lib/dates";
+import BoardColumn from "./components/BoardColumn";
+import { DialogActions } from "@mui/material";
+import { useParams } from "next/navigation";
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { t } from "@/lib/texts";
-import { estimateText } from "@/lib/estimate";
 import {
   sprintAction,
   createSprint,
@@ -35,13 +28,11 @@ import {
   syncCurrentParent,
 } from "@/lib/sprints";
 import useBoardData from "./hooks/useBoardData";
-import { AssignPopover } from "@/components/AssignPopover";
 import PullDialog from "./components/PullDialog";
 import type { Filter, Item, SprintLite, Status } from "./types";
 
 export default function BoardPage() {
   const { key } = useParams<{ key: string }>();
-  const router = useRouter();
   const {
     statuses,
     items,
@@ -72,13 +63,6 @@ export default function BoardPage() {
   );
   const [launchPick, setLaunchPick] = useState("");
   const [launchName, setLaunchName] = useState("");
-
-  async function setBoardItem(itemId: string, on: boolean) {
-    await api(`/api/items/${itemId}/board-membership`, {
-      method: "PUT",
-      body: JSON.stringify({ onBoard: on }),
-    });
-  }
 
   async function addItem(e: React.FormEvent) {
     e.preventDefault();
@@ -375,8 +359,11 @@ export default function BoardPage() {
           {statuses.map((s) => {
             const list = byStatusName.get(s.name) ?? [];
             return (
-              <Box
+              <BoardColumn
                 key={s.statusId}
+                status={s}
+                list={list}
+                dragOver={dragOver}
                 onDragOver={(e) => {
                   e.preventDefault();
                   setDragOver(s.statusId);
@@ -390,219 +377,14 @@ export default function BoardPage() {
                   const itemId = e.dataTransfer.getData("text/plain");
                   if (itemId) moveTo(itemId, s);
                 }}
-                sx={{
-                  minWidth: 280,
-                  minHeight: 300,
-                  p: 1,
-                  borderRadius: 2,
-                  bgcolor:
-                    dragOver === s.statusId
-                      ? "action.hover"
-                      : "background.default",
-                  border: "1px dashed",
-                  borderColor:
-                    dragOver === s.statusId ? "primary.main" : "divider",
-                }}
-              >
-                <Typography variant="subtitle2" sx={{ px: 1, py: 0.5 }}>
-                  {s.icon ? `${s.icon} ` : ""}
-                  {s.name}({list.length}){s.statusType === "FINAL" && " [终态]"}
-                </Typography>
-                <Stack spacing={1}>
-                  {list.length === 0 && (
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      sx={{ px: 1 }}
-                    >
-                      (空)
-                    </Typography>
-                  )}
-                  {list.map((it) => (
-                    <Card
-                      key={it.itemId}
-                      draggable
-                      onDragStart={(e) =>
-                        e.dataTransfer.setData("text/plain", it.itemId)
-                      }
-                      onClick={() => router.push(`/p/${key}/i/${it.itemId}`)}
-                      sx={{
-                        cursor: "pointer",
-                        borderLeft:
-                          "4px solid " + (it.assigneeColor ?? "#9e9e9e"),
-                        transition: "box-shadow .15s, border-color .15s",
-                        "&:hover": {
-                          boxShadow: 6,
-                          borderColor: "primary.main",
-                        },
-                      }}
-                    >
-                      <CardContent
-                        sx={{ py: 1.5, "&:last-child": { pb: 1.5 } }}
-                      >
-                        <Stack spacing={0.5}>
-                          <Stack
-                            direction="row"
-                            spacing={1}
-                            alignItems="center"
-                          >
-                            {it.parentNumber && (
-                              <Link
-                                href={`/p/${key}/i/${it.parentItemId}`}
-                                style={{ textDecoration: "none" }}
-                              >
-                                <Typography
-                                  variant="caption"
-                                  color="primary"
-                                  sx={{ whiteSpace: "nowrap" }}
-                                >
-                                  {it.parentNumber} ›
-                                </Typography>
-                              </Link>
-                            )}
-                            <Chip
-                              label={it.number}
-                              size="small"
-                              variant="outlined"
-                            />
-                            {it.feasSignal && it.feasSignal !== "GREEN" && (
-                              <Chip
-                                size="small"
-                                label={t.signal[it.feasSignal]}
-                                color={
-                                  it.feasSignal === "RED" ? "error" : "warning"
-                                }
-                              />
-                            )}
-                            {it.blocked && (
-                              <Chip
-                                size="small"
-                                color="error"
-                                variant="outlined"
-                                label="⛔ 被阻塞"
-                              />
-                            )}
-                            {it.sprintName && (
-                              <Chip
-                                size="small"
-                                variant="outlined"
-                                label={it.sprintName}
-                              />
-                            )}
-                            <AssignPopover
-                              itemId={it.itemId}
-                              assignee={it.assignee}
-                              onChanged={load}
-                            >
-                              {(onClick) => (
-                                <Chip
-                                  size="small"
-                                  variant="outlined"
-                                  label={
-                                    it.assignee
-                                      ? `👤 ${it.assignee}`
-                                      : t.assign.none
-                                  }
-                                  onClick={onClick}
-                                  sx={
-                                    it.assignee ? undefined : { opacity: 0.55 }
-                                  }
-                                />
-                              )}
-                            </AssignPopover>
-                            {!finalNames.has(it.status) && (
-                              <Tooltip title={t.board.remove}>
-                                <IconButton
-                                  size="small"
-                                  aria-label={t.board.remove}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setBoardItem(it.itemId, false).then(load);
-                                  }}
-                                  sx={{ alignSelf: "center", mr: -0.5 }}
-                                >
-                                  <UndoOutlined fontSize="inherit" />
-                                </IconButton>
-                              </Tooltip>
-                            )}
-                          </Stack>
-                          <Link
-                            href={`/p/${key}/i/${it.itemId}`}
-                            style={{ textDecoration: "none", color: "inherit" }}
-                          >
-                            <Typography
-                              variant="body2"
-                              sx={{ wordBreak: "break-word" }}
-                            >
-                              {it.title}
-                            </Typography>
-                          </Link>
-                          {(it.dueDate ||
-                            it.overdue ||
-                            it.dueSoon ||
-                            it.estimateValue != null) && (
-                            <Typography
-                              variant="caption"
-                              sx={{
-                                color: it.overdue
-                                  ? "error.main"
-                                  : it.dueSoon
-                                    ? "warning.main"
-                                    : "text.secondary",
-                                fontWeight:
-                                  it.overdue || it.dueSoon ? 700 : 400,
-                              }}
-                            >
-                              {it.estimateValue != null && (
-                                <Typography
-                                  component="span"
-                                  variant="caption"
-                                  sx={{
-                                    color: "text.secondary",
-                                    fontWeight: 400,
-                                  }}
-                                >
-                                  {estimateText(
-                                    it.estimateValue,
-                                    it.estimateUnit,
-                                  )}
-                                  {it.dueDate ? " · " : ""}
-                                </Typography>
-                              )}
-                              {it.dueDate &&
-                                (it.overdue
-                                  ? "⚠ 超期 "
-                                  : it.dueSoon
-                                    ? "⏳ 将到期 "
-                                    : "📅 ")}
-                              {it.dueDate ? fmtDate(it.dueDate) : ""}
-                            </Typography>
-                          )}
-                          {it.requirements.length > 0 && (
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                            >
-                              {it.requirements
-                                .map((r) =>
-                                  r.minLevel
-                                    ? `${r.attribute}≥${r.minLevel}`
-                                    : r.attribute,
-                                )
-                                .join(" · ")}
-                            </Typography>
-                          )}
-                        </Stack>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </Stack>
-              </Box>
+                projectKey={key}
+                onRemoved={load}
+                onAssigneeChanged={load}
+              />
             );
           })}
         </Stack>
       )}
-
       <Dialog open={sprintPickOpen} onClose={() => setSprintPickOpen(false)}>
         <DialogTitle>放入哪个组</DialogTitle>
         <DialogContent>
