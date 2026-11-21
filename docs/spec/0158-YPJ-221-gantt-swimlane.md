@@ -139,3 +139,46 @@
 - 【已拍板 2026-11-22】形态=竖线+旗标带(方案 A′);released 只画 releasedDate;targetDate null 不上图;旗标 3 层上限。
 - 【演进方向,不进本票】marker 规模化(10+)后升级泳道形态( r1 spec 存 git 留史);scope 选 milestone/release 时对应线高亮。
 - 【无未决】真值表覆盖四态+两态+空态+null 日期。
+
+## 十一、As-built(PR #245 squash a304833 合入后补,2026-11-22)
+
+### 交付形态
+
+```text
+web/app/p/[key]/gantt/              家族 2321 行(纯功能票,新增 +217)
+├── components/MilestoneLines.tsx   256(新件:marker 装配/碰撞分层/Tooltip/Link/竖线渲染)
+├── e2e/gantt.spec.ts               +141(竖线三例:x 位有序/gate 章/虚实线型/空态带)
+├── hooks/useTimelineScale.ts       ±17(markerDates 并入轴 min/max)
+├── hooks/useGanttData.ts           ±22(msOpts/relOpts 放宽全 DTO)
+├── types.ts                        +22(MilestoneMarker/ReleaseMarker 窄型)
+├── GanttChart.tsx                  ±68(props + relative 包裹 + 插入)
+└── page.tsx                        ±7(ms/rel 下传 + 图例一句)
+```
+
+### As-built 偏差(六条)
+
+- **形态改判:泳道(r1)→ 竖线+旗标带(r2)**——设计过目阶段用户质询形态,三案对比后拍板 A′(2026-11-22);r1 留 git 史,泳道降级为 marker 规模化演进方向。本票最大偏差,改动面 7 文件 → 5 文件(TitleColumn/布局零改动,无对齐风险)。
+- **轴纳入 marker 日期(CP2b 新增)**——e2e 设计发现的真缺口:轴=item 日期锚定,窗外 marker 被 xOf 钳边成假位移(YPJ 自身 completed 里程碑 10-18 即在窗外);`markerDatesOf` 同规则并入 useTimelineScale min/max,§二 CP2b 补记。
+- **旗标超限语义修正**——r2 原文「超限仅线+tooltip」自相矛盾(旗标是 tooltip 唯一宿主);CP2 定型「超 3 层仅线,旗标牺牲」并同步 spec/手测措辞。
+- **gate 里程碑无 targetDate 不上图**——§二上图规则的推论实装(无日期即无线,旗标无宿主);e2e 与手测 M3 均按「带日期的 gate 里程碑」构造。
+- **零结构拆分**:MilestoneLines 单件 256 行未再拆——菱形/旗标/线三段内聚,拆分收益为零,不符最简实现。
+- **import 纪律零应验**——本票纯新增 import 无删除,254 定型教训未触发;tsc 短路链闸每绿点执行零截获。
+
+### CP 轨迹
+
+- CP1(267af24)骨架:类型放宽 + MilestoneLines 单层 + GanttChart 插入 → tsc 绿
+- CP2(dca1e7a)碰撞分层 + Tooltip/点击跳页 + 图例 → tsc/prettier 绿
+- CP2b(1081a48)轴纳入 marker 日期(e2e 设计插曲,独立绿点)
+- CP3(99a8877)e2e 三例 → gantt 26/26 + 全量 124/124
+- CP4 手测档随 spec commit 先行落节,验收勾选随本回合
+
+### 节奏执行(新节奏第五票;V31 甘特 sprint 首票)
+
+设计两轮:r1(泳道)过目 → 用户质询形态 → 三案对比 → 拍板 A′ → r2 → "go" → 一次 coding CP1-CP3(CP2b 独立绿点)→ 停等验收 → PR #245 → 合并。期间两插曲:用户并行下达 AGENTS 结构性重构(PR #246,无文件交集);group-types flake 通报 → F8 root-cause 实锤(归 A46/YPJ-242),随 #246 台账结案。
+
+### 验证快照
+
+- tsc --noEmit 0 锁(每绿点+终检);prettier 绿
+- e2e 全量 **124/124** 双跑(agent + 用户,test 容器 8082);gantt 26/26 含新三例
+- 手测:用户验收确认(2026-11-22,integrationTest + api.http + 手测里程碑线可见);勾选清单 M1-M4/R1-R2/E1-E2/I1-I2 随本回合落档
+- 关联回写:US-M11(本回合)+ SRS v4.1 增量节 §10.8(本回合)
