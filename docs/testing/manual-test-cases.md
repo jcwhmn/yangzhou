@@ -118,3 +118,31 @@
 ### G. 自动化
 - [ ] G1 e2e 全量 121/121 绿(agent 本地,test 容器 8082)
 - [ ] G2 `npm run format` 绿(CI format check)
+
+## YPJ-251 item detail 页重构:2786 行拆组件(spec 0154;纯结构零语义)
+
+> **基线 = prod 3000(重构前代码)**,重构分支 dev 3001 对照(容器重建含 251 代码的镜像后验,核对 sha)。纯搬家票:所有用例本质 = 「与 prod 行为一致」。automation:e2e 全量即回归闸。切片A-D 分批合入本节用例。
+
+### A. 主表单(留 page)
+- [ ] A1 标题/描述/日期+时刻/优先级/类型/sprint/里程碑/release/指派逐一改存,值落对,warning toast 通道正常(YPJ-244 后写者为准双改:due/estimate 交叉改后保存,后改者生效)
+
+### B. 状态动作行(留 page)
+- [ ] B1 迁移各状态正常;planned 无活动 sprint → launchAsk 弹窗;saved 提示
+
+### C. 子条目(SubitemsBlock,策略弹窗随迁)
+- [ ] C1 编号加子/新建加子/展开对照;直排区块置页签栏上方不变
+- [ ] C2 父自有时间线加子 → 策略弹窗(sub-policy-ignore/migrate),迁移后父时间线清空、「{父标题}·原排期」子项承接
+
+### D. 八页签逐块
+- [ ] D1 评论:增/删;tab 往返输入态保留
+- [ ] D2 日志:计时开/停 + 建议登记(登记后条目消失、工时刷新)+ 手记
+- [ ] D3 判定:渲染正常;「编辑需求」按钮从判定页签打开 RequirementsDialog
+- [ ] D4 需求:页签展示 + RequirementsDialog 保存
+- [ ] D5 依赖+清单:依赖增删 + 加依赖表单开合;清单勾选/增/删
+- [ ] D6 工时:总时长/条目表/停表按钮
+- [ ] D7 属性:AttrEditor 增删改存
+- [ ] D8 GitHub:gitRefs 展示 + commits 拉取展示 + 建分支弹窗(onCreated 后主数据刷新)
+
+### E. 自动化
+- [ ] E1 e2e 全量绿(用户跑,test 容器 8082)
+- [ ] E2 `npm run format` 绿(CI format check)
