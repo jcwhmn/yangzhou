@@ -141,15 +141,19 @@ export function GanttChart({
       r.checklistTotal && r.checklistDone !== null
         ? Math.min(Math.round((r.checklistDone / r.checklistTotal) * 100), 100)
         : null;
-    // YPJ-244(五)黄覆盖:进行中在计划条上叠「已流逝」段(末端=min(今天, 条尾));
-    // 覆盖条件=计划条存在且有 estimate(due 显式无 est 不覆盖,同用户 case3 字面);
-    // 周六日照算现状下日历时间位置等价工时比例;双休日历(H8)落地时改 hoursBetween 比例换算
-    // SRS v4 §6.2(2026-11-21 拍板:进行中单条覆盖模型):凡有计划条的进行中行都画
-    // 黄覆盖(条内已流逝段,start→min(今天,条尾),方案 A 口径);无第二条实际条
+    // YPJ-255(spec 0159,2026-11-22 拍板):黄覆盖 = 进度,完全在计划条上、与日历/actualStart 无关——
+    // 占比:清单完成率优先;无清单用工时/Estimate(estH 口径同计划条钟表长);皆无则无覆盖。A47:提前开工行(计划条在未来)覆盖照画(原时间流逝口径废除)。
+    // 皆无则无覆盖。A47:提前开工行(计划条在未来)覆盖照画(原时间流逝口径废除)。
+    // 超期仍由红条表达,不再「覆盖满条」(SRS §6.2 连带修订)。
+    const estHours = estH;
+    const fillPct =
+      (r.checklistTotal ?? 0) > 0
+        ? Math.min(100, (r.checklistDone! / r.checklistTotal!) * 100)
+        : estHours !== null && r.totalMinutes > 0
+          ? Math.min(100, (r.totalMinutes / 60 / estHours) * 100)
+          : null;
     const fillW =
-      doing && planIsBar
-        ? Math.min(Math.max(Math.min(axis.todayX, right) - left, 0), width)
-        : 0;
+      doing && planIsBar && fillPct !== null ? (width * fillPct) / 100 : 0;
     // YPJ-244(spec 0151)H5:直建 FINAL(actualComplete 有而 actualStart 无)→ 完成点
     const completeDot =
       drawOwn && isFinal && r.actualStart === null && r.actualEnd !== null;
@@ -198,7 +202,6 @@ export function GanttChart({
             dueOnly={dueOnly}
             caseNo={caseNo}
             fillW={fillW}
-            actPct={actPct}
           />
           <ActualBar
             visible={act && !(doing && planIsBar)}

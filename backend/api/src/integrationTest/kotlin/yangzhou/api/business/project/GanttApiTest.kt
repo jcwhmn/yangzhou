@@ -310,6 +310,33 @@ class GanttApiTest : AbstractApiTest() {
     }
 
     @Test
+    fun `YPJ-255 spec 0159 甘特行 totalMinutes 随行下发——补录计入无工时为零`() {
+        val authed = bootstrapAndAuth()
+        createProject(authed, "TMN")
+        val a = createItem(authed, "TMN", "有工时")["itemId"].asText()
+        val b = createItem(authed, "TMN", "无工时")["itemId"].asText()
+        authed
+            .post()
+            .uri("/api/items/$a/time-entries")
+            .body(mapOf("minutes" to 90))
+            .exchange()
+            .expectStatus()
+            .isCreated()
+        val rows =
+            json.readTree(
+                authed
+                    .get()
+                    .uri("/api/projects/TMN/gantt?scope=all")
+                    .exchange()
+                    .expectBody(String::class.java)
+                    .returnResult()
+                    .responseBody!!,
+            )["rows"]
+        assertEquals(90, rows.first { it["title"].asText() == "有工时" }["totalMinutes"].asLong())
+        assertEquals(0, rows.first { it["title"].asText() == "无工时" }["totalMinutes"].asLong())
+    }
+
+    @Test
     fun `YPJ-233 行排序——同级 start 升序未排期靠后创建序兑底`() {
         val authed = bootstrapAndAuth()
         createProject(authed, "ORD")

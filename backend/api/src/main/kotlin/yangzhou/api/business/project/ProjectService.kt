@@ -98,6 +98,7 @@ class ProjectService(
     private val historyRepo: yangzhou.persistence.repository.ItemStatusHistoryRepository,
     private val checklists: yangzhou.persistence.repository.ChecklistItemRepository,
     private val memberRepo: yangzhou.persistence.repository.MemberRepository,
+    private val timeEntries: yangzhou.persistence.repository.TimeEntryRepository,
     private val mapper: ObjectMapper,
 ) {
 
@@ -318,6 +319,12 @@ class ProjectService(
         // YPJ-245(spec 0152 §10.5):排序与未排期判定按过滤后可见树(keep)——包络/排序/fit 三处同源基于可见子孙
         val byParentKept = all.filter { it.objectId in keep }.groupBy { effectiveParent(it) }
 
+        // YPJ-255(spec 0159):工时合计批量取——覆盖进度兜底分母(口径同 ItemService:minutes 优先,否则起止折算,进行中折算到 now)
+        val minutesByItem = timeEntries
+            .findByItemObjectIdIn(keep)
+            .groupBy { it.itemObjectId }
+            .mapValues { (_, rows) -> rows.sumOf { e -> e.minutes?.toLong() ?: java.time.Duration.between(e.startedAt, e.endedAt ?: java.time.Instant.now()).toMinutes() } }
+
         // YPJ-245(spec 0152 §8.2):借锚位 = 依赖锚 ?? 父链上溯最近祖先 startDate(与前端 groupStartOf 同口径,兜底 §5.3)
         fun groupStartOf(item: yangzhou.persistence.Item): LocalDateTime? {
             var cursor = effectiveParent(item)
@@ -379,6 +386,7 @@ class ProjectService(
                 anchorDate = anchors[item.objectId]?.toString(),
                 checklistDone = cc?.done?.toInt(),
                 checklistTotal = cc?.total?.toInt(),
+                totalMinutes = minutesByItem[item.objectId!!] ?: 0L,
             )
             listOf(row) + walk(item.objectId)
         }
@@ -445,6 +453,7 @@ class ProjectService(
         val anchorDate: String? = null, // YPJ-243(spec 0150):依赖锚点=多前置最晚 due(无 due 退 start);null=无可用前置时间
         val checklistDone: Int? = null,
         val checklistTotal: Int? = null,
+        val totalMinutes: Long = 0, // YPJ-255(spec 0159):覆盖进度兜底 = totalMinutes/Estimate
     )
 
     data class GanttDto(val rows: List<GanttRow>)

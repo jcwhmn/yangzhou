@@ -20,6 +20,7 @@ export type GanttRow = {
   assigneeName: string | null;
   checklistDone: number | null;
   checklistTotal: number | null;
+  totalMinutes: number; // YPJ-255(spec 0159):覆盖进度兜底分母用
 };
 
 export const DAY = 24 * 60 * 60 * 1000;

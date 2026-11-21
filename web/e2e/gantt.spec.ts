@@ -618,12 +618,12 @@ test("实际条+偏移徽标+清单遮罩+折叠徽标+hover 卡(YPJ-222/spec 01
     });
   expect(pct).toBe(50);
 
-  // 乙:进行中单条覆盖模型(SRS v4 §6.2,2026-11-21 拍板)——有计划条 → 无下条实际条;
-  // 黄覆盖=条内已流逝段(已过期→满条);YPJ-245(§11.1):进行中零徽标(超期由红计划条表达)
+  // 乙(#2):进行中单条覆盖模型(SRS v4 §6.2)——有计划条 → 无下条实际条;
+  // YPJ-255:覆盖=进度,乙无清单无工时 → 无覆盖(原时间流逝满条口径废除);进行中零徽标
   await expect(row(2).getByTestId(`gantt-actual-${projectKey}-2`)).toHaveCount(
     0,
   );
-  await expect(row(2).getByTestId(`gantt-fill-${projectKey}-2`)).toBeVisible();
+  await expect(row(2).getByTestId(`gantt-fill-${projectKey}-2`)).toHaveCount(0);
   await expect(row(2).getByTestId(`gantt-offset-${projectKey}-2`)).toHaveCount(
     0,
   );
@@ -652,6 +652,66 @@ test("实际条+偏移徽标+清单遮罩+折叠徽标+hover 卡(YPJ-222/spec 01
   await expect(tip).toContainText(/\d{2}:\d{2}/);
   await expect(tip).toContainText(/工时 \d+(\.\d+)?h/);
   await expect(tip).toContainText("实际:");
+});
+
+test("YPJ-255 进度覆盖:提前开工行(计划条全在未来)覆盖可见 + 工时/Estimate 兜底(A47 边界)", async ({
+  page,
+  projectKey,
+}) => {
+  const statuses = (
+    await apiCall<{ statuses: { statusId: string; name: string }[] }>(
+      "GET",
+      `/api/projects/${projectKey}`,
+    )
+  ).statuses;
+  const wipId = statuses.find((s) => s.name === "In Progress")!.statusId;
+  const d = (offset: number) => {
+    const t = new Date();
+    t.setDate(t.getDate() + offset);
+    return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+  };
+
+  // 甲(#1):计划条全在未来(start=明天),已提前开工(迁 In Progress + 补录工时 90m)→ A47 场景:
+  // 覆盖 = 90m/4h = 37.5%,照画在未来段上(原时间流逝口径下此处归零不可见)
+  const a = await apiCreateItem(projectKey, "E2E 提前开工甲");
+  await apiCall("PATCH", `/api/items/${a}`, {
+    startDate: d(1),
+    dueDate: d(3),
+    estimateValue: 4,
+    estimateUnit: "hour",
+  });
+  await apiAssignMe(a);
+  await apiCall("POST", `/api/items/${a}/time-entries`, { minutes: 90 });
+  await apiCall("PATCH", `/api/items/${a}`, { statusItemId: wipId });
+
+  // 乙(#2):同场景但无清单无工时 → 无覆盖(占比无源)
+  const b = await apiCreateItem(projectKey, "E2E 无进度乙");
+  await apiCall("PATCH", `/api/items/${b}`, {
+    startDate: d(1),
+    dueDate: d(3),
+  });
+  await apiAssignMe(b);
+  await apiCall("PATCH", `/api/items/${b}`, { statusItemId: wipId });
+
+  await page.goto(`/p/${projectKey}/gantt`);
+  await pickScope(page, "全部");
+  await expect(page.getByText("E2E 提前开工甲").first()).toBeVisible();
+
+  const row = (n: number) =>
+    page.locator(`a[aria-label="${projectKey}-${n}"]`).locator("xpath=..");
+
+  const ratio = await row(1)
+    .getByTestId(`gantt-fill-${projectKey}-1`)
+    .evaluate((el) => {
+      const bar = el.parentElement as HTMLElement;
+      const w = bar.getBoundingClientRect().width;
+      const f = el.getBoundingClientRect().width;
+      return w > 0 ? f / w : null;
+    });
+  expect(ratio).not.toBeNull();
+  expect(ratio!).toBeGreaterThan(0.3);
+  expect(ratio!).toBeLessThan(0.45);
+  await expect(row(2).getByTestId(`gantt-fill-${projectKey}-2`)).toHaveCount(0);
 });
 
 test("缺省视窗下限(YPJ-234):宽区间溢出可读 + 今日按钮只居中不重置缩放(案乙)", async ({
@@ -801,6 +861,8 @@ test("工时填充+完成点+依赖锚点+实际层解耦(YPJ-244)", async ({
     estimateUnit: "hour",
   });
   await apiAssignMe(a);
+  // YPJ-255:覆盖=进度,无清单 → 工时/Estimate 兕底(60m/8h=12.5%)——补录工时保住「部分填充」断言
+  await apiCall("POST", `/api/items/${a}/time-entries`, { minutes: 60 });
   await apiCall("PATCH", `/api/items/${a}`, { statusItemId: wipId });
 
   // 乙(#2):直建 FINAL(actualEnd 有而 actualStart 无)→ 完成点(终态迁移需有主)

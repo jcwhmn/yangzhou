@@ -2,16 +2,14 @@
 
 import { Box } from "@mui/material";
 
-/** 黄覆盖段 + 清单完成率遮罩(YPJ-249 自 page.tsx 原样搬出,零语义变化;仅 PlanBar 内消费) */
+/** 黄覆盖段 = 进度(YPJ-255 spec 0159 拍板:覆盖=完成度,画在计划条上;原深色清单遮罩与覆盖合一移除) */
 export function ProgressOverlay({
   fillW,
   width,
-  actPct,
   number,
 }: {
   fillW: number;
   width: number;
-  actPct: number | null;
   number: string;
 }) {
   return (
@@ -27,20 +25,6 @@ export function ProgressOverlay({
         bgcolor: "warning.main",
         opacity: 0.9,
       }}
-    >
-      {/* 清单完成率遮罩:画在黄覆盖段上(基准=覆盖段宽,SRS §6.5) */}
-      {actPct !== null && (
-        <Box
-          sx={{
-            position: "absolute",
-            left: 0,
-            top: 0,
-            height: "100%",
-            width: `${actPct}%`,
-            bgcolor: "warning.dark",
-          }}
-        />
-      )}
-    </Box>
+    ></Box>
   );
 }

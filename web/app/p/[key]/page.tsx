@@ -8,6 +8,7 @@ import BoardColumn from "./components/BoardColumn";
 import SprintPickDialog from "./components/SprintPickDialog";
 import LaunchDialog from "./components/LaunchDialog";
 import { useParams } from "next/navigation";
+import { useEffect } from "react";
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { t } from "@/lib/texts";
@@ -39,6 +40,19 @@ export default function BoardPage() {
   const [newTitle, setNewTitle] = useState("");
   const [newEstValue, setNewEstValue] = useState(""); // YPJ-186 预估表单态(成对空串=未填)
   const [newEstUnit, setNewEstUnit] = useState("");
+  // YPJ-255(spec 0159 拍板):缺 Estimate 占位——快创建预选「中」档(key=m,自定义刻度无 m 取排序中位);
+  // deps 仅 estScales:用户清空后不回弹
+  useEffect(() => {
+    if (estScales.length === 0) return;
+    const mid =
+      estScales.find((s) => s.key === "m") ??
+      [...estScales].sort((a, b) => a.value - b.value)[
+        Math.floor(estScales.length / 2)
+      ];
+    setNewEstValue(String(mid.value));
+    setNewEstUnit(mid.unit);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [estScales]);
   const [pendingEst, setPendingEst] = useState({ value: "", unit: "" }); // S2/S3 对话框路径的快照(同 pendingTitle)
   const [dragOver, setDragOver] = useState<string | null>(null);
   const [sprintInfo, setSprintInfo] = useState(""); // YPJ-120:开始动作自动入 sprint 的轻提示

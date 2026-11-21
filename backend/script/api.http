@@ -64,7 +64,7 @@ Authorization: Bearer {{token}}
     client.global.set("statusTo", response.body.statuses[1].name);
  %}
 
-### 甘特数据(YPJ-204/spec 0137:行含 blocked/estimateValue/estimateUnit;响应不回填;YPJ-220:缺省 scope=board)
+### 甘特数据(YPJ-204/spec 0137:行含 blocked/estimateValue/estimateUnit;响应不回填;YPJ-220:缺省 scope=board;YPJ-255:行增 totalMinutes 工时合计,覆盖进度兜底用)
 GET {{host}}/api/projects/{{pkey}}/gantt
 Authorization: Bearer {{token}}
 

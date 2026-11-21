@@ -49,6 +49,7 @@ class ProjectServiceUnitTest {
     private val historyRepo = mockk<yangzhou.persistence.repository.ItemStatusHistoryRepository>(relaxed = true)
     private val checklists = mockk<yangzhou.persistence.repository.ChecklistItemRepository>(relaxed = true)
     private val memberRepo = mockk<yangzhou.persistence.repository.MemberRepository>(relaxed = true)
+    private val timeEntries = mockk<yangzhou.persistence.repository.TimeEntryRepository>(relaxed = true)
     private val leaderGuard = mockk<yangzhou.api.guard.LeaderGuard>(relaxed = true)
     private val service =
         ProjectService(
@@ -73,6 +74,7 @@ class ProjectServiceUnitTest {
             historyRepo,
             checklists,
             memberRepo,
+            timeEntries,
             ObjectMapper(),
         )
 
@@ -83,7 +85,7 @@ class ProjectServiceUnitTest {
 
     @BeforeEach
     fun setup() {
-        clearMocks(projects, statuses, workflowRules, items, workspaceService, deletions, members, projectMembers, groupTypes, itemTypes, historyRepo, checklists, memberRepo)
+        clearMocks(projects, statuses, workflowRules, items, workspaceService, deletions, members, projectMembers, groupTypes, itemTypes, historyRepo, checklists, memberRepo, timeEntries)
         every { workspaceService.required() } returns Workspace(id = 1L, objectId = wsId)
         every { members.current() } returns me
         every { projects.findByKey("CHE") } returns che
