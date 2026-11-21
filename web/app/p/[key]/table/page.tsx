@@ -1,152 +1,34 @@
 "use client";
 
-import {
-  Box,
-  LinearProgress,
-  Button,
-  Chip,
-  InputAdornment,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TablePagination,
-  TableContainer,
-  TableHead,
-  TableRow,
-  TableSortLabel,
-  TextField,
-  Typography,
-} from "@mui/material";
+import { Button, LinearProgress, Stack, Typography } from "@mui/material";
 import { PageShell } from "@/components/PageShell";
-import { Dropdown } from "@/components/Dropdown";
-import { ColumnConfigPopover } from "@/components/ColumnConfigPopover";
-import Link from "next/link";
+import TableFilterBar from "./components/TableFilterBar";
+import TableToolbar from "./components/TableToolbar";
+import ViewNameDialog from "./components/ViewNameDialog";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { t } from "@/lib/texts";
-import { estimateHours, estimateText } from "@/lib/estimate";
-import { AssignPopover } from "@/components/AssignPopover";
-import SearchIcon from "@mui/icons-material/Search";
-
-type Status = { statusId: string; name: string; position: number };
-type Item = {
-  itemId: string;
-  parentNumber?: string | null;
-  number: string;
-  title: string;
-  status: string;
-  assignee: string | null;
-  feasSignal: "GREEN" | "YELLOW" | "RED" | null;
-  startDate: string | null;
-  dueDate: string | null;
-  overdue: boolean;
-  dueSoon: boolean;
-  priority: string | null;
-  estimateValue: number | null; // YPJ-186 预估快照
-  estimateUnit: string | null;
-  blocked: boolean;
-  sprintName: string | null;
-  totalMinutes: number; // YPJ-182 时间合计(分钟),列表响应才带
-  attributes: { name: string; value: string | null }[];
-};
-type ViewDto = {
-  viewId: string;
-  name: string;
-  filters: Record<string, string | null>;
-  columns: Record<string, boolean>;
-  colOrder?: string[] | null;
-  sort?: { field: string; dir: "asc" | "desc" }[] | null;
-  query?: string | null;
-};
-type Filters = { status: string; assignee: string; priority: string };
-
-const EMPTY_FILTERS: Filters = { status: "", assignee: "", priority: "" };
-
-// 列定义真相源(spec 0091 §6):编号恒显钉首位、不入顺序数组,其余按此默认顺序
-type ColumnDef = { id: string; label: string; visible: boolean };
-const COLUMN_DEFS: ColumnDef[] = [
-  { id: "number", label: "编号", visible: true },
-  { id: "title", label: "标题", visible: true },
-  { id: "priority", label: "优先级", visible: false },
-  { id: "estimate", label: "预估", visible: true },
-  { id: "timesheet", label: "工时", visible: false },
-  { id: "status", label: "状态", visible: true },
-  { id: "assignee", label: "负责人", visible: true },
-  { id: "startDate", label: "开始", visible: true },
-  { id: "dueDate", label: "截止", visible: true },
-  { id: "overdue", label: "超期", visible: true },
-  { id: "feasSignal", label: "可行性", visible: true },
-  { id: "blocked", label: "阻塞", visible: false },
-  { id: "sprint", label: "Sprint", visible: true },
-];
-const MOVABLE_IDS = COLUMN_DEFS.slice(1).map((c) => c.id);
-const DEFAULT_COL_ORDER = MOVABLE_IDS;
-
-function normalizeOrder(saved?: string[] | null): string[] {
-  const known = new Set(MOVABLE_IDS);
-  const ordered = (saved ?? []).filter((id) => known.has(id));
-  const rest = MOVABLE_IDS.filter((id) => !ordered.includes(id));
-  return [...ordered, ...rest]; // 存档剔除未知 id,新增列按默认顺序补尾
-}
-
-function readSorts(k: string): SortKey[] {
-  try {
-    const v = JSON.parse(localStorage.getItem(`yz-table-sorts:${k}`) ?? "null");
-    return Array.isArray(v) && v.length > 0 ? v : DEFAULT_SORTS;
-  } catch {
-    return DEFAULT_SORTS;
-  }
-}
-
-function readQuery(k: string): string {
-  try {
-    const v = JSON.parse(localStorage.getItem(`yz-table-query:${k}`) ?? "null");
-    return typeof v === "string" ? v : "";
-  } catch {
-    return "";
-  }
-}
-
-function readSelectedView(k: string): string | null {
-  try {
-    const v = JSON.parse(localStorage.getItem(`yz-table-view:${k}`) ?? "null");
-    return typeof v === "string" ? v : null;
-  } catch {
-    return null;
-  }
-}
-
-type SortKey = { field: string; dir: "asc" | "desc" };
-
-const PAGE_SIZES = [20, 50, 100];
-
-function readPageSize(): number {
-  if (typeof window === "undefined") return PAGE_SIZES[0];
-  const n = Number(localStorage.getItem("yz-table-page-size"));
-  return PAGE_SIZES.includes(n) ? n : PAGE_SIZES[0];
-}
-
-const DEFAULT_SORTS: SortKey[] = [{ field: "number", dir: "asc" }];
-
-/** YPJ-126 表内搜索:不区分大小写子串匹配可见字段(不含 description,YPJ-122)。 */
-function matches(it: Item, q: string): boolean {
-  if (!q) return true;
-  const s = q.toLowerCase();
-  return (
-    it.number.toLowerCase().includes(s) ||
-    (it.parentNumber ?? "").toLowerCase().includes(s) ||
-    it.title.toLowerCase().includes(s) ||
-    (it.assignee ?? "").toLowerCase().includes(s) ||
-    (it.sprintName ?? "").toLowerCase().includes(s) ||
-    (it.attributes ?? []).some((a) => (a.value ?? "").toLowerCase().includes(s))
-  );
-}
+import {
+  compareField,
+  COLUMN_DEFS,
+  DEFAULT_COL_ORDER,
+  DEFAULT_SORTS,
+  EMPTY_FILTERS,
+  matches,
+  normalizeOrder,
+  readPageSize,
+  readQuery,
+  readSelectedView,
+  readSorts,
+  type ColumnDef,
+  type Filters,
+  type Item,
+  type SortKey,
+  type Status,
+  type ViewDto,
+} from "./shared";
+import ItemsTable from "./components/ItemsTable";
 
 /** V10-S4 表格视图;YPJ-47 视图配置(spec 0045):筛选(客户端)+ 视图保存/切换 + 列配置 Popover(YPJ-28 合并)。 */
 export default function TableViewPage() {
@@ -409,53 +291,7 @@ export default function TableViewPage() {
     ),
   ];
 
-  // 多栏排序:sorts 顺序即优先级;null 恒排最后,不随方向翻转(YPJ-124)
-  type Val = string | number | boolean;
-  const getters: Record<string, (i: Item) => Val | null> = {
-    number: (i) => i.number,
-    title: (i) => i.title,
-    priority: (i) => i.priority,
-    estimate: (i) => estimateHours(i.estimateValue, i.estimateUnit),
-    timesheet: (i) => (i.totalMinutes > 0 ? i.totalMinutes : null),
-    status: (i) => i.status,
-    assignee: (i) => i.assignee,
-    startDate: (i) => i.startDate,
-    dueDate: (i) => i.dueDate,
-    overdue: (i) => i.overdue,
-    feasSignal: (i) => i.feasSignal,
-    blocked: (i) => i.blocked,
-    sprint: (i) => i.sprintName,
-  };
-  const valueRank: Record<string, Record<string, number>> = {
-    priority: { P0: 0, P1: 1, P2: 2, P3: 3 },
-    feasSignal: { GREEN: 0, YELLOW: 1, RED: 2 },
-  };
-  function compareField(
-    field: string,
-    a: Item,
-    b: Item,
-    desc: boolean,
-  ): number {
-    const av = getters[field](a);
-    const bv = getters[field](b);
-    if (av == null || bv == null) {
-      if (av == null && bv == null) return 0;
-      return av == null ? 1 : -1;
-    }
-    const rank = valueRank[field];
-    let r: number;
-    if (rank) {
-      r = (rank[String(av)] ?? 9) - (rank[String(bv)] ?? 9);
-    } else if (typeof av === "boolean" && typeof bv === "boolean") {
-      r = Number(av) - Number(bv);
-    } else if (field === "number") {
-      // number 是"KEY-N"串,按尾数字自然排序(还原后端 int 序;YPJ-123)
-      r = String(av).localeCompare(String(bv), undefined, { numeric: true });
-    } else {
-      r = String(av).localeCompare(String(bv));
-    }
-    return desc ? -r : r;
-  }
+  // 多栏排序:sorts 顺序即优先级;null 恒排最后,不随方向翻转(YPJ-124)——机器在 shared
   // 单击循环 升→降→移除;移除后空回默认;Shift+点击追加次级键(YPJ-124)
   // 多列排序:普通点击=追加/翻向/移除;Shift+点击=仅按此列(替换)(YPJ-131 用户拍板)
   function toggleSort(field: string, replace: boolean) {
@@ -510,167 +346,65 @@ export default function TableViewPage() {
 
   return (
     <PageShell>
-      <Stack
-        direction="row"
-        spacing={2}
-        alignItems="center"
-        sx={{ mb: 2 }}
-        flexWrap="wrap"
-        useFlexGap
-      >
-        <Typography variant="h5">{`${String(key)} · 表格`}</Typography>
-        <Box sx={{ flex: 1 }} />
-        {/* 视图控件(YPJ-47) */}
-        <Dropdown
-          ariaLabel={t.view.name}
-          size="small"
-          value={selectedView ?? ""}
-          onChange={(v) => {
-            const target = views.find((x) => x.viewId === v);
-            if (target) applyView(target);
-            else {
-              setSelectedView(null);
-              setFilters(EMPTY_FILTERS);
-              setCols(readCols(key));
-              setColOrder(readOrder(key));
-              setSorts(readSorts(key));
-              setQuery(readQuery(key));
-              setError("");
-              setDirty(false);
-            }
-          }}
-          sx={{ width: 180 }}
-          options={[
-            { value: "", label: t.view.defaultView },
-            ...views.map((v) => ({ value: v.viewId, label: v.name })),
-          ]}
-        />
-        <Button
-          size="small"
-          variant={dirty ? "contained" : "outlined"}
-          disabled={!loaded}
-          onClick={() => {
-            if (selectedView) void saveCurrent(selectedName);
-            else {
-              setViewName("");
-              setNameOpen("save");
-            }
-          }}
-        >
-          {t.view.save}
-          {dirty ? " ·" : ""}
-        </Button>
-        <Button
-          size="small"
-          onClick={() => {
-            setViewName("");
-            setNameOpen("saveAs");
-          }}
-          disabled={!loaded}
-        >
-          {t.view.saveAs}
-        </Button>
-        {selectedView && (
-          <Button
-            size="small"
-            color="error"
-            disabled={!loaded}
-            onClick={() => void deleteView()}
-          >
-            {t.view.delete}
-          </Button>
-        )}
-      </Stack>
-
-      {/* 筛选 + 列配置(YPJ-47/28) */}
-      <Stack
-        direction="row"
-        spacing={1}
-        sx={{ mb: 1 }}
-        flexWrap="wrap"
-        useFlexGap
-        alignItems="center"
-      >
-        <TextField
-          aria-label={t.view.searchPlaceholder}
-          placeholder={t.view.searchPlaceholder}
-          size="small"
-          value={query}
-          onChange={(e) => {
-            setQuery(e.target.value);
-            setPage(0);
-            setDirty(true);
-          }}
-          sx={{ width: 220 }}
-          slotProps={{
-            input: {
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon fontSize="small" />
-                </InputAdornment>
-              ),
-            },
-          }}
-        />
-        <Dropdown
-          ariaLabel={t.view.filterStatus}
-          size="small"
-          clearable
-          value={filters.status}
-          onChange={(v) => setFilter({ status: v })}
-          sx={{ width: 130 }}
-          placeholder={t.view.filterStatus}
-          options={statuses.map((s) => ({ value: s.name, label: s.name }))}
-        />
-        <Dropdown
-          ariaLabel={t.view.filterAssignee}
-          size="small"
-          clearable
-          value={filters.assignee}
-          onChange={(v) => setFilter({ assignee: v })}
-          sx={{ width: 130 }}
-          placeholder={t.view.filterAssignee}
-          options={[...assignees, "__none__"].map((a) => ({
-            value: a,
-            label: a === "__none__" ? t.view.unassigned : a,
-          }))}
-        />
-        <Dropdown
-          ariaLabel={t.view.filterPriority}
-          size="small"
-          clearable
-          value={filters.priority}
-          onChange={(v) => setFilter({ priority: v })}
-          sx={{ width: 130 }}
-          placeholder={t.view.filterPriority}
-          options={["P0", "P1", "P2", "P3"].map((p) => ({
-            value: p,
-            label: p,
-          }))}
-        />
-        <ColumnConfigPopover
-          disabled={!loaded}
-          columns={colOrder.flatMap((id) => {
-            const c = columns.find((x) => x.id === id);
-            return c ? [{ ...c, locked: id === "title" }] : [];
-          })}
-          visible={(id) =>
-            cols[id] ?? columns.find((c) => c.id === id)?.visible ?? true
+      <TableToolbar
+        projectKey={key}
+        selectedView={selectedView}
+        views={views}
+        selectedName={selectedName}
+        dirty={dirty}
+        loaded={loaded}
+        onViewChange={(v) => {
+          const target = views.find((x) => x.viewId === v);
+          if (target) applyView(target);
+          else {
+            setSelectedView(null);
+            setFilters(EMPTY_FILTERS);
+            setCols(readCols(key));
+            setColOrder(readOrder(key));
+            setSorts(readSorts(key));
+            setQuery(readQuery(key));
+            setError("");
+            setDirty(false);
           }
-          onToggle={toggleCol}
-          onMove={moveCol}
-          onReset={() => {
-            setCols({});
-            setColOrder(DEFAULT_COL_ORDER);
-            setDirty(true);
-          }}
-        />
-        {dirty && (
-          <Typography variant="caption" color="warning.main">
-            {t.view.dirty}
-          </Typography>
-        )}
-      </Stack>
+        }}
+        onSave={() => {
+          if (selectedView) void saveCurrent(selectedName);
+          else {
+            setViewName("");
+            setNameOpen("save");
+          }
+        }}
+        onSaveAs={() => {
+          setViewName("");
+          setNameOpen("saveAs");
+        }}
+        onDelete={() => void deleteView()}
+      />
+
+      <TableFilterBar
+        query={query}
+        onQueryChange={(v) => {
+          setQuery(v);
+          setPage(0);
+          setDirty(true);
+        }}
+        filters={filters}
+        onFilterChange={setFilter}
+        statuses={statuses}
+        assignees={assignees}
+        columns={columns}
+        colOrder={colOrder}
+        cols={cols}
+        dirty={dirty}
+        loaded={loaded}
+        onToggleCol={toggleCol}
+        onMoveCol={moveCol}
+        onResetCols={() => {
+          setCols({});
+          setColOrder(DEFAULT_COL_ORDER);
+          setDirty(true);
+        }}
+      />
 
       {items === null && !error && <LinearProgress />}
       {error && (
@@ -688,200 +422,37 @@ export default function TableViewPage() {
       )}
       {items !== null && items.length > 0 && (
         <>
-          <TableContainer sx={{ maxHeight: "calc(100vh - 280px)" }}>
-            <Table size="small" stickyHeader>
-              <TableHead>
-                <TableRow>
-                  {visibleCols.map((c) => {
-                    const idx = sorts.findIndex((k) => k.field === c.id);
-                    return (
-                      <TableCell
-                        key={c.id}
-                        sortDirection={idx >= 0 ? sorts[idx].dir : false}
-                      >
-                        <TableSortLabel
-                          active={idx >= 0}
-                          title={t.view.sortHint}
-                          direction={idx >= 0 ? sorts[idx].dir : "asc"}
-                          onClick={(e) => toggleSort(c.id, e.shiftKey)}
-                          sx={{
-                            // MUI 默认非激活列 hover 才见箭头,可发现性差;常显(半透明,激活实色)
-                            ".MuiTableSortLabel-icon": { opacity: 0.3 },
-                            "&:hover .MuiTableSortLabel-icon": { opacity: 0.6 },
-                            "&.Mui-active .MuiTableSortLabel-icon": {
-                              opacity: 1,
-                            },
-                          }}
-                        >
-                          {c.label}
-                          {sorts.length > 1 && idx >= 0 && (
-                            <Typography
-                              component="span"
-                              variant="caption"
-                              sx={{ ml: 0.5, opacity: 0.6 }}
-                            >
-                              {idx + 1}
-                            </Typography>
-                          )}
-                        </TableSortLabel>
-                      </TableCell>
-                    );
-                  })}
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {paged.map((it) => (
-                  <TableRow key={it.itemId} hover>
-                    {visibleCols.map((c) => (
-                      <TableCell key={c.id}>
-                        {c.id === "number" ? (
-                          <Link href={`/p/${key}/i/${it.itemId}?from=table`}>
-                            <Typography
-                              variant="body2"
-                              sx={{ whiteSpace: "nowrap" }}
-                            >
-                              {(it.parentNumber
-                                ? it.parentNumber + " › "
-                                : "") + it.number}
-                            </Typography>
-                          </Link>
-                        ) : c.id === "title" ? (
-                          <Link href={`/p/${key}/i/${it.itemId}?from=table`}>
-                            <Typography variant="body2">{it.title}</Typography>
-                          </Link>
-                        ) : c.id === "status" ? (
-                          it.status
-                        ) : c.id === "priority" ? (
-                          (it.priority ?? "")
-                        ) : c.id === "estimate" ? (
-                          estimateText(it.estimateValue, it.estimateUnit)
-                        ) : c.id === "timesheet" ? (
-                          it.totalMinutes > 0 ? (
-                            t.time.fmt(it.totalMinutes)
-                          ) : (
-                            "—"
-                          )
-                        ) : c.id === "assignee" ? (
-                          <AssignPopover
-                            itemId={it.itemId}
-                            assignee={it.assignee}
-                            onChanged={load}
-                          >
-                            {(onClick) => (
-                              <Chip
-                                size="small"
-                                variant="outlined"
-                                label={
-                                  it.assignee
-                                    ? `👤 ${it.assignee}`
-                                    : t.assign.none
-                                }
-                                onClick={onClick}
-                                sx={it.assignee ? undefined : { opacity: 0.55 }}
-                              />
-                            )}
-                          </AssignPopover>
-                        ) : c.id === "startDate" ? (
-                          (it.startDate ?? "")
-                        ) : c.id === "dueDate" ? (
-                          <span
-                            style={{
-                              color: it.overdue
-                                ? "red"
-                                : it.dueSoon
-                                  ? "orange"
-                                  : "inherit",
-                            }}
-                          >
-                            {it.dueDate ?? ""}
-                          </span>
-                        ) : c.id === "overdue" ? (
-                          it.overdue ? (
-                            "是"
-                          ) : (
-                            "否"
-                          )
-                        ) : c.id === "feasSignal" ? (
-                          it.feasSignal ? (
-                            t.signal[it.feasSignal]
-                          ) : (
-                            ""
-                          )
-                        ) : c.id === "sprint" ? (
-                          (it.sprintName ?? (
-                            <Typography variant="body2" sx={{ opacity: 0.5 }}>
-                              {t.view.backlog}
-                            </Typography>
-                          ))
-                        ) : c.id === "blocked" ? (
-                          it.blocked ? (
-                            "⛔"
-                          ) : (
-                            ""
-                          )
-                        ) : (
-                          ""
-                        )}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-          <TablePagination
-            rowsPerPageOptions={PAGE_SIZES}
+          <ItemsTable
+            visibleCols={visibleCols}
+            paged={paged}
+            sorts={sorts}
+            onToggleSort={toggleSort}
+            projectKey={key}
+            onAssigneeChanged={load}
             count={sorted.length}
             page={safePage}
-            onPageChange={(_, p) => setPage(p)}
+            onPageChange={setPage}
             rowsPerPage={rowsPerPage}
             onRowsPerPageChange={(e) => {
               setRowsPerPage(Number(e.target.value));
               setPage(0);
               localStorage.setItem("yz-table-page-size", e.target.value);
             }}
-            labelRowsPerPage={t.view.perPage}
-            labelDisplayedRows={({ from, to, count }) =>
-              `${from}-${to} / ${count}`
-            }
           />
         </>
       )}
 
-      {/* 命名 Dialog(save 首存 / saveAs 另存共用) */}
-      <Dialog open={nameOpen !== null} onClose={() => setNameOpen(null)}>
-        <DialogTitle>
-          {nameOpen === "saveAs" ? t.view.saveAs : t.view.save}
-        </DialogTitle>
-        <DialogContent>
-          {nameOpen !== null && error && (
-            <Typography color="error" variant="body2">
-              {error}
-            </Typography>
-          )}
-          <TextField
-            autoFocus
-            fullWidth
-            size="small"
-            label={t.view.viewName}
-            value={viewName}
-            error={nameConflict}
-            helperText={nameConflict ? t.view.nameConflict : undefined}
-            onChange={(e) => setViewName(e.target.value)}
-            sx={{ mt: 1 }}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setNameOpen(null)}>{t.assign.cancel}</Button>
-          <Button
-            variant="contained"
-            disabled={!viewName.trim() || nameConflict || saving}
-            onClick={() => void saveCurrent(viewName.trim())}
-          >
-            {t.view.save}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <ViewNameDialog
+        open={nameOpen !== null}
+        mode={nameOpen === "saveAs" ? "saveAs" : "save"}
+        viewName={viewName}
+        onNameChange={setViewName}
+        nameConflict={nameConflict}
+        saving={saving}
+        error={error}
+        onClose={() => setNameOpen(null)}
+        onSave={() => void saveCurrent(viewName.trim())}
+      />
     </PageShell>
   );
 }
