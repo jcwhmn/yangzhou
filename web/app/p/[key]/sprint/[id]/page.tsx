@@ -29,11 +29,10 @@ import {
   Typography,
 } from "@mui/material";
 import { PageShell } from "@/components/PageShell";
-import { BarChart } from "@mui/x-charts/BarChart";
 import { LineChart } from "@mui/x-charts/LineChart";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { t } from "@/lib/texts";
 import {
@@ -47,46 +46,14 @@ import {
 } from "@/lib/sprints";
 import { AssignPopover } from "@/components/AssignPopover";
 import { SignalChip, type Signal } from "@/components/Verdict";
-
-type Sprint = {
-  sprintId: string;
-  name: string;
-  status: string;
-  startDate: string | null;
-  endDate: string | null;
-  parentGroupId: string | null;
-  typeKey: string;
-};
-type Item = {
-  itemId: string;
-  number: string;
-  parentNumber?: string | null;
-  title: string;
-  status: string;
-  assignee: string | null;
-  priority: string | null;
-  dueDate: string | null;
-  feasSignal: Signal | null;
-};
-type Status = {
-  statusId: string;
-  name: string;
-  statusType: string;
-  position: number;
-};
-// spec 0097 S3:类型 workflow(GET /group-types/{typeKey}/workflow),按钮按出边渲染
-type TypeWorkflow = {
-  name: string;
-  statusType: string;
-  transitions: { function: string; target: string }[];
-};
-type Candidate = {
-  itemId: string;
-  number: string;
-  title: string;
-  status: string;
-  assignee: string | null;
-};
+import {
+  type Candidate,
+  type Item,
+  type Sprint,
+  type Status,
+  type TypeWorkflow,
+} from "./types";
+import { ChartBy } from "./components/ChartBy";
 
 /**
  * V12-S3 Sprint 落地页(spec 0010,grill 裁决 1/2):
@@ -990,44 +957,5 @@ export default function SprintPage() {
         </>
       )}
     </PageShell>
-  );
-}
-
-// YPJ-73:sprint 页图表——按状态/按负责人的 item 计数(横向条形,数据全来自页内 items)
-function ChartBy({
-  view,
-  items,
-  statusOrder,
-  ...rest
-}: {
-  view: "byStatus" | "byAssignee";
-  items: Item[];
-  statusOrder: string[];
-} & { sx?: object }) {
-  const rows = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const i of items) {
-      const k =
-        view === "byStatus"
-          ? i.status
-          : (i.assignee ?? t.sprintCharts.unassigned);
-      counts.set(k, (counts.get(k) ?? 0) + 1);
-    }
-    const order =
-      view === "byStatus"
-        ? [...statusOrder, ...counts.keys()].filter(
-            (k, idx, a) => counts.has(k) && a.indexOf(k) === idx,
-          )
-        : [...counts.keys()].sort();
-    return order.map((name) => ({ name, count: counts.get(name)! }));
-  }, [view, items, statusOrder]);
-  return (
-    <BarChart
-      height={260}
-      layout="horizontal"
-      yAxis={[{ scaleType: "band", data: rows.map((r) => r.name) }]}
-      series={[{ label: t.sprintCharts.count, data: rows.map((r) => r.count) }]}
-      {...rest}
-    />
   );
 }
