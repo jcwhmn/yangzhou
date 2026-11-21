@@ -249,5 +249,5 @@
 - [ ] G1 key 变化 9 态原子重置+重拉;负责人 AssignPopover 行内改指派→表格刷新;`?from=table` 回跳链路
 
 ### H. 自动化
-- [ ] H1 e2e 全量绿(用户跑,test 容器 8082)
+- [x] H1 e2e 全量绿(用户跑,test 容器 8082;2026-11-21 用户确认)
 - [ ] H2 `npm run format` 绿(CI format check)
