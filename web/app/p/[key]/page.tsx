@@ -18,6 +18,7 @@ import {
 } from "@mui/material";
 import { Dropdown } from "@/components/Dropdown";
 import BoardHeader from "./components/BoardHeader";
+import FilterChips from "./components/FilterChips";
 import UndoOutlined from "@mui/icons-material/UndoOutlined";
 import { DialogActions, Tooltip } from "@mui/material";
 import Link from "next/link";
@@ -352,49 +353,12 @@ export default function BoardPage() {
         </Stack>
       )}
 
-      {/* S7:assignee 过滤 chips;sprint 范围由后端 board 端点决定(YPJ-29) */}
-      <Stack
-        direction="row"
-        spacing={1}
-        sx={{ mb: 2 }}
-        flexWrap="wrap"
-        useFlexGap
-      >
-        <Chip
-          label={t.filter.all}
-          size="small"
-          color={filter === "all" ? "primary" : "default"}
-          onClick={() => setFilter("all")}
-        />
-        <Chip
-          label={t.filter.unassigned}
-          size="small"
-          color={filter === "unassigned" ? "primary" : "default"}
-          onClick={() => setFilter("unassigned")}
-        />
-        <Chip
-          label="⛔ 被阻塞"
-          size="small"
-          color={filter === "blocked" ? "primary" : "default"}
-          onClick={() => setFilter("blocked")}
-        />
-        <Button
-          size="small"
-          variant="outlined"
-          onClick={() => setPullOpen(true)}
-        >
-          {t.board.pullItem}
-        </Button>
-        {memberOptions.map((name) => (
-          <Chip
-            key={name}
-            label={`👤 ${name}`}
-            size="small"
-            color={filter === name ? "primary" : "default"}
-            onClick={() => setFilter(name)}
-          />
-        ))}
-      </Stack>
+      <FilterChips
+        filter={filter}
+        onFilterChange={setFilter}
+        memberOptions={memberOptions}
+        onOpenPull={() => setPullOpen(true)}
+      />
 
       {loading ? (
         <Stack direction="row" spacing={2}>
