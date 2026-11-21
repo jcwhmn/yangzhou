@@ -98,3 +98,33 @@ web/app/p/[key]/gantt/
 ### 自动化测试清单
 - 既有全量 e2e 即回归闸(121 例,gantt.spec/overview.spec/board 覆盖语义);**不新增测试**——纯重构,新测试=测试重构前不存在的行为。
 - 单元/集成不涉(纯前端)。
+
+## 四、As-built(PR #240 squash c06e42c 合入后补,2026-11-21)
+
+### 交付形态
+
+```text
+web/app/p/[key]/gantt/  共 2321 行
+├── page.tsx               364 行(入口:状态+hooks 装配+toolbar~157+双面板组装)
+├── GanttChart.tsx         329 行(renderGanttRow 壳=几何计算+组装 + 甘特面板 JSX)
+├── components/ ×10        HoverCard 72 · TitleColumn(+Splitter) 250 · TimelineHeader 41 · UnscheduledGroup 62
+│                          PlanBar 87 · ActualBar 84 · ProgressOverlay 46 · OffsetBadge 36 · TodayLine 30 · SummaryBar 59
+├── hooks/ ×4              useGanttData 92 · useGanttInteraction 131 · useTimelineScale 361 · useEnvelope 145
+├── utils/timeCalculations.ts 85
+└── types.ts               47
+```
+
+### As-built 偏差(目标形态 → 实拆)
+
+- **GanttRow.tsx / barGeometry.ts / sorting.ts 未单独立文件**:条几何随 renderGanttRow 壳留 GanttChart(闭包捕获集大,拆出=纯 prop 钻孔),渲染排序随 useEnvelope——「可读+可单独定位」即停,不加投机抽象。
+- 状态归属:rows/wd/opts 随 fetch 收进 useGanttData、containerW/titleW/splitting 收进 useGanttInteraction(状态随专属机制,入口经返回值持有;偏差已写进各 hook 头注释)。
+- GanttChart props:axis 取结构子型(timelineW/headerRows/todayX),整体仍由 useTimelineScale 返回、page 持有;scrollRef 由 page 持有传入;page 的 key→projectKey(href 逐字节不变);setShowCompleted→onToggleCompleted(与 TitleColumn 同式)。
+- **page 364 行 > 目标 ~300**:差距 = toolbar ~157(拍板:状态控制面留 page)+ 状态/hook 装配 ~91 + 组装/legend ~80;再拆动语义,不硬拆。
+- 迁移顺序实际执行:CP1(types/utils)→ CP2a-c(hooks)→ CP3a-d(components,含 renderGanttRow 条形子块 6 组件)→ CP4(GanttChart)→ CP5(收口)。
+
+### 验证快照
+
+- tsc --noEmit 0 错(每绿点);prettier 全绿;testid 对账零缺失(CP3d/CP4 两次全集比对)
+- e2e 全量 121/121 × 4 轮绿(CP1 后、CP2 后、CP3a-c 后、收口后;用户执行)
+- 手测 A-G(prod 3000 对照,用户执行):甘特渲染正常;**黄覆盖现象单列**——A47(实际开始早于计划的进行中行,方案 A 覆盖段归零,实际层零可见;实锤+回 V31,见 docs/planning/问题处理记录.md)
+- 台账:A47 修订(根因实锤修正)、F8 复现 2/3(group-types 建 dialog 不关,同例再红强制 root-cause)
