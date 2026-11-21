@@ -99,3 +99,42 @@ web/app/p/[key]/sprint/[id]/
 - [ ] F. 成员表:AssignPopover 行内改指派后表格刷新;`?from=sprint-N` 回跳链路
 - [ ] G. 广播链路:本页改状态/改父 epic → sidebar 即时重拉;board/overview 的 30s 定时刷新不受影响(定时器不在本页,拍板 5)
 - [ ] H. e2e 全量绿(用户跑)+ `npm run format` 绿
+
+
+## 四、As-built(PR #242 squash 7f9485f 合入后补,2026-11-21)
+
+### 交付形态
+
+```text
+web/app/p/[key]/sprint/[id]/  共 1396 行(原 page 1034 单文件)
+├── page.tsx               451 行(入口:路由解析/gone+空态/处置·成员·状态动作编排/弹窗胶水态)
+├── hooks/
+│   └── useSprintData.ts   92 行(states + 首屏/父候选 effects;error/gone 随 load 归 hook)
+├── types.ts               50 行(Disp/图表视图等 module 类型)
+└── components/ ×7
+    ├── SprintHeader.tsx        203(rollup/文案内置;actionLabel 随迁,+typeName prop)
+    ├── SprintChartSection.tsx  120(chartView + bd/burndown fetch 内置,常挂载 mount 即拉,时序不变)
+    ├── DispositionDialog.tsx   174(决策树;disp 态留 page 走胶水回调,targetLabel/Name 派生内置)
+    ├── SprintItemsTable.tsx    92(onAssigneeChanged 回调上行)
+    ├── ConfirmFlowDialog.tsx   87(confirmFlow 态留 page)
+    ├── AddMembersDialog.tsx    82(addOpen/selected 态留 page)
+    └── ChartBy.tsx             45(图表组件原样搬出)
+```
+
+### As-built 偏差(目标形态 → 实拆)
+
+- **page 451 行 > 预估 ~350-400**:处置流(决策树编排)+ 成员拉入/退回动作群留 page 是主因(拍板②「编排留 page」的直接体量代价);251 同例先河,如实记偏差,不硬拆。
+- **hook 未抽 fetchItems**:3 处 reload 保持动作体内联——逐字节零改动优先于动作归仓(抽到 hook 需改动作签名与调用点,违背纯搬家约束)。
+- **error/gone 归 hook**:load() catch 写 error、不存在 id 写 gone;page 仅解构 setError 引用(动作内 setError 调用零改动)。spec 文本未细分,实拆按数据归属断言归 hook。
+- **actionLabel 随迁 SprintHeader**:纯显示函数跟用点走;因读 header 上下文补 typeName prop,无行为面。
+- **两条解读断言(拍板 5/6)被证实**:「30s 定时器不在本页」(G 项手测过:sidebar 即时重拉正常、board/overview 定时刷新不受影响);「S0 = 空态 + gone 两分支」(A2 手测过);e2e 全量绿(用户跑,test 容器 8082)。
+- **弹窗态分布定案**:disp/addOpen/selected/confirmFlow 四态留 page(跨域动作编排胶水),弹窗内纯派生(targetLabel/Name)内置——与拍板②一致。
+
+### 节奏执行(新节奏正式适用第二票)
+
+- 一次 coding 五绿点 CP1-CP5(types/ChartBy → useSprintData → ChartSection → Header+Table → 三弹窗),每绿点 tsc+prettier 绿就地 commit,零中途停;停等仅两处(设计过目 + e2e)。PR squash 后 main 单提交(7f9485f)。
+
+### 验证快照
+
+- tsc --noEmit 0 错(每绿点);prettier + `npm run format` 绿;testid 对账 0/0(全页无 testid,保持)
+- e2e 全量绿(用户跑);手测冒烟 A-H 落档 `docs/testing/manual-test-cases.md` YPJ-252 节(交付时给勾选清单,验收逐条勾)
