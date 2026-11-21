@@ -107,3 +107,5 @@
 3. e2e:FINAL 行默认入组 → 3 个既有用例补 expandCompleted(waitFor 版,A43 竞态实锤后修);overview fixture due-only 补 start(新契约);新增徽标三档/返工/折叠组三用例。
 4. api.http §17(due-only 负例+回归钉+清场自含节);手测清单 245 节(A-E 四组)。
 5. A41:容器→GitHub TLS 断,yz items branch 延后——push 前必须补关联。
+6. **存量布局 bug 修复(计划外,e2e 三红实锤,台账 A44)**:甘特条区 Box(flex:1、子元素全绝对定位)在 `alignItems:center` 行容器里零高度居中——绝对定位几何整体下移 22px(徽标/完成点溢出到下一行)、行内今日线(top:0/bottom:0)高 0 不可见、整行点击链接剩 0 高条带。修复 = 条区 `alignSelf:"stretch"` 恢复整行高(设计几何 top5 计划条/top24 实际条本按整行高标注);YPJ-229 今日线 e2e 补高度>8px 断言作回归钉。main 同结构,存量缺陷非本票引入,但徽标(本票特性)直接撞上。视觉变化:计划/实际条上移回设计位,今日线重现——手工验收 A/B 时请留意。
+7. e2e 测试侧修正(台账 A45):fixture `dtH` 小数小时被 setHours 截断(-0.5h→-1h)改毫秒偏移;返工例 hover 目标改 Tooltip 命中区(补 testid `gantt-hover-plan/act-N`,fill 被命中区覆盖非可 hover 面)。

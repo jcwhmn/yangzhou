@@ -1019,13 +1019,14 @@ export default function GanttPage() {
           "&:hover": { bgcolor: "action.hover" },
         }}
       >
-        {/* 条区(固定像素宽;高度 flex:1 随行 minHeight 44,自身不撑行——行对齐,SRS §10.2) */}
+        {/* 条区(固定像素宽;必须整行高——曾缺 stretch 致零高居中:今日线不可见、徽标/完成点溢出下一行,A44) */}
         <Box
           sx={{
             position: "relative",
             width: axis.timelineW,
             flexShrink: 0,
             flex: 1,
+            alignSelf: "stretch",
           }}
         >
           {axis.todayX >= 0 && axis.todayX <= axis.timelineW && (
@@ -1240,6 +1241,7 @@ export default function GanttPage() {
                   (r.actualEnd === null || rework))) && (
                 <Tooltip title={hoverCard(r)}>
                   <Box
+                    data-testid={`gantt-hover-plan-${r.number}`}
                     sx={{
                       position: "absolute",
                       left,
@@ -1253,6 +1255,7 @@ export default function GanttPage() {
             {act && (
               <Tooltip title={hoverCard(r)}>
                 <Box
+                  data-testid={`gantt-hover-act-${r.number}`}
                   sx={{
                     position: "absolute",
                     left: actLeft,

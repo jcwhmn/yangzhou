@@ -432,8 +432,10 @@ test("时线回归(YPJ-229):加载中点日窗补放 + 今日时刻居中 + 零�
       return s.width === "2px" && s.position === "absolute";
     });
     return lines.some((d) => {
+      // 高度 >8px:条区零高度时今日线(top:0/bottom:0)不可见(A44 回归钉)
+      const h = (d as HTMLElement).getBoundingClientRect().height;
       const x = (d as HTMLElement).offsetLeft - scroll.scrollLeft;
-      return x >= 0 && x <= scroll.clientWidth;
+      return h > 8 && x >= 0 && x <= scroll.clientWidth;
     });
   });
   expect(todayVis).toBe(true);
@@ -996,8 +998,8 @@ test("YPJ-245 徽标三档:On time / ±Nh / 提前绿(仅 FINAL)", async ({
   ).statuses;
   const finalId = statuses[statuses.length - 1].statusId;
   const dtH = (offsetHours: number) => {
-    const t = new Date();
-    t.setHours(t.getHours() + offsetHours);
+    // 毫秒偏移:setHours 加小数会被截断成整数小时(-0.5h→-1h,A45 实锤)
+    const t = new Date(Date.now() + offsetHours * 3600000);
     const p2 = (n: number) => String(n).padStart(2, "0");
     return `${t.getFullYear()}-${p2(t.getMonth() + 1)}-${p2(t.getDate())}T${p2(t.getHours())}:${p2(t.getMinutes())}`;
   };
@@ -1089,7 +1091,8 @@ test("YPJ-245 返工渲染:当前状态优先,完成史进 hover(SRS §6.6)", as
     0,
   );
   // 完成史进 hover
-  await row(1).getByTestId(`gantt-fill-${projectKey}-1`).hover();
+  // hover 目标 = Tooltip 命中区(设计上覆盖条面,fill 被其覆盖不可直 hover,A45)
+  await row(1).getByTestId(`gantt-hover-plan-${projectKey}-1`).hover();
   await expect(page.getByText(/上次完成:/)).toBeVisible();
 });
 
