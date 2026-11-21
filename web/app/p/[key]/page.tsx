@@ -19,14 +19,7 @@ import {
 import { Dropdown } from "@/components/Dropdown";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import UndoOutlined from "@mui/icons-material/UndoOutlined";
-import {
-  Checkbox,
-  List,
-  ListItem,
-  ListItemText,
-  DialogActions,
-  Tooltip,
-} from "@mui/material";
+import { DialogActions, Tooltip } from "@mui/material";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
@@ -46,42 +39,8 @@ import {
   syncCurrentParent,
 } from "@/lib/sprints";
 import { AssignPopover } from "@/components/AssignPopover";
-import type { Signal } from "@/components/Verdict";
-
-type Status = {
-  statusId: string;
-  name: string;
-  icon: string | null;
-  statusType: string;
-  position: number;
-};
-type Item = {
-  itemId: string;
-  parentItemId?: string | null;
-  parentNumber?: string | null;
-  number: string;
-  title: string;
-  status: string;
-  assignee: string | null;
-  assigneeColor: string | null;
-  requirements: { attribute: string; minLevel: number | null }[];
-  feasSignal: Signal | null;
-  dueDate: string | null;
-  overdue: boolean;
-  dueSoon: boolean;
-  estimateValue: number | null; // YPJ-186 预估快照
-  estimateUnit: string | null;
-  blocked: boolean;
-  sprintName: string | null;
-};
-
-type Filter = "all" | "unassigned" | "blocked" | string; // string = memberId
-type SprintLite = {
-  sprintId: string;
-  name: string;
-  status: string;
-  parentGroupId: string | null;
-};
+import PullDialog from "./components/PullDialog";
+import type { Filter, Item, SprintLite, Status } from "./types";
 
 export default function BoardPage() {
   const { key } = useParams<{ key: string }>();
@@ -112,8 +71,6 @@ export default function BoardPage() {
   );
   const [launchPick, setLaunchPick] = useState("");
   const [launchName, setLaunchName] = useState("");
-  const [backlogItems, setBacklogItems] = useState<Item[] | null>(null);
-  const [picked, setPicked] = useState<Set<string>>(new Set());
 
   // V9-Q3:看板 30s 自动刷新(手刷按钮同函数)
   useEffect(() => {
@@ -171,27 +128,11 @@ export default function BoardPage() {
     return () => window.removeEventListener("yz:project-changed", h);
   }, [load]);
 
-  function openPull() {
-    setPicked(new Set());
-    api<Item[]>(`/api/projects/${key}/backlog`)
-      .then(setBacklogItems)
-      .catch(() => setBacklogItems([]));
-    setPullOpen(true);
-  }
-
   async function setBoardItem(itemId: string, on: boolean) {
     await api(`/api/items/${itemId}/board-membership`, {
       method: "PUT",
       body: JSON.stringify({ onBoard: on }),
     });
-  }
-
-  async function confirmPull() {
-    for (const id of picked) {
-      await setBoardItem(id, true);
-    }
-    setPullOpen(false);
-    await load();
   }
 
   async function addItem(e: React.FormEvent) {
@@ -527,7 +468,11 @@ export default function BoardPage() {
           color={filter === "blocked" ? "primary" : "default"}
           onClick={() => setFilter("blocked")}
         />
-        <Button size="small" variant="outlined" onClick={openPull}>
+        <Button
+          size="small"
+          variant="outlined"
+          onClick={() => setPullOpen(true)}
+        >
           {t.board.pullItem}
         </Button>
         {memberOptions.map((name) => (
@@ -856,58 +801,12 @@ export default function BoardPage() {
           </Button>
         </DialogActions>
       </Dialog>
-      <Dialog
+      <PullDialog
         open={pullOpen}
+        projectKey={key}
         onClose={() => setPullOpen(false)}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>{t.board.pullTitle}</DialogTitle>
-        <DialogContent dividers sx={{ maxHeight: 480 }}>
-          <List dense disablePadding>
-            {[...(backlogItems ?? [])]
-              .sort(
-                (a, b) =>
-                  Number(a.status === "To Do") - Number(b.status === "To Do"),
-              )
-              .map((it) => (
-                <ListItem key={it.itemId} dense disableGutters>
-                  <Checkbox
-                    size="small"
-                    checked={picked.has(it.itemId)}
-                    onChange={() =>
-                      setPicked((prev) => {
-                        const next = new Set(prev);
-                        if (next.has(it.itemId)) next.delete(it.itemId);
-                        else next.add(it.itemId);
-                        return next;
-                      })
-                    }
-                  />
-                  <ListItemText
-                    primary={`${it.number} · ${it.title}`}
-                    secondary={it.status}
-                  />
-                </ListItem>
-              ))}
-            {(backlogItems ?? []).length === 0 && (
-              <Typography variant="caption" color="text.secondary">
-                {t.board.pullEmpty}
-              </Typography>
-            )}
-          </List>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setPullOpen(false)}>取消</Button>
-          <Button
-            variant="contained"
-            onClick={confirmPull}
-            disabled={picked.size === 0}
-          >
-            {t.board.pullConfirm}
-          </Button>
-        </DialogActions>
-      </Dialog>
+        onPulled={load}
+      />
     </Box>
   );
 }
