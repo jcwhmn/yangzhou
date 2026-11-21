@@ -357,7 +357,8 @@ export default function GanttPage() {
             已流逝(进行中,今天 vs due,用实际 色覆盖计划) · 蓝点 =
             依赖锚点落位(无 start 无 due) · On time/±Nh/±Nd =
             偏移徽标(仅完成行,提前绿/延期红) · 悬停条看详情 · Ctrl+滚轮或 ± 缩放
-            · 「今日」回中今天
+            · 「今日」回中今天 · 竖线 =
+            里程碑/发布时点(虚=计划,实=已发布;旗标可点跳管理页)
           </Typography>
         </>
       )}

@@ -2,7 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
-import { type GanttRow, type MilestoneMarker, type ReleaseMarker } from "../types";
+import {
+  type GanttRow,
+  type MilestoneMarker,
+  type ReleaseMarker,
+} from "../types";
 import { hmToMin } from "../utils/timeCalculations";
 
 /** 甘特数据获取与借锚(YPJ-249 自 page.tsx 原样搬出,零语义变化)。

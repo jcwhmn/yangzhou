@@ -56,7 +56,7 @@
 
 - **线**:1px 竖线,`pointerEvents:none`(不拦条 hover、不可点);画在行区**条下层**(DOM 序先于行,条不透明段自然盖线,间隙露线)。
 - **旗标**:可点(Tooltip + Link);`border:1px` 用线色,底 `background.paper`(任何底色上可读);位于线右侧 4px。
-- **旗标碰撞退让**(确定性,无测量):按 x 升序,标签宽估算 = name 字数×12 + (gate 章 44) + (version 40) + padding;重叠则下一层(带高 20px/层);**上限 3 层,超限仅线+tooltip**;带高 = 层数×20,层 0/无 marker → 带不渲染。
+- **旗标碰撞退让**(确定性,无测量):按 x 升序,标签宽估算 = name 字数×12 + (gate 章 44) + (version 40) + padding;重叠则下一层(带高 20px/层);**上限 3 层,超限仅线(旗标牺牲)**;带高 = 层数×20,层 0/无 marker → 带不渲染。
 
 ## 四、页面示意图(ASCII,贴合实况)
 
@@ -114,7 +114,7 @@
 - [ ] R1 planned release → targetDate 蓝虚线
 - [ ] R2 released release → releasedDate 绿实线+旗标;targetDate 无线;tooltip 含两日期
 - [ ] E1 无里程碑/发布的项目 → 旗标带不渲染,行位/表头不受影响
-- [ ] E2 两线同日 → 旗标上下层错位;构造 4 个同日 marker → 第 4 面旗不渲染仅 tooltip
+- [ ] E2 两线同日 → 旗标上下层错位;构造 4 个同日 marker → 第 4 面旗不渲染(仅线)
 - [ ] I1 点旗标 → 跳对应管理页;hover → tooltip 全信息;线本身不可点不拦 hover
 - [ ] I2 条盖线(条段处线不可见,间隙露线);横滚同步;已完成组展开后线延伸到底
 

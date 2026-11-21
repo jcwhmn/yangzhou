@@ -302,36 +302,41 @@ export function GanttChart({
 
           {/* YPJ-221:旗标带+竖线的定位基准(线 top:0→bottom:0 覆盖带+行区,含完成组) */}
           <Box sx={{ position: "relative" }}>
-            <MilestoneLines ms={ms} rel={rel} xOf={xOf} />
+            <MilestoneLines
+              ms={ms}
+              rel={rel}
+              xOf={xOf}
+              projectKey={projectKey}
+            />
 
             {scheduled.length === 0 && (
-            <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>
-              暂无已排期 item——在详情页填起止日期后出现在这里。
-            </Typography>
-          )}
+              <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>
+                暂无已排期 item——在详情页填起止日期后出现在这里。
+              </Typography>
+            )}
 
-          {mainRows.map(renderGanttRow)}
-          {completedRows.length > 0 && (
-            <Box
-              sx={{
-                minHeight: 44,
-                borderBottom: "1px solid",
-                borderColor: "divider",
-                display: "flex",
-                alignItems: "center",
-              }}
-            >
-              <Button
-                size="small"
-                data-testid="gantt-completed-group-bar"
-                onClick={onToggleCompleted}
-                sx={{ ml: 1 }}
+            {mainRows.map(renderGanttRow)}
+            {completedRows.length > 0 && (
+              <Box
+                sx={{
+                  minHeight: 44,
+                  borderBottom: "1px solid",
+                  borderColor: "divider",
+                  display: "flex",
+                  alignItems: "center",
+                }}
               >
-                {showCompleted ? "▼" : "▶"} 已完成({completedRows.length})
-              </Button>
-            </Box>
-          )}
-          {showCompleted && completedRows.map((r) => renderGanttRow(r))}
+                <Button
+                  size="small"
+                  data-testid="gantt-completed-group-bar"
+                  onClick={onToggleCompleted}
+                  sx={{ ml: 1 }}
+                >
+                  {showCompleted ? "▼" : "▶"} 已完成({completedRows.length})
+                </Button>
+              </Box>
+            )}
+            {showCompleted && completedRows.map((r) => renderGanttRow(r))}
           </Box>
         </Box>
       </Box>
