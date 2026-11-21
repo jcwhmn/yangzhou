@@ -23,6 +23,7 @@ import { Splitter, TitleColumn } from "./components/TitleColumn";
 import { UnscheduledGroup } from "./components/UnscheduledGroup";
 import { ZOOM_STEP } from "./types";
 import { GanttChart } from "./GanttChart";
+import { markerDatesOf } from "./components/MilestoneLines";
 /** 单项目树形甘特(只读)。条 = start→due;只有 due 画里程碑菱形;今日线;未排期折叠组。 */
 export default function GanttPage() {
   const { key } = useParams<{ key: string }>();
@@ -104,6 +105,7 @@ export default function GanttPage() {
     groupStartOf,
     summaryOf,
     saveView,
+    markerDates: markerDatesOf(msOpts, relOpts),
   });
 
   const changeScope = (next: string) => {
@@ -342,6 +344,8 @@ export default function GanttPage() {
               wd={wd}
               scrollRef={scrollRef}
               projectKey={key}
+              ms={msOpts}
+              rel={relOpts}
             />
           </Stack>
           <Typography
@@ -355,7 +359,8 @@ export default function GanttPage() {
             已流逝(进行中,今天 vs due,用实际 色覆盖计划) · 蓝点 =
             依赖锚点落位(无 start 无 due) · On time/±Nh/±Nd =
             偏移徽标(仅完成行,提前绿/延期红) · 悬停条看详情 · Ctrl+滚轮或 ± 缩放
-            · 「今日」回中今天
+            · 「今日」回中今天 · 竖线 =
+            里程碑/发布时点(虚=计划,实=已发布;旗标可点跳管理页)
           </Typography>
         </>
       )}

@@ -1154,3 +1154,144 @@ test("YPJ-245 已完成折叠组:FINAL 默认收起可展开(SRS §10.6)", async
   await grp.click();
   await expect(row(1)).toBeHidden();
 });
+
+// ===== YPJ-221(spec 0158 r2):里程碑/发布时点竖线 + 旗标带 =====
+
+/** 近期动态日期(A22 教训:固定老日期拉爆轴;marker 日期同理) */
+function dayOffset(offset: number): string {
+  const t = new Date();
+  t.setDate(t.getDate() + offset);
+  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+}
+
+/** 已排期底座 item:双面板仅 rows 非空渲染,行区撑起后竖线/旗标才可见 */
+async function makeScheduledItem(key: string, title: string): Promise<void> {
+  const id = await apiCreateItem(key, title);
+  await apiCall("PATCH", `/api/items/${id}`, {
+    startDate: dayOffset(0),
+    dueDate: dayOffset(2),
+  });
+}
+
+test("里程碑竖线+旗标:两态 x 位有序 + gate 章 + tooltip + 点击跳页(YPJ-221)", async ({
+  page,
+  projectKey,
+}) => {
+  await makeScheduledItem(projectKey, "E2E 竖线底座");
+  const m1 = (
+    await apiCall<{ milestoneId: string }>(
+      "POST",
+      `/api/projects/${projectKey}/milestones`,
+      { name: "E2M1", targetDate: dayOffset(3) },
+    )
+  ).milestoneId;
+  const m2 = (
+    await apiCall<{ milestoneId: string }>(
+      "POST",
+      `/api/projects/${projectKey}/milestones`,
+      { name: "E2M2", targetDate: dayOffset(10) },
+    )
+  ).milestoneId;
+  await apiCall("PATCH", `/api/projects/${projectKey}/milestones/${m2}`, {
+    status: "in_progress",
+  });
+  // gate 里程碑:挂 1 个 FINAL item → 旗标 1/1(无 targetDate 的里程碑不上图,故带日期)
+  const statuses = (
+    await apiCall<{ statuses: { statusId: string; name: string }[] }>(
+      "GET",
+      `/api/projects/${projectKey}`,
+    )
+  ).statuses;
+  const finalId = statuses[statuses.length - 1].statusId;
+  const gi = await apiCreateItem(projectKey, "E2E 关口件");
+  await apiAssignMe(gi);
+  await apiCall("PATCH", `/api/items/${gi}`, { statusItemId: finalId });
+  const m3 = (
+    await apiCall<{ milestoneId: string }>(
+      "POST",
+      `/api/projects/${projectKey}/milestones`,
+      { name: "E2M3", targetDate: dayOffset(6) },
+    )
+  ).milestoneId;
+  await apiCall("PUT", `/api/projects/${projectKey}/milestones/${m3}/items`, {
+    itemIds: [gi],
+  });
+
+  await page.goto(`/p/${projectKey}/gantt`);
+  await pickScope(page, "全部");
+  await expect(page.getByTestId("gantt-flag-band")).toBeVisible();
+  await expect(page.getByTestId(`gantt-ms-flag-${m1}`)).toBeVisible();
+  await expect(page.getByTestId(`gantt-ms-flag-${m2}`)).toBeVisible();
+  await expect(page.getByTestId(`gantt-ms-flag-${m3}`)).toHaveText(/1\/1/);
+  // x 位有序:d(3) 在 d(10) 左侧(轴已纳入 marker 日期,无钳边假位移)
+  const l1 = await page
+    .getByTestId(`gantt-ms-flag-${m1}`)
+    .evaluate((el) => el.getBoundingClientRect().left);
+  const l2 = await page
+    .getByTestId(`gantt-ms-flag-${m2}`)
+    .evaluate((el) => el.getBoundingClientRect().left);
+  expect(l2).toBeGreaterThan(l1);
+  // hover → tooltip 全信息;点击 → 跳里程碑管理页
+  await page.getByTestId(`gantt-ms-flag-${m1}`).hover();
+  await expect(page.getByText(/目标日期:/)).toBeVisible();
+  await page.getByTestId(`gantt-ms-flag-${m1}`).click();
+  await expect(page).toHaveURL(new RegExp(`/p/${projectKey}/milestones`));
+});
+
+test("发布竖线:planned 虚线@targetDate / released 实线@releasedDate(YPJ-221)", async ({
+  page,
+  projectKey,
+}) => {
+  await makeScheduledItem(projectKey, "E2E 发布底座");
+  const r1 = (
+    await apiCall<{ releaseId: string }>(
+      "POST",
+      `/api/projects/${projectKey}/releases`,
+      { name: "E2R1", targetDate: dayOffset(5) },
+    )
+  ).releaseId;
+  const r2 = (
+    await apiCall<{ releaseId: string }>(
+      "POST",
+      `/api/projects/${projectKey}/releases`,
+      {
+        name: "E2R2",
+        version: "1.0",
+        targetDate: dayOffset(-5),
+        status: "released",
+        releasedDate: dayOffset(-2),
+      },
+    )
+  ).releaseId;
+
+  await page.goto(`/p/${projectKey}/gantt`);
+  await pickScope(page, "全部");
+  const styleOf = (testid: string) =>
+    page
+      .getByTestId(testid)
+      .evaluate((el) => getComputedStyle(el).borderLeftStyle);
+  await expect(page.getByTestId(`gantt-rel-flag-${r1}`)).toBeVisible();
+  await expect(page.getByTestId(`gantt-rel-flag-${r2}`)).toHaveText(/v1\.0/);
+  // 线型:planned 虚线 / released 实线;r2 只画 releasedDate(拍板:targetDate 不画)
+  expect(await styleOf(`gantt-rel-line-${r1}`)).toBe("dashed");
+  expect(await styleOf(`gantt-rel-line-${r2}`)).toBe("solid");
+  // r2 线在 r1 左侧(d(-2) < d(5));轴纳入 releasedDate,不在钳边(负向最早日期 → 轴起点)
+  const l1 = await page
+    .getByTestId(`gantt-rel-line-${r1}`)
+    .evaluate((el) => el.getBoundingClientRect().left);
+  const l2 = await page
+    .getByTestId(`gantt-rel-line-${r2}`)
+    .evaluate((el) => el.getBoundingClientRect().left);
+  expect(l2).toBeLessThan(l1);
+});
+
+test("无里程碑/发布:旗标带不渲染,行位不受影响(YPJ-221 E1)", async ({
+  page,
+  projectKey,
+}) => {
+  await makeScheduledItem(projectKey, "E2E 空态底座");
+  await page.goto(`/p/${projectKey}/gantt`);
+  await pickScope(page, "全部");
+  await expect(page.getByTestId("gantt-flag-band")).toHaveCount(0);
+  await expect(page.getByText("E2E 空态底座")).toBeVisible();
+});

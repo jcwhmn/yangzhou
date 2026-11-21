@@ -39,6 +39,28 @@ export type HeaderRow = {
   ticks: Tick[];
 };
 
+// YPJ-221(spec 0158 r2):milestone/release 列表 DTO 前端窄型(泳道/竖线旗标用;列表 API 返回超集,只声明所需字段)
+export type MilestoneMarker = {
+  milestoneId: string;
+  name: string;
+  status: string; // planned/in_progress/completed/cancelled
+  targetDate: string | null;
+  overdue: boolean;
+  gateDone: number | null; // 双 null = 零 gate 站
+  gateTotal: number | null;
+  daysToTarget: number | null; // 负=已超
+};
+export type ReleaseMarker = {
+  releaseId: string;
+  name: string;
+  version: string | null;
+  stage: string | null;
+  status: string; // planned/released
+  targetDate: string | null;
+  releasedDate: string | null;
+  overdue: boolean;
+};
+
 // estimateUnit 封闭枚举(hour/day/week)的短标(YPJ-204)
 export const EST_UNIT_SHORT: Record<string, string> = {
   hour: "h",
