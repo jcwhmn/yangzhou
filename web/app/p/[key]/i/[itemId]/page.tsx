@@ -1221,70 +1221,17 @@ export default function ItemDetailPage() {
 
           {/* 子条目:主页面直排区块,置于页签栏上方(YPJ-84;核心功能不做页签,2026-10-24 用户拍板) */}
 
-          <Box sx={{ mt: 3 }}>
-            <Typography variant="h6" sx={{ mb: 1 }}>
-              子条目
-            </Typography>
-
-            {(subitems ?? []).length === 0 ? (
-              <Typography variant="caption" color="text.secondary">
-                (无子条目)
-              </Typography>
-            ) : (
-              <Stack spacing={0.5}>
-                {(subitems ?? []).map((s) => (
-                  <Stack
-                    key={s.itemId}
-                    direction="row"
-                    spacing={1}
-                    alignItems="center"
-                  >
-                    <Chip size="small" variant="outlined" label={s.number} />
-
-                    <Link href={`/p/${key}/i/${s.itemId}`}>
-                      <Typography variant="body2" noWrap sx={{ maxWidth: 360 }}>
-                        {s.title}
-                      </Typography>
-                    </Link>
-
-                    <Chip
-                      size="small"
-                      label={s.status}
-                      color={s.overdue ? "error" : "default"}
-                    />
-                  </Stack>
-                ))}
-              </Stack>
-            )}
-
-            <Stack
-              direction="row"
-              spacing={1}
-              alignItems="center"
-              sx={{ mt: 1 }}
-            >
-              <TextField
-                size="small"
-
-                placeholder="加一个子条目…"
-
-                value={newSubTitle}
-
-                onChange={(e) => setNewSubTitle(e.target.value)}
-
-                sx={{ width: 300 }}
-              />
-
-              <Button
-                size="small"
-                variant="outlined"
-                onClick={addSubitem}
-                disabled={!newSubTitle.trim()}
-              >
-                添加
-              </Button>
-            </Stack>
-          </Box>
+          <SubitemsBlock
+            projectKey={String(key)}
+            subitems={subitems}
+            newSubTitle={newSubTitle}
+            onSubTitleChange={setNewSubTitle}
+            onAdd={addSubitem}
+            policyOpen={subPolicyDialog}
+            onPolicyClose={() => setSubPolicyDialog(false)}
+            onPolicyIgnore={() => addSubitemWithPolicy("ignore")}
+            onPolicyMigrate={() => addSubitemWithPolicy("migrate")}
+          />
 
           <Tabs
             value={tab}
@@ -1439,31 +1386,6 @@ export default function ItemDetailPage() {
         </DialogActions>
       </Dialog>
 
-      {/* YPJ-218 spec 0139:加子时父自有时间线策略(默认迁移) */}
-      <Dialog open={subPolicyDialog} onClose={() => setSubPolicyDialog(false)}>
-        <DialogTitle>父 item 已有自己的时间线</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" color="text.secondary">
-            父 item 的起止时间将让给子项汇总。选择如何处置原有时间线:
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setSubPolicyDialog(false)}>取消</Button>
-          <Button
-            onClick={() => addSubitemWithPolicy("ignore")}
-            data-testid="sub-policy-ignore"
-          >
-            忽略原时间线
-          </Button>
-          <Button
-            variant="contained"
-            onClick={() => addSubitemWithPolicy("migrate")}
-            data-testid="sub-policy-migrate"
-          >
-            迁移为新子项(推荐)
-          </Button>
-        </DialogActions>
-      </Dialog>
       <Snackbar
         open={warnMsg !== null}
         autoHideDuration={8000}
@@ -1482,6 +1404,7 @@ import { AttrEditor } from "./components/AttrEditor";
 import { RequirementsDialog } from "./components/RequirementsDialog";
 import { CreateBranchDialog } from "./components/CreateBranchDialog";
 import { DependencyAddForm } from "./components/DependencyAddForm";
+import { SubitemsBlock } from "./components/SubitemsBlock";
 import { TimeLogTab } from "./components/TimeLogTab";
 import { AttributesTab } from "./components/AttributesTab";
 import { GithubTab } from "./components/GithubTab";
