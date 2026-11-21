@@ -1,92 +1,35 @@
 "use client";
 
-import {
-  Box,
-  Button,
-  Chip,
-  Checkbox,
-  TextField,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  FormControl,
-  InputLabel,
-  List,
-  ListItem,
-  ListItemText,
-  MenuItem,
-  Select,
-  Stack,
-  Table,
-  ToggleButton,
-  ToggleButtonGroup,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Typography,
-} from "@mui/material";
+import { Button, Stack, Typography } from "@mui/material";
 import { PageShell } from "@/components/PageShell";
-import { BarChart } from "@mui/x-charts/BarChart";
-import { LineChart } from "@mui/x-charts/LineChart";
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { api, ApiError } from "@/lib/api";
+import { useState } from "react";
+import { api } from "@/lib/api";
 import { t } from "@/lib/texts";
 import {
   getSprint,
-  listGroups,
   sprintAction,
   assignSprint,
   createSprint,
   listParentCandidates,
   updateGroupParent,
 } from "@/lib/sprints";
-import { AssignPopover } from "@/components/AssignPopover";
-import { SignalChip, type Signal } from "@/components/Verdict";
-
-type Sprint = {
-  sprintId: string;
-  name: string;
-  status: string;
-  startDate: string | null;
-  endDate: string | null;
-  parentGroupId: string | null;
-  typeKey: string;
-};
-type Item = {
-  itemId: string;
-  number: string;
-  parentNumber?: string | null;
-  title: string;
-  status: string;
-  assignee: string | null;
-  priority: string | null;
-  dueDate: string | null;
-  feasSignal: Signal | null;
-};
-type Status = {
-  statusId: string;
-  name: string;
-  statusType: string;
-  position: number;
-};
-// spec 0097 S3:类型 workflow(GET /group-types/{typeKey}/workflow),按钮按出边渲染
-type TypeWorkflow = {
-  name: string;
-  statusType: string;
-  transitions: { function: string; target: string }[];
-};
-type Candidate = {
-  itemId: string;
-  number: string;
-  title: string;
-  status: string;
-  assignee: string | null;
-};
+import {
+  type Candidate,
+  type Item,
+  type Sprint,
+  type Status,
+  type TypeWorkflow,
+  type Disp,
+} from "./types";
+import { ChartBy } from "./components/ChartBy";
+import { useSprintData } from "./hooks/useSprintData";
+import { SprintChartSection } from "./components/SprintChartSection";
+import { AddMembersDialog } from "./components/AddMembersDialog";
+import { ConfirmFlowDialog } from "./components/ConfirmFlowDialog";
+import { DispositionDialog } from "./components/DispositionDialog";
+import { SprintHeader } from "./components/SprintHeader";
+import { SprintItemsTable } from "./components/SprintItemsTable";
 
 /**
  * V12-S3 Sprint 落地页(spec 0010,grill 裁决 1/2):
@@ -97,91 +40,31 @@ type Candidate = {
 export default function SprintPage() {
   const { key, id } = useParams<{ key: string; id: string }>();
   const router = useRouter();
-  const [sprint, setSprint] = useState<Sprint | null>(null);
-  // 0110:版本号防乱序覆盖——初始加载的慢响应不得覆盖动作后的本地状态(单步弹出后点击更快,竞态实测)
-  const sprintVer = useRef(0);
-  const [items, setItems] = useState<Item[] | null>(null);
-  const [statuses, setStatuses] = useState<Status[]>([]);
-  const [error, setError] = useState("");
-  const [gone, setGone] = useState(false);
+  const {
+    sprint,
+    setSprint,
+    sprintVer,
+    items,
+    setItems,
+    statuses,
+    groups,
+    l1Key,
+    typeName,
+    wf,
+    parentSel,
+    error,
+    setError,
+    gone,
+  } = useSprintData(key, id);
   const [addOpen, setAddOpen] = useState(false);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
-  // spec 0114:全量组——处置目标树/开始提示按本组类型取候选(L1-only 不再够用)
-  const [groups, setGroups] = useState<Sprint[]>([]);
-  // spec 0114:上一层组选项(null=顶层组/平面项目,不渲染选择器)
-  const [parentSel, setParentSel] = useState<{
-    name: string;
-    options: { sprintId: string; name: string }[];
-  } | null>(null);
-  // spec 0114:level-1 类型 key(判定本组是否叶层;null=项目无组类型)
-  const [l1Key, setL1Key] = useState<string | null>(null);
-  // spec 0114:本组类型显示名(按钮/确认弹窗文案「开始{类型名}」动态化)
-  const [typeName, setTypeName] = useState<string | null>(null);
-  const [wf, setWf] = useState<TypeWorkflow[]>([]);
   const [confirmFlow, setConfirmFlow] = useState<
     null | "start" | "complete" | "reopen"
   >(null);
   // 0106:组完成后的非终态成员处置(rows 默认全转入目标组,逐行可覆写回 Backlog;D2/D3)
-  const [disp, setDisp] = useState<null | {
-    rows: { itemId: string; title: string; toBacklog: boolean }[];
-    actives: Sprint[];
-    planned: Sprint[];
-    typeName: string;
-    pick: string;
-    newName: string;
-  }>(null);
-  // YPJ-73:图表视图切换(燃専数据不足时显示空态而非整块消失)
-  const [chartView, setChartView] = useState<
-    "burndown" | "byStatus" | "byAssignee"
-  >("burndown");
-  // YPJ-46:burndown(剩余 vs 理想线);端点要求 sprint 有起止日期
-  const [bd, setBd] = useState<{
-    ideal: { date: string; remaining: number }[];
-    actual: { date: string; remaining: number }[];
-  } | null>(null);
-
-  useEffect(() => {
-    const ver = ++sprintVer.current;
-    Promise.all([
-      getSprint(key, id),
-      api<Item[]>(`/api/projects/${key}/groups/${id}/items`),
-      api<{ statuses: Status[] }>(`/api/projects/${key}`),
-      listGroups(key),
-      api<{ typeKey: string; name: string; level: number | null }[]>(
-        `/api/projects/${key}/group-types`,
-      ),
-    ])
-      .then(([s, its, p, gs, tps]) => {
-        if (sprintVer.current === ver) setSprint(s);
-        setSprint(s);
-        setItems(its);
-        setStatuses(p.statuses);
-        setGroups(gs);
-        const l1 = tps.find((tp) => tp.level === 1)?.typeKey ?? null;
-        setL1Key(l1);
-        setTypeName(tps.find((tp) => tp.typeKey === s.typeKey)?.name ?? null);
-        // spec 0114:workflow 按本组自身类型拉取(类型纯用户配置,不得硬编码 sprint)
-        api<TypeWorkflow[]>(
-          `/api/projects/${key}/group-types/${s.typeKey}/workflow`,
-        )
-          .then(setWf)
-          .catch(() => setWf([]));
-      })
-      .catch((e) => {
-        if (e instanceof ApiError && e.status === 404) setGone(true);
-        else setError(e instanceof Error ? e.message : "加载失败");
-      });
-  }, [key, id]);
-
-  useEffect(() => {
-    // spec 0114:上一层组候选按本组类型 L+1 动态拉取;无上层类型(顶层/平面)→ null
-    if (!sprint) return;
-    listParentCandidates(key, sprint.typeKey)
-      .then(setParentSel)
-      .catch(() => setParentSel(null));
-  }, [key, sprint]);
+  const [disp, setDisp] = useState<Disp | null>(null);
 
   async function changeStatus(status: string) {
     if (!sprint) return;
@@ -334,26 +217,6 @@ export default function SprintPage() {
     setBusy(false);
   }
 
-  function targetLabel(d: typeof disp): string {
-    if (!d) return "";
-    if (d.actives.length > 1 || d.planned.length > 1)
-      return t.sprintPage.dispPickTitle;
-    if (d.actives.length === 1) return `转入进行中的「${d.actives[0].name}」`;
-    if (d.planned.length === 1)
-      return `将激活计划中的「${d.planned[0].name}」并转入`;
-    return `将新建组「${d.newName}」并激活,转入`;
-  }
-  // 摘要行用:目标组名(多选时取 pick,与 confirmDisposition 落库一致)
-  function targetGroupName(d: NonNullable<typeof disp>): string {
-    if (d.actives.length > 0)
-      return (d.actives.find((s) => s.sprintId === d.pick) ?? d.actives[0])
-        .name;
-    if (d.planned.length > 0)
-      return (d.planned.find((s) => s.sprintId === d.pick) ?? d.planned[0])
-        .name;
-    return d.newName;
-  }
-
   /** 0110:「进 Backlog」——全部非终态成员显式回池,随完成同事务落库(旧行清理由 replaceMembership 承担)。 */
   async function doBacklogAll() {
     if (!disp || busy) return;
@@ -398,21 +261,6 @@ export default function SprintPage() {
     const finalName = wf.find((s) => s.statusType === "FINAL")?.name;
     return (finalName ? edgeFn(finalName) : undefined) ?? "complete";
   }
-  function actionLabel(fn: string, target?: string): string {
-    const name = typeName ?? sprint?.typeKey ?? "";
-    // 已知函数名优先;自定义工作流的 switch 等未知函数按出边目标态取文案
-    if (fn === "start") return t.sprintPage.startBtn.replace("{name}", name);
-    if (fn === "complete")
-      return t.sprintPage.completeBtn.replace("{name}", name);
-    if (fn === "reopen") return t.sprintPage.reopenBtn;
-    return target === "active"
-      ? t.sprintPage.startBtn.replace("{name}", name)
-      : target === "completed"
-        ? t.sprintPage.completeBtn.replace("{name}", name)
-        : target === "planned"
-          ? t.sprintPage.reopenBtn
-          : fn;
-  }
   function actionClick(fn: string, target?: string) {
     if (fn === "start") return startSprint();
     if (fn === "complete") return completeSprint();
@@ -431,19 +279,6 @@ export default function SprintPage() {
     setSprint(s);
     setConfirmFlow(null);
   }
-
-  useEffect(() => {
-    let alive = true;
-    api<{
-      ideal: { date: string; remaining: number }[];
-      actual: { date: string; remaining: number }[];
-    }>(`/api/projects/${key}/metrics/burndown?groupId=${id}`)
-      .then((r) => alive && setBd({ ideal: r.ideal, actual: r.actual }))
-      .catch(() => alive && setBd(null));
-    return () => {
-      alive = false;
-    };
-  }, [key, id]);
 
   // V13-S3:拉入/移出同一对话框——列出非终态 item 多选,确认后逐条走既有 PUT /items/{id}/sprint
   async function openAdd() {
@@ -489,6 +324,34 @@ export default function SprintPage() {
     }
   }
 
+  const toggleCandidate = (itemId: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(itemId)) next.delete(itemId);
+      else next.add(itemId);
+      return next;
+    });
+  const pickDisp = (sprintId: string) => {
+    if (disp) setDisp({ ...disp, pick: sprintId });
+  };
+  const renameDisp = (newName: string) => {
+    if (disp) setDisp({ ...disp, newName });
+  };
+  const toggleRowDisp = (idx: number) => {
+    if (!disp) return;
+    const r = disp.rows[idx];
+    setDisp({
+      ...disp,
+      rows: disp.rows.toSpliced(idx, 1, { ...r, toBacklog: !r.toBacklog }),
+    });
+  };
+  const closeDisp = () => setDisp(null);
+  const confirmFlowConfirm = () => {
+    if (confirmFlow === "start") void doStart();
+    else if (confirmFlow === "reopen") void doReopen();
+    else void completeEmpty();
+  };
+
   // 页内错误态:未知 sprint id 等;给返回按钮,不依赖浏览器后退(用户反馈)
   if (gone) {
     return (
@@ -518,516 +381,71 @@ export default function SprintPage() {
       )}
       {sprint && (
         <>
-          <Stack
-            direction="row"
-            spacing={2}
-            alignItems="center"
-            sx={{ mb: 1 }}
-            flexWrap="wrap"
-            useFlexGap
-          >
-            <Typography variant="h5">{sprint.name}</Typography>
-            <Chip
-              size="small"
-              label={
-                t.projectNav.sprintStatus[
-                  sprint.status as keyof typeof t.projectNav.sprintStatus
-                ] ?? sprint.status
-              }
-              color={
-                sprint.status === "active"
-                  ? "primary"
-                  : sprint.status === "completed"
-                    ? "default"
-                    : "warning"
-              }
-            />
-            <Typography color="text.secondary" variant="body2">
-              {sprint.startDate ?? "—"} ~ {sprint.endDate ?? "—"}
-            </Typography>
-            {/* spec 0113/0114:有上层类型才渲染;悬空组显示占位但不可选回(无置空语义) */}
-            {parentSel && parentSel.options.length > 0 && (
-              <FormControl size="small" sx={{ minWidth: 160 }}>
-                <InputLabel id="epic-select-label">
-                  {t.sprintPage.parentLabel.replace("{name}", parentSel.name)}
-                </InputLabel>
-                <Select
-                  labelId="epic-select-label"
-                  label={t.sprintPage.parentLabel.replace(
-                    "{name}",
-                    parentSel.name,
-                  )}
-                  value={sprint.parentGroupId ?? ""}
-                  displayEmpty
-                  onChange={(e) => void reparent(e.target.value as string)}
-                >
-                  {sprint.parentGroupId == null && (
-                    <MenuItem value="" disabled>
-                      {t.sprintPage.parentDangling}
-                    </MenuItem>
-                  )}
-                  {parentSel.options.map((ep) => (
-                    <MenuItem key={ep.sprintId} value={ep.sprintId}>
-                      {ep.name}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            )}
-            {/* V14 组级 rollup:组内 items feasSignal 取最差(红>黄>绿;无信号不显示) */}
-            {(() => {
-              if (!items || items.length === 0) return null;
-              const rank: Record<Signal, number> = {
-                RED: 0,
-                YELLOW: 1,
-                GREEN: 2,
-              };
-              const sigs = items
-                .map((i) => i.feasSignal)
-                .filter((s): s is Signal => s !== null);
-              return sigs.length > 0 ? (
-                <SignalChip
-                  signal={sigs.reduce((a, b) => (rank[a] <= rank[b] ? a : b))}
-                  size="small"
-                />
-              ) : null;
-            })()}
-            <Stack
-              direction="row"
-              spacing={1}
-              alignItems="center"
-              sx={{ ml: "auto" }}
-            >
-              {wf
-                .find((s) => s.name === sprint.status)
-                ?.transitions.filter(
-                  (tr) =>
-                    tr.function !== "backward" && sprint.typeKey === l1Key,
-                )
-                .map((tr) => (
-                  <Button
-                    key={tr.function}
-                    size="small"
-                    variant={
-                      tr.function === "reopen" || tr.target === "planned"
-                        ? "outlined"
-                        : "contained"
-                    }
-                    color={
-                      tr.function === "reopen" || tr.target === "planned"
-                        ? "inherit"
-                        : "primary"
-                    }
-                    disabled={items === null} // 0110:items 未载禁用,防误开处置/确认弹窗
-                    onClick={() => actionClick(tr.function, tr.target)}
-                  >
-                    {actionLabel(tr.function, tr.target)}
-                  </Button>
-                ))}
-            </Stack>
-            {sprint.status !== "completed" && sprint.typeKey === l1Key && (
-              <Button size="small" variant="outlined" onClick={openAdd}>
-                拉入 item
-              </Button>
-            )}
-          </Stack>
-          {sprint.status === "completed" && (
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ display: "block", mb: 2 }}
-            >
-              此 Sprint 已完成,以下为历史 items(成员关系不可再变,可重开组)。
-            </Typography>
-          )}
+          <SprintHeader
+            sprint={sprint}
+            items={items}
+            wf={wf}
+            l1Key={l1Key}
+            parentSel={parentSel}
+            typeName={typeName}
+            onReparent={(target) => void reparent(target)}
+            onAction={actionClick}
+            onOpenAdd={openAdd}
+          />
 
-          {items !== null && items.length === 0 && (
-            <Typography color="text.secondary" sx={{ mt: 4 }}>
-              此 Sprint 还没有 item——点右上「拉入 item」批量勾选,或在 item
-              详情用「Sprint」下拉指派。
-            </Typography>
-          )}
-
-          <Stack direction="row" justifyContent="flex-end" sx={{ mb: 1 }}>
-            <ToggleButtonGroup
-              size="small"
-              exclusive
-              value={chartView}
-              onChange={(_, v) => v && setChartView(v)}
-            >
-              <ToggleButton value="burndown">
-                {t.sprintCharts.burndown}
-              </ToggleButton>
-              <ToggleButton value="byStatus">
-                {t.sprintCharts.byStatus}
-              </ToggleButton>
-              <ToggleButton value="byAssignee">
-                {t.sprintCharts.byAssignee}
-              </ToggleButton>
-            </ToggleButtonGroup>
-          </Stack>
-          {chartView === "burndown" &&
-            (bd && bd.actual.length > 1 ? (
-              <LineChart
-                height={260}
-                xAxis={[
-                  {
-                    scaleType: "time",
-                    data: bd.actual.map((p) => new Date(p.date)),
-                  },
-                ]}
-                series={[
-                  {
-                    label: t.flow.remaining,
-                    data: bd.actual.map((p) => p.remaining),
-                    showMark: false,
-                  },
-                  {
-                    label: t.flow.ideal,
-                    data: bd.ideal.map((p) => p.remaining),
-                    showMark: false,
-                  },
-                ]}
-                sx={{ mb: 2 }}
-              />
-            ) : (
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                sx={{ display: "block", mb: 2 }}
-              >
-                {t.sprintCharts.burndownEmpty}
-              </Typography>
-            ))}
-          {chartView !== "burndown" && items !== null && items.length > 0 && (
-            <ChartBy
-              view={chartView}
-              items={items}
-              statusOrder={statuses.map((s) => s.name)}
-              sx={{ mb: 2 }}
-            />
-          )}
+          <SprintChartSection
+            projectKey={key}
+            groupId={id}
+            items={items}
+            statusOrder={statuses.map((s) => s.name)}
+          />
 
           {items !== null && items.length > 0 && (
-            <TableContainer>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    {["编号", "标题", "优先级", "状态", "负责人", "截止"].map(
-                      (c) => (
-                        <TableCell key={c}>{c}</TableCell>
-                      ),
-                    )}
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {items.map((it) => (
-                    <TableRow key={it.itemId} hover>
-                      <TableCell>
-                        <Link
-                          href={`/p/${key}/i/${it.itemId}?from=sprint-${id}`}
-                        >
-                          <Typography
-                            variant="body2"
-                            sx={{ whiteSpace: "nowrap" }}
-                          >
-                            {(it.parentNumber ? it.parentNumber + " › " : "") +
-                              it.number}
-                          </Typography>
-                        </Link>
-                      </TableCell>
-                      <TableCell>
-                        <Link
-                          href={`/p/${key}/i/${it.itemId}?from=sprint-${id}`}
-                        >
-                          <Typography variant="body2">{it.title}</Typography>
-                        </Link>
-                      </TableCell>
-                      <TableCell>{it.priority ?? "—"}</TableCell>
-                      <TableCell>{it.status}</TableCell>
-                      <TableCell>
-                        <AssignPopover
-                          itemId={it.itemId}
-                          assignee={it.assignee}
-                          onChanged={() =>
-                            api<Item[]>(
-                              `/api/projects/${key}/sprints/${id}/items`,
-                            )
-                              .then(setItems)
-                              .catch(() => {})
-                          }
-                        >
-                          {(onClick) => (
-                            <Chip
-                              size="small"
-                              variant="outlined"
-                              label={
-                                it.assignee
-                                  ? `👤 ${it.assignee}`
-                                  : t.assign.none
-                              }
-                              onClick={onClick}
-                              sx={it.assignee ? undefined : { opacity: 0.55 }}
-                            />
-                          )}
-                        </AssignPopover>
-                      </TableCell>
-                      <TableCell>{it.dueDate ?? "—"}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
+            <SprintItemsTable
+              projectKey={key}
+              groupId={id}
+              items={items}
+              onAssigneeChanged={() =>
+                api<Item[]>(`/api/projects/${key}/sprints/${id}/items`)
+                  .then(setItems)
+                  .catch(() => {})
+              }
+            />
           )}
-          <Dialog
+          <AddMembersDialog
             open={addOpen}
+            candidates={candidates}
+            selected={selected}
+            busy={busy}
+            onToggle={toggleCandidate}
             onClose={() => setAddOpen(false)}
-            maxWidth="sm"
-            fullWidth
-          >
-            <DialogTitle>拉入 item</DialogTitle>
-            <DialogContent dividers sx={{ maxHeight: 480 }}>
-              <List dense disablePadding>
-                {candidates.map((it) => (
-                  <ListItem key={it.itemId} dense disableGutters>
-                    <Checkbox
-                      size="small"
-                      checked={selected.has(it.itemId)}
-                      onChange={() =>
-                        setSelected((prev) => {
-                          const next = new Set(prev);
-                          if (next.has(it.itemId)) next.delete(it.itemId);
-                          else next.add(it.itemId);
-                          return next;
-                        })
-                      }
-                    />
-                    <ListItemText
-                      primary={`${it.number} · ${it.title}`}
-                      secondary={[
-                        it.status,
-                        it.assignee ? `👤 ${it.assignee}` : null,
-                      ]
-                        .filter(Boolean)
-                        .join(" · ")}
-                    />
-                  </ListItem>
-                ))}
-                {candidates.length === 0 && (
-                  <Typography variant="caption" color="text.secondary">
-                    项目里没有可拉入的非终态 item。
-                  </Typography>
-                )}
-              </List>
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={() => setAddOpen(false)}>取消</Button>
-              <Button
-                variant="contained"
-                onClick={applyMembership}
-                disabled={busy}
-              >
-                完成
-              </Button>
-            </DialogActions>
-          </Dialog>
-          <Dialog
-            open={confirmFlow !== null}
+            onApply={applyMembership}
+          />
+          <ConfirmFlowDialog
+            confirmFlow={confirmFlow}
+            groupId={id}
+            typeName={typeName}
+            sprint={sprint}
+            groups={groups}
+            items={items}
+            statuses={statuses}
             onClose={() => setConfirmFlow(null)}
-            maxWidth="xs"
-            fullWidth
-          >
-            <DialogTitle>
-              {confirmFlow === "start"
-                ? `开始 ${typeName ?? sprint.typeKey}`
-                : confirmFlow === "reopen"
-                  ? "重开组"
-                  : `完成 ${typeName ?? sprint.typeKey}`}
-            </DialogTitle>
-            <DialogContent>
-              <Typography>
-                {confirmFlow === "start"
-                  ? `项目已有进行中的 ${typeName ?? sprint.typeKey}「${groups.find((s) => s.typeKey === sprint.typeKey && s.status === "active" && s.sprintId !== id)?.name ?? ""}」,允许同时存在多个进行中。仍要开始本 ${typeName ?? sprint.typeKey}?`
-                  : confirmFlow === "reopen"
-                    ? t.sprintPage.reopenConfirm
-                    : `完成后,${(items ?? []).filter((it) => !(statuses.find((st) => st.name === it.status)?.statusType === "FINAL")).length} 个未完成 item 将进入处置(选定去向);已完成 item 保留在本页历史。`}
-              </Typography>
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={() => setConfirmFlow(null)}>取消</Button>
-              <Button
-                variant="contained"
-                onClick={
-                  confirmFlow === "start"
-                    ? doStart
-                    : confirmFlow === "reopen"
-                      ? doReopen
-                      : completeEmpty
-                }
-              >
-                {confirmFlow === "start"
-                  ? "仍要开始"
-                  : confirmFlow === "reopen"
-                    ? "确认重开"
-                    : "确认完成"}
-              </Button>
-            </DialogActions>
-          </Dialog>
+            onConfirm={confirmFlowConfirm}
+          />
           {/* 0106:非终态成员处置——目标组决策树 + 逐行覆写回 Backlog(D2/D3);0107 行内显式按钮 + 提交前摘要(方案A,消除 checkbox 误勾事故) */}
-          <Dialog open={disp !== null} maxWidth="sm" fullWidth>
-            <DialogTitle>
-              完成「{sprint?.name ?? ""}」——{disp?.rows.length ?? 0} 个未完成
-              item 待处置
-            </DialogTitle>
-            <DialogContent>
-              <Typography sx={{ mt: 1, mb: 1, fontWeight: 600 }}>
-                {targetLabel(disp)}
-              </Typography>
-              {disp && (disp.actives.length > 1 || disp.planned.length > 1) && (
-                <Stack spacing={1} sx={{ mb: 1 }}>
-                  {[...disp.actives, ...disp.planned].map((sp) => (
-                    <Button
-                      key={sp.sprintId}
-                      variant={
-                        disp.pick === sp.sprintId ? "contained" : "outlined"
-                      }
-                      onClick={() => setDisp({ ...disp, pick: sp.sprintId })}
-                    >
-                      {sp.name}
-                    </Button>
-                  ))}
-                </Stack>
-              )}
-              {disp &&
-                disp.actives.length === 0 &&
-                disp.planned.length === 0 && (
-                  <TextField
-                    label={t.board.newGroupName}
-                    value={disp.newName}
-                    onChange={(e) =>
-                      setDisp({ ...disp, newName: e.target.value })
-                    }
-                    fullWidth
-                    sx={{ mb: 1 }}
-                  />
-                )}
-              {disp?.rows.map((r, idx) => (
-                <Box
-                  key={r.itemId}
-                  sx={{ display: "flex", alignItems: "center", gap: 1 }}
-                >
-                  <Box
-                    sx={{
-                      flex: 1,
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      color: r.toBacklog ? "warning.dark" : "text.primary",
-                    }}
-                  >
-                    {r.title}
-                  </Box>
-                  {r.toBacklog && (
-                    <Typography
-                      variant="body2"
-                      color="warning.dark"
-                      fontWeight={600}
-                    >
-                      {t.sprintPage.dispRowMarked}
-                    </Typography>
-                  )}
-                  <Button
-                    size="small"
-                    variant={r.toBacklog ? "contained" : "text"}
-                    color={r.toBacklog ? "warning" : "inherit"}
-                    aria-label={`${r.toBacklog ? t.sprintPage.dispRowUndo : t.sprintPage.dispRowBacklog} ${r.title}`}
-                    onClick={() =>
-                      setDisp({
-                        ...disp,
-                        rows: disp.rows.toSpliced(idx, 1, {
-                          ...r,
-                          toBacklog: !r.toBacklog,
-                        }),
-                      })
-                    }
-                  >
-                    {r.toBacklog
-                      ? t.sprintPage.dispRowUndo
-                      : t.sprintPage.dispRowBacklog}
-                  </Button>
-                </Box>
-              ))}
-              {disp && disp.rows.length > 0 && (
-                <Typography
-                  variant="body2"
-                  sx={{ mt: 1 }}
-                  color={
-                    disp.rows.some((r) => r.toBacklog)
-                      ? "warning.dark"
-                      : "text.secondary"
-                  }
-                >
-                  {`${t.sprintPage.dispSummaryMove}「${targetGroupName(disp)}」 ${disp.rows.filter((r) => !r.toBacklog).length} ${t.sprintPage.dispSummaryBack} ${disp.rows.filter((r) => r.toBacklog).length} ${t.sprintPage.dispSummaryTail}`}
-                </Typography>
-              )}
-            </DialogContent>
-            <DialogActions>
-              {/* 0110:取消|进 Backlog|进「组名」三钮(用户拍板一次弹出) */}
-              <Button onClick={() => setDisp(null)} disabled={busy}>
-                "取消"
-              </Button>
-              <Button onClick={doBacklogAll} disabled={busy}>
-                {t.sprintPage.dispGoBacklog}
-              </Button>
-              <Button
-                variant="contained"
-                onClick={confirmDisposition}
-                disabled={busy}
-              >
-                {disp && `进「${targetGroupName(disp)}」`}
-              </Button>
-            </DialogActions>
-          </Dialog>
+          <DispositionDialog
+            disp={disp}
+            sprintName={sprint?.name ?? ""}
+            busy={busy}
+            onClose={closeDisp}
+            onPick={pickDisp}
+            onNewName={renameDisp}
+            onToggleRow={toggleRowDisp}
+            onBacklogAll={doBacklogAll}
+            onConfirm={confirmDisposition}
+          />
         </>
       )}
     </PageShell>
-  );
-}
-
-// YPJ-73:sprint 页图表——按状态/按负责人的 item 计数(横向条形,数据全来自页内 items)
-function ChartBy({
-  view,
-  items,
-  statusOrder,
-  ...rest
-}: {
-  view: "byStatus" | "byAssignee";
-  items: Item[];
-  statusOrder: string[];
-} & { sx?: object }) {
-  const rows = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const i of items) {
-      const k =
-        view === "byStatus"
-          ? i.status
-          : (i.assignee ?? t.sprintCharts.unassigned);
-      counts.set(k, (counts.get(k) ?? 0) + 1);
-    }
-    const order =
-      view === "byStatus"
-        ? [...statusOrder, ...counts.keys()].filter(
-            (k, idx, a) => counts.has(k) && a.indexOf(k) === idx,
-          )
-        : [...counts.keys()].sort();
-    return order.map((name) => ({ name, count: counts.get(name)! }));
-  }, [view, items, statusOrder]);
-  return (
-    <BarChart
-      height={260}
-      layout="horizontal"
-      yAxis={[{ scaleType: "band", data: rows.map((r) => r.name) }]}
-      series={[{ label: t.sprintCharts.count, data: rows.map((r) => r.count) }]}
-      {...rest}
-    />
   );
 }
