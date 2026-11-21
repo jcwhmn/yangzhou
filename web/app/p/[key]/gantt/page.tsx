@@ -28,126 +28,26 @@ import { parseLocal, fmtDateTime } from "@/lib/dates";
 import { t } from "@/lib/texts";
 import { DateInput } from "@/components/DateInput";
 
-type GanttRow = {
-  itemId: string;
-  parentItemId: string | null;
-  number: string;
-  title: string;
-  startDate: string | null;
-  dueDate: string | null;
-  statusName: string;
-  statusType: string | null;
-  overdue: boolean;
-  blocked: boolean;
-  estimateValue: number | null;
-  estimateUnit: string | null;
-  depth: number;
-  actualStart: string | null;
-  actualEnd: string | null;
-  anchorDate: string | null; // YPJ-244(spec 0151):依赖锚点=多前置最晚 due(无 due 退 start);null=无可用前置时间
-  assigneeName: string | null;
-  checklistDone: number | null;
-  checklistTotal: number | null;
-};
-
-const DAY = 24 * 60 * 60 * 1000;
-
-// YPJ-244(spec 0151 五):工作日历换算 JS 移植(口径同 WorkdayCalculator:每日窗线性,周六日照算,无午休)
-const hmToMin = (s: string) => {
-  const [h, m] = s.split(":").map(Number);
-  return h * 60 + m;
-};
-
-function dueFromJs(
-  startT: number,
-  hours: number,
-  ws: number,
-  we: number,
-): number {
-  if (hours <= 0) return startT;
-  let day0 = new Date(startT);
-  day0.setHours(0, 0, 0, 0);
-  let cursor = Math.max(startT, +day0 + ws * 60000);
-  let remain = Math.round(hours * 60) * 60000;
-  for (;;) {
-    const dayEnd = +day0 + we * 60000;
-    if (cursor >= dayEnd) {
-      day0 = new Date(+day0 + DAY);
-      cursor = +day0 + ws * 60000;
-      continue;
-    }
-    const avail = dayEnd - cursor;
-    if (remain >= avail) {
-      remain -= avail;
-      if (remain === 0) return dayEnd;
-      day0 = new Date(+day0 + DAY);
-      cursor = +day0 + ws * 60000;
-    } else return cursor + remain;
-  }
-}
-
-function estimateHoursOf(
-  v: number | null,
-  unit: string | null,
-  ws: number,
-  we: number,
-): number | null {
-  if (v == null) return null;
-  const winH = (we - ws) / 60;
-  return (unit ?? "hour") === "hour"
-    ? v
-    : unit === "day"
-      ? v * winH
-      : unit === "week"
-        ? v * 7 * winH // SRS v4 §3.3(2026-11-21 拍板):week = 7 天(无 weekend 休息日语义)
-        : v;
-}
-
-// YPJ-245(SRS §11.1):偏移徽标仅 FINAL 行(进行中超期由红计划条表达,零徽标)
-// Δ = actualEnd − due(真实完成时刻 = 最近一次 FINAL);|Δ|<1h On time(中性)/ <24h ±Nh / ≥24h ±Nd(日历日差);提前绿/延期红;due 无值不标
-function offsetBadge(r: GanttRow): { label: string; color: string } | null {
-  if (r.statusType !== "FINAL" || !r.dueDate || !r.actualEnd) return null;
-  const dh = (+parseLocal(r.actualEnd) - +parseLocal(r.dueDate)) / 3600000;
-  const day0 = (t: number) => {
-    const d = new Date(t);
-    d.setHours(0, 0, 0, 0);
-    return +d;
-  };
-  if (Math.abs(dh) < 1) return { label: "On time", color: "text.secondary" };
-  if (Math.abs(dh) < 24) {
-    return {
-      label: `${dh > 0 ? "+" : "-"}${Math.round(Math.abs(dh))}h`,
-      color: dh > 0 ? "error.main" : "success.main",
-    };
-  }
-  const days = Math.round(
-    (day0(+parseLocal(r.actualEnd)) - day0(+parseLocal(r.dueDate))) / DAY,
-  );
-  return {
-    label: `${days > 0 ? "+" : ""}${days}d`,
-    color: days > 0 ? "error.main" : "success.main",
-  };
-}
-
-// YPJ-219 v2(spec 0140):轴 = 数据锚定(首日 00:00 → 末日 24:00),连续缩放,无语义档位
-const TITLE_W_DEFAULT = 280; // 标题列默认宽(=236 出厂值;237 双击重置回落此值)
-const TITLE_W_MIN = 120;
-const TITLE_W_LS = "yz-gantt-title-w"; // 237:标题列宽 localStorage 记忆键
-const MAX_PPD = 2400; // 缩放上限:1日窗承诺在内容宽 ≤2680 成立(YPJ-230;1920 屏内容 1386 原被 720 夹成 ~1.9 天)
-const GANTT_MIN_PPD = 3; // 缺省视窗 pxPerDay 下限(YPJ-234 拍板案 B 修订:宽区间不把条压没;1 天 ≈ 3px、1 月 ≈ 91px 可读;只约束缺省态,显式缩放仍可压破至 fit)
-const MIN_LABEL_PX = 44; // 刻度标签最小间距
-const ZOOM_STEP = 1.5; // ± 按钮步进系数
-
-type Tick = { x: number; label: string; key: string };
-type HeaderRow = { gran: "month" | "week" | "day" | "hour"; ticks: Tick[] };
-
-// estimateUnit 封闭枚举(hour/day/week)的短标(YPJ-204)
-const EST_UNIT_SHORT: Record<string, string> = {
-  hour: "h",
-  day: "d",
-  week: "w",
-};
-
+import {
+  DAY,
+  EST_UNIT_SHORT,
+  GANTT_MIN_PPD,
+  MAX_PPD,
+  MIN_LABEL_PX,
+  TITLE_W_DEFAULT,
+  TITLE_W_LS,
+  TITLE_W_MIN,
+  ZOOM_STEP,
+  type GanttRow,
+  type HeaderRow,
+  type Tick,
+} from "./types";
+import {
+  dueFromJs,
+  estimateHoursOf,
+  hmToMin,
+  offsetBadge,
+} from "./utils/timeCalculations";
 /** 单项目树形甘特(只读)。条 = start→due;只有 due 画里程碑菱形;今日线;未排期折叠组。 */
 export default function GanttPage() {
   const { key } = useParams<{ key: string }>();
