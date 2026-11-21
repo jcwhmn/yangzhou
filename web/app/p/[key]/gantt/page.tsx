@@ -23,7 +23,6 @@ import {
   useState,
   type MouseEvent as ReactMouseEvent,
 } from "react";
-import { api } from "@/lib/api";
 import { parseLocal, fmtDateTime } from "@/lib/dates";
 import { t } from "@/lib/texts";
 import { DateInput } from "@/components/DateInput";
@@ -42,17 +41,15 @@ import {
   type HeaderRow,
   type Tick,
 } from "./types";
+import { useGanttData } from "./hooks/useGanttData";
 import {
   dueFromJs,
   estimateHoursOf,
-  hmToMin,
   offsetBadge,
 } from "./utils/timeCalculations";
 /** 单项目树形甘特(只读)。条 = start→due;只有 due 画里程碑菱形;今日线;未排期折叠组。 */
 export default function GanttPage() {
   const { key } = useParams<{ key: string }>();
-  const [rows, setRows] = useState<GanttRow[] | null>(null);
-  const [wd, setWd] = useState<[number, number] | null>(null); // 五:工作日历窗(分钟;默认 09:00-18:00)
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   // YPJ-245(SRS §10.6):已完成折叠组,默认收起(会话态,不持久)
   const [showCompleted, setShowCompleted] = useState(false);
@@ -76,6 +73,12 @@ export default function GanttPage() {
   const [center, setCenter] = useState(savedView.center ?? "");
   const [scope, setScope] = useState(savedView.scope ?? "board");
   const [scopeIds, setScopeIds] = useState<string[]>(savedView.scopeIds ?? []);
+  // 数据获取与借锚(CP2a:rows/wd/二级选项随 fetch 收进 useGanttData,入口经返回值持有)
+  const { rows, wd, groupOpts, msOpts, relOpts, groupStartOf } = useGanttData(
+    key,
+    scope,
+    scopeIds,
+  );
   const [containerW, setContainerW] = useState(0); // 可视宽(内容至少撑满一屏)
   // 237(spec 0145):标题列宽可拖拽,localStorage 记忆;无值/越界回落默认
   const [titleW, setTitleW] = useState(() => {
@@ -88,7 +91,6 @@ export default function GanttPage() {
     null,
   );
   const scrollRef = useRef<HTMLDivElement>(null);
-  const loadSeqRef = useRef(0); // 响应序号守卫:切范围后慢响应晚到不覆盖新状态
 
   // 夹取:仅交互路径调用(此时 containerW 已实测;初值不夹 max,避免测量前误夹 120)
   const clampTitleW = (w: number) =>
@@ -123,86 +125,10 @@ export default function GanttPage() {
     window.addEventListener("mouseup", up);
   };
 
-  // 范围二级选项(group/milestone/release;列表 API 均返回裸数组)
-  const [groupOpts, setGroupOpts] = useState<
-    { groupId: string; name: string }[]
-  >([]);
-  const [msOpts, setMsOpts] = useState<{ milestoneId: string; name: string }[]>(
-    [],
-  );
-  const [relOpts, setRelOpts] = useState<{ releaseId: string; name: string }[]>(
-    [],
-  );
-
-  const load = useCallback(async () => {
-    // 未选完不发请求:group 空多选 / milestone、release 未选中 → 直接空态
-    if (
-      scope === "group"
-        ? scopeIds.length === 0
-        : (scope === "milestone" || scope === "release") &&
-          scopeIds.length !== 1
-    ) {
-      setRows([]);
-      return;
-    }
-    const qs = new URLSearchParams();
-    if (scope !== "board") qs.set("scope", scope);
-    if (scopeIds.length > 0) qs.set("scopeIds", scopeIds.join(","));
-    const seq = ++loadSeqRef.current;
-    const q = qs.toString();
-    const [data, proj] = await Promise.all([
-      api<{ rows: GanttRow[] }>(
-        `/api/projects/${key}/gantt${q ? `?${q}` : ""}`,
-      ),
-      api<{ workdayStart: string; workdayEnd: string }>(`/api/projects/${key}`),
-    ]);
-    if (seq !== loadSeqRef.current) return; // 已有更新的范围请求,丢弃过期响应
-    setRows(data.rows);
-    setWd([hmToMin(proj.workdayStart), hmToMin(proj.workdayEnd)]);
-  }, [key, scope, scopeIds]);
-
-  useEffect(() => {
-    load().catch(() => setRows([]));
-  }, [load]);
-
-  // 二级选项一次拉取(失败静默:选择器留空,不阻塞甘特)
-  useEffect(() => {
-    api<{ groupId: string; name: string }[]>(`/api/projects/${key}/groups`)
-      .then(setGroupOpts)
-      .catch(() => {});
-    api<{ milestoneId: string; name: string }[]>(
-      `/api/projects/${key}/milestones`,
-    )
-      .then(setMsOpts)
-      .catch(() => {});
-    api<{ releaseId: string; name: string }[]>(`/api/projects/${key}/releases`)
-      .then(setRelOpts)
-      .catch(() => {});
-  }, [key]);
-
   const changeScope = (next: string) => {
     setScope(next);
     setScopeIds([]); // 切范围清空二级选择(spec 0141)
   };
-
-  // YPJ-244(spec 0151 五):group 开始锚=父链上溯最近祖先 startDate(全链无=null)
-  const rowById = useMemo(
-    () => new Map((rows ?? []).map((r) => [r.itemId, r] as const)),
-    [rows],
-  );
-  const groupStartOf = useCallback(
-    (r: GanttRow): string | null => {
-      let p = r.parentItemId;
-      while (p) {
-        const parent = rowById.get(p);
-        if (!parent) break;
-        if (parent.startDate) return parent.startDate;
-        p = parent.parentItemId;
-      }
-      return null;
-    },
-    [rowById],
-  );
 
   // 轴(YPJ-219 spec 0140 v2):范围 = 数据锚定日界;pxPerDay 连续 ∈ [fit 全区间压一屏, MAX_PPD]
   const axis = useMemo(() => {
