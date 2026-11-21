@@ -1,21 +1,12 @@
 "use client";
 
-import {
-  Alert,
-  Box,
-  Button,
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  Skeleton,
-  Stack,
-  TextField,
-  Typography,
-} from "@mui/material";
+import { Alert, Box, Skeleton, Stack } from "@mui/material";
 import { Dropdown } from "@/components/Dropdown";
 import BoardHeader from "./components/BoardHeader";
 import FilterChips from "./components/FilterChips";
 import BoardColumn from "./components/BoardColumn";
+import SprintPickDialog from "./components/SprintPickDialog";
+import LaunchDialog from "./components/LaunchDialog";
 import { DialogActions } from "@mui/material";
 import { useParams } from "next/navigation";
 import { useState } from "react";
@@ -385,78 +376,24 @@ export default function BoardPage() {
           })}
         </Stack>
       )}
-      <Dialog open={sprintPickOpen} onClose={() => setSprintPickOpen(false)}>
-        <DialogTitle>放入哪个组</DialogTitle>
-        <DialogContent>
-          <Stack spacing={1} sx={{ mt: 1 }}>
-            {activeSprints.map((sp) => (
-              <Button
-                key={sp.sprintId}
-                variant="outlined"
-                onClick={() =>
-                  createInGroup(pendingTitle, sp.sprintId, pendingEst)
-                }
-              >
-                {sp.name}
-              </Button>
-            ))}
-          </Stack>
-        </DialogContent>
-      </Dialog>
+      <SprintPickDialog
+        open={sprintPickOpen}
+        onClose={() => setSprintPickOpen(false)}
+        activeSprints={activeSprints}
+        onPick={(sprintId) => createInGroup(pendingTitle, sprintId, pendingEst)}
+      />
       {/* 0105 S2/S2m/S3:创建前置确认——激活并放入/新建并激活;取消=放弃创建(D6) */}
-      <Dialog open={launchOpen} onClose={() => setLaunchOpen(false)}>
-        <DialogTitle>
-          {launchMode === "activate" &&
-          sprints.filter((s) => s.status === "planned").length > 1
-            ? t.board.launchPickTitle
-            : t.board.launchTitle}
-        </DialogTitle>
-        <DialogContent>
-          {launchMode === "create" ? (
-            <TextField
-              label={t.board.newGroupName}
-              value={launchName}
-              onChange={(e) => setLaunchName(e.target.value)}
-              autoFocus
-              fullWidth
-              sx={{ mt: 1 }}
-            />
-          ) : sprints.filter((s) => s.status === "planned").length > 1 ? (
-            <Stack spacing={1} sx={{ mt: 1 }}>
-              {sprints
-                .filter((s) => s.status === "planned")
-                .map((sp) => (
-                  <Button
-                    key={sp.sprintId}
-                    variant={
-                      launchPick === sp.sprintId ? "contained" : "outlined"
-                    }
-                    onClick={() => setLaunchPick(sp.sprintId)}
-                  >
-                    {sp.name}
-                  </Button>
-                ))}
-            </Stack>
-          ) : (
-            <Typography>
-              {t.board.launchBody.replace(
-                "{name}",
-                sprints.find((s) => s.status === "planned")?.name ?? "",
-              )}
-            </Typography>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setLaunchOpen(false)}>
-            {t.board.launchCancel}
-          </Button>
-          <Button variant="contained" onClick={confirmLaunch}>
-            {launchMode === "create"
-              ? t.board.launchCreateConfirm
-              : t.board.launchConfirm}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <LaunchDialog
+        open={launchOpen}
+        onClose={() => setLaunchOpen(false)}
+        mode={launchMode}
+        sprints={sprints}
+        pick={launchPick}
+        onPick={setLaunchPick}
+        name={launchName}
+        onNameChange={setLaunchName}
+        onConfirm={confirmLaunch}
+      />
       <PullDialog
         open={pullOpen}
         projectKey={key}
