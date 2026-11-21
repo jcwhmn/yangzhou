@@ -667,9 +667,9 @@ export default function GanttPage() {
               ? +parseLocal(x.dueDate) +
                 (/^\d{4}-\d{2}-\d{2}$/.test(x.dueDate) ? DAY : 0)
               : null;
-          const estEnd =
-            estH !== null ? dueFromJs(a, estH, wsm, wem) : null;
-          if (dueEnd !== null || estEnd !== null) consider(a, Math.max(a, dueEnd ?? estEnd!));
+          const estEnd = estH !== null ? dueFromJs(a, estH, wsm, wem) : null;
+          if (dueEnd !== null || estEnd !== null)
+            consider(a, Math.max(a, dueEnd ?? estEnd!));
           else consider(a, a); // 计划点:零宽(case1 借锚点 / case3b)
         } else if (x.dueDate !== null) {
           // due-only 菱形(历史数据,Q11 废除后无新增):零宽点位参与包络
@@ -679,7 +679,8 @@ export default function GanttPage() {
         // 实际层元素
         if (x.actualStart !== null) {
           const s = +parseLocal(x.actualStart);
-          const e = x.actualEnd !== null ? +parseLocal(x.actualEnd) : Date.now();
+          const e =
+            x.actualEnd !== null ? +parseLocal(x.actualEnd) : Date.now();
           consider(s, Math.max(s, e));
         } else if (x.actualEnd !== null) {
           const e = +parseLocal(x.actualEnd);
