@@ -128,7 +128,7 @@ class ItemDateApiTest : AbstractApiTest() {
         authed
             .patch()
             .uri("/api/items/$itemId")
-            .body(mapOf("dueDate" to "2020-01-01")) // 明显过去
+            .body(mapOf("startDate" to "2019-12-01", "dueDate" to "2020-01-01")) // 明显过去(§12.5:due 须带 start)
             .exchange()
             .expectStatus()
             .isOk()
@@ -286,5 +286,54 @@ class ItemDateApiTest : AbstractApiTest() {
             .expectStatus()
             .isOk()
         assertTrue(detail(authed, item2Id)["dueDate"].isNull)
+    }
+
+    @Test
+    fun `due-only 契约拒绝——due 有而 start 无 400(SRS 12-5,YPJ-245)`() {
+        val (authed, itemId) = setup()
+
+        // 1) 显式设 due、无 start → 400,存量未写
+        authed
+            .patch()
+            .uri("/api/items/$itemId")
+            .body(mapOf("dueDate" to "2026-12-01"))
+            .exchange()
+            .expectStatus()
+            .isBadRequest()
+        assertTrue(detail(authed, itemId)["dueDate"].isNull)
+
+        // 2) start+due 同发 → 合法(排期窗口)
+        authed
+            .patch()
+            .uri("/api/items/$itemId")
+            .body(mapOf("startDate" to "2026-11-23", "dueDate" to "2026-12-01"))
+            .exchange()
+            .expectStatus()
+            .isOk()
+
+        // 2b) 只带 due 的 PATCH → 200 且存量 start 保持(探针回归:旧码把 start 抹成 null)
+        authed
+            .patch()
+            .uri("/api/items/$itemId")
+            .body(mapOf("dueDate" to "2026-12-02"))
+            .exchange()
+            .expectStatus()
+            .isOk()
+        val d2 = detail(authed, itemId)
+        assertEquals("2026-11-23T00:00", d2["startDate"].asText())
+        assertEquals("2026-12-02T23:59:59", d2["dueDate"].asText())
+
+        // 3) 清 start 残留 due → 400(结果态判定)
+        authed
+            .patch()
+            .uri("/api/items/$itemId")
+            .body(mapOf("startDate" to ""))
+            .exchange()
+            .expectStatus()
+            .isBadRequest()
+        // 400 回滚:dates 未落库(start 仍在、due 未动)
+        val d = detail(authed, itemId)
+        assertEquals("2026-11-23T00:00", d["startDate"].asText())
+        assertEquals("2026-12-02T23:59:59", d["dueDate"].asText())
     }
 }

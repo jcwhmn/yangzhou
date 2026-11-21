@@ -12,6 +12,9 @@ test("Overview 五区块——状态分布/信号/我的/风险/Sprint @smoke", 
   page,
   projectKey,
 }) => {
+  // 预置中段「挂能力」触发 recomputeWorkspace(全 workspace 同步重算,量级 ∝ 库内项目数,
+  // 台账 A46;本用例在套件中后段,库已 ~百项目,单调用可达 30s)——独立预算防撞 30s 默认值
+  test.setTimeout(90_000);
   // 预置:item 覆盖各区块;信号链 = 属性 → 我的能力 → item 需求(requirements PUT 触发重算)
   const statuses = (
     await apiCall<{
@@ -23,6 +26,8 @@ test("Overview 五区块——状态分布/信号/我的/风险/Sprint @smoke", 
   await apiAssignMe(mine);
   const overdue = await apiCreateItem(projectKey, "OV 超期 item");
   await apiCall("PATCH", `/api/items/${overdue}`, {
+    // YPJ-245(§12.5):due 须带 start(400 契约);start=前天 due=昨天保持超期语义
+    startDate: new Date(Date.now() - 2 * 86_400_000).toISOString().slice(0, 10),
     dueDate: new Date(Date.now() - 86_400_000).toISOString().slice(0, 10),
   });
   const blocker = await apiCreateItem(projectKey, "OV 依赖源 item");

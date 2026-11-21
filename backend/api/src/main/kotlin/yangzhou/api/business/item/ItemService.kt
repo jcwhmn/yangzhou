@@ -458,9 +458,8 @@ class ItemService(
                                 warnings += String.format(W_EST_FROM_DATES, estimateText(value, "hour"))
                             }
                         }
-                    } else {
-                        warnings += W_NO_START_DUE
                     }
+                    // start == null 已被上方 §12.5 400 拦截(YPJ-245),W_NO_START_DUE 死代码删除
                 }
                 // 双显式(H1):due+estimate 同请求都变 → 双存不互算;冲突仅警告(后写者为准由前端发送顺序保证)
                 estimateChanged && dueExplicit && start != null && estHours != null -> {
@@ -473,11 +472,16 @@ class ItemService(
                     if (recalc != due) due = recalc
                 }
             }
+            // SRS v4 §12.5(YPJ-245):due-only 废除——**结果态** due 有而 start 无 → 400
+            // 结果态 start:未携带 = 保持存量(探针实锤:旧码 copy(startDate=newStart) 会把存量 start 抹成 null,
+            // due-only PATCH 破坏数据,2026-11-21 修复);显式空串 = 清除;显式日期 = 新值
+            val resultStart = if (startDateText == null) current.startDate else newStart
+            if (due != null && resultStart == null) throw BadRequestException("须先填开始日期")
             if (start != null && due != null && start > due) throw BadRequestException("开始日期不能晚于截止日期")
-            if (newStart != current.startDate || due != current.dueDate) {
+            if (resultStart != current.startDate || due != current.dueDate) {
                 val old = "${current.startDate ?: "—"} ~ ${current.dueDate ?: "—"}"
-                current = itemRepo.save(current.copy(startDate = newStart, dueDate = due))
-                logActivity(current.objectId!!, "dates_changed", old, "${newStart ?: "—"} ~ ${due ?: "—"}", actorId)
+                current = itemRepo.save(current.copy(startDate = resultStart, dueDate = due))
+                logActivity(current.objectId!!, "dates_changed", old, "${resultStart ?: "—"} ~ ${due ?: "—"}", actorId)
             }
         }
         return get(current.objectId).copy(autoAssignedSprintName = autoSprintName, warnings = warnings) // YPJ-120
@@ -893,7 +897,6 @@ private const val W_DUE_FROM_ESTIMATE = "截止时间已按预估重算"
 private const val W_NO_START_ESTIMATE = "无开始日期,截止时间未铺算"
 private const val W_DUE_CLEAR_BACKFILL = "截止时间已按预估回填(清除被推算覆盖)"
 private const val W_EST_FROM_DATES = "预估已按起止重算:%s"
-private const val W_NO_START_DUE = "无开始日期,预估未推算"
 private const val W_EST_CLAMP = "预估超出上限 999,已钳制"
 private const val W_CONFLICT = "起止时长与预估不一致,已按双值保存"
 
