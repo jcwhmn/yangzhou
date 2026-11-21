@@ -96,3 +96,38 @@ web/app/p/[key]/table/      共 ~830(887 → -6%;本票逻辑留 page 多,抽取
 - [ ] F. 持久化:默认视图下 cols/colOrder/sorts/query/页大小/选中视图记忆写 localStorage(选中视图时不冲默认存档,YPJ-131);重进恢复
 - [ ] G. 项目切换:key 变化 9 态原子重置+重拉;负责人 AssignPopover 行内改指派→表格刷新;`?from=table` 回跳链路
 - [ ] H. e2e 全量绿(用户跑)+ `npm run format` 绿
+
+
+## 四、As-built(PR #244 squash 99457f7 合入后补,2026-11-21)
+
+### 交付形态
+
+```text
+web/app/p/[key]/table/      共 1098 行(原 page 887 单文件,+24%;家族最瘦,252 +35% / 253 +27%)
+├── page.tsx               458 行(入口:态+6 effects+load+视图/筛选/排序编排+胶水)
+├── shared.ts              167 行(module 全迁:类型/常量/localStorage 读写/matches/排序机器)
+└── components/ ×4
+    ├── ItemsTable.tsx       199(表头多栏排序标签+13 列单元格分发+分页;PAGE_SIZES/ColumnDef 自 shared)
+    ├── TableFilterBar.tsx   124(搜索+三筛选 Dropdown+ColumnConfigPopover+dirty 提示)
+    ├── TableToolbar.tsx     79(标题+视图切换+保存/另存/删除;视图机器回调上行)
+    └── ViewNameDialog.tsx   71(命名弹窗 save/saveAs 共用;nameOpen/viewName/saving 受控)
+```
+
+### As-built 偏差(目标形态 → 实拆)
+
+- **page 458 行**:高于预估 ~380,仍 > 票面 ≤~300——视图/排序编排(saveCurrent/deleteView/applyView/toggleSort)+ 回调胶水(工具栏 onViewChange 12 行重置分支、save 直存决策体)留 page 是主因;251(1398)/252(451)/253(404)同例。shared.ts 内部用点(MOVABLE_IDS/DEFAULT_COL_ORDER 派生)不外露,仅导出跨文件用点。
+- **无数据球 hook(拍板 1 落实)**:load 留 page——与 253 useBoardData(自含 load)的本质差异 = 本页 load 成功后调 applyView(记忆视图应用/回退默认),hook 化需外露 8+ setter 或注入回调;useTablePrefs/useTableViewData 两个备选均因 key 重置 9 态原子耦合/dirty 贯穿否决(见 §二否决备选)。
+- **dirty 贯穿全域留 page**:toggleCol/moveCol/setFilter/toggleSort/query/applyView 全部写路径置位,不进任何子组件;FilterBar 的 onQueryChange 由 page 提供 lambda(setQuery+setPage(0)+setDirty)保编排原样。
+- **key 重置 effect 留 page 原样**(拍板 6):一个 effect 原子重置 9 态(prefs+视图+loaded/fatal/dirty),未拆分。
+- **残留 import 两截获一清理**:CP2 提前删 Dropdown import(筛选条仍用,CP3 才迁)被 tsc 截获,恢复后 amend 回绿——253 CP2 slotRef 同款教训第二次应验;CP4 删 Button import 被 fatal 重试钮(留 page)截获,同法;终检 PAGE_SIZES 残留(TablePagination 已迁,仅 ItemsTable 用点)单独绿点清理。**教训定型:import 删除必须等最后一个用点迁走的同一 CP,提前删必红**。
+- **真值表/示意图不适用维持**:零新交互;排序机器(compareField/getters/valueRank)随 shared.ts 迁移为纯函数,D1/D2 手测过(YPJ-123/124/131 语义原样)。
+
+### 节奏执行(新节奏第四票,V32 收官)
+
+- 一次 coding CP1-CP4(shared → 双件 → 筛选条 → 表格),每绿点 tsc+prettier 绿就地 commit,零中途停;停等仅两处(设计过目 "go" + e2e)。PR squash 后 main 单提交(99457f7)。
+
+### 验证快照
+
+- tsc --noEmit 0 锁(每绿点+终检);prettier + `npm run format` 绿;testid 对账 0/5(全家族无 testid;e2e table/view.spec 走角色文本定位)
+- e2e 全量绿(用户跑,test 容器 8082);手测冒烟 A-H 落档 `docs/testing/manual-test-cases.md` YPJ-254 节(H1 已勾)
+- CP 行数轨迹:887→747→688→623→459(残留清理→458)
