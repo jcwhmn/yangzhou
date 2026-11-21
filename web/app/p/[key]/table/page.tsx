@@ -23,8 +23,7 @@ import {
   Typography,
 } from "@mui/material";
 import { PageShell } from "@/components/PageShell";
-import { Dropdown } from "@/components/Dropdown"; // CP2 保留:筛选条三 Dropdown 属 CP3,随 TableFilterBar 迁走
-import { ColumnConfigPopover } from "@/components/ColumnConfigPopover";
+import TableFilterBar from "./components/TableFilterBar";
 import TableToolbar from "./components/TableToolbar";
 import ViewNameDialog from "./components/ViewNameDialog";
 import Link from "next/link";
@@ -407,95 +406,30 @@ export default function TableViewPage() {
         onDelete={() => void deleteView()}
       />
 
-      {/* 筛选 + 列配置(YPJ-47/28) */}
-      <Stack
-        direction="row"
-        spacing={1}
-        sx={{ mb: 1 }}
-        flexWrap="wrap"
-        useFlexGap
-        alignItems="center"
-      >
-        <TextField
-          aria-label={t.view.searchPlaceholder}
-          placeholder={t.view.searchPlaceholder}
-          size="small"
-          value={query}
-          onChange={(e) => {
-            setQuery(e.target.value);
-            setPage(0);
-            setDirty(true);
-          }}
-          sx={{ width: 220 }}
-          slotProps={{
-            input: {
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon fontSize="small" />
-                </InputAdornment>
-              ),
-            },
-          }}
-        />
-        <Dropdown
-          ariaLabel={t.view.filterStatus}
-          size="small"
-          clearable
-          value={filters.status}
-          onChange={(v) => setFilter({ status: v })}
-          sx={{ width: 130 }}
-          placeholder={t.view.filterStatus}
-          options={statuses.map((s) => ({ value: s.name, label: s.name }))}
-        />
-        <Dropdown
-          ariaLabel={t.view.filterAssignee}
-          size="small"
-          clearable
-          value={filters.assignee}
-          onChange={(v) => setFilter({ assignee: v })}
-          sx={{ width: 130 }}
-          placeholder={t.view.filterAssignee}
-          options={[...assignees, "__none__"].map((a) => ({
-            value: a,
-            label: a === "__none__" ? t.view.unassigned : a,
-          }))}
-        />
-        <Dropdown
-          ariaLabel={t.view.filterPriority}
-          size="small"
-          clearable
-          value={filters.priority}
-          onChange={(v) => setFilter({ priority: v })}
-          sx={{ width: 130 }}
-          placeholder={t.view.filterPriority}
-          options={["P0", "P1", "P2", "P3"].map((p) => ({
-            value: p,
-            label: p,
-          }))}
-        />
-        <ColumnConfigPopover
-          disabled={!loaded}
-          columns={colOrder.flatMap((id) => {
-            const c = columns.find((x) => x.id === id);
-            return c ? [{ ...c, locked: id === "title" }] : [];
-          })}
-          visible={(id) =>
-            cols[id] ?? columns.find((c) => c.id === id)?.visible ?? true
-          }
-          onToggle={toggleCol}
-          onMove={moveCol}
-          onReset={() => {
-            setCols({});
-            setColOrder(DEFAULT_COL_ORDER);
-            setDirty(true);
-          }}
-        />
-        {dirty && (
-          <Typography variant="caption" color="warning.main">
-            {t.view.dirty}
-          </Typography>
-        )}
-      </Stack>
+      <TableFilterBar
+        query={query}
+        onQueryChange={(v) => {
+          setQuery(v);
+          setPage(0);
+          setDirty(true);
+        }}
+        filters={filters}
+        onFilterChange={setFilter}
+        statuses={statuses}
+        assignees={assignees}
+        columns={columns}
+        colOrder={colOrder}
+        cols={cols}
+        dirty={dirty}
+        loaded={loaded}
+        onToggleCol={toggleCol}
+        onMoveCol={moveCol}
+        onResetCols={() => {
+          setCols({});
+          setColOrder(DEFAULT_COL_ORDER);
+          setDirty(true);
+        }}
+      />
 
       {items === null && !error && <LinearProgress />}
       {error && (
