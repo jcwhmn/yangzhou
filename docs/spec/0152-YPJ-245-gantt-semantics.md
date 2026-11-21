@@ -109,3 +109,15 @@
 5. A41:容器→GitHub TLS 断,yz items branch 延后——push 前必须补关联。
 6. **存量布局 bug 修复(计划外,e2e 三红实锤,台账 A44)**:甘特条区 Box(flex:1、子元素全绝对定位)在 `alignItems:center` 行容器里零高度居中——绝对定位几何整体下移 22px(徽标/完成点溢出到下一行)、行内今日线(top:0/bottom:0)高 0 不可见、整行点击链接剩 0 高条带。修复 = 条区 `alignSelf:"stretch"` 恢复整行高(设计几何 top5 计划条/top24 实际条本按整行高标注);YPJ-229 今日线 e2e 补高度>8px 断言作回归钉。main 同结构,存量缺陷非本票引入,但徽标(本票特性)直接撞上。视觉变化:计划/实际条上移回设计位,今日线重现——手工验收 A/B 时请留意。
 7. e2e 测试侧修正(台账 A45):fixture `dtH` 小数小时被 setHours 截断(-0.5h→-1h)改毫秒偏移;返工例 hover 目标改 Tooltip 命中区(补 testid `gantt-hover-plan/act-N`,fill 被命中区覆盖非可 hover 面)。
+
+## 五、As-built(2026-11-21,PR #239 squash 8e9dbbf 合入 main)
+
+> 验收:用户 `gradle clean build` + 全量 `integrationTest` 绿、`api.http` 全过、手测 245 节 A–E 15 条全过(当面确认「可以收了」);agent 本地全量 e2e 121/121 绿;CI checks build+e2e pass。用户 e2e 轮 120 过 1 红(table.spec 分页超时)= F9 flake 桶复现 1/3,拍板忽略,242 落地后观察是否自愈。yz:245 Done(sprint V31 甘特图完善,无父票)。
+
+- §二 六项全落地;§12.5 存量拍板 = 默认**方案 A**(契约只拦新写入,前端菱形分支保留渲染 YPJ-105/144 存量,零数据风险)。
+- 计划外修复两处(均探针/e2e 实锤,台账 A42/A44):① PATCH 只带 due 抹存量 start → §12.5 的 400 改**结果态**判定;② 甘特条区 Box 零高度居中缺陷(存量,非本票引入)→ 条区 `alignSelf:"stretch"` 复位设计位,行内今日线重现、徽标/完成点不再溢出行——**本票像素级视觉与 spec 示意图即按修复后形态验收**。
+- 期望更新(借锚排序的正确波及,非回归):GanttApiTest YPJ-233 c2 组序变更(排序锚=渲染锚);ItemDateApiTest 超期用例补 start;overview fixture due-only 补 start(新契约)。
+- e2e 测试侧修正(台账 A45):fixture 小数小时截断改毫秒偏移;hover 目标改 Tooltip 命中区(testid `gantt-hover-plan/act-N`)。
+- 交付形态:13 文件 +1280/−515(backend 7:ProjectService/ItemService/RowOrder/DateApi/GanttApi/单元×2 + api.http;web 3:gantt/page.tsx + gantt/overview spec;docs 3:spec/手测/台账);本地分支保留(014422a,过程考古),远程已删。
+- 验收遗留(非本票):overview N+1 性能根因归 **242**(A46 实锤:能力 PUT 尾部 recompute 全 workspace 逐 item,~120 项目库单发 10.8-12.7s);甘特视觉打磨归 **246**(今日线贯穿全高为 A44 副产品,正式验收归 246 需求域 #2)。
+- 流程留痕:台账 A39–A46;手测 245 节留作回归基线勿删。
