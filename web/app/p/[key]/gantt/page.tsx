@@ -103,16 +103,30 @@ function estimateHoursOf(
         : v;
 }
 
-// YPJ-222(spec 0147):偏移量 = (实际结束 ?? 今天) 与 due 的日历日差(FINAL 冻结于 actualEnd,未完成随今天;无 due 不标)
-function offsetDays(r: GanttRow): number | null {
-  if (!r.dueDate) return null;
-  const endT = r.actualEnd ? +parseLocal(r.actualEnd) : Date.now();
+// YPJ-245(SRS §11.1):偏移徽标仅 FINAL 行(进行中超期由红计划条表达,零徽标)
+// Δ = actualEnd − due(真实完成时刻 = 最近一次 FINAL);|Δ|<1h On time(中性)/ <24h ±Nh / ≥24h ±Nd(日历日差);提前绿/延期红;due 无值不标
+function offsetBadge(r: GanttRow): { label: string; color: string } | null {
+  if (r.statusType !== "FINAL" || !r.dueDate || !r.actualEnd) return null;
+  const dh = (+parseLocal(r.actualEnd) - +parseLocal(r.dueDate)) / 3600000;
   const day0 = (t: number) => {
     const d = new Date(t);
     d.setHours(0, 0, 0, 0);
     return +d;
   };
-  return Math.round((day0(endT) - day0(+parseLocal(r.dueDate))) / DAY);
+  if (Math.abs(dh) < 1) return { label: "On time", color: "text.secondary" };
+  if (Math.abs(dh) < 24) {
+    return {
+      label: `${dh > 0 ? "+" : "-"}${Math.round(Math.abs(dh))}h`,
+      color: dh > 0 ? "error.main" : "success.main",
+    };
+  }
+  const days = Math.round(
+    (day0(+parseLocal(r.actualEnd)) - day0(+parseLocal(r.dueDate))) / DAY,
+  );
+  return {
+    label: `${days > 0 ? "+" : ""}${days}d`,
+    color: days > 0 ? "error.main" : "success.main",
+  };
 }
 
 // YPJ-219 v2(spec 0140):轴 = 数据锚定(首日 00:00 → 末日 24:00),连续缩放,无语义档位
@@ -140,6 +154,8 @@ export default function GanttPage() {
   const [rows, setRows] = useState<GanttRow[] | null>(null);
   const [wd, setWd] = useState<[number, number] | null>(null); // 五:工作日历窗(分钟;默认 09:00-18:00)
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  // YPJ-245(SRS §10.6):已完成折叠组,默认收起(会话态,不持久)
+  const [showCompleted, setShowCompleted] = useState(false);
   const [showUnscheduled, setShowUnscheduled] = useState(false);
   // v2 工况:zoom(pxPerDay,null=自适应全区间)+ 视点日(日窗预设/今日的中心)+ 滚动位,sessionStorage 持久化
   // YPJ-220:范围 scope/scopeIds 同存同恢复(旧值缺省补 board)
@@ -743,8 +759,15 @@ export default function GanttPage() {
         {r.actualStart && (
           <Typography variant="caption">
             实际:{fmtDateTime(r.actualStart)} →{" "}
-            {r.actualEnd ? fmtDateTime(r.actualEnd) : "进行中"}
+            {r.actualEnd && r.statusType === "FINAL"
+              ? fmtDateTime(r.actualEnd)
+              : "进行中"}
             {actH !== null ? ` · 工时 ${fmtH(actH)}` : ""}
+          </Typography>
+        )}
+        {r.actualEnd && r.statusType !== "FINAL" && (
+          <Typography variant="caption">
+            上次完成:{fmtDateTime(r.actualEnd)}(返工中,SRS §6.6)
           </Typography>
         )}
         {r.anchorDate && (
@@ -806,6 +829,465 @@ export default function GanttPage() {
       r.actualStart ||
       groupStartOf(r),
   );
+
+  // YPJ-245(SRS §10.6):FINAL 行摘入「已完成(N)」组;父行仅当整子树 FINAL 才摘(防孤儿断树)
+  function isCompletedRow(r: GanttRow): boolean {
+    if (r.statusType !== "FINAL") return false;
+    return (rows ?? [])
+      .filter((x) => x.parentItemId === r.itemId)
+      .every((x) => isCompletedRow(x));
+  }
+  const completedRows = scheduled.filter((r) => isCompletedRow(r));
+  const mainRows = scheduled.filter((r) => !isCompletedRow(r));
+
+  // YPJ-245(SRS §10.6):行渲染器抽出——主树与「已完成(N)」组复用同一渲染(双面板同步)
+  const renderTitleCell = (r: GanttRow) => (
+    <Box
+      key={r.itemId}
+      sx={{
+        borderBottom: "1px solid",
+        borderColor: "divider",
+        minHeight: 44,
+        display: "flex",
+        alignItems: "center",
+        "&:hover": { bgcolor: "action.hover" },
+      }}
+    >
+      <Stack
+        direction="row"
+        spacing={0.5}
+        alignItems="center"
+        sx={{ pl: 1 + r.depth * 2, py: 0.5 }}
+      >
+        {hasKid(r) && (
+          <Button
+            size="small"
+            onClick={() => toggle(r.itemId)}
+            sx={{ minWidth: 0, px: 0.5 }}
+          >
+            {collapsed.has(r.itemId) ? "▶" : "▼"}
+          </Button>
+        )}
+        <Chip
+          label={r.number}
+          size="small"
+          variant="outlined"
+          sx={{ height: 20 }}
+        />
+        {/* 标题可点进详情;自然宽不截断,列内横滚(YPJ-236) */}
+        <Link
+          href={`/p/${key}/i/${r.itemId}?from=gantt`}
+          style={{ minWidth: 0 }}
+        >
+          {/* component=div:inline span 吃不到盒模型属性,nowrap 文字会画出盒叠压 chip(YPJ-230) */}
+          <Typography
+            component="div"
+            data-testid={`gantt-title-${r.number}`}
+            variant="caption"
+            noWrap
+            sx={{
+              color: "text.primary",
+              textDecoration: "underline",
+              "&:hover": { color: "primary.main" },
+            }}
+          >
+            {r.title}
+          </Typography>
+        </Link>
+        {r.estimateValue !== null && (
+          <Chip
+            data-testid={`gantt-est-${r.number}`}
+            label={`${r.estimateValue}${EST_UNIT_SHORT[r.estimateUnit ?? ""] ?? r.estimateUnit ?? ""}`}
+            size="small"
+            variant="outlined"
+            sx={{ height: 18 }}
+          />
+        )}
+        {r.blocked && (
+          <Chip
+            data-testid={`gantt-blocked-${r.number}`}
+            label="🔗 blocked"
+            size="small"
+            color="warning"
+            sx={{ height: 18 }}
+          />
+        )}
+      </Stack>
+    </Box>
+  );
+
+  const renderGanttRow = (r: GanttRow) => {
+    const isFinal = r.statusType === "FINAL";
+    const summary = hasKid(r) ? summaryOf(r.itemId) : null;
+    const summaryLeft = summary ? (xOf(summary[0]) ?? 0) : 0;
+    const summaryWidth =
+      summary !== null
+        ? Math.max((xEndOf(summary[1]) ?? 0) - summaryLeft, 1.2)
+        : 0;
+    // 有子孙的父行只画汇总条,不画自有条
+    const drawOwn = !hasKid(r);
+    // YPJ-244(spec 0151 五):渲染规则 v2——case 2×2 分型 × 3 状态(用户 Obsidian 2026-11-20)
+    const wsm = wd?.[0] ?? 0;
+    const wem = wd?.[1] ?? 1440;
+    const estH = estimateHoursOf(r.estimateValue, r.estimateUnit, wsm, wem);
+    const startAnchor = r.startDate ?? r.anchorDate ?? null;
+    const gS = groupStartOf(r);
+    const caseNo =
+      !estH && startAnchor === null
+        ? 1
+        : estH && startAnchor === null
+          ? 2
+          : !estH
+            ? 3
+            : 4;
+    // SRS §6.6(YPJ-245):FINAL 后返工=当前状态优先——按 §6.2 进行中渲染(黄条延伸今天,零徽标)
+    const rework = r.actualEnd !== null && r.statusType !== "FINAL";
+    const doing = r.actualStart !== null && (r.actualEnd === null || rework);
+    const dueOnly = startAnchor === null && r.dueDate !== null; // 里程碑菱形(既有,不进矩阵)
+    // 上条锚:case3/4=start/依赖锚;case2=actualStart(借实际锚)或 groupStart(未开始借 group 锚);case1=仅未开始在 group 开始画点
+    const planT =
+      startAnchor !== null
+        ? +parseLocal(startAnchor)
+        : dueOnly
+          ? +parseLocal(r.dueDate!)
+          : estH !== null
+            ? r.actualStart
+              ? +parseLocal(r.actualStart)
+              : gS
+                ? +parseLocal(gS)
+                : null
+            : !r.actualStart && gS
+              ? +parseLocal(gS)
+              : null;
+    // 条 vs 点:有长度来源(due 显式或 estimate 铺算)→ 条;仅锚无长度 → 点
+    const planIsBar =
+      planT !== null && !dueOnly && (r.dueDate !== null || estH !== null);
+    const planEndT =
+      planT === null || !planIsBar
+        ? null
+        : r.dueDate !== null
+          ? +parseLocal(r.dueDate) +
+            (/^\d{4}-\d{2}-\d{2}$/.test(r.dueDate) ? DAY : 0)
+          : dueFromJs(planT, estH!, wsm, wem);
+    const left = planT === null ? 0 : xOfT(planT);
+    const right = planEndT === null ? left : xOfT(planEndT);
+    // 零时长条最小 3px 可见(YPJ-229;due-only 菱形是标记不受影响)
+    const width = planT !== null ? Math.max(right - left, 3) : 0;
+    // YPJ-222(spec 0147):实际条(叶+有迁出史;due-only 行不画)+ 清单遮罩 + 偏移徽标
+    // YPJ-244(spec 0151)H5:实际层与计划 start 解耦——actualStart 有即画
+    const act = drawOwn && r.actualStart !== null;
+    const actLeft = act ? (xOf(r.actualStart) ?? 0) : 0;
+    const actRight = act
+      ? Math.max(
+          isFinal && r.actualEnd
+            ? (xEndOf(r.actualEnd) ?? actLeft)
+            : Math.max(axis.todayX, actLeft),
+          actLeft,
+        )
+      : 0;
+    const actWidth = act ? Math.max(actRight - actLeft, 3) : 0;
+    const actColor = isFinal ? "success.main" : "warning.main"; // 五:颜色3 绿=完成实际 / 颜色2 黄=进行中实际(返工行黄,SRS §6.6)
+    const actPct =
+      r.checklistTotal && r.checklistDone !== null
+        ? Math.min(Math.round((r.checklistDone / r.checklistTotal) * 100), 100)
+        : null;
+    // YPJ-244(五)黄覆盖:进行中在计划条上叠「已流逝」段(末端=min(今天, 条尾));
+    // 覆盖条件=计划条存在且有 estimate(due 显式无 est 不覆盖,同用户 case3 字面);
+    // 周六日照算现状下日历时间位置等价工时比例;双休日历(H8)落地时改 hoursBetween 比例换算
+    // SRS v4 §6.2(2026-11-21 拍板:进行中单条覆盖模型):凡有计划条的进行中行都画
+    // 黄覆盖(条内已流逝段,start→min(今天,条尾),方案 A 口径);无第二条实际条
+    const fillW =
+      doing && planIsBar
+        ? Math.min(Math.max(Math.min(axis.todayX, right) - left, 0), width)
+        : 0;
+    // YPJ-244(spec 0151)H5:直建 FINAL(actualComplete 有而 actualStart 无)→ 完成点
+    const completeDot =
+      drawOwn && isFinal && r.actualStart === null && r.actualEnd !== null;
+    const badge = offsetBadge(r);
+    const badgeLeft =
+      Math.max(planT !== null ? right : left + 12, act ? actRight : 0) + 6;
+    return (
+      <Box
+        key={r.itemId}
+        sx={{
+          position: "relative",
+          borderBottom: "1px solid",
+          borderColor: "divider",
+          minHeight: 44,
+          display: "flex",
+          alignItems: "center",
+          "&:hover": { bgcolor: "action.hover" },
+        }}
+      >
+        {/* 条区(固定像素宽;高度 flex:1 随行 minHeight 44,自身不撑行——行对齐,SRS §10.2) */}
+        <Box
+          sx={{
+            position: "relative",
+            width: axis.timelineW,
+            flexShrink: 0,
+            flex: 1,
+          }}
+        >
+          {axis.todayX >= 0 && axis.todayX <= axis.timelineW && (
+            <Box
+              sx={{
+                position: "absolute",
+                left: axis.todayX,
+                top: 0,
+                bottom: 0,
+                width: "2px",
+                bgcolor: "info.main",
+                opacity: 0.5,
+              }}
+            />
+          )}
+          <Box
+            data-summary={summary ? "" : undefined}
+            sx={{
+              position: "absolute",
+              left: summaryLeft,
+              width: summaryWidth,
+              top: 4,
+              display: summary ? "block" : "none",
+            }}
+          >
+            <Box
+              sx={{
+                height: 8,
+                borderRadius: 1,
+                bgcolor: "warning.main", // YPJ-222:配色重整——汇总条灰→橙(spec 0147 Q3)
+                opacity: 0.75,
+              }}
+            />
+          </Box>
+          {/* 折叠聚合徽标(YPJ-222) */}
+          {summary && collapsed.has(r.itemId) && (
+            <Chip
+              label={`+${descendantsOf(r.itemId)} 子任务`}
+              size="small"
+              data-testid={`gantt-collapsed-${r.number}`}
+              sx={{
+                position: "absolute",
+                left: summaryLeft + summaryWidth + 4,
+                top: 0,
+                height: 16,
+                fontSize: 10,
+              }}
+            />
+          )}
+          <Box
+            data-final={isFinal ? "" : undefined}
+            data-testid={`gantt-bar-${r.number}`}
+            sx={{
+              position: "absolute",
+              left,
+              width,
+              top: 5,
+              display: drawOwn && planT !== null ? "block" : "none",
+            }}
+          >
+            {planIsBar ? (
+              <Box
+                sx={{
+                  position: "relative",
+                  height: 12,
+                  borderRadius: 1,
+                  bgcolor: r.overdue ? "error.main" : "primary.main",
+                  opacity: 0.85,
+                }}
+              >
+                {fillW > 0 && (
+                  <Box
+                    data-testid={`gantt-fill-${r.number}`}
+                    sx={{
+                      position: "absolute",
+                      left: 0,
+                      top: 0,
+                      height: "100%",
+                      width: fillW,
+                      borderRadius: fillW >= width ? 1 : "4px 0 0 4px",
+                      bgcolor: "warning.main",
+                      opacity: 0.9,
+                    }}
+                  >
+                    {/* 清单完成率遮罩:画在黄覆盖段上(基准=覆盖段宽,SRS §6.5) */}
+                    {actPct !== null && (
+                      <Box
+                        sx={{
+                          position: "absolute",
+                          left: 0,
+                          top: 0,
+                          height: "100%",
+                          width: `${actPct}%`,
+                          bgcolor: "warning.dark",
+                        }}
+                      />
+                    )}
+                  </Box>
+                )}
+              </Box>
+            ) : dueOnly ? (
+              <Box
+                sx={{
+                  width: 12,
+                  height: 12,
+                  transform: "rotate(45deg)",
+                  bgcolor: r.overdue ? "error.main" : "warning.main",
+                  opacity: 1,
+                  mx: "auto",
+                }}
+              />
+            ) : (
+              // spec 0151 五:case1/3 计划层圆点——位置=group 开始(case1 未开始)/ start 或依赖锚(case3)
+              <Box
+                data-testid={`gantt-${caseNo === 1 ? "grouppoint" : r.anchorDate && r.startDate === null ? "anchor" : "plandot"}-${r.number}`}
+                sx={{
+                  width: 3,
+                  height: 12,
+                  borderRadius: 1,
+                  bgcolor: "primary.main",
+                }}
+              />
+            )}
+          </Box>
+          {/* 实际条(下条):仅 无计划条的进行中(case1/3b 黄条)/ 完成(绿条)/ 返工 渲染;
+                            有计划条的进行中行 = 单条覆盖模型,不再画第二条(SRS v4 §6.2,2026-11-21 用户拍板) */}
+          {act && !(doing && planIsBar) && (
+            <Box
+              data-testid={`gantt-actual-${r.number}`}
+              sx={{
+                position: "absolute",
+                left: actLeft,
+                width: actWidth,
+                top: 24,
+              }}
+            >
+              <Box
+                sx={{
+                  position: "relative",
+                  height: 12,
+                  borderRadius: 1,
+                  bgcolor: actColor,
+                  opacity: 0.85,
+                }}
+              >
+                {actPct !== null && (
+                  <Box
+                    sx={{
+                      position: "absolute",
+                      left: 0,
+                      top: 0,
+                      height: "100%",
+                      width: `${actPct}%`,
+                      borderRadius: 1,
+                      bgcolor: isFinal ? "success.dark" : "warning.dark",
+                    }}
+                  />
+                )}
+              </Box>
+            </Box>
+          )}
+          {/* YPJ-244(spec 0151)H5:完成点(actualComplete 有而 actualStart 无) */}
+          {completeDot && (
+            <Box
+              data-testid={`gantt-complete-${r.number}`}
+              sx={{
+                position: "absolute",
+                left: (xEndOf(r.actualEnd) ?? 0) - 5,
+                top: 26,
+                width: 10,
+                height: 10,
+                borderRadius: "50%",
+                bgcolor: isFinal ? "text.disabled" : "success.main",
+                opacity: isFinal ? 0.5 : 0.85,
+              }}
+            />
+          )}
+          {/* 偏移徽标:仅 FINAL;On time 中性 / ±Nh / ±Nd,提前绿/延期红(SRS §11.1,YPJ-245) */}
+          {badge !== null && (
+            <Typography
+              variant="caption"
+              data-testid={`gantt-offset-${r.number}`}
+              sx={{
+                position: "absolute",
+                left: badgeLeft,
+                top: 24,
+                lineHeight: "12px",
+                fontWeight: 600,
+                color: badge.color,
+                whiteSpace: "nowrap",
+              }}
+            >
+              {badge.label}
+            </Typography>
+          )}
+          <Link
+            href={`/p/${key}/i/${r.itemId}?from=gantt`}
+            style={{
+              position: "absolute",
+              left: 0,
+              top: 0,
+              right: 0,
+              bottom: 0,
+              display: "block",
+            }}
+            aria-label={r.number}
+          >
+            {/* hover 详情卡命中区 = 条/点矩形(YPJ-222;其余区域仍整块直进详情) */}
+            {drawOwn &&
+              (planT !== null ||
+                (r.actualStart !== null &&
+                  (r.actualEnd === null || rework))) && (
+                <Tooltip title={hoverCard(r)}>
+                  <Box
+                    sx={{
+                      position: "absolute",
+                      left,
+                      top: 5,
+                      width: Math.max(width, 12),
+                      height: 12,
+                    }}
+                  />
+                </Tooltip>
+              )}
+            {act && (
+              <Tooltip title={hoverCard(r)}>
+                <Box
+                  sx={{
+                    position: "absolute",
+                    left: actLeft,
+                    top: 24,
+                    width: actWidth,
+                    height: 12,
+                  }}
+                />
+              </Tooltip>
+            )}
+            {summary && (
+              <Tooltip title={hoverCard(r)}>
+                <Box
+                  sx={{
+                    position: "absolute",
+                    left: summaryLeft,
+                    top: 4,
+                    width: summaryWidth,
+                    height: 8,
+                  }}
+                />
+              </Tooltip>
+            )}
+          </Link>
+        </Box>
+
+        <Chip
+          label={r.statusName}
+          size="small"
+          variant="outlined"
+          sx={{ mr: 1, height: 20, position: "sticky", right: 0 }}
+        />
+      </Box>
+    );
+  };
 
   return (
     <PageShell>
@@ -1028,80 +1510,28 @@ export default function GanttPage() {
                     }}
                   />
                 ))}
-                {scheduled.map((r) => (
+                {mainRows.map(renderTitleCell)}
+                {completedRows.length > 0 && (
                   <Box
-                    key={r.itemId}
                     sx={{
                       borderBottom: "1px solid",
                       borderColor: "divider",
                       minHeight: 44,
                       display: "flex",
                       alignItems: "center",
-                      "&:hover": { bgcolor: "action.hover" },
                     }}
                   >
-                    <Stack
-                      direction="row"
-                      spacing={0.5}
-                      alignItems="center"
-                      sx={{ pl: 1 + r.depth * 2, py: 0.5 }}
+                    <Button
+                      size="small"
+                      data-testid="gantt-completed-group"
+                      onClick={() => setShowCompleted((v) => !v)}
+                      sx={{ pl: 1 }}
                     >
-                      {hasKid(r) && (
-                        <Button
-                          size="small"
-                          onClick={() => toggle(r.itemId)}
-                          sx={{ minWidth: 0, px: 0.5 }}
-                        >
-                          {collapsed.has(r.itemId) ? "▶" : "▼"}
-                        </Button>
-                      )}
-                      <Chip
-                        label={r.number}
-                        size="small"
-                        variant="outlined"
-                        sx={{ height: 20 }}
-                      />
-                      {/* 标题可点进详情;自然宽不截断,列内横滚(YPJ-236) */}
-                      <Link
-                        href={`/p/${key}/i/${r.itemId}?from=gantt`}
-                        style={{ minWidth: 0 }}
-                      >
-                        {/* component=div:inline span 吃不到盒模型属性,nowrap 文字会画出盒叠压 chip(YPJ-230) */}
-                        <Typography
-                          component="div"
-                          data-testid={`gantt-title-${r.number}`}
-                          variant="caption"
-                          noWrap
-                          sx={{
-                            color: "text.primary",
-                            textDecoration: "underline",
-                            "&:hover": { color: "primary.main" },
-                          }}
-                        >
-                          {r.title}
-                        </Typography>
-                      </Link>
-                      {r.estimateValue !== null && (
-                        <Chip
-                          data-testid={`gantt-est-${r.number}`}
-                          label={`${r.estimateValue}${EST_UNIT_SHORT[r.estimateUnit ?? ""] ?? r.estimateUnit ?? ""}`}
-                          size="small"
-                          variant="outlined"
-                          sx={{ height: 18 }}
-                        />
-                      )}
-                      {r.blocked && (
-                        <Chip
-                          data-testid={`gantt-blocked-${r.number}`}
-                          label="🔗 blocked"
-                          size="small"
-                          color="warning"
-                          sx={{ height: 18 }}
-                        />
-                      )}
-                    </Stack>
+                      {showCompleted ? "▼" : "▶"} 已完成({completedRows.length})
+                    </Button>
                   </Box>
-                ))}
+                )}
+                {showCompleted && completedRows.map((r) => renderTitleCell(r))}
               </Box>
             </Box>
             {/* 237 分割线:骑在标题列右边线上的透明热区,hover/拖拽/键盘焦点显 info.main 竖线 */}
@@ -1197,406 +1627,28 @@ export default function GanttPage() {
                   </Typography>
                 )}
 
-                {scheduled.map((r) => {
-                  const isFinal = r.statusType === "FINAL";
-                  const summary = hasKid(r) ? summaryOf(r.itemId) : null;
-                  const summaryLeft = summary ? (xOf(summary[0]) ?? 0) : 0;
-                  const summaryWidth =
-                    summary !== null
-                      ? Math.max((xEndOf(summary[1]) ?? 0) - summaryLeft, 1.2)
-                      : 0;
-                  // 有子孙的父行只画汇总条,不画自有条
-                  const drawOwn = !hasKid(r);
-                  // YPJ-244(spec 0151 五):渲染规则 v2——case 2×2 分型 × 3 状态(用户 Obsidian 2026-11-20)
-                  const wsm = wd?.[0] ?? 0;
-                  const wem = wd?.[1] ?? 1440;
-                  const estH = estimateHoursOf(
-                    r.estimateValue,
-                    r.estimateUnit,
-                    wsm,
-                    wem,
-                  );
-                  const startAnchor = r.startDate ?? r.anchorDate ?? null;
-                  const gS = groupStartOf(r);
-                  const caseNo =
-                    !estH && startAnchor === null
-                      ? 1
-                      : estH && startAnchor === null
-                        ? 2
-                        : !estH
-                          ? 3
-                          : 4;
-                  const doing = r.actualStart !== null && r.actualEnd === null;
-                  const dueOnly = startAnchor === null && r.dueDate !== null; // 里程碑菱形(既有,不进矩阵)
-                  // 上条锚:case3/4=start/依赖锚;case2=actualStart(借实际锚)或 groupStart(未开始借 group 锚);case1=仅未开始在 group 开始画点
-                  const planT =
-                    startAnchor !== null
-                      ? +parseLocal(startAnchor)
-                      : dueOnly
-                        ? +parseLocal(r.dueDate!)
-                        : estH !== null
-                          ? r.actualStart
-                            ? +parseLocal(r.actualStart)
-                            : gS
-                              ? +parseLocal(gS)
-                              : null
-                          : !r.actualStart && gS
-                            ? +parseLocal(gS)
-                            : null;
-                  // 条 vs 点:有长度来源(due 显式或 estimate 铺算)→ 条;仅锚无长度 → 点
-                  const planIsBar =
-                    planT !== null &&
-                    !dueOnly &&
-                    (r.dueDate !== null || estH !== null);
-                  const planEndT =
-                    planT === null || !planIsBar
-                      ? null
-                      : r.dueDate !== null
-                        ? +parseLocal(r.dueDate) +
-                          (/^\d{4}-\d{2}-\d{2}$/.test(r.dueDate) ? DAY : 0)
-                        : dueFromJs(planT, estH!, wsm, wem);
-                  const left = planT === null ? 0 : xOfT(planT);
-                  const right = planEndT === null ? left : xOfT(planEndT);
-                  // 零时长条最小 3px 可见(YPJ-229;due-only 菱形是标记不受影响)
-                  const width = planT !== null ? Math.max(right - left, 3) : 0;
-                  // YPJ-222(spec 0147):实际条(叶+有迁出史;due-only 行不画)+ 清单遮罩 + 偏移徽标
-                  // YPJ-244(spec 0151)H5:实际层与计划 start 解耦——actualStart 有即画
-                  const act = drawOwn && r.actualStart !== null;
-                  const actLeft = act ? (xOf(r.actualStart) ?? 0) : 0;
-                  const actRight = act
-                    ? Math.max(
-                        r.actualEnd
-                          ? (xEndOf(r.actualEnd) ?? actLeft)
-                          : Math.max(axis.todayX, actLeft),
-                        actLeft,
-                      )
-                    : 0;
-                  const actWidth = act ? Math.max(actRight - actLeft, 3) : 0;
-                  const actColor = r.actualEnd
-                    ? "success.main"
-                    : "warning.main"; // 五:颜色3 绿=完成实际 / 颜色2 黄=进行中实际
-                  const actPct =
-                    r.checklistTotal && r.checklistDone !== null
-                      ? Math.min(
-                          Math.round(
-                            (r.checklistDone / r.checklistTotal) * 100,
-                          ),
-                          100,
-                        )
-                      : null;
-                  // YPJ-244(五)黄覆盖:进行中在计划条上叠「已流逝」段(末端=min(今天, 条尾));
-                  // 覆盖条件=计划条存在且有 estimate(due 显式无 est 不覆盖,同用户 case3 字面);
-                  // 周六日照算现状下日历时间位置等价工时比例;双休日历(H8)落地时改 hoursBetween 比例换算
-                  // SRS v4 §6.2(2026-11-21 拍板:进行中单条覆盖模型):凡有计划条的进行中行都画
-                  // 黄覆盖(条内已流逝段,start→min(今天,条尾),方案 A 口径);无第二条实际条
-                  const fillW =
-                    doing && planIsBar
-                      ? Math.min(
-                          Math.max(Math.min(axis.todayX, right) - left, 0),
-                          width,
-                        )
-                      : 0;
-                  // YPJ-244(spec 0151)H5:直建 FINAL(actualComplete 有而 actualStart 无)→ 完成点
-                  const completeDot =
-                    drawOwn && r.actualStart === null && r.actualEnd !== null;
-                  const off = offsetDays(r);
-                  const badgeLeft =
-                    Math.max(
-                      planT !== null ? right : left + 12,
-                      act ? actRight : 0,
-                    ) + 6;
-                  return (
-                    <Box
-                      key={r.itemId}
-                      sx={{
-                        position: "relative",
-                        borderBottom: "1px solid",
-                        borderColor: "divider",
-                        minHeight: 44,
-                        display: "flex",
-                        alignItems: "center",
-                        "&:hover": { bgcolor: "action.hover" },
-                      }}
+                {mainRows.map(renderGanttRow)}
+                {completedRows.length > 0 && (
+                  <Box
+                    sx={{
+                      minHeight: 44,
+                      borderBottom: "1px solid",
+                      borderColor: "divider",
+                      display: "flex",
+                      alignItems: "center",
+                    }}
+                  >
+                    <Button
+                      size="small"
+                      data-testid="gantt-completed-group-bar"
+                      onClick={() => setShowCompleted((v) => !v)}
+                      sx={{ ml: 1 }}
                     >
-                      {/* 条区(固定像素宽;高度 flex:1 随行 minHeight 44,自身不撑行——行对齐,SRS §10.2) */}
-                      <Box
-                        sx={{
-                          position: "relative",
-                          width: axis.timelineW,
-                          flexShrink: 0,
-                          flex: 1,
-                        }}
-                      >
-                        {axis.todayX >= 0 && axis.todayX <= axis.timelineW && (
-                          <Box
-                            sx={{
-                              position: "absolute",
-                              left: axis.todayX,
-                              top: 0,
-                              bottom: 0,
-                              width: "2px",
-                              bgcolor: "info.main",
-                              opacity: 0.5,
-                            }}
-                          />
-                        )}
-                        <Box
-                          data-summary={summary ? "" : undefined}
-                          sx={{
-                            position: "absolute",
-                            left: summaryLeft,
-                            width: summaryWidth,
-                            top: 4,
-                            display: summary ? "block" : "none",
-                          }}
-                        >
-                          <Box
-                            sx={{
-                              height: 8,
-                              borderRadius: 1,
-                              bgcolor: "warning.main", // YPJ-222:配色重整——汇总条灰→橙(spec 0147 Q3)
-                              opacity: 0.75,
-                            }}
-                          />
-                        </Box>
-                        {/* 折叠聚合徽标(YPJ-222) */}
-                        {summary && collapsed.has(r.itemId) && (
-                          <Chip
-                            label={`+${descendantsOf(r.itemId)} 子任务`}
-                            size="small"
-                            data-testid={`gantt-collapsed-${r.number}`}
-                            sx={{
-                              position: "absolute",
-                              left: summaryLeft + summaryWidth + 4,
-                              top: 0,
-                              height: 16,
-                              fontSize: 10,
-                            }}
-                          />
-                        )}
-                        <Box
-                          data-final={isFinal ? "" : undefined}
-                          data-testid={`gantt-bar-${r.number}`}
-                          sx={{
-                            position: "absolute",
-                            left,
-                            width,
-                            top: 5,
-                            display:
-                              drawOwn && planT !== null ? "block" : "none",
-                          }}
-                        >
-                          {planIsBar ? (
-                            <Box
-                              sx={{
-                                position: "relative",
-                                height: 12,
-                                borderRadius: 1,
-                                bgcolor: r.overdue
-                                  ? "error.main"
-                                  : "primary.main",
-                                opacity: 0.85,
-                              }}
-                            >
-                              {fillW > 0 && (
-                                <Box
-                                  data-testid={`gantt-fill-${r.number}`}
-                                  sx={{
-                                    position: "absolute",
-                                    left: 0,
-                                    top: 0,
-                                    height: "100%",
-                                    width: fillW,
-                                    borderRadius:
-                                      fillW >= width ? 1 : "4px 0 0 4px",
-                                    bgcolor: "warning.main",
-                                    opacity: 0.9,
-                                  }}
-                                >
-                                  {/* 清单完成率遮罩:画在黄覆盖段上(基准=覆盖段宽,SRS §6.5) */}
-                                  {actPct !== null && (
-                                    <Box
-                                      sx={{
-                                        position: "absolute",
-                                        left: 0,
-                                        top: 0,
-                                        height: "100%",
-                                        width: `${actPct}%`,
-                                        bgcolor: "warning.dark",
-                                      }}
-                                    />
-                                  )}
-                                </Box>
-                              )}
-                            </Box>
-                          ) : dueOnly ? (
-                            <Box
-                              sx={{
-                                width: 12,
-                                height: 12,
-                                transform: "rotate(45deg)",
-                                bgcolor: r.overdue
-                                  ? "error.main"
-                                  : "warning.main",
-                                opacity: 1,
-                                mx: "auto",
-                              }}
-                            />
-                          ) : (
-                            // spec 0151 五:case1/3 计划层圆点——位置=group 开始(case1 未开始)/ start 或依赖锚(case3)
-                            <Box
-                              data-testid={`gantt-${caseNo === 1 ? "grouppoint" : r.anchorDate && r.startDate === null ? "anchor" : "plandot"}-${r.number}`}
-                              sx={{
-                                width: 3,
-                                height: 12,
-                                borderRadius: 1,
-                                bgcolor: "primary.main",
-                              }}
-                            />
-                          )}
-                        </Box>
-                        {/* 实际条(下条):仅 无计划条的进行中(case1/3b 黄条)/ 完成(绿条)/ 返工 渲染;
-                            有计划条的进行中行 = 单条覆盖模型,不再画第二条(SRS v4 §6.2,2026-11-21 用户拍板) */}
-                        {act && !(doing && planIsBar) && (
-                          <Box
-                            data-testid={`gantt-actual-${r.number}`}
-                            sx={{
-                              position: "absolute",
-                              left: actLeft,
-                              width: actWidth,
-                              top: 24,
-                            }}
-                          >
-                            <Box
-                              sx={{
-                                position: "relative",
-                                height: 12,
-                                borderRadius: 1,
-                                bgcolor: actColor,
-                                opacity: 0.85,
-                              }}
-                            >
-                              {actPct !== null && (
-                                <Box
-                                  sx={{
-                                    position: "absolute",
-                                    left: 0,
-                                    top: 0,
-                                    height: "100%",
-                                    width: `${actPct}%`,
-                                    borderRadius: 1,
-                                    bgcolor: r.actualEnd
-                                      ? "success.dark"
-                                      : "warning.dark",
-                                  }}
-                                />
-                              )}
-                            </Box>
-                          </Box>
-                        )}
-                        {/* YPJ-244(spec 0151)H5:完成点(actualComplete 有而 actualStart 无) */}
-                        {completeDot && (
-                          <Box
-                            data-testid={`gantt-complete-${r.number}`}
-                            sx={{
-                              position: "absolute",
-                              left: (xEndOf(r.actualEnd) ?? 0) - 5,
-                              top: 26,
-                              width: 10,
-                              height: 10,
-                              borderRadius: "50%",
-                              bgcolor: isFinal
-                                ? "text.disabled"
-                                : "success.main",
-                              opacity: isFinal ? 0.5 : 0.85,
-                            }}
-                          />
-                        )}
-                        {/* 偏移徽标:延期红/提前绿/0 不显(YPJ-222) */}
-                        {off !== null && (
-                          <Typography
-                            variant="caption"
-                            data-testid={`gantt-offset-${r.number}`}
-                            sx={{
-                              position: "absolute",
-                              left: badgeLeft,
-                              top: 24,
-                              lineHeight: "12px",
-                              fontWeight: 600,
-                              color: off > 0 ? "error.main" : "success.main",
-                              whiteSpace: "nowrap",
-                            }}
-                          >
-                            {off > 0 ? `+${off}d` : `${off}d`}
-                          </Typography>
-                        )}
-                        <Link
-                          href={`/p/${key}/i/${r.itemId}?from=gantt`}
-                          style={{
-                            position: "absolute",
-                            left: 0,
-                            top: 0,
-                            right: 0,
-                            bottom: 0,
-                            display: "block",
-                          }}
-                          aria-label={r.number}
-                        >
-                          {/* hover 详情卡命中区 = 条/点矩形(YPJ-222;其余区域仍整块直进详情) */}
-                          {drawOwn &&
-                            (planT !== null ||
-                              (r.actualStart !== null &&
-                                r.actualEnd === null)) && (
-                              <Tooltip title={hoverCard(r)}>
-                                <Box
-                                  sx={{
-                                    position: "absolute",
-                                    left,
-                                    top: 5,
-                                    width: Math.max(width, 12),
-                                    height: 12,
-                                  }}
-                                />
-                              </Tooltip>
-                            )}
-                          {act && (
-                            <Tooltip title={hoverCard(r)}>
-                              <Box
-                                sx={{
-                                  position: "absolute",
-                                  left: actLeft,
-                                  top: 24,
-                                  width: actWidth,
-                                  height: 12,
-                                }}
-                              />
-                            </Tooltip>
-                          )}
-                          {summary && (
-                            <Tooltip title={hoverCard(r)}>
-                              <Box
-                                sx={{
-                                  position: "absolute",
-                                  left: summaryLeft,
-                                  top: 4,
-                                  width: summaryWidth,
-                                  height: 8,
-                                }}
-                              />
-                            </Tooltip>
-                          )}
-                        </Link>
-                      </Box>
-
-                      <Chip
-                        label={r.statusName}
-                        size="small"
-                        variant="outlined"
-                        sx={{ mr: 1, height: 20, position: "sticky", right: 0 }}
-                      />
-                    </Box>
-                  );
-                })}
+                      {showCompleted ? "▼" : "▶"} 已完成({completedRows.length})
+                    </Button>
+                  </Box>
+                )}
+                {showCompleted && completedRows.map((r) => renderGanttRow(r))}
               </Box>
             </Box>
           </Stack>
@@ -1609,8 +1661,9 @@ export default function GanttPage() {
             父汇总(子孙并集,折叠显 +N 子任务) · 列 = 24h 钟表轴(条长 ∝ 钟表跨度)
             · 上条 = 计划(蓝) / 下条 = 实际 (绿,深色 = 清单完成率) · 绿填充 =
             已流逝(进行中,今天 vs due,用实际 色覆盖计划) · 蓝点 =
-            依赖锚点落位(无 start 无 due) · ±Nd = 偏移(实际/ 今天 vs due) ·
-            悬停条看详情 · Ctrl+滚轮或 ± 缩放 · 「今日」回中今天
+            依赖锚点落位(无 start 无 due) · On time/±Nh/±Nd =
+            偏移徽标(仅完成行,提前绿/延期红) · 悬停条看详情 · Ctrl+滚轮或 ± 缩放
+            · 「今日」回中今天
           </Typography>
         </>
       )}

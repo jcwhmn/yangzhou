@@ -24,14 +24,16 @@ import java.time.LocalDateTime
 import java.util.UUID
 
 /** YPJ-233(spec 0148)+ YPJ-244/SRS v4 修订(2026-11-21 拍板;第三方评审 P0-2/P1-1 修订):排序锚 = 渲染锚——
- *  叶行锚 = min(计划层左端(startDate ?? dueDate), 实际层左端(actualStart ?? actualEnd 完成点))——行序与可见条最左端一致;
- *  父行 = 子孙**叶节点**渲染元素并集最早端(叶贡献 startDate ?? dueDate 与 actualStart ?? actualEnd);
+ *  叶行锚 = min(计划层左端(startDate ?? dueDate ?? 借锚位), 实际层左端(actualStart ?? actualEnd 完成点))——行序与可见条最左端一致;
+ *  借锚位 = 依赖锚 ?? 父链 group 借锚(与前端 groupStartOf 同口径,兜底路径 SRS §5.3)(YPJ-245 §8.2);
+ *  父行 = 子孙**叶节点**渲染元素并集最早端(叶贡献 startDate ?? dueDate ?? 借锚位 与 actualStart ?? actualEnd);
  *  各级父行自有日期与自有状态史作废,不参与(SRS §4.3)。
- *  未排期 = 叶行计划层与实际层均无任何可渲染元素(start/due/actualStart/actualEnd 全空,SRS §5.4);
+ *  未排期 = 叶行计划层(含借锚位)与实际层均无任何可渲染元素(start/due/借锚/actualStart/actualEnd 全空,SRS §5.4);
  *  未排靠后,number 兜底。纯函数直测(GanttRowOrderTest)。 */
 internal fun ganttWalkOrder(
     siblings: List<yangzhou.persistence.Item>,
     childrenOf: (UUID) -> List<yangzhou.persistence.Item>,
+    borrowedAnchorOf: (yangzhou.persistence.Item) -> LocalDateTime?,
     actualOf: (yangzhou.persistence.Item) -> Pair<LocalDateTime?, LocalDateTime?>,
 ): List<yangzhou.persistence.Item> {
     val memo = HashMap<UUID, LocalDateTime?>()
@@ -42,7 +44,7 @@ internal fun ganttWalkOrder(
         val (aS, aE) = actualOf(item)
         val own = if (kids.isEmpty()) {
             // 叶行:计划左端(start??due)与实际左端(start??完成点)全部参与(SRS §7.2 渲染元素口径)
-            listOfNotNull(item.startDate ?: item.dueDate, aS ?: aE)
+            listOfNotNull(item.startDate ?: item.dueDate ?: borrowedAnchorOf(item), aS ?: aE)
         } else {
             emptyList() // 父行自有日期与状态史作废(SRS §4.3):包络只由叶节点贡献
         }
@@ -54,12 +56,12 @@ internal fun ganttWalkOrder(
     fun isUnscheduled(item: yangzhou.persistence.Item): Boolean {
         if (childrenOf(item.objectId!!).isNotEmpty()) return memo[item.objectId!!] == null
         val (aS, aE) = actualOf(item)
-        return item.startDate == null && item.dueDate == null && aS == null && aE == null
+        return item.startDate == null && item.dueDate == null && borrowedAnchorOf(item) == null && aS == null && aE == null
     }
     fun anchorOf(item: yangzhou.persistence.Item): LocalDateTime? {
         if (childrenOf(item.objectId!!).isNotEmpty()) return memo[item.objectId!!]
         val (aS, aE) = actualOf(item)
-        return listOfNotNull(item.startDate ?: item.dueDate, aS ?: aE).minOrNull()
+        return listOfNotNull(item.startDate ?: item.dueDate ?: borrowedAnchorOf(item), aS ?: aE).minOrNull()
     }
     return siblings.sortedWith(
         compareBy(
@@ -313,6 +315,22 @@ class ProjectService(
             }
         }
 
+        // YPJ-245(spec 0152 §10.5):排序与未排期判定按过滤后可见树(keep)——包络/排序/fit 三处同源基于可见子孙
+        val byParentKept = all.filter { it.objectId in keep }.groupBy { effectiveParent(it) }
+
+        // YPJ-245(spec 0152 §8.2):借锚位 = 依赖锚 ?? 父链上溯最近祖先 startDate(与前端 groupStartOf 同口径,兜底 §5.3)
+        fun groupStartOf(item: yangzhou.persistence.Item): LocalDateTime? {
+            var cursor = effectiveParent(item)
+            while (cursor != null) {
+                val p = byId[cursor] ?: return null
+                p.startDate?.let { return it }
+                cursor = effectiveParent(p)
+            }
+            return null
+        }
+
+        fun borrowedAnchorOf(item: yangzhou.persistence.Item): LocalDateTime? = anchors[item.objectId] ?: groupStartOf(item)
+
         fun depthOf(item: yangzhou.persistence.Item): Int {
             var depth = 0
             var cursor = effectiveParent(item)
@@ -324,8 +342,9 @@ class ProjectService(
         }
 
         fun walk(parent: UUID?): List<GanttRow> = ganttWalkOrder(
-            byParent[parent].orEmpty(),
-            { id -> byParent[id].orEmpty() },
+            byParentKept[parent].orEmpty(),
+            { id -> byParentKept[id].orEmpty() },
+            { item -> borrowedAnchorOf(item) },
         ) { item ->
             // 状态史 createdAt 为 Instant,排序锚取本地墙钟(与前端渲染同口径)
             // actualStart=首次迁出 START;actualEnd=迁入 FINAL(多次返工取最近一次,SRS §3.4/§6.6——0150 首次口径核对入 YPJ-245)
@@ -364,7 +383,7 @@ class ProjectService(
             listOf(row) + walk(item.objectId)
         }
 
-        return GanttDto(rows = walk(null).filter { it.itemId in keep })
+        return GanttDto(rows = walk(null)) // walk 只经过可见树(byParentKept),无需再过滤
     }
 
     /** spec 0141:范围 → 命中 item objectId 集;board 复用看板口径,group 多选并集,milestone/release 取挂接表。 */

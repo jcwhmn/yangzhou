@@ -18,6 +18,16 @@ async function pickScope(page: import("@playwright/test").Page, label: string) {
   await expect(page.getByRole("listbox")).toBeHidden();
 }
 
+/** YPJ-245(SRS §10.6):FINAL 行默认折叠进「已完成(N)」组;断言 FINAL 行视觉前先展开。 */
+async function expandCompleted(page: import("@playwright/test").Page) {
+  // 等组按钮出现(rows 加载完成)再点——isVisible 竞态实锤:数据未载时跑空不点(2026-11-21 三红同根)
+  const btn = page.getByTestId("gantt-completed-group");
+  await btn.waitFor({ state: "visible", timeout: 10000 }).catch(() => {});
+  if (await btn.isVisible().catch(() => false)) {
+    await btn.click();
+  }
+}
+
 /** 给 item 挂父并设日期(API;POST 不带日期,子项日期走 PATCH)。 */
 async function makeChild(
   key: string,
@@ -65,6 +75,7 @@ test("甘特父汇总条 + FINAL 置灰 + 条宽含当天", async ({ page, proje
 
   await page.goto(`/p/${projectKey}/gantt`);
   await pickScope(page, "全部");
+  await expandCompleted(page); // 子一 FINAL → 已完成组(YPJ-245)
   await expect(page.getByText("E2E 汇总父")).toBeVisible();
 
   const barArea = (n: number) =>
@@ -549,7 +560,7 @@ test("实际条+偏移徽标+清单遮罩+折叠徽标+hover 卡(YPJ-222/spec 01
   const a = await apiCreateItem(projectKey, "E2E 实际甲");
   await apiCall("PATCH", `/api/items/${a}`, {
     startDate: d(-4),
-    dueDate: d(-1),
+    dueDate: d(-3), // YPJ-245:Δ≥24h → ±Nd 档确定性(原 -1d 落 ±Nh/On time 时变)
   });
   await apiAssignMe(a);
   const t1 = await apiCall<{ checklistItemId: string }>(
@@ -580,6 +591,7 @@ test("实际条+偏移徽标+清单遮罩+折叠徽标+hover 卡(YPJ-222/spec 01
 
   await page.goto(`/p/${projectKey}/gantt`);
   await pickScope(page, "全部");
+  await expandCompleted(page); // 甲 FINAL → 已完成组(YPJ-245)
 
   const row = (n: number) =>
     page.locator(`a[aria-label="${projectKey}-${n}"]`).locator("xpath=..");
@@ -605,13 +617,13 @@ test("实际条+偏移徽标+清单遮罩+折叠徽标+hover 卡(YPJ-222/spec 01
   expect(pct).toBe(50);
 
   // 乙:进行中单条覆盖模型(SRS v4 §6.2,2026-11-21 拍板)——有计划条 → 无下条实际条;
-  // 黄覆盖=条内已流逝段(已过期→满条),徽标延期(进行中徽标 244 保留,FINAL-only 归 YPJ-245)
+  // 黄覆盖=条内已流逝段(已过期→满条);YPJ-245(§11.1):进行中零徽标(超期由红计划条表达)
   await expect(row(2).getByTestId(`gantt-actual-${projectKey}-2`)).toHaveCount(
     0,
   );
   await expect(row(2).getByTestId(`gantt-fill-${projectKey}-2`)).toBeVisible();
-  await expect(row(2).getByTestId(`gantt-offset-${projectKey}-2`)).toHaveText(
-    /^\+\d+d$/,
+  await expect(row(2).getByTestId(`gantt-offset-${projectKey}-2`)).toHaveCount(
+    0,
   );
 
   // 折叠父 → 徽标 +2 子任务;展开 → 消失(折叠钮在标题列面板;工具栏还有个 ▶,须收窄到 titlepane)
@@ -807,6 +819,7 @@ test("工时填充+完成点+依赖锚点+实际层解耦(YPJ-244)", async ({
 
   await page.goto(`/p/${projectKey}/gantt`);
   await pickScope(page, "全部");
+  await expandCompleted(page); // 乙直建 FINAL → 已完成组(YPJ-245)
   await expect(page.getByText("E2E 填充甲").first()).toBeVisible();
 
   const row = (n: number) =>
@@ -968,4 +981,173 @@ test("表单后写者为准:due 后发覆盖 estimate + warnings toast(YPJ-244)"
   await expect(page.getByLabel("数值")).not.toHaveValue("2");
   const est = await page.getByLabel("数值").inputValue();
   expect(Number(est)).toBeGreaterThan(0);
+});
+
+// YPJ-245(spec 0152):徽标三档/返工渲染/已完成折叠组
+test("YPJ-245 徽标三档:On time / ±Nh / 提前绿(仅 FINAL)", async ({
+  page,
+  projectKey,
+}) => {
+  const statuses = (
+    await apiCall<{ statuses: { statusId: string; name: string }[] }>(
+      "GET",
+      `/api/projects/${projectKey}`,
+    )
+  ).statuses;
+  const finalId = statuses[statuses.length - 1].statusId;
+  const dtH = (offsetHours: number) => {
+    const t = new Date();
+    t.setHours(t.getHours() + offsetHours);
+    const p2 = (n: number) => String(n).padStart(2, "0");
+    return `${t.getFullYear()}-${p2(t.getMonth() + 1)}-${p2(t.getDate())}T${p2(t.getHours())}:${p2(t.getMinutes())}`;
+  };
+
+  // On time:FINAL 时刻 ≈ due+0.5h(|Δ|<1h 中性)
+  const a = await apiCreateItem(projectKey, "E2E 徽标准点");
+  await apiAssignMe(a);
+  await apiCall("PATCH", `/api/items/${a}`, {
+    startDate: dtH(-1),
+    dueDate: dtH(-0.5),
+  });
+  await apiCall("PATCH", `/api/items/${a}`, { statusItemId: finalId });
+
+  // ±Nh:due = now-5h,FINAL → +5h 红
+  const b = await apiCreateItem(projectKey, "E2E 徽标Nh");
+  await apiAssignMe(b);
+  await apiCall("PATCH", `/api/items/${b}`, {
+    startDate: dtH(-6),
+    dueDate: dtH(-5),
+  });
+  await apiCall("PATCH", `/api/items/${b}`, { statusItemId: finalId });
+
+  // 提前绿:due 未来 2 天,FINAL → -2d 绿
+  const c = await apiCreateItem(projectKey, "E2E 徽标提前");
+  await apiAssignMe(c);
+  await apiCall("PATCH", `/api/items/${c}`, {
+    startDate: dtH(-1),
+    dueDate: dtH(48),
+  });
+  await apiCall("PATCH", `/api/items/${c}`, { statusItemId: finalId });
+
+  await page.goto(`/p/${projectKey}/gantt`);
+  await pickScope(page, "全部");
+  await expandCompleted(page); // 三条全 FINAL → 已完成组
+
+  const row = (n: number) =>
+    page.locator(`a[aria-label="${projectKey}-${n}"]`).locator("xpath=..");
+  await expect(row(1).getByTestId(`gantt-offset-${projectKey}-1`)).toHaveText(
+    "On time",
+  );
+  await expect(row(2).getByTestId(`gantt-offset-${projectKey}-2`)).toHaveText(
+    /^\+\d+h$/,
+  );
+  await expect(row(3).getByTestId(`gantt-offset-${projectKey}-3`)).toHaveText(
+    /^-\d+d$/,
+  );
+});
+
+test("YPJ-245 返工渲染:当前状态优先,完成史进 hover(SRS §6.6)", async ({
+  page,
+  projectKey,
+}) => {
+  const statuses = (
+    await apiCall<{ statuses: { statusId: string; name: string }[] }>(
+      "GET",
+      `/api/projects/${projectKey}`,
+    )
+  ).statuses;
+  const wipId = statuses.find((s) => s.name === "In Progress")!.statusId;
+  const finalId = statuses[statuses.length - 1].statusId;
+  const d = (offset: number) => {
+    const t = new Date();
+    t.setDate(t.getDate() + offset);
+    const p2 = (n: number) => String(n).padStart(2, "0");
+    return `${t.getFullYear()}-${p2(t.getMonth() + 1)}-${p2(t.getDate())}`;
+  };
+
+  const a = await apiCreateItem(projectKey, "E2E 返工甲");
+  await apiAssignMe(a);
+  await apiCall("PATCH", `/api/items/${a}`, {
+    startDate: d(-4),
+    dueDate: d(-1),
+  });
+  await apiCall("PATCH", `/api/items/${a}`, { statusItemId: wipId });
+  await apiCall("PATCH", `/api/items/${a}`, { statusItemId: finalId });
+  await apiCall("PATCH", `/api/items/${a}`, { statusItemId: wipId }); // FINAL 后返工
+
+  await page.goto(`/p/${projectKey}/gantt`);
+  await pickScope(page, "全部");
+
+  const row = (n: number) =>
+    page.locator(`a[aria-label="${projectKey}-${n}"]`).locator("xpath=..");
+  // 返工行按 §6.2 进行中渲染:黄覆盖在(主树,不入已完成组)、无下条、零徽标
+  await expect(row(1).getByTestId(`gantt-fill-${projectKey}-1`)).toBeVisible();
+  await expect(row(1).getByTestId(`gantt-actual-${projectKey}-1`)).toHaveCount(
+    0,
+  );
+  await expect(row(1).getByTestId(`gantt-offset-${projectKey}-1`)).toHaveCount(
+    0,
+  );
+  // 完成史进 hover
+  await row(1).getByTestId(`gantt-fill-${projectKey}-1`).hover();
+  await expect(page.getByText(/上次完成:/)).toBeVisible();
+});
+
+test("YPJ-245 已完成折叠组:FINAL 默认收起可展开(SRS §10.6)", async ({
+  page,
+  projectKey,
+}) => {
+  const statuses = (
+    await apiCall<{ statuses: { statusId: string; name: string }[] }>(
+      "GET",
+      `/api/projects/${projectKey}`,
+    )
+  ).statuses;
+  const wipId = statuses.find((s) => s.name === "In Progress")!.statusId;
+  const finalId = statuses[statuses.length - 1].statusId;
+  const d = (offset: number) => {
+    const t = new Date();
+    t.setDate(t.getDate() + offset);
+    const p2 = (n: number) => String(n).padStart(2, "0");
+    return `${t.getFullYear()}-${p2(t.getMonth() + 1)}-${p2(t.getDate())}`;
+  };
+
+  const a = await apiCreateItem(projectKey, "E2E 完成一");
+  await apiAssignMe(a);
+  await apiCall("PATCH", `/api/items/${a}`, {
+    startDate: d(-4),
+    dueDate: d(-2),
+  });
+  await apiCall("PATCH", `/api/items/${a}`, { statusItemId: wipId });
+  await apiCall("PATCH", `/api/items/${a}`, { statusItemId: finalId });
+  const b = await apiCreateItem(projectKey, "E2E 完成二");
+  await apiAssignMe(b);
+  await apiCall("PATCH", `/api/items/${b}`, {
+    startDate: d(-3),
+    dueDate: d(-1),
+  });
+  await apiCall("PATCH", `/api/items/${b}`, { statusItemId: finalId });
+  const c = await apiCreateItem(projectKey, "E2E 进行中");
+  await apiAssignMe(c);
+  await apiCall("PATCH", `/api/items/${c}`, {
+    startDate: d(-1),
+    dueDate: d(1),
+  });
+  await apiCall("PATCH", `/api/items/${c}`, { statusItemId: wipId });
+
+  await page.goto(`/p/${projectKey}/gantt`);
+  await pickScope(page, "全部");
+
+  const grp = page.getByTestId("gantt-completed-group");
+  await expect(grp).toContainText("已完成(2)");
+  const row = (n: number) =>
+    page.locator(`a[aria-label="${projectKey}-${n}"]`).locator("xpath=..");
+  await expect(row(1)).toBeHidden(); // FINAL 默认收起
+  await expect(row(2)).toBeHidden();
+  await expect(row(3)).toBeVisible(); // 进行中在主树
+  await grp.click();
+  await expect(row(1)).toBeVisible();
+  await expect(row(2)).toBeVisible();
+  await grp.click();
+  await expect(row(1)).toBeHidden();
 });

@@ -349,9 +349,9 @@ class GanttApiTest : AbstractApiTest() {
                     .responseBody!!,
             )["rows"].map { it["title"].asText() }
 
-        // 根级按渲染锚(YPJ-244 修订:父行排序锚=子孙并集最早端,自有 start 忽略):A 组锚=b1(12-04)→ C 组锚=c1(12-05);
-        // C 组内 c1(start)在前、c2(未排期)落尾;B 组内 b1 正常
-        assertEquals(listOf("A", "B", "b1", "C", "c1", "c2"), rows)
+        // YPJ-245(§8.2 借锚位):c2 借父链 C.start 12-01 → 不再未排期;C 组锚 = min(c1 12-05, c2 借 12-01) = 12-01 → C 组先;
+        // C 组内 c2(借 12-01)先于 c1(12-05)——排序锚=渲染锚,与前端包络(groupStartOf 计入)同口径
+        assertEquals(listOf("C", "c2", "c1", "A", "B", "b1"), rows)
     }
 
     @Test
@@ -410,5 +410,96 @@ class GanttApiTest : AbstractApiTest() {
         assertEquals("2026-09-30T12:00", byTitle["后继"]!!["anchorDate"].asText())
         assertTrue(byTitle["前置A"]!!["anchorDate"].isNull)
         assertTrue(byTitle["前置B"]!!["anchorDate"].isNull)
+    }
+
+    @Test
+    fun `YPJ-245 过滤后父行排序按可见子孙——被过滤兄弟不影响包络锚(SRS 10-5)`() {
+        val authed = bootstrapAndAuth()
+        createProject(authed, "VIS")
+
+        // G1(父,不挂 milestone)+ 两子:L1(挂 milestone,12-20)/ C2(不挂,12-01 早锚);L2(根叶,12-10,挂 milestone)
+        val g1 = createItem(authed, "VIS", "父G1")["itemId"].asText()
+        val l1 = createItem(authed, "VIS", "圈上叶L1", parentItemId = g1)["itemId"].asText()
+        authed.patch().uri("/api/items/$l1").body(mapOf("startDate" to "2026-12-20")).exchange().expectStatus().isOk()
+        val c2 = createItem(authed, "VIS", "圈外叶C2", parentItemId = g1)["itemId"].asText()
+        authed.patch().uri("/api/items/$c2").body(mapOf("startDate" to "2026-12-01")).exchange().expectStatus().isOk()
+        val l2 = createItem(authed, "VIS", "根叶L2")["itemId"].asText()
+        authed.patch().uri("/api/items/$l2").body(mapOf("startDate" to "2026-12-10")).exchange().expectStatus().isOk()
+
+        val ms =
+            json
+                .readTree(
+                    authed
+                        .post()
+                        .uri("/api/projects/VIS/milestones")
+                        .body(mapOf("name" to "M1"))
+                        .exchange()
+                        .expectStatus()
+                        .isCreated()
+                        .expectBody(String::class.java)
+                        .returnResult()
+                        .responseBody!!,
+                )["milestoneId"].asText()
+        authed
+            .put()
+            .uri("/api/projects/VIS/milestones/$ms/items")
+            .body(mapOf("itemIds" to listOf(l1, l2)))
+            .exchange()
+            .expectStatus()
+            .isOk()
+
+        val rows =
+            json.readTree(
+                authed
+                    .get()
+                    .uri("/api/projects/VIS/gantt?scope=milestone&scopeIds=$ms")
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody(String::class.java)
+                    .returnResult()
+                    .responseBody!!,
+            )["rows"]
+
+        // 可见集 = {L1, L2, G1(祖先链)};C2 被过滤,不得出现在行里
+        val titles = rows.map { it["title"].asText() }
+        assertTrue("圈外叶C2" !in titles)
+        // 旧行为(bug):G1 锚含被过滤 C2 的 12-01 → G1 先;新行为:G1 锚 = 可见 L1 12-20 → L2(12-10) 先
+        assertEquals(listOf("根叶L2", "父G1", "圈上叶L1"), titles)
+    }
+
+    @Test
+    fun `YPJ-245 借锚行按依赖锚位排序,不再落未排期尾(SRS 8-2)`() {
+        val authed = bootstrapAndAuth()
+        createProject(authed, "ANC2")
+
+        // A(start 12-18,due 12-20)→ B(无日期,依赖 A,借锚 = A.due 12-20);C(12-15);D(12-22)
+        val a = createItem(authed, "ANC2", "A")["itemId"].asText()
+        authed.patch().uri("/api/items/$a").body(mapOf("startDate" to "2026-12-18", "dueDate" to "2026-12-20")).exchange().expectStatus().isOk()
+        val b = createItem(authed, "ANC2", "B")["itemId"].asText()
+        authed.post().uri("/api/items/$b/dependencies").body(mapOf("dependsOnItemId" to a)).exchange().expectStatus().isCreated()
+        val c = createItem(authed, "ANC2", "C")["itemId"].asText()
+        authed.patch().uri("/api/items/$c").body(mapOf("startDate" to "2026-12-15")).exchange().expectStatus().isOk()
+        val d = createItem(authed, "ANC2", "D")["itemId"].asText()
+        authed.patch().uri("/api/items/$d").body(mapOf("startDate" to "2026-12-22")).exchange().expectStatus().isOk()
+
+        val rows =
+            json.readTree(
+                authed
+                    .get()
+                    .uri("/api/projects/ANC2/gantt?scope=all")
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody(String::class.java)
+                    .returnResult()
+                    .responseBody!!,
+            )["rows"]
+
+        // 旧行为(bug):B 无日期 → 未排期置尾;新行为:B 锚 = 借锚 12-20 → 排 A 后 D 前
+        val titles = rows.map { it["title"].asText() }
+        val bRow = rows.first { it["title"].asText() == "B" }
+        assertTrue(bRow["anchorDate"].asText().startsWith("2026-12-20"))
+        assertEquals(listOf("C", "A", "B", "D"), titles)
     }
 }

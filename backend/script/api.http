@@ -2824,3 +2824,69 @@ Authorization: Bearer {{token}}
     const row = response.body.rows.find(r => r.title.indexOf("150 后继C") === 0);
     client.log("C anchorDate=" + row.anchorDate + " (期望 A.due=2026-11-25T13:00)");
  %}
+
+### ============ 17. YPJ-245 语义统一:due-only 契约拒绝(SRS v4 §12.5;节内自建前置) ============
+
+### 建一次性项目(handler 存变量 key245)
+POST {{host}}/api/projects
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "key": "S245{{run}}",
+  "name": "YPJ-245 语义统一演练"
+}
+
+> {%
+    client.global.set("key245", response.body.key);
+%}
+
+### 建 item(handler 存 item245)
+POST {{host}}/api/projects/{{key245}}/items
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "title": "245 due-only 负例票" }
+
+> {%
+    client.global.set("item245", response.body.itemId);
+%}
+
+### [负例] 只带 due 无 start → 400「须先填开始日期」(存量 due-only 行不受影响)
+PATCH {{host}}/api/items/{{item245}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "dueDate": "2026-12-01" }
+
+### [正例] start+due 同发 → 200(排期窗口;date-only due = 当日日末 23:59:59)
+PATCH {{host}}/api/items/{{item245}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "startDate": "2026-11-23", "dueDate": "2026-12-01" }
+
+### [正例·回归钉] 只带 due 的 PATCH → 200 且存量 start 保持(旧码把 start 抹成 null,已修)
+PATCH {{host}}/api/items/{{item245}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "dueDate": "2026-12-02" }
+
+> {%
+    const d = response.body;
+    if (d.startDate !== "2026-11-23T00:00") throw new Error("start 被抹:" + d.startDate);
+    if (d.dueDate !== "2026-12-02T23:59:59") throw new Error("due 异常:" + d.dueDate);
+    client.log("start 保持 ✓ due=2026-12-02T23:59:59 ✓");
+%}
+
+### [负例] 清 start 残留 due → 400(结果态判定)
+PATCH {{host}}/api/items/{{item245}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "startDate": "" }
+
+### 清场:删一次性项目(.force 物理删)
+DELETE {{host}}/api/projects/{{key245}}?force=true
+Authorization: Bearer {{token}}

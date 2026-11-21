@@ -23,6 +23,8 @@ test("Overview 五区块——状态分布/信号/我的/风险/Sprint @smoke", 
   await apiAssignMe(mine);
   const overdue = await apiCreateItem(projectKey, "OV 超期 item");
   await apiCall("PATCH", `/api/items/${overdue}`, {
+    // YPJ-245(§12.5):due 须带 start(400 契约);start=前天 due=昨天保持超期语义
+    startDate: new Date(Date.now() - 2 * 86_400_000).toISOString().slice(0, 10),
     dueDate: new Date(Date.now() - 86_400_000).toISOString().slice(0, 10),
   });
   const blocker = await apiCreateItem(projectKey, "OV 依赖源 item");

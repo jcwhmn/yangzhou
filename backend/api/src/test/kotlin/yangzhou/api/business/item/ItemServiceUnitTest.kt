@@ -589,6 +589,71 @@ class ItemServiceUnitTest {
             assertEquals("开始日期不能晚于截止日期", e.message)
         }
 
+        // ---------- YPJ-245(spec 0152 §12.5):due-only 废除——due 有而 start 无 → 400 ----------
+
+        @Test
+        fun `due 显式且无 start——400 须先填开始日期(YPJ-245)`() {
+            val e =
+                assertFailsWith<BadRequestException> {
+                    service.update(
+                        itemOid,
+                        title = null,
+                        description = null,
+                        type = null,
+                        statusItemId = null,
+                        parentItemId = null,
+                        dueDateText = "2026-11-25",
+                    )
+                }
+
+            assertEquals("须先填开始日期", e.message)
+            assertNull(row.dueDate)
+        }
+
+        @Test
+        fun `清 start 残留 due——400(YPJ-245 结果态判定)`() {
+            row = row.copy(startDate = LocalDateTime.parse("2026-11-23T09:00"), dueDate = LocalDateTime.parse("2026-11-25T18:00"))
+
+            val e =
+                assertFailsWith<BadRequestException> {
+                    service.update(
+                        itemOid,
+                        title = null,
+                        description = null,
+                        type = null,
+                        statusItemId = null,
+                        parentItemId = null,
+                        startDateText = "",
+                    )
+                }
+
+            assertEquals("须先填开始日期", e.message)
+        }
+
+        @Test
+        fun `PATCH 只带 due——存量 start 保持不变(YPJ-245 探针回归,due-only PATCH 不再抹 start)`() {
+            row = row.copy(startDate = LocalDateTime.parse("2026-11-23T09:00"))
+
+            service.update(
+                itemOid, title = null, description = null, type = null, statusItemId = null, parentItemId = null,
+                dueDateText = "2026-11-25",
+            )
+
+            assertEquals(LocalDateTime.parse("2026-11-23T09:00"), row.startDate)
+            assertEquals(LocalDateTime.parse("2026-11-25T23:59:59"), row.dueDate)
+        }
+
+        @Test
+        fun `start+due 同发——合法(排期窗口,YPJ-245)`() {
+            service.update(
+                itemOid, title = null, description = null, type = null, statusItemId = null, parentItemId = null,
+                startDateText = "2026-11-23", dueDateText = "2026-11-25",
+            )
+
+            assertEquals(LocalDateTime.parse("2026-11-23T00:00"), row.startDate)
+            assertEquals(LocalDateTime.parse("2026-11-25T23:59:59"), row.dueDate)
+        }
+
         // ---------- YPJ-235(spec 0146):due 缺省时按 estimate 工作日铺算 ----------
 
         @Test
@@ -733,17 +798,19 @@ class ItemServiceUnitTest {
         }
 
         @Test
-        fun `due 后写——无 start 只警告不推算`() {
+        fun `due 后写——无 start 400(SRS 12-5,YPJ-245 推翻旧只警告语义)`() {
             row = row.copy(startDate = null)
 
-            val dto =
-                service.update(
-                    itemOid, title = null, description = null, type = null, statusItemId = null, parentItemId = null,
-                    dueDateText = "2026-11-23T14:00",
-                )
+            val e =
+                assertFailsWith<BadRequestException> {
+                    service.update(
+                        itemOid, title = null, description = null, type = null, statusItemId = null, parentItemId = null,
+                        dueDateText = "2026-11-23T14:00",
+                    )
+                }
 
+            assertEquals("须先填开始日期", e.message)
             assertNull(row.estimateValue)
-            assertTrue(dto.warnings.any { "无开始日期" in it })
         }
 
         @Test
@@ -794,6 +861,7 @@ class ItemServiceUnitTest {
         fun `date-only due——全天窗缺省当日日末秒精度 235959(防纳秒常量被 timestamp 六位微秒进位成次日零点)`() {
             service.update(
                 itemOid, title = null, description = null, type = null, statusItemId = null, parentItemId = null,
+                startDateText = "2026-11-23", // §12.5(YPJ-245):due-only 400,显式带 start
                 dueDateText = "2026-11-23",
             )
 

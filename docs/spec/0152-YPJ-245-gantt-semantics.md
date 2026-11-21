@@ -99,3 +99,11 @@
 - 集成:`GanttApiTest`(+过滤后排序 case/借锚排序 case);`ItemDateApiTest`(+400 负例)
 - `api.http`:负例区补 due-only 400
 - e2e:`gantt.spec.ts`(徽标三档断言/返工例/折叠组例);board 涉 ±Nd 断言同步
+
+## 四、实现增量(2026-11-21 编码期;As-built 合并回合补)
+
+1. **存量 bug 修复(计划外,探针实锤)**:PATCH 只带 due 会把存量 start 抹成 null(copy(startDate=newStart) 不传即抹)——§12.5 实现前置修复,见台账 A42;400 改**结果态**判定(resultStart)。
+2. 借锚排序波及既有期望:GanttApiTest YPJ-233 用例 c2 借父链锚 → C 组锚=12-01 组序变更(排序锚=渲染锚的正确结果,期望更新);ItemDateApiTest 超期用例补 start。
+3. e2e:FINAL 行默认入组 → 3 个既有用例补 expandCompleted(waitFor 版,A43 竞态实锤后修);overview fixture due-only 补 start(新契约);新增徽标三档/返工/折叠组三用例。
+4. api.http §17(due-only 负例+回归钉+清场自含节);手测清单 245 节(A-E 四组)。
+5. A41:容器→GitHub TLS 断,yz items branch 延后——push 前必须补关联。
