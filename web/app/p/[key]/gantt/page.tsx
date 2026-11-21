@@ -342,6 +342,8 @@ export default function GanttPage() {
               wd={wd}
               scrollRef={scrollRef}
               projectKey={key}
+              ms={msOpts}
+              rel={relOpts}
             />
           </Stack>
           <Typography

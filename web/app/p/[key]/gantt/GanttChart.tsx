@@ -17,6 +17,8 @@ import { SummaryBar } from "./components/SummaryBar";
 import { PlanBar } from "./components/PlanBar";
 import { ActualBar } from "./components/ActualBar";
 import { OffsetBadge } from "./components/OffsetBadge";
+import { MilestoneLines } from "./components/MilestoneLines";
+import { type MilestoneMarker, type ReleaseMarker } from "./types";
 
 /** 甘特面板:缩放/横滚;今日线、条、状态章(YPJ-249 自 page.tsx 原样搬出,零语义变化)。
  * renderGanttRow 壳(几何计算+组装)留此,条形子块已拆 components/。
@@ -41,6 +43,8 @@ export function GanttChart({
   wd,
   scrollRef,
   projectKey,
+  ms,
+  rel,
 }: {
   axis: { timelineW: number; headerRows: HeaderRow[]; todayX: number };
   mainRows: GanttRow[];
@@ -59,6 +63,8 @@ export function GanttChart({
   wd: [number, number] | null;
   scrollRef: RefObject<HTMLDivElement | null>;
   projectKey: string;
+  ms: MilestoneMarker[];
+  rel: ReleaseMarker[];
 }) {
   const renderGanttRow = (r: GanttRow) => {
     const isFinal = r.statusType === "FINAL";
@@ -294,7 +300,11 @@ export function GanttChart({
           {/* header 自适应 2–3 行(月/周/日/时,自上而下粗→细) */}
           <TimelineHeader headerRows={axis.headerRows} />
 
-          {scheduled.length === 0 && (
+          {/* YPJ-221:旗标带+竖线的定位基准(线 top:0→bottom:0 覆盖带+行区,含完成组) */}
+          <Box sx={{ position: "relative" }}>
+            <MilestoneLines ms={ms} rel={rel} xOf={xOf} />
+
+            {scheduled.length === 0 && (
             <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>
               暂无已排期 item——在详情页填起止日期后出现在这里。
             </Typography>
@@ -322,6 +332,7 @@ export function GanttChart({
             </Box>
           )}
           {showCompleted && completedRows.map((r) => renderGanttRow(r))}
+          </Box>
         </Box>
       </Box>
     </>

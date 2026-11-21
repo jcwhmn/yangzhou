@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
-import { type GanttRow } from "../types";
+import { type GanttRow, type MilestoneMarker, type ReleaseMarker } from "../types";
 import { hmToMin } from "../utils/timeCalculations";
 
 /** 甘特数据获取与借锚(YPJ-249 自 page.tsx 原样搬出,零语义变化)。
@@ -12,16 +12,12 @@ export function useGanttData(key: string, scope: string, scopeIds: string[]) {
   const [wd, setWd] = useState<[number, number] | null>(null); // 五:工作日历窗(分钟;默认 09:00-18:00)
   const loadSeqRef = useRef(0); // 响应序号守卫:切范围后慢响应晚到不覆盖新状态
 
-  // 范围二级选项(group/milestone/release;列表 API 均返回裸数组)
+  // 范围二级选项(group/milestone/release;列表 API 均返回裸数组)。ms/rel 取全 DTO(YPJ-221 竖线旗标复用同一响应)
   const [groupOpts, setGroupOpts] = useState<
     { groupId: string; name: string }[]
   >([]);
-  const [msOpts, setMsOpts] = useState<{ milestoneId: string; name: string }[]>(
-    [],
-  );
-  const [relOpts, setRelOpts] = useState<{ releaseId: string; name: string }[]>(
-    [],
-  );
+  const [msOpts, setMsOpts] = useState<MilestoneMarker[]>([]);
+  const [relOpts, setRelOpts] = useState<ReleaseMarker[]>([]);
 
   const load = useCallback(async () => {
     // 未选完不发请求:group 空多选 / milestone、release 未选中 → 直接空态
@@ -59,12 +55,10 @@ export function useGanttData(key: string, scope: string, scopeIds: string[]) {
     api<{ groupId: string; name: string }[]>(`/api/projects/${key}/groups`)
       .then(setGroupOpts)
       .catch(() => {});
-    api<{ milestoneId: string; name: string }[]>(
-      `/api/projects/${key}/milestones`,
-    )
+    api<MilestoneMarker[]>(`/api/projects/${key}/milestones`)
       .then(setMsOpts)
       .catch(() => {});
-    api<{ releaseId: string; name: string }[]>(`/api/projects/${key}/releases`)
+    api<ReleaseMarker[]>(`/api/projects/${key}/releases`)
       .then(setRelOpts)
       .catch(() => {});
   }, [key]);
