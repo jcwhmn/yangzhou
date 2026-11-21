@@ -12,6 +12,9 @@ test("Overview 五区块——状态分布/信号/我的/风险/Sprint @smoke", 
   page,
   projectKey,
 }) => {
+  // 预置中段「挂能力」触发 recomputeWorkspace(全 workspace 同步重算,量级 ∝ 库内项目数,
+  // 台账 A46;本用例在套件中后段,库已 ~百项目,单调用可达 30s)——独立预算防撞 30s 默认值
+  test.setTimeout(90_000);
   // 预置:item 覆盖各区块;信号链 = 属性 → 我的能力 → item 需求(requirements PUT 触发重算)
   const statuses = (
     await apiCall<{
