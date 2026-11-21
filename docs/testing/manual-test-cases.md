@@ -219,3 +219,35 @@
 ### H. 自动化
 - [x] H1 e2e 全量绿(用户跑,test 容器 8082;2026-11-21 用户确认)
 - [ ] H2 `npm run format` 绿(CI format check)
+
+## YPJ-254 表格视图页重构:887 行拆 shared/组件(spec 0157;纯结构零语义)
+
+> **基线 = prod 3000(重构前代码)**,重构分支 dev 3001 对照(容器重建含 254 代码的镜像后验,核对 sha)。纯搬家票:所有用例本质 = 「与 prod 行为一致」。automation:e2e 全量即回归闸。
+
+### A. 加载/渲染
+- [ ] A1 标题+视图下拉(默认视图名)+保存/另存/删除(选中视图才显删除);拉取期 LinearProgress;错误条(6s 消失;命名弹窗开着保持)+ fatal 常驻重试;空态「暂无 item」
+
+### B. 列配置
+- [ ] B1 Popover 勾选显隐(编号恒显钉首位)/上下移(title 锁定)/重置;刷新后默认视图下 localStorage 保持
+
+### C. 筛选+搜索
+- [ ] C1 状态/负责人(含「未分配」)/优先级 Dropdown
+- [ ] C2 表内搜索子串大小写不敏感(YPJ-126,含属性值);筛选后页码越界兜底(YPJ-125)
+
+### D. 排序
+- [ ] D1 单击循环 升→降→移除(空回默认 number);Shift+点击=仅此列替换(YPJ-131);多栏序号角标
+- [ ] D2 null 恒末不随方向翻转(YPJ-124);number 自然序(YPJ-123);priority/feasSignal rank 序
+
+### E. 视图
+- [ ] E1 切换(六态一次写)/选中视图保存直存 PATCH 不弹框/默认视图首存→命名弹窗/另存 POST 副本/删除回默认
+- [ ] E2 同名预检 409 前置(YPJ-131);防连点
+
+### F. 持久化
+- [ ] F1 默认视图下 cols/colOrder/sorts/query/页大小/选中视图记忆写 localStorage(选中视图时不冲默认存档,YPJ-131);重进恢复
+
+### G. 项目切换
+- [ ] G1 key 变化 9 态原子重置+重拉;负责人 AssignPopover 行内改指派→表格刷新;`?from=table` 回跳链路
+
+### H. 自动化
+- [ ] H1 e2e 全量绿(用户跑,test 容器 8082)
+- [ ] H2 `npm run format` 绿(CI format check)
