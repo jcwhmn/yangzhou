@@ -16,21 +16,19 @@ import { PageShell } from "@/components/PageShell";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useRef, useState } from "react";
-import { parseLocal, fmtDateTime } from "@/lib/dates";
+import { parseLocal } from "@/lib/dates";
 import { t } from "@/lib/texts";
 import { DateInput } from "@/components/DateInput";
 
-import {
-  DAY,
-  EST_UNIT_SHORT,
-  TITLE_W_DEFAULT,
-  ZOOM_STEP,
-  type GanttRow,
-} from "./types";
+import { DAY, ZOOM_STEP, type GanttRow } from "./types";
 import { useGanttData } from "./hooks/useGanttData";
 import { useEnvelope } from "./hooks/useEnvelope";
 import { useGanttInteraction } from "./hooks/useGanttInteraction";
 import { useTimelineScale } from "./hooks/useTimelineScale";
+import { HoverCard } from "./components/HoverCard";
+import { Splitter, TitleColumn } from "./components/TitleColumn";
+import { TimelineHeader } from "./components/TimelineHeader";
+import { UnscheduledGroup } from "./components/UnscheduledGroup";
 import {
   dueFromJs,
   estimateHoursOf,
@@ -125,64 +123,6 @@ export default function GanttPage() {
   };
 
   // YPJ-222(spec 0147):条上 hover 详情卡;起止显时分、工时按小时(YPJ-244:数据含时分)
-  function hoverCard(r: GanttRow) {
-    const estH = estimateHoursOf(
-      r.estimateValue,
-      r.estimateUnit,
-      wd?.[0] ?? 0,
-      wd?.[1] ?? 1440,
-    );
-    const actH =
-      r.actualStart && r.actualEnd
-        ? Math.max(
-            0,
-            (+parseLocal(r.actualEnd) - +parseLocal(r.actualStart)) / 3600000,
-          )
-        : null;
-    const fmtH = (h: number) => `${+h.toFixed(1)}h`;
-    return (
-      <Stack spacing={0.25}>
-        <Typography variant="caption" sx={{ fontWeight: 600 }}>
-          {r.number} {r.title}
-        </Typography>
-        <Typography variant="caption">
-          {r.statusName}
-          {r.assigneeName ? ` · ${r.assigneeName}` : ""}
-        </Typography>
-        <Typography variant="caption">
-          计划:{r.startDate ? fmtDateTime(r.startDate) : "?"} →{" "}
-          {r.dueDate ? fmtDateTime(r.dueDate) : "?"}
-        </Typography>
-        {estH !== null && (
-          <Typography variant="caption">预估工时:{fmtH(estH)}</Typography>
-        )}
-        {r.actualStart && (
-          <Typography variant="caption">
-            实际:{fmtDateTime(r.actualStart)} →{" "}
-            {r.actualEnd && r.statusType === "FINAL"
-              ? fmtDateTime(r.actualEnd)
-              : "进行中"}
-            {actH !== null ? ` · 工时 ${fmtH(actH)}` : ""}
-          </Typography>
-        )}
-        {r.actualEnd && r.statusType !== "FINAL" && (
-          <Typography variant="caption">
-            上次完成:{fmtDateTime(r.actualEnd)}(返工中,SRS §6.6)
-          </Typography>
-        )}
-        {r.anchorDate && (
-          <Typography variant="caption">
-            锚点:{fmtDateTime(r.anchorDate)}(依赖落位)
-          </Typography>
-        )}
-        {r.checklistTotal ? (
-          <Typography variant="caption">
-            清单:{r.checklistDone ?? 0}/{r.checklistTotal}
-          </Typography>
-        ) : null}
-      </Stack>
-    );
-  }
 
   function toggle(itemId: string) {
     setCollapsed((prev) => {
@@ -192,82 +132,6 @@ export default function GanttPage() {
       return next;
     });
   }
-
-  // YPJ-245(SRS §10.6):行渲染器抽出——主树与「已完成(N)」组复用同一渲染(双面板同步)
-  const renderTitleCell = (r: GanttRow) => (
-    <Box
-      key={r.itemId}
-      sx={{
-        borderBottom: "1px solid",
-        borderColor: "divider",
-        minHeight: 44,
-        display: "flex",
-        alignItems: "center",
-        "&:hover": { bgcolor: "action.hover" },
-      }}
-    >
-      <Stack
-        direction="row"
-        spacing={0.5}
-        alignItems="center"
-        sx={{ pl: 1 + r.depth * 2, py: 0.5 }}
-      >
-        {hasKid(r) && (
-          <Button
-            size="small"
-            onClick={() => toggle(r.itemId)}
-            sx={{ minWidth: 0, px: 0.5 }}
-          >
-            {collapsed.has(r.itemId) ? "▶" : "▼"}
-          </Button>
-        )}
-        <Chip
-          label={r.number}
-          size="small"
-          variant="outlined"
-          sx={{ height: 20 }}
-        />
-        {/* 标题可点进详情;自然宽不截断,列内横滚(YPJ-236) */}
-        <Link
-          href={`/p/${key}/i/${r.itemId}?from=gantt`}
-          style={{ minWidth: 0 }}
-        >
-          {/* component=div:inline span 吃不到盒模型属性,nowrap 文字会画出盒叠压 chip(YPJ-230) */}
-          <Typography
-            component="div"
-            data-testid={`gantt-title-${r.number}`}
-            variant="caption"
-            noWrap
-            sx={{
-              color: "text.primary",
-              textDecoration: "underline",
-              "&:hover": { color: "primary.main" },
-            }}
-          >
-            {r.title}
-          </Typography>
-        </Link>
-        {r.estimateValue !== null && (
-          <Chip
-            data-testid={`gantt-est-${r.number}`}
-            label={`${r.estimateValue}${EST_UNIT_SHORT[r.estimateUnit ?? ""] ?? r.estimateUnit ?? ""}`}
-            size="small"
-            variant="outlined"
-            sx={{ height: 18 }}
-          />
-        )}
-        {r.blocked && (
-          <Chip
-            data-testid={`gantt-blocked-${r.number}`}
-            label="🔗 blocked"
-            size="small"
-            color="warning"
-            sx={{ height: 18 }}
-          />
-        )}
-      </Stack>
-    </Box>
-  );
 
   const renderGanttRow = (r: GanttRow) => {
     const isFinal = r.statusType === "FINAL";
@@ -592,7 +456,7 @@ export default function GanttPage() {
               (planT !== null ||
                 (r.actualStart !== null &&
                   (r.actualEnd === null || rework))) && (
-                <Tooltip title={hoverCard(r)}>
+                <Tooltip title={<HoverCard r={r} wd={wd} />}>
                   <Box
                     data-testid={`gantt-hover-plan-${r.number}`}
                     sx={{
@@ -606,7 +470,7 @@ export default function GanttPage() {
                 </Tooltip>
               )}
             {act && (
-              <Tooltip title={hoverCard(r)}>
+              <Tooltip title={<HoverCard r={r} wd={wd} />}>
                 <Box
                   data-testid={`gantt-hover-act-${r.number}`}
                   sx={{
@@ -620,7 +484,7 @@ export default function GanttPage() {
               </Tooltip>
             )}
             {summary && (
-              <Tooltip title={hoverCard(r)}>
+              <Tooltip title={<HoverCard r={r} wd={wd} />}>
                 <Box
                   sx={{
                     position: "absolute",
@@ -811,24 +675,12 @@ export default function GanttPage() {
         <Typography color="text.secondary">{t.projects.empty}</Typography>
       ) : (
         <>
-          {/* 未排期折叠组 */}
-          {unscheduled.length > 0 && (
-            <Box sx={{ mb: 2 }}>
-              <Button
-                size="small"
-                variant="outlined"
-                onClick={() => setShowUnscheduled((v) => !v)}
-              >
-                {showUnscheduled ? "▼" : "▶"} 未排期({unscheduled.length})
-              </Button>
-              {showUnscheduled &&
-                unscheduled.map((r) => (
-                  <Box key={r.itemId} sx={{ pl: 2 + r.depth * 2, mt: 0.5 }}>
-                    <RowTitle r={r} />
-                  </Box>
-                ))}
-            </Box>
-          )}
+          <UnscheduledGroup
+            unscheduled={unscheduled}
+            showUnscheduled={showUnscheduled}
+            onToggle={() => setShowUnscheduled((v) => !v)}
+            projectKey={key}
+          />
 
           {/* 双面板(YPJ-236):标题列独立横滚+右边线+异色底;甘特区缩放横滚;纵向行对齐 */}
           <Stack
@@ -841,93 +693,23 @@ export default function GanttPage() {
               alignItems: "stretch",
             }}
           >
-            {/* 标题面板:标题按自然宽呈现,超宽时列内底部横滚(YPJ-236) */}
-            <Box
-              data-testid="gantt-titlepane"
-              sx={{
-                width: titleW,
-                flexShrink: 0,
-                overflowX: "auto",
-                overflowY: "hidden",
-                bgcolor: "grey.50",
-                borderRight: "1px solid",
-                borderColor: "divider",
-              }}
-            >
-              <Box sx={{ width: "max-content", minWidth: "100%" }}>
-                {/* 表头占位:与甘特区刻度行同高同边框,保证行对齐 */}
-                {axis.headerRows.map((row) => (
-                  <Box
-                    key={row.gran}
-                    sx={{
-                      height: 24,
-                      borderBottom: "1px solid",
-                      borderColor: "divider",
-                    }}
-                  />
-                ))}
-                {mainRows.map(renderTitleCell)}
-                {completedRows.length > 0 && (
-                  <Box
-                    sx={{
-                      borderBottom: "1px solid",
-                      borderColor: "divider",
-                      minHeight: 44,
-                      display: "flex",
-                      alignItems: "center",
-                    }}
-                  >
-                    <Button
-                      size="small"
-                      data-testid="gantt-completed-group"
-                      onClick={() => setShowCompleted((v) => !v)}
-                      sx={{ pl: 1 }}
-                    >
-                      {showCompleted ? "▼" : "▶"} 已完成({completedRows.length})
-                    </Button>
-                  </Box>
-                )}
-                {showCompleted && completedRows.map((r) => renderTitleCell(r))}
-              </Box>
-            </Box>
-            {/* 237 分割线:骑在标题列右边线上的透明热区,hover/拖拽/键盘焦点显 info.main 竖线 */}
-            <Box
-              data-testid="gantt-splitter"
-              role="separator"
-              aria-orientation="vertical"
-              aria-label="调整标题列宽度"
-              tabIndex={0}
-              onMouseDown={onSplitMouseDown}
-              onDoubleClick={() => persistTitleW(TITLE_W_DEFAULT)}
-              onKeyDown={(e) => {
-                if (e.key === "ArrowLeft") {
-                  e.preventDefault();
-                  persistTitleW(titleW - 16);
-                } else if (e.key === "ArrowRight") {
-                  e.preventDefault();
-                  persistTitleW(titleW + 16);
-                }
-              }}
-              sx={{
-                width: 9,
-                flexShrink: 0,
-                ml: "-5px", // 骑上右边线;不用 sx 数字(被 theme spacing 放大,实锤 -35px)
-                position: "relative",
-                zIndex: 1,
-                cursor: "col-resize",
-                "&::after": {
-                  content: '""',
-                  position: "absolute",
-                  top: 0,
-                  bottom: 0,
-                  left: 3.5,
-                  width: 2,
-                  bgcolor: splitting ? "info.main" : "transparent",
-                },
-                "&:hover::after, &:focus-visible::after": {
-                  bgcolor: "info.main",
-                },
-              }}
+            <TitleColumn
+              titleW={titleW}
+              headerRows={axis.headerRows}
+              mainRows={mainRows}
+              completedRows={completedRows}
+              showCompleted={showCompleted}
+              onToggleCompleted={() => setShowCompleted((v) => !v)}
+              collapsed={collapsed}
+              toggle={toggle}
+              hasKid={hasKid}
+              projectKey={key}
+            />
+            <Splitter
+              titleW={titleW}
+              splitting={splitting}
+              onSplitMouseDown={onSplitMouseDown}
+              persistTitleW={persistTitleW}
             />
             {/* 甘特面板:缩放/横滚;今日线、条、状态章 */}
             <Box
@@ -943,35 +725,7 @@ export default function GanttPage() {
             >
               <Box sx={{ width: axis.timelineW, minWidth: "100%" }}>
                 {/* header 自适应 2–3 行(月/周/日/时,自上而下粗→细) */}
-                {axis.headerRows.map((row) => (
-                  <Box
-                    key={row.gran}
-                    data-testid={`gantt-row-${row.gran}`}
-                    sx={{
-                      position: "relative",
-                      height: 24,
-                      borderBottom: "1px solid",
-                      borderColor: "divider",
-                      bgcolor: "background.default",
-                    }}
-                  >
-                    {row.ticks.map((tk) => (
-                      <Typography
-                        key={tk.key}
-                        variant="caption"
-                        color="text.secondary"
-                        sx={{
-                          position: "absolute",
-                          left: tk.x + 4,
-                          top: 2,
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {tk.label}
-                      </Typography>
-                    ))}
-                  </Box>
-                ))}
+                <TimelineHeader headerRows={axis.headerRows} />
 
                 {scheduled.length === 0 && (
                   <Typography
@@ -1025,31 +779,4 @@ export default function GanttPage() {
       )}
     </PageShell>
   );
-
-  function RowTitle({ r }: { r: GanttRow }) {
-    return (
-      <Stack direction="row" spacing={1} alignItems="center">
-        <Chip
-          label={r.number}
-          size="small"
-          variant="outlined"
-          sx={{ height: 20 }}
-        />
-        {/* 标题列可点进详情(条形区另有整块隐形覆盖链接,YPJ-220 反馈补) */}
-        <Link href={`/p/${key}/i/${r.itemId}?from=gantt`}>
-          <Typography
-            variant="caption"
-            color="text.primary"
-            noWrap
-            sx={{
-              textDecoration: "underline",
-              "&:hover": { color: "primary.main" },
-            }}
-          >
-            {r.title}
-          </Typography>
-        </Link>
-      </Stack>
-    );
-  }
 }
