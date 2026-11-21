@@ -17,14 +17,11 @@ import {
   Typography,
 } from "@mui/material";
 import { Dropdown } from "@/components/Dropdown";
-import RefreshIcon from "@mui/icons-material/Refresh";
+import BoardHeader from "./components/BoardHeader";
 import UndoOutlined from "@mui/icons-material/UndoOutlined";
 import { DialogActions, Tooltip } from "@mui/material";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { createPortal } from "react-dom";
-import { useProjectToolbarSlot } from "@/components/ProjectToolbar"; // CP2 保留:portal 表单态留 page,CP3 随 BoardHeader 迁走
-import { EstimateField } from "@/components/EstimateField";
 import { fmtDate } from "@/lib/dates";
 import { useState } from "react";
 import { api } from "@/lib/api";
@@ -57,7 +54,6 @@ export default function BoardPage() {
     setError,
     load,
   } = useBoardData(key);
-  const { slotRef } = useProjectToolbarSlot();
   const [newTitle, setNewTitle] = useState("");
   const [newEstValue, setNewEstValue] = useState(""); // YPJ-186 预估表单态(成对空串=未填)
   const [newEstUnit, setNewEstUnit] = useState("");
@@ -300,56 +296,22 @@ export default function BoardPage() {
 
   return (
     <Box sx={{ p: 3 }}>
-      <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
-        <Typography variant="h5">{String(key).toUpperCase()} · 看板</Typography>
-        <IconButton
-          size="small"
-          aria-label={t.board.refresh}
-          onClick={() => load()}
-        >
-          <RefreshIcon fontSize="small" />
-        </IconButton>
-        {/* YPJ-187:快速添加 portal 进统一顶栏;工时/收藏/设置在顶栏右簇 */}
-        {slotRef.current &&
-          createPortal(
-            <Stack
-              component="form"
-              direction="row"
-              spacing={1}
-              onSubmit={addItem}
-            >
-              <TextField
-                size="small"
-                placeholder={t.board.addItem}
-                value={newTitle}
-                onChange={(e) => setNewTitle(e.target.value)}
-              />
-              <EstimateField
-                scales={estScales}
-                required={estRequired}
-                value={newEstValue}
-                unit={newEstUnit}
-                onChange={(v, u) => {
-                  setNewEstValue(v);
-                  setNewEstUnit(u);
-                }}
-              />
-              <Button
-                type="submit"
-                variant="outlined"
-                disabled={
-                  loading ||
-                  (newEstUnit !== "" &&
-                    (newEstValue === "" || Number(newEstValue) <= 0)) ||
-                  (estRequired && newEstValue === "")
-                }
-              >
-                {t.board.addItem}
-              </Button>
-            </Stack>,
-            slotRef.current,
-          )}
-      </Stack>
+      <BoardHeader
+        projectKey={key}
+        loading={loading}
+        estRequired={estRequired}
+        estScales={estScales}
+        newTitle={newTitle}
+        onTitleChange={setNewTitle}
+        estValue={newEstValue}
+        estUnit={newEstUnit}
+        onEstChange={(v, u) => {
+          setNewEstValue(v);
+          setNewEstUnit(u);
+        }}
+        onAddItem={addItem}
+        onRefresh={() => load()}
+      />
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
