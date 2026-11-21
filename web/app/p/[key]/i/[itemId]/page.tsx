@@ -202,14 +202,6 @@ export default function ItemDetailPage() {
 
   const [newComment, setNewComment] = useState("");
 
-  const [branchOpen, setBranchOpen] = useState(false);
-
-  const [commits, setCommits] = useState<CommitBlock[] | null>(null);
-
-  const [commitsLoading, setCommitsLoading] = useState(false);
-
-  const [commitsError, setCommitsError] = useState("");
-
   const [timeLog, setTimeLog] = useState<{
     entries: TimeEntry[];
     totalMinutes: number;
@@ -828,8 +820,6 @@ export default function ItemDetailPage() {
     await reloadChecklist();
   }
 
-  const runningEntry = timeLog?.entries.find((e) => e.endedAt === null) ?? null;
-
   if (!item) {
     return (
       <Box sx={{ p: 3 }}>
@@ -1365,377 +1355,40 @@ export default function ItemDetailPage() {
           )}
 
           {tab === 5 && (
-            <Box>
-              <Stack
-                direction="row"
-                spacing={1}
-                alignItems="center"
-                sx={{ mb: 1 }}
-              >
-                <Typography variant="h6">{t.time.section}</Typography>
-
-                {timeLog && timeLog.totalMinutes > 0 && (
-                  <Typography variant="body2" color="text.secondary">
-                    {t.time.fmt(timeLog.totalMinutes)}
-                  </Typography>
-                )}
-
-                {runningEntry ? (
-                  <Chip
-                    size="small"
-                    color="warning"
-                    label={`${t.time.running} ${t.time.fmt(timeLog!.entries.find((e) => e.endedAt === null)!.minutes)}`}
-                  />
-                ) : (
-                  <Button size="small" variant="outlined" onClick={startTimer}>
-                    {t.time.start}
-                  </Button>
-                )}
-              </Stack>
-
-              {runningEntry && (
-                <Button
-                  size="small"
-                  color="error"
-                  variant="contained"
-                  onClick={() => stopTimer(runningEntry.timeEntryId)}
-                  sx={{ mb: 1 }}
-                >
-                  {t.time.stop}
-                </Button>
-              )}
-
-              {timeLog && timeLog.entries.length > 0 && (
-                <Stack spacing={0.5} sx={{ mb: 1 }}>
-                  {timeLog.entries.map((e) => (
-                    <Stack
-                      key={e.timeEntryId}
-                      direction="row"
-                      spacing={1}
-                      alignItems="center"
-                    >
-                      <Typography variant="caption" color="text.secondary">
-                        {e.member} ·{" "}
-                        {new Date(e.startedAt).toLocaleString("zh-CN")}
-                        {e.endedAt
-                          ? ` → ${new Date(e.endedAt).toLocaleTimeString("zh-CN")}`
-                          : ` → ${t.time.running}`}
-                      </Typography>
-
-                      <Typography variant="caption">
-                        {t.time.fmt(e.minutes)}
-                      </Typography>
-
-                      {e.note && (
-                        <Typography variant="caption" color="text.secondary">
-                          {e.note}
-                        </Typography>
-                      )}
-
-                      {e.endedAt === null && (
-                        <Button
-                          size="small"
-                          color="error"
-                          onClick={() => stopTimer(e.timeEntryId)}
-                        >
-                          {t.time.stop}
-                        </Button>
-                      )}
-                    </Stack>
-                  ))}
-                </Stack>
-              )}
-
-              <Stack
-                direction="row"
-                spacing={1}
-                alignItems="center"
-                sx={{ mt: 1 }}
-              >
-                <TextField
-                  size="small"
-
-                  label={t.time.minutesLabel}
-
-                  type="number"
-
-                  value={manualMinutes}
-
-                  onChange={(e) => setManualMinutes(e.target.value)}
-
-                  sx={{ width: 140 }}
-                />
-
-                <TextField
-                  size="small"
-
-                  label={t.time.noteLabel}
-
-                  value={manualNote}
-
-                  onChange={(e) => setManualNote(e.target.value)}
-
-                  sx={{ width: 220 }}
-                />
-
-                <Button
-                  size="small"
-                  variant="outlined"
-                  onClick={addManual}
-                  disabled={!manualMinutes}
-                >
-                  {t.time.addManual}
-                </Button>
-              </Stack>
-
-              <Stack
-                direction="row"
-                spacing={1}
-                alignItems="center"
-                sx={{ mt: 1 }}
-              >
-                <Button
-                  size="small"
-                  variant="outlined"
-                  onClick={loadSuggestions}
-                  disabled={suggestionsBusy}
-                >
-                  {t.time.suggest}
-                </Button>
-              </Stack>
-
-              {suggestions !== null && suggestions.length === 0 && (
-                <Typography variant="caption" color="text.secondary">
-                  {t.time.suggestEmpty}
-                </Typography>
-              )}
-
-              {(suggestions ?? []).map((s) => (
-                <Stack
-                  key={s.ref}
-                  direction="row"
-                  spacing={1}
-                  alignItems="center"
-                  sx={{ mt: 0.5 }}
-                >
-                  <Typography variant="caption" color="text.secondary">
-                    {s.ref} · {s.commitCount} commits ·{" "}
-                    {new Date(s.startedAt).toLocaleString("zh-CN")} →{" "}
-                    {new Date(s.endedAt).toLocaleTimeString("zh-CN")}
-                  </Typography>
-
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    onClick={() => logSuggestion(s)}
-                    disabled={suggestionsBusy}
-                  >
-                    {t.time.logSuggestion}
-                  </Button>
-                </Stack>
-              ))}
-            </Box>
+            <TimeLogTab
+              timeLog={timeLog}
+              manualMinutes={manualMinutes}
+              manualNote={manualNote}
+              onManualMinutesChange={setManualMinutes}
+              onManualNoteChange={setManualNote}
+              suggestions={suggestions}
+              suggestionsBusy={suggestionsBusy}
+              onStartTimer={startTimer}
+              onStopTimer={stopTimer}
+              onAddManual={addManual}
+              onLoadSuggestions={loadSuggestions}
+              onLogSuggestion={logSuggestion}
+            />
           )}
 
           {tab === 7 && (
-            <Box>
-              <Typography variant="h6" sx={{ mb: 1 }}>
-                {t.item.itemAttributes}
-              </Typography>
-
-              <AttrEditor
-                customAttrs={attributes.filter((at) => at.kind === "custom")}
-
-                initial={(item.attributes ?? []).map((at) => ({ ...at }))}
-
-                onSave={saveAttributes}
-              />
-            </Box>
+            <AttributesTab
+              attributes={attributes}
+              itemAttributes={item.attributes}
+              onSaveAttrs={saveAttributes}
+            />
           )}
 
           {tab === 6 && (
-            <Box>
-              <Stack
-                direction="row"
-                spacing={1}
-                alignItems="center"
-                sx={{ mb: 1 }}
-              >
-                <Typography variant="h6">{t.gh.gitRefs}</Typography>
-
-                <Button
-                  size="small"
-                  variant="outlined"
-                  onClick={() => setBranchOpen(true)}
-                >
-                  {t.gh.branch}
-                </Button>
-              </Stack>
-
-              {(item.gitRefs?.length ?? 0) === 0 && (
-                <Typography color="text.secondary" variant="body2">
-                  {t.gh.gitRefsEmpty}
-                </Typography>
-              )}
-
-              <Stack spacing={0.5}>
-                {(item.gitRefs ?? []).map((r) => (
-                  <Stack
-                    key={`${r.kind}-${r.repo}-${r.ref}`}
-                    direction="row"
-                    spacing={1}
-                    alignItems="center"
-                  >
-                    <Chip
-                      size="small"
-
-                      variant="outlined"
-
-                      label={r.kind === "pr" ? t.gh.statePr : t.gh.stateBranch}
-
-                      color={r.kind === "pr" ? "secondary" : "default"}
-                    />
-
-                    {r.kind === "pr" && r.state && (
-                      <Chip
-                        size="small"
-
-                        label={
-                          r.state === "merged"
-                            ? t.gh.stateMerged
-                            : r.state === "open"
-                              ? t.gh.stateOpen
-                              : t.gh.stateClosed
-                        }
-
-                        color={
-                          r.state === "merged"
-                            ? "success"
-                            : r.state === "open"
-                              ? "primary"
-                              : "default"
-                        }
-                      />
-                    )}
-
-                    {r.url ? (
-                      <a href={r.url} target="_blank" rel="noreferrer">
-                        <Typography variant="body2">{r.ref}</Typography>
-                      </a>
-                    ) : (
-                      <Typography variant="body2">{r.ref}</Typography>
-                    )}
-
-                    <Typography variant="caption" color="text.secondary">
-                      {r.repo}
-                    </Typography>
-                  </Stack>
-                ))}
-              </Stack>
-
-              <Stack
-                direction="row"
-                spacing={1}
-                alignItems="center"
-                sx={{ mt: 2, mb: 1 }}
-              >
-                <Typography variant="h6">{t.gh.commitsTitle}</Typography>
-
-                <Button
-                  size="small"
-
-                  variant="outlined"
-
-                  onClick={() => {
-                    setCommitsError("");
-
-                    setCommitsLoading(true);
-
-                    api<CommitBlock[]>(`/api/items/${itemId}/commits`)
-                      .then(setCommits)
-
-                      .catch((e) =>
-                        setCommitsError(
-                          e instanceof Error ? e.message : "拉取失败",
-                        ),
-                      )
-
-                      .finally(() => setCommitsLoading(false));
-                  }}
-
-                  disabled={commitsLoading}
-                >
-                  {t.gh.loadCommits}
-                </Button>
-              </Stack>
-
-              {commitsError && (
-                <Typography color="error" variant="body2">
-                  {commitsError}
-                </Typography>
-              )}
-
-              {commits === null && !commitsError && (
-                <Typography color="text.secondary" variant="body2">
-                  {t.gh.commitsHint}
-                </Typography>
-              )}
-
-              {(commits ?? []).map((block) => (
-                <Box key={`${block.repo}-${block.ref}`} sx={{ mb: 1 }}>
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                    {block.repo} · {block.ref}
-                    {block.viaPr && (
-                      <Typography
-                        component="span"
-                        variant="caption"
-                        color="text.secondary"
-                        sx={{ ml: 1, fontWeight: 400 }}
-                      >
-                        {t.gh.viaPr}
-                        {block.prNumber != null ? ` #${block.prNumber}` : ""}
-                      </Typography>
-                    )}
-                  </Typography>
-
-                  {block.commits.length === 0 && (
-                    <Typography variant="caption" color="text.secondary">
-                      {t.gh.noCommits}
-                    </Typography>
-                  )}
-
-                  {block.commits.map((c) => (
-                    <Typography
-                      key={c.sha}
-                      variant="caption"
-                      color="text.secondary"
-                      component="div"
-                    >
-                      {c.sha.slice(0, 7)} {c.message}
-                      {c.author ? ` · ${c.author}` : ""}
-                    </Typography>
-                  ))}
-                </Box>
-              ))}
-
-              <CreateBranchDialog
-                open={branchOpen}
-
-                onClose={() => setBranchOpen(false)}
-
-                projectKey={String(key)}
-
-                itemNumber={item.number}
-
-                itemType={item.type}
-
-                itemTitle={item.title}
-
-                itemId={String(itemId)}
-
-                onCreated={load}
-              />
-            </Box>
+            <GithubTab
+              projectKey={String(key)}
+              itemId={String(itemId)}
+              gitRefs={item.gitRefs}
+              itemNumber={item.number}
+              itemType={item.type}
+              itemTitle={item.title}
+              onCreated={load}
+            />
           )}
 
           <Box sx={{ width: 240, flexShrink: 0 }}>
@@ -1829,6 +1482,9 @@ import { AttrEditor } from "./components/AttrEditor";
 import { RequirementsDialog } from "./components/RequirementsDialog";
 import { CreateBranchDialog } from "./components/CreateBranchDialog";
 import { DependencyAddForm } from "./components/DependencyAddForm";
+import { TimeLogTab } from "./components/TimeLogTab";
+import { AttributesTab } from "./components/AttributesTab";
+import { GithubTab } from "./components/GithubTab";
 import { RequirementsTab } from "./components/RequirementsTab";
 import { DependenciesTab } from "./components/DependenciesTab";
 import { CommentsTab } from "./components/CommentsTab";
