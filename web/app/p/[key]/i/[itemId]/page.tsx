@@ -1331,45 +1331,10 @@ export default function ItemDetailPage() {
           {/* 七区块横向页签:评论/日志/判定/需求/依赖+清单/工时/GitHub(子条目为主页面直排区块,不在页签内,YPJ-84) */}
 
           {tab === 3 && (
-            <Box>
-              <Typography variant="h6">{t.item.requirements}</Typography>
-
-              {(item.requirements ?? []).length === 0 ? (
-                <Typography color="text.secondary" variant="body2">
-                  (无需求——判定聚合在上方)
-                </Typography>
-              ) : (
-                <Stack spacing={0.5}>
-                  {item.requirements.map((r, i) => (
-                    <Stack
-                      key={i}
-                      direction="row"
-                      spacing={1}
-                      alignItems="center"
-                    >
-                      <Chip
-                        size="small"
-                        variant="outlined"
-                        label={r.attribute}
-                      />
-
-                      <Typography variant="body2">
-                        {r.minLevel ? `≥${r.minLevel}` : "在场即可"}
-                      </Typography>
-                    </Stack>
-                  ))}
-                </Stack>
-              )}
-
-              <Button
-                size="small"
-                variant="outlined"
-                onClick={() => setReqOpen(true)}
-                sx={{ mt: 2 }}
-              >
-                编辑需求
-              </Button>
-            </Box>
+            <RequirementsTab
+              requirements={item.requirements}
+              onRequestEdit={() => setReqOpen(true)}
+            />
           )}
 
           <RequirementsDialog
@@ -1383,177 +1348,20 @@ export default function ItemDetailPage() {
           />
 
           {tab === 4 && (
-            <>
-              <Box>
-                <Stack
-                  direction="row"
-                  spacing={1}
-                  alignItems="center"
-                  sx={{ mb: 1 }}
-                >
-                  <Typography variant="h6">检查清单</Typography>
-
-                  {checklist && checklist.totalCount > 0 && (
-                    <Chip
-                      size="small"
-                      label={`${checklist.doneCount}/${checklist.totalCount}`}
-                      color={
-                        checklist.doneCount === checklist.totalCount
-                          ? "success"
-                          : "default"
-                      }
-                    />
-                  )}
-                </Stack>
-
-                <Stack spacing={0.5}>
-                  {(checklist?.entries ?? []).map((e) => (
-                    <Stack
-                      key={e.checklistItemId}
-                      direction="row"
-                      spacing={1}
-                      alignItems="center"
-                    >
-                      <input
-                        type="checkbox"
-
-                        checked={e.done}
-
-                        onChange={() =>
-                          toggleCheckEntry(e.checklistItemId, !e.done)
-                        }
-                      />
-
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          textDecoration: e.done ? "line-through" : "none",
-                          color: e.done ? "text.secondary" : "inherit",
-                        }}
-                      >
-                        {e.text}
-                      </Typography>
-
-                      <Button
-                        size="small"
-                        color="error"
-                        onClick={() => removeCheckEntry(e.checklistItemId)}
-                      >
-                        删除
-                      </Button>
-                    </Stack>
-                  ))}
-                </Stack>
-
-                <Stack
-                  direction="row"
-                  spacing={1}
-                  alignItems="center"
-                  sx={{ mt: 1 }}
-                >
-                  <TextField
-                    size="small"
-
-                    placeholder="加一条检查项…"
-
-                    value={newCheckText}
-
-                    onChange={(e) => setNewCheckText(e.target.value)}
-
-                    sx={{ width: 300 }}
-                  />
-
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    onClick={addCheckEntry}
-                    disabled={!newCheckText.trim()}
-                  >
-                    添加
-                  </Button>
-                </Stack>
-              </Box>
-
-              <Box sx={{ mt: 3 }}>
-                <Stack
-                  direction="row"
-                  spacing={1}
-                  alignItems="center"
-                  sx={{ mb: 1 }}
-                >
-                  <Typography variant="h6">依赖</Typography>
-
-                  {depBlocked && (
-                    <Chip size="small" color="error" label="⛔ 被阻塞" />
-                  )}
-
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    onClick={() => setDepAddOpen((v) => !v)}
-                  >
-                    加依赖
-                  </Button>
-                </Stack>
-
-                {depAddOpen && (
-                  <DependencyAddForm
-                    projectKey={String(key)}
-                    selfId={String(itemId)}
-                    onAdd={addDependency}
-                  />
-                )}
-
-                {(deps ?? []).length === 0 ? (
-                  <Typography variant="caption" color="text.secondary">
-                    (无依赖)
-                  </Typography>
-                ) : (
-                  <Stack spacing={0.5}>
-                    {(deps ?? []).map((d) => (
-                      <Stack
-                        key={d.dependencyItemId}
-                        direction="row"
-                        spacing={1}
-                        alignItems="center"
-                      >
-                        <Chip
-                          size="small"
-                          variant="outlined"
-                          label={d.number}
-                        />
-
-                        <Typography
-                          variant="caption"
-                          noWrap
-                          sx={{ maxWidth: 220 }}
-                        >
-                          {d.title}
-                        </Typography>
-
-                        <Chip
-                          size="small"
-                          label={d.statusName}
-                          color={d.final ? "success" : "default"}
-                        />
-
-                        {!d.final && (
-                          <Chip size="small" color="error" label="阻塞中" />
-                        )}
-
-                        <Button
-                          size="small"
-                          color="error"
-                          onClick={() => removeDep(d.dependencyItemId)}
-                        >
-                          移除
-                        </Button>
-                      </Stack>
-                    ))}
-                  </Stack>
-                )}
-              </Box>
-            </>
+            <DependenciesTab
+              projectKey={String(key)}
+              itemId={String(itemId)}
+              deps={deps}
+              depBlocked={depBlocked}
+              checklist={checklist}
+              newCheckText={newCheckText}
+              onCheckTextChange={setNewCheckText}
+              onAddCheck={addCheckEntry}
+              onToggleCheck={toggleCheckEntry}
+              onRemoveCheck={removeCheckEntry}
+              onAddDep={addDependency}
+              onRemoveDep={removeDep}
+            />
           )}
 
           {tab === 5 && (
@@ -2021,6 +1829,8 @@ import { AttrEditor } from "./components/AttrEditor";
 import { RequirementsDialog } from "./components/RequirementsDialog";
 import { CreateBranchDialog } from "./components/CreateBranchDialog";
 import { DependencyAddForm } from "./components/DependencyAddForm";
+import { RequirementsTab } from "./components/RequirementsTab";
+import { DependenciesTab } from "./components/DependenciesTab";
 import { CommentsTab } from "./components/CommentsTab";
 import { ActivityTab } from "./components/ActivityTab";
 import { FeasibilityTab } from "./components/FeasibilityTab";
