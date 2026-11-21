@@ -110,3 +110,45 @@ web/app/p/[key]/(board)      共 ~1270(913 → +39%,252 家族 +35% 同例)
 - [ ] F. 无 active 提示条:两文案态(无组/有组无 active)+ planned Dropdown 一键开始 → 看板收窄
 - [ ] G. 刷新链路:30s 自动刷新仍在(hook 化后时序不变)+ 手刷钮 + `yz:project-changed` 广播重拉 + last-project 记忆(V11-S1)
 - [ ] H. e2e 全量绿(用户跑)+ `npm run format` 绿
+
+
+## 四、As-built(PR #243 squash 9194a10 合入后补,2026-11-21)
+
+### 交付形态
+
+```text
+web/app/p/[key]/(board)      共 1155 行(原 page 913 单文件,+27%;252 家族 +35%,更瘦)
+├── page.tsx               404 行(入口:态+派生+S-flow 决策树/moveTo/startSprint 编排+胶水)
+├── hooks/
+│   └── useBoardData.ts    91 行(数据球 8 态 + load + 4 effects 全归:setItems 外露供 moveTo 乐观更新)
+├── types.ts               36 行(Status/Item/Filter/SprintLite)
+└── components/ ×7
+    ├── BoardCard.tsx        176(chips 行/标题 Link/due+est/requirements;移出内置,onRemoved 上行)
+    ├── PullDialog.tsx       103(backlog 拉取+picked 局部+逐条 PUT 内置;onPulled 上行)
+    ├── BoardHeader.tsx      91(标题+手刷+快速添加 portal;slotRef/useProjectToolbarSlot 随迁,portal 时序不变)
+    ├── LaunchDialog.tsx     84(S2/S3 前置确认;launchPick/launchName 受控,planned 派生内置)
+    ├── BoardColumn.tsx      68(列壳+drag 三 handler page 闭包下发+空态)
+    ├── FilterChips.tsx      59(S7 chips+member chips+拉入钮)
+    └── SprintPickDialog.tsx 42(S1m 选组,纯展示)
+```
+
+### As-built 偏差(目标形态 → 实拆)
+
+- **page 404 行**:优于预估 ~430,仍 > 票面 ≤~300——S-flow 决策树 ~152 行 + moveTo 53 行编排留 page 是主因(拍板 2/7;251:1398/252:451 同例);最大组件 BoardCard 176 < 核心文件 <400 闸。
+- **setBoardItem 拆两处内置**(拍板 3 落实):PullDialog 确认 PUT(onBoard:true)+ BoardCard 移出 PUT(onBoard:false + `.then(onRemoved)`);原共享函数退役,page 不再持有 board-membership 调用。
+- **removable=列 statusType!==FINAL**:原 `!finalNames.has(it.status)`;卡片按 status 名分列(byStatusName),it.status===列名,故与列 statusType!==FINAL 等价——名称唯一性前提,同原分组逻辑自身前提。
+- **LaunchDialog planned 派生内置**:原三处内联 `sprints.filter(planned)`/`find` → 组件内 hoist 一次,表达式等价(launchBody 的 find → planned[0],首元素同)。
+- **assignSprint 死导入顺手清**:原 page import 未使用(疑似历史残留),随 CP2 import 收敛一并删除,零行为面。
+- **残留 import 清理单独绿点**:CP6 后 page 残留 DialogActions import,终检发现单独提交(1a6cf0e)——切片后残留检查纳入下票 checklist。
+- **真值表/示意图不适用与解读断言**:零新交互维持;30s 定时器随 useBoardData 迁移后 interval 空依赖挂载一次、load 闭包随 key 稳定,时序不变(G1 手测过)。
+
+### 节奏执行(新节奏第三票)
+
+- 一次 coding CP1-CP6(types+PullDialog → 数据球 → Header → FilterChips → 卡列 → 双弹窗),每绿点 tsc+prettier 绿就地 commit,零中途停;停等仅两处(设计过目 "go" + e2e)。PR squash 后 main 单提交(9194a10)。
+- **踩坑延续(handoff 实录应验)**:CP2 提交链 `tsc > log; echo exit=$? && commit` 把红提交放行(echo 恒 0)——当场发现,slotRef 属 CP3 范围、恢复后 amend 回绿;此后闸一律 `tsc --noEmit > log 2>&1 && echo GREEN` 短路链。**教训:闸的退出码必须直接短路 &&,不得经 echo/中转变量**。
+
+### 验证快照
+
+- tsc --noEmit 0 锁(每绿点 + 终检);prettier --check + `npm run format` 绿;testid 对账 0/0(本页无 testid;e2e 依赖的 cand-row 在 layout 未动)
+- e2e 全量绿(用户跑,test 容器 8082);手测冒烟 A-H 落档 `docs/testing/manual-test-cases.md` YPJ-253 节(H1 已勾)
+- CP 行数轨迹:913→808→760→722→686→468→405(残留清理→404)
