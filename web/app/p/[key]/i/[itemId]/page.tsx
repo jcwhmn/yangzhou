@@ -1308,142 +1308,24 @@ export default function ItemDetailPage() {
           </Tabs>
 
           {tab === 0 && (
-            <>
-              <Typography variant="h6" sx={{ mb: 1 }}>
-                评论
-              </Typography>
-
-              <Stack spacing={1} sx={{ mb: 0 }}>
-                {comments.map((c) => (
-                  <Box
-                    key={c.commentId}
-                    sx={{
-                      p: 1.5,
-                      bgcolor: "background.paper",
-                      borderRadius: 1,
-                      border: "1px solid",
-                      borderColor: "divider",
-                    }}
-                  >
-                    <Stack
-                      direction="row"
-                      justifyContent="space-between"
-                      alignItems="center"
-                    >
-                      <Typography variant="caption" color="text.secondary">
-                        {c.author} ·{" "}
-                        {new Date(c.createdAt).toLocaleString("zh-CN")}
-                      </Typography>
-
-                      <Button
-                        size="small"
-                        color="error"
-                        onClick={() => removeComment(c.commentId)}
-                      >
-                        删除
-                      </Button>
-                    </Stack>
-
-                    <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
-                      {c.body}
-                    </Typography>
-                  </Box>
-                ))}
-              </Stack>
-
-              <Stack direction="row" spacing={1}>
-                <TextField
-                  size="small"
-
-                  placeholder="写评论…"
-
-                  value={newComment}
-
-                  onChange={(e) => setNewComment(e.target.value)}
-
-                  fullWidth
-
-                  multiline
-
-                  minRows={4}
-
-                  maxRows={8}
-
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey && newComment.trim()) {
-                      e.preventDefault();
-
-                      addComment();
-                    }
-                  }}
-                />
-
-                <Button
-                  variant="outlined"
-                  onClick={addComment}
-                  disabled={!newComment.trim()}
-                >
-                  发送
-                </Button>
-              </Stack>
-            </>
+            <CommentsTab
+              comments={comments}
+              newComment={newComment}
+              onCommentChange={setNewComment}
+              onAdd={addComment}
+              onRemove={removeComment}
+            />
           )}
 
           {tab === 1 && activity.length > 0 && (
-            <Box sx={{ mt: 3 }}>
-              <Typography variant="h6" gutterBottom>
-                活动日志
-              </Typography>
-
-              <Stack spacing={0.5}>
-                {activity.map((a) => (
-                  <Typography
-                    key={a.objectId}
-                    variant="caption"
-                    color="text.secondary"
-                  >
-                    {new Date(a.createdAt).toLocaleString("zh-CN")} ·{" "}
-                    {a.actorMemberId == null
-                      ? "GitHub"
-                      : (memberNames.get(String(a.actorMemberId)) ??
-                        `#${a.actorMemberId}`)}{" "}
-                    · {activityLabel[a.kind] ?? a.kind}
-                    {a.oldValue || a.newValue
-                      ? `: ${a.oldValue ?? ""} → ${a.newValue ?? ""}`
-                      : ""}
-                  </Typography>
-                ))}
-              </Stack>
-            </Box>
+            <ActivityTab activity={activity} memberNames={memberNames} />
           )}
 
           {tab === 2 && feasibility && (
-            <Box sx={{ mt: 3 }}>
-              <Stack direction="row" spacing={1} alignItems="center">
-                <Typography variant="h6">{t.item.verdicts}</Typography>
-
-                <Button
-                  size="small"
-                  variant="outlined"
-                  onClick={() => setReqOpen(true)}
-                >
-                  编辑需求
-                </Button>
-              </Stack>
-
-              {feasibility.verdicts.length === 0 && (
-                <Typography color="text.secondary">(无需求)</Typography>
-              )}
-
-              {feasibility.verdicts.map((v, i) => (
-                <VerdictLine key={i} v={v} />
-              ))}
-
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                缺门 {feasibility.missingCount} · 总差距{" "}
-                {feasibility.totalDelta} 级
-              </Typography>
-            </Box>
+            <FeasibilityTab
+              feasibility={feasibility}
+              onRequestEdit={() => setReqOpen(true)}
+            />
           )}
 
           {/* 七区块横向页签:评论/日志/判定/需求/依赖+清单/工时/GitHub(子条目为主页面直排区块,不在页签内,YPJ-84) */}
@@ -2139,3 +2021,6 @@ import { AttrEditor } from "./components/AttrEditor";
 import { RequirementsDialog } from "./components/RequirementsDialog";
 import { CreateBranchDialog } from "./components/CreateBranchDialog";
 import { DependencyAddForm } from "./components/DependencyAddForm";
+import { CommentsTab } from "./components/CommentsTab";
+import { ActivityTab } from "./components/ActivityTab";
+import { FeasibilityTab } from "./components/FeasibilityTab";
