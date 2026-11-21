@@ -7,7 +7,6 @@ import FilterChips from "./components/FilterChips";
 import BoardColumn from "./components/BoardColumn";
 import SprintPickDialog from "./components/SprintPickDialog";
 import LaunchDialog from "./components/LaunchDialog";
-import { DialogActions } from "@mui/material";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import { api } from "@/lib/api";
