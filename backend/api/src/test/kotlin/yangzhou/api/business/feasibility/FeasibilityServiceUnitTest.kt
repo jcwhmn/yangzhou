@@ -20,6 +20,7 @@ import yangzhou.persistence.repository.CapabilityRepository
 import yangzhou.persistence.repository.ItemRepository
 import yangzhou.persistence.repository.ProjectRepository
 import yangzhou.persistence.repository.RequirementRepository
+import yangzhou.persistence.repository.StatusRepository
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -37,8 +38,10 @@ class FeasibilityServiceUnitTest {
     private val requirementRepo = mockk<RequirementRepository>(relaxed = true)
     private val definitions = mockk<AttributeDefinitionRepository>(relaxed = true)
     private val capabilities = mockk<CapabilityRepository>(relaxed = true)
+    private val statusRepo = mockk<StatusRepository>(relaxed = true)
     private val memberService = mockk<MemberService>(relaxed = true)
     private val workspaceService = mockk<WorkspaceService>(relaxed = true)
+    private val capturedReqs = mutableListOf<Requirement>()
 
     private val service =
         FeasibilityService(
@@ -47,6 +50,7 @@ class FeasibilityServiceUnitTest {
             requirementRepo,
             definitions,
             capabilities,
+            statusRepo,
             memberService,
             workspaceService,
         )
@@ -61,6 +65,11 @@ class FeasibilityServiceUnitTest {
     @BeforeEach
     fun setup() {
         clearMocks(projects, itemRepo, requirementRepo, definitions, capabilities, memberService, workspaceService)
+        // YPJ-242:重算走批量口径——按查询的 itemObjectId 集过滤(归属字段已真实化)
+        every { requirementRepo.findByItemObjectIdIn(any()) } answers {
+            val ids = firstArg<Collection<UUID>>()
+            capturedReqs.filter { it.itemObjectId in ids }
+        }
         every { workspaceService.required() } returns ws
         every { definitions.findByWorkspaceObjectId(UUID(0, 1)) } returns listOf(attrKotlin, attrReact)
         every { memberService.current() } returns me
@@ -92,7 +101,10 @@ class FeasibilityServiceUnitTest {
                 title = "item $number",
                 statusObjectId = UUID.randomUUID(),
             )
-        every { requirementRepo.findByItemObjectId(UUID(0, id)) } returns reqs.toList()
+        // YPJ-242:重算按 requirement.itemObjectId 分组,测试数据的归属字段必须真实指向所属 item
+        val rr = reqs.map { r -> r.copy(itemObjectId = UUID(0, id)) }
+        capturedReqs += rr
+        every { requirementRepo.findByItemObjectId(UUID(0, id)) } returns rr
         every { itemRepo.findByObjectId(it.objectId) } returns it
         return it
     }
@@ -205,8 +217,9 @@ class FeasibilityServiceUnitTest {
     inner class RecomputeWorkspace {
         @Test
         fun `按 id 升序重算(YPJ-26 锁序)- 乱序输入也归序`() {
-            val p1 = project.copy(id = 1L, objectId = UUID(0, 1))
-            val p2 = project.copy(id = 2L, objectId = UUID(0, 2))
+            val p1 = project.copy(id = 1L, objectId = UUID(0, 1), feasSignal = "RED")
+            val p2 = project.copy(id = 2L, objectId = UUID(0, 2), feasSignal = "RED")
+            // YPJ-242:只 save 变化行——初值 RED→null(null≠RED)才触发写回,验证 id 升序锁序
             every { projects.findAll() } returns listOf(p2, p1) // 故意乱序
             stubItems(emptyList(), UUID(0, 1))
             stubItems(emptyList(), UUID(0, 2))

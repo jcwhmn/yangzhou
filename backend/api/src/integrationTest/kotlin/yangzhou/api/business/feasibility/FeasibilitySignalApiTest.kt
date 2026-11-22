@@ -168,4 +168,61 @@ class FeasibilitySignalApiTest : AbstractApiTest() {
                 .responseBody!!
         assertTrue(res.contains("signal"))
     }
+
+    /** YPJ-242(spec 0162):FINAL item 不重算、不进 project rollup;全 FINAL → null。 */
+    @Test
+    fun `FINAL 冻结——rollup 排除 FINAL——全 FINAL 为 null`() {
+        val authed = bootstrapAndAuth()
+        authed
+            .post()
+            .uri("/api/attributes")
+            .body(mapOf("name" to "React", "kind" to "skill", "leveled" to true))
+            .exchange()
+            .expectStatus()
+            .isCreated()
+        createProject(authed, "FIN")
+        val statusIds =
+            json
+                .readTree(
+                    authed
+                        .get()
+                        .uri("/api/projects/FIN")
+                        .exchange()
+                        .expectBody(String::class.java)
+                        .returnResult()
+                        .responseBody!!,
+                )["statuses"]
+                .associate { it["name"].asText() to it["statusId"].asText() }
+        val a = createItem(authed, "FIN", "gap 行")["itemId"].asText()
+        val b = createItem(authed, "FIN", "满足行")["itemId"].asText()
+        // 开工/迁移需有主(开工前请先指派负责人)
+        val meId =
+            json.readTree(
+                authed.get().uri("/api/members").exchange().expectStatus().isOk().expectBody(String::class.java).returnResult().responseBody!!,
+            )[0]["memberId"].asText()
+        listOf(a, b).forEach { id ->
+            authed.put().uri("/api/items/$id/assignee").body(mapOf("assigneeItemId" to meId)).exchange().expectStatus().isOk()
+        }
+        authed
+            .put()
+            .uri("/api/items/$a/requirements")
+            .body(mapOf("requirements" to listOf(mapOf("attribute" to "React", "minLevel" to 2))))
+            .exchange()
+            .expectStatus()
+            .isOk()
+
+        // A=RED,B=GREEN → project YELLOW? 无 B 需求 → B GREEN;聚合 = RED
+        authed.patch().uri("/api/items/$a").body(mapOf("statusItemId" to statusIds["In Progress"])).exchange().expectStatus().isOk()
+        assertEquals("RED" to "RED", signals(authed, "FIN"))
+
+        // A 转 FINAL:冻结在 RED;rollup 只看非 FINAL(B GREEN)→ project GREEN
+        authed.patch().uri("/api/items/$a").body(mapOf("statusItemId" to statusIds["Done"])).exchange().expectStatus().isOk()
+        val (pSig, aSig) = signals(authed, "FIN")
+        assertEquals("GREEN", pSig)
+        assertEquals("RED", aSig) // 冻结在转入 FINAL 前最后一次重算
+
+        // 全 FINAL → project signal null
+        authed.patch().uri("/api/items/$b").body(mapOf("statusItemId" to statusIds["Done"])).exchange().expectStatus().isOk()
+        assertEquals(null to "RED", signals(authed, "FIN")) // A 冻结 RED;rollup 全 FINAL → null
+    }
 }

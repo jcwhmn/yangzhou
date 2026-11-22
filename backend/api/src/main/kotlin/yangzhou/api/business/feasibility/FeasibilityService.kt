@@ -8,11 +8,13 @@ import yangzhou.domain.matching.MatchResult
 import yangzhou.domain.matching.MatchingEngine
 import yangzhou.domain.matching.RollupResult
 import yangzhou.domain.matching.Verdict
+import yangzhou.persistence.StatusType
 import yangzhou.persistence.repository.AttributeDefinitionRepository
 import yangzhou.persistence.repository.CapabilityRepository
 import yangzhou.persistence.repository.ItemRepository
 import yangzhou.persistence.repository.ProjectRepository
 import yangzhou.persistence.repository.RequirementRepository
+import yangzhou.persistence.repository.StatusRepository
 import java.util.UUID
 
 /**
@@ -26,6 +28,7 @@ class FeasibilityService(
     private val requirementRepo: RequirementRepository,
     private val definitions: AttributeDefinitionRepository,
     private val capabilities: CapabilityRepository,
+    private val statusRepo: StatusRepository, // YPJ-242:FINAL 判定
     private val memberService: MemberService,
     private val workspaceService: WorkspaceService,
 ) {
@@ -107,25 +110,53 @@ class FeasibilityService(
 
     private val rank = mapOf("GREEN" to 0, "YELLOW" to 1, "RED" to 2)
 
-    /** 重算单 item 冗余并返回 signal。private:外部直接调用会先锁单个 item 行,破坏 recompute 的编号序锁序(YPJ-26 40P01 死锁根因)。 */
-    private fun recomputeItemSignal(item: yangzhou.persistence.Item): String {
-        val signal = item(item.objectId).signal
+    /** 重算项目:全部 item 冗余 + 聚合到 project(RED>YELLOW>GREEN;无 item = null)。
+     * YPJ-242(spec 0162):批量读(ctx 装配/需求一次取)→ 引擎纯内存 → 只 save 变化行;
+     * FINAL item 不重算、不进 rollup(冻结 = 转 FINAL 前最后一次重算;全 FINAL → null)。 */
+    fun recomputeProjectSignal(projectObjectId: UUID): String? = recomputeProjectSignal(projectObjectId, loadCtx())
 
-        itemRepo.save(item.copy(feasSignal = signal))
-        return signal
+    /** 批量装配:definitions + 当前成员 capabilities 一次读,跨项目/跨 item 复用。 */
+    private fun loadCtx(): BatchCtx {
+        val attrs = definitions.findByWorkspaceObjectId(workspaceService.required().objectId!!).associate { it.objectId!! to it.name }
+        val caps =
+            capabilities.findByMemberObjectId(memberService.current().objectId!!).mapNotNull { c ->
+                attrs[c.attributeDefinitionObjectId]?.let { yangzhou.domain.Capability(yangzhou.domain.Attribute(it), c.level) }
+            }
+        return BatchCtx(yangzhou.domain.Member(memberService.current().displayName, caps), attrs)
     }
 
-    /** 重算项目:全部 item 冗余 + 聚合到 project(RED>YELLOW>GREEN;无 item = null)。 */
-    fun recomputeProjectSignal(projectObjectId: UUID): String? {
+    private data class BatchCtx(
+        val member: yangzhou.domain.Member,
+        val attrs: Map<UUID, String>,
+    )
+
+    private fun recomputeProjectSignal(projectObjectId: UUID, ctx: BatchCtx): String? {
         projects.lockByObjectId(projectObjectId) // YPJ-128 统一锁序:入口先拿 project 行锁(对已持锁事务 no-op;spec 0096)
-        val projectItems = itemRepo.findByProjectObjectIdAndDeletedAtIsNullOrderByNumber(projectObjectId)
-        var worst: String? = null
-        for (it in projectItems) {
-            val s = recomputeItemSignal(it)
-            worst = if (worst == null || rank.getValue(s) > rank.getValue(worst)) s else worst
-        }
         val project = projects.findByObjectId(projectObjectId) ?: return null
-        projects.save(project.copy(feasSignal = worst))
+        val projectItems = itemRepo.findByProjectObjectIdAndDeletedAtIsNullOrderByNumber(projectObjectId)
+        val statusById = statusRepo.findByProjectObjectIdOrderByPosition(projectObjectId).associateBy { it.objectId }
+        val finalIds = statusById.values.filter { it.statusType == StatusType.FINAL }.mapNotNull { it.objectId }.toSet()
+        val reqsByItem =
+            requirementRepo.findByItemObjectIdIn(projectItems.mapNotNull { it.objectId })
+                .groupBy { it.itemObjectId }
+                .mapValues { (_, rs) ->
+                    rs.mapNotNull { r -> ctx.attrs[r.attributeDefinitionObjectId]?.let { yangzhou.domain.Requirement(yangzhou.domain.Attribute(it), r.minLevel) } }
+                }
+        var worst: String? = null
+        val changed = mutableListOf<yangzhou.persistence.Item>()
+        for (item in projectItems) {
+            if (item.statusObjectId in finalIds) continue // FINAL 冻结(YPJ-242)
+            val domain = yangzhou.domain.Item(
+                "${project.key}-${item.number}",
+                item.title,
+                reqsByItem[item.objectId].orEmpty(),
+            )
+            val signal = MatchingEngine.matchItem(domain, ctx.member).worst.name
+            if (item.feasSignal != signal) changed += item.copy(feasSignal = signal)
+            worst = if (worst == null || rank.getValue(signal) > rank.getValue(worst)) signal else worst
+        }
+        changed.sortedBy { it.number }.forEach { itemRepo.save(it) } // 编号序锁序(YPJ-26)
+        if (project.feasSignal != worst) projects.save(project.copy(feasSignal = worst))
         return worst
     }
 
@@ -135,11 +166,13 @@ class FeasibilityService(
         return recomputeProjectSignal(project.objectId!!)
     }
 
-    /** capability 变更影响全 workspace:重算所有项目(V9-Q2)。 */
+    /** capability 变更影响全 workspace:重算所有项目(V9-Q2)。
+     * YPJ-242:ctx 装配一次跨项目复用;锁序不变(project id 升序)。 */
     fun recomputeWorkspace() {
+        val ctx = loadCtx()
         // YPJ-10:按 id 升序锁定 project 行——并发重算各自按同一全序 UPDATE,消除锁序环
         // (此前 findAll 无序,行锁获取顺序不定 → PostgreSQL 40P01 deadlock → 500,日志实锤)
-        projects.findAll().sortedBy { it.objectId }.forEach { recomputeProjectSignal(it.objectId!!) }
+        projects.findAll().sortedBy { it.objectId }.forEach { recomputeProjectSignal(it.objectId!!, ctx) }
     }
 
     /** V9-S1 短板聚合(服务端算,替代首页 N 次调用+客户端聚合)。 */
