@@ -2524,6 +2524,26 @@ Content-Type: application/json
     client.global.set("ws208", response.body.workdayStart);
  %}
 
+### api.http:轴制式(work=工作制跳周末 / wall=墙钟制;YPJ-226/spec 0163)
+PATCH {{host}}/api/projects/{{pkey}}/settings
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "workMode": "work",
+  "workdayStart": "09:00",
+  "workdayEnd": "18:00"
+}
+
+### [预期 400] 非法制式值
+PATCH {{host}}/api/projects/{{pkey}}/settings
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "workMode": "bogus"
+}
+
 ### [预期 400] 工作日历倒挂
 PATCH {{host}}/api/projects/{{pkey}}/settings
 Authorization: Bearer {{token}}

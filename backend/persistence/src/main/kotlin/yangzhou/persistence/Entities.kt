@@ -183,6 +183,8 @@ data class Project(
     /** YPJ-208(spec 0138 切片 b):工作日历(HH:mm);date-only 默认填充与时长换算用。SRS v4 §3.2(2026-11-21 拍板):缺省 24h 全天窗,"24:00"=全天终点(WorkdayCalculator 同口径)。 */
     val workdayStart: String = "00:00",
     val workdayEnd: String = "24:00",
+    /** YPJ-226(spec 0163):轴制式 work=工作制(跳周末,真窗) / wall=墙钟制(钟表线性);存量默认 wall,新建 API 缺省 work。 */
+    val workMode: String = "wall",
     @CreatedDate
     var createdAt: Instant = Instant.now(),
     @LastModifiedDate

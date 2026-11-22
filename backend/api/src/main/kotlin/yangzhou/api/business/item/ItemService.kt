@@ -398,6 +398,8 @@ class ItemService(
         if (startDateText != null || dueDateText != null || estimateChanged) {
             // YPJ-208(spec 0138 切片 b):date-only → 项目工作日界默认时刻;datetime 原样
             val (ws, we) = workdayBounds(project)
+
+            // YPJ-226(spec 0163):工作制 = 跳周末;墙钟制 = 周六日照算(原行为)
             fun parse(
                 text: String?,
                 field: String,
@@ -422,7 +424,7 @@ class ItemService(
             }
             val start = newStart ?: current.startDate
             val estHours = estimateHours(current.estimateValue, current.estimateUnit, ws, we)
-            val calc = WorkdayCalculator(ws, we)
+            val calc = WorkdayCalculator(ws, we, skipWeekends = project.workMode == "work")
             // YPJ-243(spec 0150)双向互算·后写者为准(真值表见 spec §2.1;推翻 0146 两处,用户 2026-11-20 拍板)
             when {
                 // estimate 后写(显式改预估且变化;due 未显式携带)→ due 按预估重算;无 start 只警告

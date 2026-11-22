@@ -16,6 +16,8 @@ import java.time.LocalTime
 class WorkdayCalculator(
     private val workdayStart: LocalTime,
     private val workdayEnd: LocalTime,
+    /** YPJ-226(spec 0163):工作制(work mode)= 跳周末(窗口正交:全天窗+跳周末 = 只折周末);墙钟制(wall)= 周六日照算(原行为)。 */
+    private val skipWeekends: Boolean = false,
 ) {
     /** 全天窗判定:两端均为 00:00(“24:00”存值解析为 MIDNIGHT)。 */
     val isFullDay: Boolean = workdayStart == LocalTime.MIDNIGHT && workdayEnd == LocalTime.MIDNIGHT
@@ -36,6 +38,11 @@ class WorkdayCalculator(
         var cursor = maxOf(start, day.atTime(workdayStart))
         var remainingMin = Math.round(hours * 60)
         while (remainingMin > 0) {
+            if (skipWeekends && day.dayOfWeek.value >= 6) {
+                day = day.plusDays(1)
+                cursor = day.atTime(workdayStart)
+                continue
+            }
             val dayEnd = dayEndOf(day)
             if (cursor >= dayEnd) {
                 day = day.plusDays(1)
@@ -64,6 +71,10 @@ class WorkdayCalculator(
         var day = start.toLocalDate()
         var totalMin = 0L
         while (day <= due.toLocalDate()) {
+            if (skipWeekends && day.dayOfWeek.value >= 6) {
+                day = day.plusDays(1)
+                continue
+            }
             val s = maxOf(start, day.atTime(workdayStart))
             val e = minOf(due, dayEndOf(day))
             if (e.isAfter(s)) totalMin += Duration.between(s, e).toMinutes()

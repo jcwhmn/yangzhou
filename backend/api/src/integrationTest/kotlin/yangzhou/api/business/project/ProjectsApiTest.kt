@@ -138,4 +138,55 @@ class ProjectsApiTest : AbstractApiTest() {
             )
         assertEquals("标准日", intact["estimateScales"][0]["label"].asText())
     }
+
+    /** YPJ-226(spec 0163):新建缺省 work;切 wall;工作制+全天窗 400。 */
+    @Test
+    fun `工作制轴制式——新建默认 work,可切 wall,work 拒全天窗`() {
+        val authed = bootstrapAndAuth()
+        val project = createProject(authed, "WMR", "workmode")
+        assertEquals("work", project["workMode"].asText())
+
+        val switched =
+            json.readTree(
+                authed
+                    .patch()
+                    .uri("/api/projects/WMR/settings")
+                    .body(mapOf("workMode" to "wall"))
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody(String::class.java)
+                    .returnResult()
+                    .responseBody!!,
+            )
+        assertEquals("wall", switched["workMode"].asText())
+
+        authed
+            .patch()
+            .uri("/api/projects/WMR/settings")
+            .body(mapOf("workMode" to "work"))
+            .exchange()
+            .expectStatus()
+            .isOk() // 全天窗+工作制合法(窗口正交,spec 0163):只跳周末
+        authed
+            .patch()
+            .uri("/api/projects/WMR/settings")
+            .body(mapOf("workMode" to "work", "workdayStart" to "09:00", "workdayEnd" to "18:00"))
+            .exchange()
+            .expectStatus()
+            .isOk()
+        authed
+            .patch()
+            .uri("/api/projects/WMR/settings")
+            .body(mapOf("workMode" to "bogus"))
+            .exchange()
+            .expectStatus()
+            .isBadRequest()
+        val final =
+            json.readTree(
+                authed.get().uri("/api/projects/WMR").exchange().expectStatus().isOk().expectBody(String::class.java).returnResult().responseBody!!,
+            )
+        assertEquals("work", final["workMode"].asText())
+        assertEquals("09:00", final["workdayStart"].asText())
+    }
 }
