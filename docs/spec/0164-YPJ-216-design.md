@@ -84,7 +84,7 @@
 |---|---|
 | 5.1 分支 | `ItemSprintPullScheduleApiTest`:必填 409 / 非必填放行 / 铺算 / 显式保留 / 前置 / 幂等重拉 / 跨周末 |
 | 4.4 缺省 | settings PATCH 校验(集成);甘特缺省条(e2e gantt) |
-| 5.2 四途径 | e2e:board-membership / sprint / board-item-creation / item-detail;fixture 原则=真拉组且依赖铺算的造票带预估 |
+| 5.2 四途径 | e2e:board-membership / sprint页(组页) / board-item-creation / item-detail;fixture 原则=真拉组且依赖铺算的造票带预估 |
 | api.http | settings 新字段段 + 拉入段(必填 409 / 非必填放行 / 回填 / 覆盖) |
 
 ## 八、实现差距清单(相对 SRS 现状)
