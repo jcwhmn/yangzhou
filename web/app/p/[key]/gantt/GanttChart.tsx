@@ -18,6 +18,7 @@ import { PlanBar } from "./components/PlanBar";
 import { ActualBar } from "./components/ActualBar";
 import { OffsetBadge } from "./components/OffsetBadge";
 import { MilestoneLines } from "./components/MilestoneLines";
+import { GridLines } from "./components/GridLines";
 import { type MilestoneMarker, type ReleaseMarker } from "./types";
 
 /** 甘特面板:缩放/横滚;今日线、条、状态章(YPJ-249 自 page.tsx 原样搬出,零语义变化)。
@@ -305,6 +306,8 @@ export function GanttChart({
 
           {/* YPJ-221:旗标带+竖线的定位基准(线 top:0→bottom:0 覆盖带+行区,含完成组) */}
           <Box sx={{ position: "relative" }}>
+            {/* YPJ-239:日/周界淡分割线,条下层 */}
+            <GridLines headerRows={axis.headerRows} />
             <MilestoneLines
               ms={ms}
               rel={rel}
