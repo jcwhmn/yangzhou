@@ -310,11 +310,14 @@ export default function SprintPage() {
   }
 
   // YPJ-216(spec 0164 途径④):对话框行内补录的预估先落票(已有预估的票跳过,避免互算改 due),再逐条入组
-  async function applyMembership(estimates: Record<string, { v: string; u: string }> = {}) {
+  async function applyMembership(
+    estimates: Record<string, { v: string; u: string }> = {},
+  ) {
     setBusy(true);
     try {
       for (const [itemId, e] of Object.entries(estimates)) {
-        const already = candidates.find((c) => c.itemId === itemId)?.estimateValue != null;
+        const already =
+          candidates.find((c) => c.itemId === itemId)?.estimateValue != null;
         if (already) continue; // 已有预估的票不重录(重录触发互算改 due)
         await api(`/api/items/${itemId}`, {
           method: "PATCH",
@@ -426,6 +429,7 @@ export default function SprintPage() {
           )}
           <AddMembersDialog
             open={addOpen}
+            projectKey={key}
             candidates={candidates}
             selected={selected}
             busy={busy}

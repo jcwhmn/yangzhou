@@ -18,9 +18,11 @@ import { t } from "@/lib/texts";
 import type { Item } from "../types";
 import EstimateFillDialog from "./EstimateFillDialog";
 
-/** 拉入弹窗:open 时拉 backlog、picked 局部;确认逐条 PUT 上板(原 page openPull/confirmPull 自包含随迁),完成后 onPulled 上行重拉。
- *  YPJ-216(spec 0164 途径③,2026-11-24 SRS 修订):选择控件保持原样不动;确认时勾选票有缺预估 →
- *  先弹 EstimateFillDialog 补录,提交后继续拉入。 */
+/** 全量 item DTO(含 onBoard;看板端点不含该标记,列表用全量端点自筛) */
+type ItemRow = Item & { onBoard: boolean };
+
+/** 拉入弹窗:候选 = 已在看板 item(预选中,取消勾选=退回)+ backlog item;确认逐条 PUT board-membership。
+ *  YPJ-216(spec 0164 途径③,2026-11-24 SRS 修订):完成后勾选中缺预估的新拉入票 → EstimateFillDialog 补录后继续。 */
 export default function PullDialog({
   open,
   projectKey,
@@ -32,31 +34,41 @@ export default function PullDialog({
   onClose: () => void;
   onPulled: () => void | Promise<void>;
 }) {
-  const [backlogItems, setBacklogItems] = useState<Item[] | null>(null);
+  const [items, setItems] = useState<ItemRow[] | null>(null);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [error, setError] = useState(""); // YPJ-216:守卫 409 要浮出(无预估拉入不再静默吞,2026-11-23 手工实锤)
-  // 补录阶段:非空 = 勾选票中有缺预估,先弹补录框(列出全部需录入票)
+  // 补录阶段:非空 = 有缺预估的新拉入票,先弹补录框(列出全部需录入票)
   const [fillItems, setFillItems] = useState<
     { itemId: string; number: number | string; title: string }[]
   >([]);
 
   useEffect(() => {
     if (!open) return;
-    setPicked(new Set());
     setError("");
     setFillItems([]);
-    api<Item[]>(`/api/projects/${projectKey}/backlog`)
-      .then(setBacklogItems)
-      .catch(() => setBacklogItems([]));
+    api<{ items: Item[] }>(`/api/projects/${projectKey}/board`)
+      .then((r) => {
+        const onBoard = r.items.map((it) => ({ ...it, onBoard: true }));
+        setPicked(new Set(onBoard.map((it) => it.itemId)));
+        return api<Item[]>(`/api/projects/${projectKey}/backlog`).then((bl) =>
+          setItems([
+            ...onBoard,
+            ...bl.map((it) => ({ ...it, onBoard: false })),
+          ] as ItemRow[]),
+        );
+      })
+      .catch(() => setItems([]));
   }, [open, projectKey]);
 
   async function doPull() {
     setError("");
     try {
-      for (const id of picked) {
-        await api(`/api/items/${id}/board-membership`, {
+      for (const it of items ?? []) {
+        const now = picked.has(it.itemId);
+        if (it.onBoard === now) continue; // 勾选状态未变化的票不发请求
+        await api(`/api/items/${it.itemId}/board-membership`, {
           method: "PUT",
-          body: JSON.stringify({ onBoard: true }),
+          body: JSON.stringify({ onBoard: now }),
         });
       }
     } catch (e) {
@@ -68,9 +80,9 @@ export default function PullDialog({
   }
 
   async function confirmPull() {
-    // YPJ-216 SRS 修订:完成后检查勾选票,有缺预估 → 弹补录对话框列出全部需录入票,提交后继续
-    const needing = (backlogItems ?? []).filter(
-      (it) => picked.has(it.itemId) && it.estimateValue == null,
+    // YPJ-216 SRS 修订:完成后检查新拉入的勾选票,有缺预估 → 弹补录对话框列出全部需录入票,提交后继续
+    const needing = (items ?? []).filter(
+      (it) => !it.onBoard && picked.has(it.itemId) && it.estimateValue == null,
     );
     if (needing.length > 0) {
       setFillItems(
@@ -93,7 +105,7 @@ export default function PullDialog({
               </Typography>
             </ListItem>
           )}
-          {[...(backlogItems ?? [])]
+          {[...(items ?? [])]
             .sort(
               (a, b) =>
                 Number(a.status === "To Do") - Number(b.status === "To Do"),
@@ -118,7 +130,7 @@ export default function PullDialog({
                 />
               </ListItem>
             ))}
-          {(backlogItems ?? []).length === 0 && (
+          {(items ?? []).length === 0 && (
             <Typography variant="caption" color="text.secondary">
               {t.board.pullEmpty}
             </Typography>
@@ -127,16 +139,13 @@ export default function PullDialog({
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>取消</Button>
-        <Button
-          variant="contained"
-          onClick={confirmPull}
-          disabled={picked.size === 0}
-        >
+        <Button variant="contained" onClick={confirmPull}>
           {t.board.pullConfirm}
         </Button>
       </DialogActions>
       <EstimateFillDialog
         open={fillItems.length > 0}
+        projectKey={projectKey}
         items={fillItems}
         onCancel={() => setFillItems([])}
         onSubmit={async (estimates) => {

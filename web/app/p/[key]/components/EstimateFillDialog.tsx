@@ -13,16 +13,20 @@ import {
   TextField,
 } from "@mui/material";
 import { useEffect, useState } from "react";
+import { api } from "@/lib/api";
 
 /** YPJ-216(spec 0164 途径③④):选择完成后的补录对话框——列出所有缺预估的勾选票逐行录入。
- *  SRS 修订(2026-11-24 用户拍板):选择控件不含预估输入;完成后检查,缺才弹此框;取消 → 不拉入。 */
+ *  每行预填项目缺省预估(设置→中档;未设置回退内置 5 day),不输入直接提交也可(2026-11-24 用户反馈)。
+ *  取消 → 不拉入。 */
 export default function EstimateFillDialog({
   open,
+  projectKey,
   items,
   onCancel,
   onSubmit,
 }: {
   open: boolean;
+  projectKey: string;
   /** 需补录的票(勾选中且原无预估) */
   items: { itemId: string; number: number | string; title: string }[];
   onCancel: () => void;
@@ -34,12 +38,30 @@ export default function EstimateFillDialog({
   const [allU, setAllU] = useState("hour");
 
   useEffect(() => {
-    if (open) {
-      setEst({});
-      setAllV("");
-      setAllU("hour");
-    }
-  }, [open]);
+    if (!open) return;
+    // 项目缺省预估(中档)预填:未设置 → 内置 5 day(SRS 4.4 同源)
+    api<{
+      defaultEstimateValue: string | null;
+      defaultEstimateUnit: string | null;
+    }>(`/api/projects/${projectKey}`)
+      .then((p) => {
+        const v = p.defaultEstimateValue ?? "5";
+        const u = p.defaultEstimateUnit ?? "day";
+        setAllV(v);
+        setAllU(u);
+        setEst(Object.fromEntries(items.map((it) => [it.itemId, { v, u }])));
+      })
+      .catch(() => {
+        setAllV("5");
+        setAllU("day");
+        setEst(
+          Object.fromEntries(
+            items.map((it) => [it.itemId, { v: "5", u: "day" }]),
+          ),
+        );
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, projectKey]);
 
   const allFilled =
     items.length > 0 &&
@@ -97,7 +119,7 @@ export default function EstimateFillDialog({
                     ...prev,
                     [it.itemId]: {
                       v: ev.target.value,
-                      u: prev[it.itemId]?.u ?? "hour",
+                      u: prev[it.itemId]?.u ?? allU,
                     },
                   }))
                 }
@@ -107,12 +129,12 @@ export default function EstimateFillDialog({
                 size="small"
                 select
                 label="单位"
-                value={est[it.itemId]?.u ?? "hour"}
+                value={est[it.itemId]?.u ?? allU}
                 onChange={(ev) =>
                   setEst((prev) => ({
                     ...prev,
                     [it.itemId]: {
-                      v: prev[it.itemId]?.v ?? "",
+                      v: prev[it.itemId]?.v ?? allV,
                       u: ev.target.value,
                     },
                   }))

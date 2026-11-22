@@ -22,6 +22,8 @@ import { type Candidate } from "../types";
 export function AddMembersDialog({
   open,
 
+  projectKey,
+
   candidates,
 
   selected,
@@ -35,6 +37,8 @@ export function AddMembersDialog({
   onApply,
 }: {
   open: boolean;
+
+  projectKey: string;
 
   candidates: Candidate[];
 
@@ -102,6 +106,7 @@ export function AddMembersDialog({
       </DialogActions>
       <EstimateFillDialog
         open={fillItems.length > 0}
+        projectKey={projectKey}
         items={fillItems}
         onCancel={() => setFillItems([])}
         onSubmit={(estimates) => {
