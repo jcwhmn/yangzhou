@@ -8,7 +8,7 @@ test("V12-S3 Sprint 全链路——建/指派/开始/完成/backlog/历史 @smok
   projectKey,
 }) => {
   test.slow();
-  await apiCreateItem(projectKey, "E2E 冒烟 item");
+  await apiCreateItem(projectKey, "E2E 冒烟 item", { estimate: true }); // 全程挂 sprint,守卫需预估
   await page.goto(`/p/${projectKey}/backlog`);
   // 侧边栏新建 Sprint
   await page.getByRole("button", { name: "新建 Sprint" }).click();
@@ -105,7 +105,7 @@ test("V13-S3 拉入对话框——多选勾入/移出 + 详情回链", async ({
   page,
   projectKey,
 }) => {
-  await apiCreateItem(projectKey, "E2E 冒烟 item");
+  await apiCreateItem(projectKey, "E2E 冒烟 item", { estimate: true }); // 拉入对话框勾入,守卫需预估
   await page.goto(`/p/${projectKey}`);
   await page.getByRole("button", { name: "新建 Sprint" }).click();
   await page.getByLabel("名称").fill("Sprint 43");

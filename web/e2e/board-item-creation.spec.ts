@@ -166,7 +166,9 @@ test("D10 详情页挂计划中组→弹窗激活→item 随组进看板", async
   projectKey,
 }) => {
   await apiCreateSprint(projectKey, "计划中B3");
-  const itemId = await apiCreateItem(projectKey, "挂载 item");
+  const itemId = await apiCreateItem(projectKey, "挂载 item", {
+    estimate: true,
+  }); // 挂 timed 组走守卫,需预估
   await page.goto(`/p/${projectKey}/i/${itemId}`);
 
   // getByLabel('Sprint') 会同时命中侧栏「新建 Sprint」按钮,用 role 收窄
@@ -189,7 +191,9 @@ test("D10 详情页挂计划中组→暂不→挂载生效但未激活", async (
   projectKey,
 }) => {
   await apiCreateSprint(projectKey, "计划中B4");
-  const itemId = await apiCreateItem(projectKey, "挂载取消 item");
+  const itemId = await apiCreateItem(projectKey, "挂载取消 item", {
+    estimate: true,
+  });
   await page.goto(`/p/${projectKey}/i/${itemId}`);
 
   await page.getByRole("combobox", { name: "Sprint" }).click();

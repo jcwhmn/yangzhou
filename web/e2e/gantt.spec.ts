@@ -400,7 +400,9 @@ test("时线回归(YPJ-229):今日时刻居中 + 零时长条可见", async ({
   page,
   projectKey,
 }) => {
-  const item = await apiCreateItem(projectKey, "E2E 时线零时长");
+  const item = await apiCreateItem(projectKey, "E2E 时线零时长", {
+    estimate: true,
+  }); // 挂 sprint 走守卫;显式 start=due 保留,零时长语义不变
   // start=due 同刻(零时长条,今天 00:00 → 在数据锚定轴内且今日窗可见)
   const today = new Date();
   const ymd = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
