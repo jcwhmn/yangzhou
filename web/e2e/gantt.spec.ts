@@ -1134,7 +1134,11 @@ test("YPJ-245 返工渲染:当前状态优先,完成史进 hover(SRS §6.6)", as
   await apiCall("PATCH", `/api/items/${a}`, {
     startDate: d(-4),
     dueDate: d(-1),
+    estimateValue: 4,
+    estimateUnit: "hour",
   });
+  // YPJ-255:覆盖=进度——补录工时给覆盖一个源(60m/4h),「黄覆盖在」仍是进行中渲染的探针
+  await apiCall("POST", `/api/items/${a}/time-entries`, { minutes: 60 });
   await apiCall("PATCH", `/api/items/${a}`, { statusItemId: wipId });
   await apiCall("PATCH", `/api/items/${a}`, { statusItemId: finalId });
   await apiCall("PATCH", `/api/items/${a}`, { statusItemId: wipId }); // FINAL 后返工
