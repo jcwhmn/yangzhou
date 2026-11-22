@@ -321,6 +321,8 @@ class ItemService(
                 )
             }
             notificationService.notifyStatusChange(current, actorId, oldStatus?.name, status.name)
+            // YPJ-242(spec 0162):FINAL 冻结/rollup 排除靠迁移后重算生效;批量后亚秒级
+            feasibilityService.recomputeProjectSignal(projectObjectId)
             // YPJ-120(spec 0089):开始动作自动入当前 sprint——离开 start 态、目标为进行态、且无 sprint 时,
             // 挂到最早创建的 active sprint(与 board activeSprints[0] 同序);无 active/已有 sprint 静默跳过。
             if (oldStatus?.statusType == StatusType.START && status.statusType == StatusType.ACTIVE) {
