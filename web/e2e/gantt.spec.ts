@@ -380,9 +380,8 @@ test("无 due 的 item 画起点小标记,不外延到轴末端(YPJ-220 反馈)"
   page,
   projectKey,
 }) => {
-  const item = await apiCreateItem(projectKey, "E2E 仅开始", {
-    estimate: true,
-  });
+  // 无预估:spec 0151 case3(仅锚无长度)→ 起点小标记;带预估会变 case4 铺算条。本票不进 sprint,无需预估
+  const item = await apiCreateItem(projectKey, "E2E 仅开始");
   await apiCall("PATCH", `/api/items/${item}`, { startDate: "2020-03-01" });
 
   await page.goto(`/p/${projectKey}/gantt`);
