@@ -122,16 +122,18 @@ class ItemSprintPullScheduleApiTest : AbstractApiTest() {
     }
 
     @Test
-    fun `有预估无前置——start=今天 date-only 语义,due=铺算回填`() {
+    fun `有预估无前置——start=现在钳工作时刻(不落过去),due=铺算回填`() {
         val authed = setup()
         val sid = sprint(authed)
         val id = item(authed, "今天票", "8" to "hour")
         pull(authed, id, sid)
         val d = detail(authed, id)
-        var exp = LocalDate.now()
-        while (exp.dayOfWeek.value >= 6) exp = exp.plusDays(1) // 工作制全窗仍跳周末;工作日=当日
-        assertEquals("${exp}T00:00", d["startDate"].asText())
-        assertEquals("${exp}T08:00", d["dueDate"].asText()) // 全天窗 8h 铺算
+        // 新建项目默认工作制+全天窗:start=现在(周末顺延周一),due=start+8h;关键断言=due 在未来(不立刻超期)
+        val start = java.time.LocalDateTime.parse(d["startDate"].asText())
+        val due = java.time.LocalDateTime.parse(d["dueDate"].asText())
+        assertTrue(!start.isBefore(java.time.LocalDateTime.now().minusMinutes(1)), "start 应为现在/未来:$start")
+        assertTrue(due.isAfter(start), "due 应晚于 start")
+        assertTrue(java.time.Duration.between(start, due).toMinutes() == 480L, "8h 铺算:${start}~${due}")
     }
 
     @Test

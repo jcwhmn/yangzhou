@@ -631,10 +631,10 @@ class ItemService(
         return item
     }
 
-    /** 今天的工作制起点:wall=当日 00:00(既有 date-only 填充语义);work=当日窗起(周末顺延周一)。 */
+    /** 今天的起点:wall=现在(避免日中拉入 due 落在过去立刻超期);work=钳到当前时刻的下一工作时刻(周末→周一窗起)。 */
     private fun todayStart(ws: LocalTime, we: LocalTime, workMode: Boolean): LocalDateTime {
-        val day = clock.instant().atZone(java.time.ZoneId.systemDefault()).toLocalDate()
-        return nextWorkMoment(day.atStartOfDay(), ws, we, workMode)
+        val now = LocalDateTime.ofInstant(clock.instant(), java.time.ZoneId.systemDefault())
+        return nextWorkMoment(now, ws, we, workMode)
     }
 
     /** YPJ-216:下一工作时刻(仅工作制生效;wall 原样返回)。周末→下周一窗起;当日窗前→窗起;窗后→次工作日窗起。 */
