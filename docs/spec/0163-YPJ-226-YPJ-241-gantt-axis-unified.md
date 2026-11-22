@@ -78,3 +78,11 @@
 - ⚠ 夜间折叠推论(§二#6):dev 验收时用户复核,不合意再返工
 
 ## 六、As-built(完工后补)
+
+三个切片均已合入(切片式连续 PR,用户特批仅限本票;后续复杂票改子 item 模式,见 workflow.md §复杂票拆解):
+
+- 切片 1(PR #251):V68 `project.work_mode`;WorkdayCalculator skipWeekends(窗口正交修订,见 §3.1);project DTO/settings 校验;api.http「轴制式」三段
+- 切片 2(PR #252):前端折叠轴——`tToX` 统一坐标函数(逐工作日窗段累计+二分);zoomTo px 比例缩放;分模式刻度(work 无周行、月落首工作日);`wd` 三元组贯通;`dueFromJs` skipWeekends;e2e fixture 项目显式回 wall(新建项目缺省 work 后纯周末跨度用例翻车的实锤修复)
+- 切片 3(PR #253):MAX_PPD 4800;分钟级梯子 5–720min;年行(wall=元旦/work=年内首个工作日);表头 cap 4
+- 实测落点:后端铺算跳周末直调实锤(WTEST 周五 16h → 周一 16:00);e2e 全量 125 绿;dev 手工 LGTM(用户)
+- 偏差:加班显式建模不做(§一);季行未做;夜间折叠随窗宽自然成立,用户 dev 验收通过即默认确认
