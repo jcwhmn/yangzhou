@@ -144,15 +144,18 @@ export function useTimelineScale(opts: {
 
     // 刻度行(YPJ-241 分层):wall=钟表时刻循环;work=逐工作日窗内/窗起点。门控统一用 pxPerDay(每工作日)。
     const rowsOut: HeaderRow[] = [];
-    const pxPerHour = pxPerDay / (skipWk ? (wem - wsm) / 60 || 24 : 24);
-    // 小时行:梯子取最小步长使间距≥MIN_LABEL_PX;wall=钟表循环 / work=逐工作日窗内(无解整行丢弃)
-    const stepH = [1, 2, 3, 6, 12].find((s) => s * pxPerHour >= MIN_LABEL_PX);
-    if (pxPerDay >= MIN_LABEL_PX && stepH) {
+    // 分钟/小时行(YPJ-226 切片3 spec 0163):梯子 5–720 分钟,取间距≥MIN_LABEL_PX 的最小步长;wall=钟表循环 / work=逐工作日窗内(步长≤窗宽)
+    const pxPerMin = pxPerDay / (skipWk ? wem - wsm || 1440 : 1440);
+    const winMin = skipWk ? wem - wsm : Infinity;
+    const stepMin = [5, 10, 15, 20, 30, 60, 120, 180, 360, 720].find(
+      (s) => s * pxPerMin >= MIN_LABEL_PX && s <= winMin,
+    );
+    if (pxPerDay >= MIN_LABEL_PX && stepMin) {
       const ticks: Tick[] = [];
       if (skipWk) {
         for (const g of segs) {
-          for (let h = 0; h < (wem - wsm) / 60; h += stepH) {
-            const t = g.s + h * 3600000;
+          for (let m = 0; m < wem - wsm; m += stepMin) {
+            const t = g.s + m * 60000;
             const d = new Date(t);
             ticks.push({
               x: tToX(t),
@@ -162,12 +165,13 @@ export function useTimelineScale(opts: {
           }
         }
       } else {
-        for (let h = 0; h <= spanDays * 24; h += stepH) {
-          const d = new Date(+start + (h * DAY) / 24);
+        const spanMin = spanDays * 1440;
+        for (let m = 0; m <= spanMin; m += stepMin) {
+          const d = new Date(+start + m * 60000);
           ticks.push({
             x: tToX(+d),
             label: `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`,
-            key: `h${h}`,
+            key: `h${m}`,
           });
         }
       }
@@ -255,6 +259,26 @@ export function useTimelineScale(opts: {
     if (pxPerDay * (skipWk ? 21 : 30) >= 70) {
       rowsOut.push({ gran: "month", ticks: genMonthTicks(1) });
     }
+    // 年行(YPJ-226 切片3 spec 0163):极缩小时 YYYY;wall=元旦 / work=年内首个工作日窗起点;单点无意义不渲染
+    if (pxPerDay * 365 <= MIN_LABEL_PX) {
+      const y0 = new Date(+start).getFullYear();
+      const y1 = new Date(endT).getFullYear();
+      const ticks: Tick[] = [];
+      for (let y = y0; y <= y1; y++) {
+        let tickT: number;
+        if (skipWk) {
+          const probe = new Date(y, 0, 1);
+          while (probe.getDay() === 0 || probe.getDay() === 6)
+            probe.setDate(probe.getDate() + 1);
+          tickT = +probe + wsm * 60000;
+        } else {
+          tickT = +new Date(y, 0, 1);
+        }
+        if (tickT >= +start && tickT < endT)
+          ticks.push({ x: tToX(tickT), label: `${y}`, key: `y${y}` });
+      }
+      if (ticks.length > 1) rowsOut.push({ gran: "year", ticks });
+    }
     // 保底:极缩小时只留月行(抽稀)
     if (rowsOut.length === 0) {
       const stepDays = Math.ceil((MIN_LABEL_PX * 1.5) / pxPerDay / 30) * 30;
@@ -263,9 +287,9 @@ export function useTimelineScale(opts: {
         ticks: genMonthTicks(Math.max(stepDays / 30, 1)),
       });
     }
-    // 最多 3 行:自顶(最粗)丢弃;渲染序 = 粗→细(月在最上,时在最底)
+    // 最多 4 行(YPJ-226 切片3:年/月/周/日/时取最粗四层);自顶丢弃;渲染序 = 粗→细
     rowsOut.reverse();
-    while (rowsOut.length > 3) rowsOut.shift();
+    while (rowsOut.length > 4) rowsOut.shift();
 
     return {
       start,
