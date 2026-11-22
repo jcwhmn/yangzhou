@@ -35,11 +35,17 @@ async function makeChild(
   parentId: string,
   start?: string,
   due?: string,
+  estimate?: boolean, // YPJ-216:拉入 sprint 的子票需预估
 ): Promise<string> {
   const { itemId } = await apiCall<{ itemId: string }>(
     "POST",
     `/api/projects/${key}/items`,
-    { title, parentItemId: parentId },
+    {
+      title,
+      parentItemId: parentId,
+      estimateValue: estimate ? "3" : null,
+      estimateUnit: estimate ? "hour" : null,
+    },
   );
   if (start || due) {
     await apiCall("PATCH", `/api/items/${itemId}`, {
@@ -254,6 +260,7 @@ test("范围过滤(YPJ-220):缺省 board 祖先链 / group 多选并集 / milest
     parent,
     "2030-01-01",
     "2030-01-03",
+    true, // 拉入 S1
   );
   const b = await makeChild(
     projectKey,
@@ -261,6 +268,7 @@ test("范围过滤(YPJ-220):缺省 board 祖先链 / group 多选并集 / milest
     parent,
     "2030-02-01",
     "2030-02-03",
+    true, // 拉入 S2
   );
   const o = await apiCreateItem(projectKey, "E2E 圈外O");
   await apiCall("PATCH", `/api/items/${o}`, {
@@ -372,7 +380,9 @@ test("无 due 的 item 画起点小标记,不外延到轴末端(YPJ-220 反馈)"
   page,
   projectKey,
 }) => {
-  const item = await apiCreateItem(projectKey, "E2E 仅开始");
+  const item = await apiCreateItem(projectKey, "E2E 仅开始", {
+    estimate: true,
+  });
   await apiCall("PATCH", `/api/items/${item}`, { startDate: "2020-03-01" });
 
   await page.goto(`/p/${projectKey}/gantt`);

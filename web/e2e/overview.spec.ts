@@ -22,7 +22,9 @@ test("Overview 五区块——状态分布/信号/我的/风险/Sprint @smoke", 
     }>("GET", `/api/projects/${projectKey}`)
   ).statuses.sort((a, b) => a.position - b.position);
 
-  const mine = await apiCreateItem(projectKey, "OV 我的 item");
+  const mine = await apiCreateItem(projectKey, "OV 我的 item", {
+    estimate: true,
+  });
   await apiAssignMe(mine);
   const overdue = await apiCreateItem(projectKey, "OV 超期 item");
   await apiCall("PATCH", `/api/items/${overdue}`, {

@@ -177,7 +177,9 @@ test("看板卡片指派入口——Popover 弹出/Esc 收起/指派成功且不
   page,
   projectKey,
 }) => {
-  const itemId = await apiCreateItem(projectKey, "AP 卡片指派");
+  const itemId = await apiCreateItem(projectKey, "AP 卡片指派", {
+    estimate: true,
+  });
   // 看板卡仅在有 active sprint 时承载(方案A):API 造 active sprint + 成员
   const sprintId = await apiCreateSprint(projectKey, "AP Sprint");
   await apiCall("PUT", `/api/items/${itemId}/group-membership`, {

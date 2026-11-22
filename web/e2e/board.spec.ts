@@ -54,7 +54,9 @@ test("日期与超期标识——详情设置日期,看板红标,甘特可见", 
   // 另造一个无日期 item:甘特「未排期」桶 length>0 才渲染,只有带日期 item 时桶不出现
   await apiCreateItem(projectKey, "E2E 未排期 item");
   // 超期 item 放进 active sprint:看板卡才有红标(无 active 时根页落 Backlog,方案A)
-  const itemId = await apiCreateItem(projectKey, "E2E 超期 item");
+  const itemId = await apiCreateItem(projectKey, "E2E 超期 item", {
+    estimate: true,
+  });
   const sprintId = await apiCreateSprint(projectKey, "E2E Date Sprint");
   await apiCall("PUT", `/api/items/${itemId}/group-membership`, {
     groupId: sprintId,
@@ -226,7 +228,9 @@ test("回收站——删除后可恢复", async ({ page, projectKey }) => {
 
 test("看板刷新按钮可用", async ({ page, projectKey }) => {
   // 看板仅在有 active sprint 时承载(方案A):API 造板
-  const itemId = await apiCreateItem(projectKey, "E2E 刷新 item");
+  const itemId = await apiCreateItem(projectKey, "E2E 刷新 item", {
+    estimate: true,
+  });
   const sprintId = await apiCreateSprint(projectKey, "E2E 刷新 Sprint");
   await apiCall("PUT", `/api/items/${itemId}/group-membership`, {
     groupId: sprintId,
@@ -263,7 +267,9 @@ test("board——根页=看板(无 active 显示补集);开始 sprint 后收窄"
   page,
   projectKey,
 }) => {
-  const inSprint = await apiCreateItem(projectKey, "Sprint内 item");
+  const inSprint = await apiCreateItem(projectKey, "Sprint内 item", {
+    estimate: true,
+  });
   await apiCreateItem(projectKey, "Sprint外 item");
   const sprintId = await apiCreateSprint(projectKey, "E2E Board Sprint");
   await apiCall("PUT", `/api/items/${inSprint}/group-membership`, {

@@ -56,7 +56,9 @@ test("已有 sprint 的 item 开始不覆盖、无 toast", async ({
     `/api/projects/${projectKey}/groups/${keep}/actions/start`,
     {},
   );
-  const itemId = await apiCreateItem(projectKey, "已在 sprint 的 item");
+  const itemId = await apiCreateItem(projectKey, "已在 sprint 的 item", {
+    estimate: true,
+  });
   await apiCall("PUT", `/api/items/${itemId}/group-membership`, {
     groupId: keep,
     groupType: "sprint",

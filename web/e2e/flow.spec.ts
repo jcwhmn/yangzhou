@@ -57,7 +57,9 @@ test("Sprint 详情 burndown——active sprint 出现剩余/理想线图例", a
       },
     )
   ).groupId;
-  const item = await apiCreateItem(projectKey, "FL Sprint item");
+  const item = await apiCreateItem(projectKey, "FL Sprint item", {
+    estimate: true,
+  });
   await apiCall("PUT", `/api/items/${item}/group-membership`, {
     groupId: sprintId,
     groupType: "sprint",

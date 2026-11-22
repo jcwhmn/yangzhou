@@ -122,6 +122,7 @@ export async function apiCreateMember(displayName: string): Promise<void> {
 export async function apiCreateItem(
   key: string,
   title: string,
+  opts?: { estimate?: boolean }, // YPJ-216(spec 0164):拉入 sprint 的票传 true(硬校验需预估;其余保持三无语义)
 ): Promise<string> {
   const res = await fetch(`${config.apiURL}/api/projects/${key}/items`, {
     method: "POST",
@@ -131,9 +132,8 @@ export async function apiCreateItem(
     },
     body: JSON.stringify({
       title,
-      // YPJ-216(spec 0164):拉入 sprint 需预估,API 造票统一带默认预估(UI 快创建自身预选中档)
-      estimateValue: "3",
-      estimateUnit: "hour",
+      estimateValue: opts?.estimate ? "3" : null,
+      estimateUnit: opts?.estimate ? "hour" : null,
     }),
   });
   if (!res.ok) await assertOk(res, "创建 item");

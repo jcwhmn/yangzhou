@@ -34,7 +34,12 @@ async function group(
 
 /** 建 item 并挂组 */
 async function member(key: string, title: string, gid: string): Promise<void> {
-  await apiCall("POST", `/api/projects/${key}/items`, { title, sprintId: gid });
+  await apiCall("POST", `/api/projects/${key}/items`, {
+    title,
+    sprintId: gid,
+    estimateValue: "3",
+    estimateUnit: "hour",
+  }); // YPJ-216 拉入需预估
 }
 
 /** 完成组并回到组详情页(处置弹窗所在) */
@@ -67,7 +72,12 @@ test("完成组→处置弹窗列出非终态成员(Done 不列),默认全转入
   const todoId = await apiCall<{ itemId: string }>(
     "POST",
     `/api/projects/${projectKey}/items`,
-    { title: "终态成员", sprintId: doneGid },
+    {
+      title: "终态成员",
+      sprintId: doneGid,
+      estimateValue: "3",
+      estimateUnit: "hour",
+    }, // YPJ-216
   ).then((r) => r.itemId);
   // 终态化:迁移到 FINAL 状态(取项目 statuses 的 FINAL 项)
   const proj = await apiCall<{
