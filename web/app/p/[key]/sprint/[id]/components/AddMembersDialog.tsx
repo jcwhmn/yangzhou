@@ -17,25 +17,37 @@ import EstimateFillDialog from "../../../components/EstimateFillDialog";
 import { type Candidate } from "../types";
 
 /** AddMembersDialog(YPJ-252 自 page.tsx 搬出;V13-S3 拉入/退回,态留 page 拍板 4)。
- *  YPJ-216(spec 0164 途径④,SRS 2026-11-24 修订):纯勾选;完成后缺预估 → EstimateFillDialog 补录,
- *  onApply 携带每票预估,页面先落预估再拉入。 */
+ *  YPJ-216(spec 0164 途径④,2026-11-24 SRS 修订):选择控件保持原样不动(本组成员仍预选中);
+ *  确认时勾选票有缺预估 → 先弹 EstimateFillDialog 补录,onApply 携带每票预估,页面先落预估再拉入。 */
 export function AddMembersDialog({
   open,
+
   candidates,
+
   selected,
+
   busy,
+
   onToggle,
+
   onClose,
+
   onApply,
 }: {
   open: boolean;
+
   candidates: Candidate[];
+
   selected: Set<string>;
+
   busy: boolean;
+
   onToggle: (itemId: string) => void;
+
   onClose: () => void;
-  /** estimates:勾选票的补录预估({数值,单位});仅需补录的票(原无预估且填了值) */
-  onApply: (estimates: Record<string, { v: string; u: string }>) => void;
+
+  /** 原版为 () => void;YPJ-216 可选携带补录预估(页面 applyMembership 先落预估再拉入) */
+  onApply: (estimates?: Record<string, { v: string; u: string }>) => void;
 }) {
   // 补录阶段:非空 = 勾选票中有缺预估,先弹补录框
   const [fillItems, setFillItems] = useState<
@@ -52,7 +64,7 @@ export function AddMembersDialog({
       );
       return;
     }
-    onApply({});
+    onApply();
   }
 
   return (
@@ -61,7 +73,7 @@ export function AddMembersDialog({
       <DialogContent dividers sx={{ maxHeight: 480 }}>
         <List dense disablePadding>
           {candidates.map((it) => (
-            <ListItem key={it.itemId} dense disableGutters sx={{ gap: 1 }}>
+            <ListItem key={it.itemId} dense disableGutters>
               <Checkbox
                 size="small"
                 checked={selected.has(it.itemId)}
