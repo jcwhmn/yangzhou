@@ -85,6 +85,7 @@ export default function EstimateFillDialog({
             <TextField
               size="small"
               label="预估(应用到全部)"
+              placeholder={allV || "5"}
               value={allV}
               onChange={(e) => setAllV(e.target.value)}
               sx={{ width: 140 }}
@@ -113,6 +114,7 @@ export default function EstimateFillDialog({
               <TextField
                 size="small"
                 label="预估"
+                placeholder={allV || "5"}
                 value={est[it.itemId]?.v ?? ""}
                 onChange={(ev) =>
                   setEst((prev) => ({

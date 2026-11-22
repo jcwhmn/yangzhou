@@ -12,7 +12,8 @@ import {
   ListItemText,
   Typography,
 } from "@mui/material";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { api } from "@/lib/api";
 import EstimateFillDialog from "../../../components/EstimateFillDialog";
 import { type Candidate } from "../types";
 
@@ -57,11 +58,22 @@ export function AddMembersDialog({
   const [fillItems, setFillItems] = useState<
     { itemId: string; number: number | string; title: string }[]
   >([]);
+  // 项目设置:必预估时才需补录(非必填直接拉入,2026-11-24 用户反馈)
+  const [estimateRequired, setEstimateRequired] = useState(true);
+
+  useEffect(() => {
+    if (!open) return;
+    api<{ estimateRequired: boolean }>(`/api/projects/${projectKey}`)
+      .then((p) => setEstimateRequired(p.estimateRequired))
+      .catch(() => setEstimateRequired(true));
+  }, [open, projectKey]);
 
   function confirmApply() {
-    const needing = candidates.filter(
-      (it) => selected.has(it.itemId) && it.estimateValue == null,
-    );
+    const needing = estimateRequired
+      ? candidates.filter(
+          (it) => selected.has(it.itemId) && it.estimateValue == null,
+        )
+      : [];
     if (needing.length > 0) {
       setFillItems(
         needing.map(({ itemId, number, title }) => ({ itemId, number, title })),

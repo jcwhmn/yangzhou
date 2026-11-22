@@ -37,6 +37,8 @@ export default function PullDialog({
   const [items, setItems] = useState<ItemRow[] | null>(null);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [error, setError] = useState(""); // YPJ-216:守卫 409 要浮出(无预估拉入不再静默吞,2026-11-23 手工实锤)
+  // 项目设置:必预估时才需补录(非必填直接拉入,2026-11-24 用户反馈)
+  const [estimateRequired, setEstimateRequired] = useState(true);
   // 补录阶段:非空 = 有缺预估的新拉入票,先弹补录框(列出全部需录入票)
   const [fillItems, setFillItems] = useState<
     { itemId: string; number: number | string; title: string }[]
@@ -46,6 +48,9 @@ export default function PullDialog({
     if (!open) return;
     setError("");
     setFillItems([]);
+    api<{ estimateRequired: boolean }>(`/api/projects/${projectKey}`)
+      .then((p) => setEstimateRequired(p.estimateRequired))
+      .catch(() => setEstimateRequired(true));
     api<{ items: Item[] }>(`/api/projects/${projectKey}/board`)
       .then((r) => {
         const onBoard = r.items.map((it) => ({ ...it, onBoard: true }));
@@ -80,10 +85,13 @@ export default function PullDialog({
   }
 
   async function confirmPull() {
-    // YPJ-216 SRS 修订:完成后检查新拉入的勾选票,有缺预估 → 弹补录对话框列出全部需录入票,提交后继续
-    const needing = (items ?? []).filter(
-      (it) => !it.onBoard && picked.has(it.itemId) && it.estimateValue == null,
-    );
+    // YPJ-216 SRS 修订:必预估项目才检查新拉入票的缺预估 → 弹补录框;非必填直接拉入(2026-11-24 用户反馈)
+    const needing = estimateRequired
+      ? (items ?? []).filter(
+          (it) =>
+            !it.onBoard && picked.has(it.itemId) && it.estimateValue == null,
+        )
+      : [];
     if (needing.length > 0) {
       setFillItems(
         needing.map(({ itemId, number, title }) => ({ itemId, number, title })),
