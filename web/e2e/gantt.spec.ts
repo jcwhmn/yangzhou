@@ -411,24 +411,28 @@ test("时线回归(YPJ-229):今日时刻居中 + 零时长条可见", async ({
   });
 
   await page.goto(`/p/${projectKey}/gantt`);
-  // YPJ-256:日窗预设/挂起补放机制已删;今日按钮回中(只居中不重置缩放)
+  // YPJ-256:日窗预设/挂起补放机制已删;等行渲染后点今日回中(只居中不重置缩放)
+  await expect(page.locator('[data-testid^="gantt-bar-"]').first()).toBeVisible();
   await page.getByTestId("gantt-today").click();
-  // 今日线(2px 蓝竖线)在视口内(视点日=今日 → 当前时刻居中)
-  const todayVis = await page.evaluate(() => {
-    const scroll = document.querySelector('[data-testid="gantt-scroll"]');
-    if (!scroll) return false;
-    const lines = [...scroll.querySelectorAll("div")].filter((d) => {
-      const s = getComputedStyle(d);
-      return s.width === "2px" && s.position === "absolute";
-    });
-    return lines.some((d) => {
-      // 高度 >8px:条区零高度时今日线(top:0/bottom:0)不可见(A44 回归钉)
-      const h = (d as HTMLElement).getBoundingClientRect().height;
-      const x = (d as HTMLElement).offsetLeft - scroll.scrollLeft;
-      return h > 8 && x >= 0 && x <= scroll.clientWidth;
-    });
-  });
-  expect(todayVis).toBe(true);
+  // 今日线(2px 蓝竖线)在视口内(视点日=今日 → 当前时刻居中);poll:居中滚动是异步生效
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const scroll = document.querySelector('[data-testid="gantt-scroll"]');
+        if (!scroll) return false;
+        const lines = [...scroll.querySelectorAll("div")].filter((d) => {
+          const s = getComputedStyle(d);
+          return s.width === "2px" && s.position === "absolute";
+        });
+        return lines.some((d) => {
+          // 高度 >8px:条区零高度时今日线(top:0/bottom:0)不可见(A44 回归钉)
+          const h = (d as HTMLElement).getBoundingClientRect().height;
+          const x = (d as HTMLElement).offsetLeft - scroll.scrollLeft;
+          return h > 8 && x >= 0 && x <= scroll.clientWidth;
+        });
+      }),
+    )
+    .toBe(true);
   // 零时长条可见(宽 ≥3px)
   const w = await page
     .locator('[data-testid^="gantt-bar-"]')
