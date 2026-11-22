@@ -72,9 +72,26 @@ export default function BacklogPage() {
     } catch (e) {
       const msg = e instanceof Error ? e.message : "拉入失败";
       if (msg.includes("预估")) {
-        // 守卫缺预估:弹补录对话框而非报错(SRS 途径②)
+        // 守卫缺预估:弹补录对话框而非报错(SRS 途径②);
+        // 预填项目缺省预估(未设回退内置中档 5day,同 EstimateFillDialog 源);仅空值时回填,不覆盖用户已输入
         const it = (items ?? []).find((x) => x.itemId === itemId);
         setSupplement({ itemId, title: it?.title || title, v: "", u: "hour" });
+        api<{
+          defaultEstimateValue: string | null;
+          defaultEstimateUnit: string | null;
+        }>(`/api/projects/${key}`)
+          .then((p) =>
+            setSupplement((s) =>
+              s && s.itemId === itemId && s.v === ""
+                ? {
+                    ...s,
+                    v: p.defaultEstimateValue ?? "5",
+                    u: p.defaultEstimateUnit ?? "day",
+                  }
+                : s,
+            ),
+          )
+          .catch(() => {});
       } else {
         setError(msg);
       }
@@ -249,7 +266,12 @@ export default function BacklogPage() {
         </TableContainer>
       )}
       {/* YPJ-216(SRS 途径②):缺预估补录对话框——提交后自动重试拉入 */}
-      <Dialog open={supplement != null} onClose={() => setSupplement(null)} maxWidth="xs" fullWidth>
+      <Dialog
+        open={supplement != null}
+        onClose={() => setSupplement(null)}
+        maxWidth="xs"
+        fullWidth
+      >
         <DialogTitle>补录预估</DialogTitle>
         <DialogContent>
           <Typography variant="body2" sx={{ mb: 2 }}>
@@ -285,7 +307,11 @@ export default function BacklogPage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setSupplement(null)}>取消</Button>
-          <Button variant="contained" onClick={submitSupplement} disabled={!supplement?.v}>
+          <Button
+            variant="contained"
+            onClick={submitSupplement}
+            disabled={!supplement?.v}
+          >
             确定并拉入
           </Button>
         </DialogActions>

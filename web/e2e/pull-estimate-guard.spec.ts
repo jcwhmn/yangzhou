@@ -18,6 +18,9 @@ test.describe("estimateRequired=true——三途径缺预估弹补录", () => {
     await page.getByRole("button", { name: "拉入看板" }).first().click();
     const dlg = page.getByRole("dialog", { name: "补录预估" });
     await expect(dlg).toBeVisible();
+    // 预填项目缺省(未设 → 内置中档 5day);不输入直接确定也可用
+    await expect(dlg.getByLabel("预估", { exact: true })).toHaveValue("5");
+    await expect(dlg.getByLabel("单位", { exact: true })).toHaveValue("day");
     await dlg.getByLabel("预估", { exact: true }).fill("2");
     await dlg.getByRole("button", { name: "确定并拉入" }).click();
     await expect(dlg).toBeHidden();
