@@ -147,7 +147,11 @@ export default function PullDialog({
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>取消</Button>
-        <Button variant="contained" onClick={confirmPull}>
+        <Button
+          variant="contained"
+          onClick={confirmPull}
+          disabled={picked.size === 0}
+        >
           {t.board.pullConfirm}
         </Button>
       </DialogActions>
