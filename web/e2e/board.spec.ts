@@ -85,9 +85,12 @@ test("日期与超期标识——详情设置日期,看板红标,甘特可见", 
   await saveResp;
   await reloadResp;
   await expectDate(page, "开始日期", "2020-01-01");
-  // YPJ-208 切片 c:时刻字段可录并随保存发出 datetime。YPJ-216 起拉入守卫会给 due 预铺时刻(任意),
-  // 「date-only→日末 23:59 回填」断言在本票不再成立(语义由后端集成测试覆盖);等回填落地后直接录 12:30
-  await page.getByLabel("截止时刻").fill("12:30");
+  // YPJ-208 切片 c:时刻字段可录并随保存发出 datetime。YPJ-216 起守卫会给 due 预铺任意时刻,
+  // 「date-only→日末 23:59 回填」断言不再成立(语义转后端集成覆盖);先等回填渲染落地再录,免 A10 同款竞态
+  const dueTimeInput = page.getByLabel("截止时刻");
+  await expect(dueTimeInput).not.toHaveValue("");
+  await dueTimeInput.fill("12:30");
+  await expect(dueTimeInput).toHaveValue("12:30");
   const patchBody = page.waitForRequest(
     (r) => r.url().includes("/api/items/") && r.method() === "PATCH",
   );
