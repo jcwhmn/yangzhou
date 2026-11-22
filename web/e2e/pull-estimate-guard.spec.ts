@@ -9,10 +9,11 @@ test.describe("estimateRequired=true——三途径缺预估弹补录", () => {
     page,
     projectKey,
   }) => {
+    // 先建票再开必填(create 守卫:必填项目立票即 400,无预估票只能存量)
+    await apiCreateItem(projectKey, "EG 补录甲");
     await apiCall("PATCH", `/api/projects/${projectKey}/settings`, {
       estimateRequired: true,
     });
-    await apiCreateItem(projectKey, "EG 补录甲");
     await apiCreateSprint(projectKey, "EG Sprint 甲");
     await page.goto(`/p/${projectKey}/backlog`);
     await page.getByRole("button", { name: "拉入看板" }).first().click();
@@ -31,10 +32,11 @@ test.describe("estimateRequired=true——三途径缺预估弹补录", () => {
     page,
     projectKey,
   }) => {
+    // 先建票再开必填(create 守卫:必填项目立票即 400,无预估票只能存量)
+    await apiCreateItem(projectKey, "EG 补录乙");
     await apiCall("PATCH", `/api/projects/${projectKey}/settings`, {
       estimateRequired: true,
     });
-    await apiCreateItem(projectKey, "EG 补录乙");
     const sprintId = await apiCreateSprint(projectKey, "EG Sprint 乙");
     await apiCall(
       "POST",
@@ -63,10 +65,11 @@ test.describe("estimateRequired=true——三途径缺预估弹补录", () => {
     page,
     projectKey,
   }) => {
+    // 先建票再开必填(create 守卫:必填项目立票即 400,无预估票只能存量)
+    await apiCreateItem(projectKey, "EG 补录丙");
     await apiCall("PATCH", `/api/projects/${projectKey}/settings`, {
       estimateRequired: true,
     });
-    await apiCreateItem(projectKey, "EG 补录丙");
     const sprintId = await apiCreateSprint(projectKey, "EG Sprint 丙");
     await page.goto(`/p/${projectKey}/sprint/${sprintId}`);
     await page.getByRole("button", { name: "拉入 item" }).click();
