@@ -412,7 +412,9 @@ test("时线回归(YPJ-229):今日时刻居中 + 零时长条可见", async ({
 
   await page.goto(`/p/${projectKey}/gantt`);
   // YPJ-256:日窗预设/挂起补放机制已删;等行渲染后点今日回中(只居中不重置缩放)
-  await expect(page.locator('[data-testid^="gantt-bar-"]').first()).toBeVisible();
+  await expect(
+    page.locator('[data-testid^="gantt-bar-"]').first(),
+  ).toBeVisible();
   await page.getByTestId("gantt-today").click();
   // 今日线(2px 蓝竖线)在视口内(视点日=今日 → 当前时刻居中);poll:居中滚动是异步生效
   await expect
