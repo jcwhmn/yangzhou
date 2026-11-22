@@ -84,29 +84,21 @@ export default function GanttPage() {
     completedRows,
     mainRows,
   } = useEnvelope({ rows, wd, groupStartOf, collapsed });
-  const {
-    axis,
-    zoomTo,
-    goToDayWindow,
-    shiftCenter,
-    centerOnToday,
-    xOf,
-    xOfT,
-    xEndOf,
-  } = useTimelineScale({
-    rows,
-    wd,
-    zoom,
-    setZoom,
-    center,
-    setCenter,
-    containerW,
-    scrollRef,
-    groupStartOf,
-    summaryOf,
-    saveView,
-    markerDates: markerDatesOf(msOpts, relOpts),
-  });
+  const { axis, zoomTo, shiftCenter, centerOnToday, xOf, xOfT, xEndOf } =
+    useTimelineScale({
+      rows,
+      wd,
+      zoom,
+      setZoom,
+      center,
+      setCenter,
+      containerW,
+      scrollRef,
+      groupStartOf,
+      summaryOf,
+      saveView,
+      markerDates: markerDatesOf(msOpts, relOpts),
+    });
 
   const changeScope = (next: string) => {
     setScope(next);
@@ -238,18 +230,6 @@ export default function GanttPage() {
           >
             今日
           </Button>
-          {/* 日窗预设(视点日为中心,N 天撑满) */}
-          {[1, 2, 3, 5].map((n) => (
-            <Button
-              key={n}
-              size="small"
-              variant="outlined"
-              data-testid={`gantt-win-${n}`}
-              onClick={() => goToDayWindow(n)}
-            >
-              {n}日
-            </Button>
-          ))}
           {/* 视点日导航:◀ 前一天 / 后一天 ▶ / 指定日期 */}
           <Stack
             direction="row"
