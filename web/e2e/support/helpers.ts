@@ -129,7 +129,12 @@ export async function apiCreateItem(
       "Content-Type": "application/json",
       Authorization: `Bearer ${await apiToken()}`,
     },
-    body: JSON.stringify({ title }),
+    body: JSON.stringify({
+      title,
+      // YPJ-216(spec 0164):拉入 sprint 需预估,API 造票统一带默认预估(UI 快创建自身预选中档)
+      estimateValue: "3",
+      estimateUnit: "hour",
+    }),
   });
   if (!res.ok) await assertOk(res, "创建 item");
   return ((await res.json()) as { itemId: string }).itemId;
