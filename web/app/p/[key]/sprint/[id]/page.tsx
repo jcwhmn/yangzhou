@@ -283,7 +283,8 @@ export default function SprintPage() {
   // V13-S3:拉入/移出同一对话框——列出非终态 item 多选,确认后逐条走既有 PUT /items/{id}/sprint
   async function openAdd() {
     try {
-      // V13-S4:范围 = Backlog + 本 sprint 成员(其它 sprint 的 item 不列,挪动走详情下拉)
+      // V13-S4:范围 = Backlog + 本 sprint 成员(其它 sprint 的 item 不列,挪动走详情下拉);
+      // YPJ-216:候选带预估快照(已有预估的票不重录,重录会触发互算改 due)
       const backlogItems = await api<Candidate[]>(
         `/api/projects/${key}/backlog`,
       );
@@ -293,6 +294,8 @@ export default function SprintPage() {
         title: i.title,
         status: i.status,
         assignee: i.assignee,
+        estimateValue: i.estimateValue,
+        estimateUnit: i.estimateUnit,
       }));
       const memberIds = new Set(members.map((m) => m.itemId));
       setCandidates([
@@ -306,9 +309,21 @@ export default function SprintPage() {
     }
   }
 
-  async function applyMembership() {
+  // YPJ-216(spec 0164 途径④):对话框行内补录的预估先落票(已有预估的票跳过,避免互算改 due),再逐条入组
+  async function applyMembership(
+    estimates: Record<string, { v: string; u: string }> = {},
+  ) {
     setBusy(true);
     try {
+      for (const [itemId, e] of Object.entries(estimates)) {
+        const already =
+          candidates.find((c) => c.itemId === itemId)?.estimateValue != null;
+        if (already) continue; // 已有预估的票不重录(重录触发互算改 due)
+        await api(`/api/items/${itemId}`, {
+          method: "PATCH",
+          body: JSON.stringify({ estimateValue: e.v, estimateUnit: e.u }),
+        });
+      }
       const prev = new Set((items ?? []).map((i) => i.itemId));
       for (const c of candidates) {
         const now = selected.has(c.itemId);
@@ -414,6 +429,7 @@ export default function SprintPage() {
           )}
           <AddMembersDialog
             open={addOpen}
+            projectKey={key}
             candidates={candidates}
             selected={selected}
             busy={busy}

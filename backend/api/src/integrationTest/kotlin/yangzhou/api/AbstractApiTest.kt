@@ -243,6 +243,7 @@ abstract class AbstractApiTest {
         title: String,
         requirements: List<Map<String, Any?>> = emptyList(),
         parentItemId: String? = null,
+        estimate: Boolean = false, // YPJ-216(spec 0164):拉 sprint 成员的 fixture 传 true
     ): JsonNode {
         val body =
             mutableMapOf(
@@ -253,6 +254,10 @@ abstract class AbstractApiTest {
                     },
             )
         if (parentItemId != null) body["parentItemId"] = parentItemId
+        if (estimate) {
+            body["estimateValue"] = "3"
+            body["estimateUnit"] = "hour"
+        }
         val r =
             authed
                 .post()

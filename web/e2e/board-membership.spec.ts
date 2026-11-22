@@ -49,7 +49,9 @@ test("有 active sprint——拉入同时挂 sprint_退回清成员", async ({
   page,
   projectKey,
 }) => {
-  const item = await apiCreateItem(projectKey, "BM 冲刺 item");
+  const item = await apiCreateItem(projectKey, "BM 冲刺 item", {
+    estimate: true,
+  }); // 拉入自动挂 active sprint,守卫需预估
   const sprintId = await apiCreateSprint(projectKey, "BM Sprint");
   await apiCall(
     "POST",

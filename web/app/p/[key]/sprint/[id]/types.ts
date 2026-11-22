@@ -19,6 +19,8 @@ export type Item = {
   priority: string | null;
   dueDate: string | null;
   feasSignal: Signal | null;
+  estimateValue?: number | null; // YPJ-216:候选预估快照(已有预估的票不重录)
+  estimateUnit?: string | null;
 };
 export type Status = {
   statusId: string;
@@ -38,6 +40,8 @@ export type Candidate = {
   title: string;
   status: string;
   assignee: string | null;
+  estimateValue?: number | null; // YPJ-216:已有预估的票不重录(重录会触发互算改 due)
+  estimateUnit?: string | null;
 };
 // 0106:组完成后的非终态成员处置(rows 默认全转入目标组,逐行可覆写回 Backlog;D2/D3)
 export type Disp = {

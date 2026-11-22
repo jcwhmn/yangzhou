@@ -13,7 +13,7 @@ class GanttApiTest : AbstractApiTest() {
         createProject(authed, "CHE")
 
         // 父 item(带日期，超期，带 estimate)+ 子 item(无日期，被依赖未终态 → 父 blocked)
-        val parent = createItem(authed, "CHE", "父任务")
+        val parent = createItem(authed, "CHE", "父任务", estimate = true)
         authed
             .patch()
             .uri("/api/items/${parent["itemId"].asText()}")
@@ -84,9 +84,9 @@ class GanttApiTest : AbstractApiTest() {
     fun `YPJ-218 B1 孤儿兑底——父被清除后子按根显示`() {
         val authed = bootstrapAndAuth()
         createProject(authed, "ORP")
-        val parent = createItem(authed, "ORP", "将被清除的父")
+        val parent = createItem(authed, "ORP", "将被清除的父", estimate = true)
         val child = createItem(authed, "ORP", "孤儿子", parentItemId = parent["itemId"].asText())
-        createItem(authed, "ORP", "普通根")
+        createItem(authed, "ORP", "普通根", estimate = true)
 
         // 造孤儿:删父(子树软删)→ 只恢复子(其 parentItemId 指向软删中的父,gantt 全集过滤后即孤儿)
         authed.delete().uri("/api/items/${parent["itemId"].asText()}").exchange().expectStatus().isNoContent()
@@ -123,10 +123,10 @@ class GanttApiTest : AbstractApiTest() {
         val authed = bootstrapAndAuth()
         createProject(authed, "SCO")
 
-        val parent = createItem(authed, "SCO", "父")
-        val a = createItem(authed, "SCO", "A", parentItemId = parent["itemId"].asText())
-        val b = createItem(authed, "SCO", "B", parentItemId = parent["itemId"].asText())
-        createItem(authed, "SCO", "圈外O")
+        val parent = createItem(authed, "SCO", "父", estimate = true)
+        val a = createItem(authed, "SCO", "A", parentItemId = parent["itemId"].asText(), estimate = true) // YPJ-216 拉入需预估
+        val b = createItem(authed, "SCO", "B", parentItemId = parent["itemId"].asText(), estimate = true)
+        createItem(authed, "SCO", "圈外O", estimate = true)
 
         fun gantt(q: String) = json.readTree(
             authed
@@ -257,7 +257,7 @@ class GanttApiTest : AbstractApiTest() {
         }
 
         // 甲:start+due → 迁 In Progress → Done;指派给我;清单 2 条完成 1 条
-        val a = createItem(authed, "ACT", "甲")["itemId"].asText()
+        val a = createItem(authed, "ACT", "甲", estimate = true)["itemId"].asText()
         patchItem(a, mapOf("startDate" to "2026-01-01", "dueDate" to "2026-01-10"))
         authed.put().uri("/api/items/$a/assignee").body(mapOf("assigneeItemId" to meId)).exchange().expectStatus().isOk()
         val t1 =
@@ -279,7 +279,7 @@ class GanttApiTest : AbstractApiTest() {
         patchItem(a, mapOf("statusItemId" to statusIds["Done"]))
 
         // 乙:start+due,未动(仍 To Do,无清单无负责人)
-        val b = createItem(authed, "ACT", "乙")["itemId"].asText()
+        val b = createItem(authed, "ACT", "乙", estimate = true)["itemId"].asText()
         patchItem(b, mapOf("startDate" to "2026-02-01", "dueDate" to "2026-02-10"))
 
         val rows =
@@ -313,8 +313,8 @@ class GanttApiTest : AbstractApiTest() {
     fun `YPJ-255 spec 0159 甘特行 totalMinutes 随行下发——补录计入无工时为零`() {
         val authed = bootstrapAndAuth()
         createProject(authed, "TMN")
-        val a = createItem(authed, "TMN", "有工时")["itemId"].asText()
-        val b = createItem(authed, "TMN", "无工时")["itemId"].asText()
+        val a = createItem(authed, "TMN", "有工时", estimate = true)["itemId"].asText()
+        val b = createItem(authed, "TMN", "无工时", estimate = true)["itemId"].asText()
         authed
             .post()
             .uri("/api/items/$a/time-entries")
@@ -342,9 +342,9 @@ class GanttApiTest : AbstractApiTest() {
         createProject(authed, "ORD")
 
         // 创建序故意与 start 序错开;无日期 = 未排期
-        val a = createItem(authed, "ORD", "A")
-        val b = createItem(authed, "ORD", "B")
-        val c = createItem(authed, "ORD", "C")
+        val a = createItem(authed, "ORD", "A", estimate = true)
+        val b = createItem(authed, "ORD", "B", estimate = true)
+        val c = createItem(authed, "ORD", "C", estimate = true)
         val c2 = createItem(authed, "ORD", "c2", parentItemId = c["itemId"].asText()) // C 子,未排期,先建
         val c1 = createItem(authed, "ORD", "c1", parentItemId = c["itemId"].asText()) // C 子,后建
         val b1 = createItem(authed, "ORD", "b1", parentItemId = b["itemId"].asText())
@@ -386,7 +386,7 @@ class GanttApiTest : AbstractApiTest() {
         val authed = bootstrapAndAuth()
         createProject(authed, "ANC")
 
-        val predA = createItem(authed, "ANC", "前置A")
+        val predA = createItem(authed, "ANC", "前置A", estimate = true)
         authed
             .patch()
             .uri("/api/items/${predA["itemId"].asText()}")
@@ -394,7 +394,7 @@ class GanttApiTest : AbstractApiTest() {
             .exchange()
             .expectStatus()
             .isOk()
-        val predB = createItem(authed, "ANC", "前置B")
+        val predB = createItem(authed, "ANC", "前置B", estimate = true)
         authed
             .patch()
             .uri("/api/items/${predB["itemId"].asText()}")
@@ -402,7 +402,7 @@ class GanttApiTest : AbstractApiTest() {
             .exchange()
             .expectStatus()
             .isOk()
-        val succ = createItem(authed, "ANC", "后继")
+        val succ = createItem(authed, "ANC", "后继", estimate = true)
 
         // succ 依赖 A 与 B → anchor = max(A.due 09-30T12:00, B.start 09-05T00:00)
         authed
@@ -445,12 +445,12 @@ class GanttApiTest : AbstractApiTest() {
         createProject(authed, "VIS")
 
         // G1(父,不挂 milestone)+ 两子:L1(挂 milestone,12-20)/ C2(不挂,12-01 早锚);L2(根叶,12-10,挂 milestone)
-        val g1 = createItem(authed, "VIS", "父G1")["itemId"].asText()
+        val g1 = createItem(authed, "VIS", "父G1", estimate = true)["itemId"].asText()
         val l1 = createItem(authed, "VIS", "圈上叶L1", parentItemId = g1)["itemId"].asText()
         authed.patch().uri("/api/items/$l1").body(mapOf("startDate" to "2026-12-20")).exchange().expectStatus().isOk()
         val c2 = createItem(authed, "VIS", "圈外叶C2", parentItemId = g1)["itemId"].asText()
         authed.patch().uri("/api/items/$c2").body(mapOf("startDate" to "2026-12-01")).exchange().expectStatus().isOk()
-        val l2 = createItem(authed, "VIS", "根叶L2")["itemId"].asText()
+        val l2 = createItem(authed, "VIS", "根叶L2", estimate = true)["itemId"].asText()
         authed.patch().uri("/api/items/$l2").body(mapOf("startDate" to "2026-12-10")).exchange().expectStatus().isOk()
 
         val ms =
@@ -501,13 +501,13 @@ class GanttApiTest : AbstractApiTest() {
         createProject(authed, "ANC2")
 
         // A(start 12-18,due 12-20)→ B(无日期,依赖 A,借锚 = A.due 12-20);C(12-15);D(12-22)
-        val a = createItem(authed, "ANC2", "A")["itemId"].asText()
+        val a = createItem(authed, "ANC2", "A", estimate = true)["itemId"].asText()
         authed.patch().uri("/api/items/$a").body(mapOf("startDate" to "2026-12-18", "dueDate" to "2026-12-20")).exchange().expectStatus().isOk()
-        val b = createItem(authed, "ANC2", "B")["itemId"].asText()
+        val b = createItem(authed, "ANC2", "B", estimate = true)["itemId"].asText()
         authed.post().uri("/api/items/$b/dependencies").body(mapOf("dependsOnItemId" to a)).exchange().expectStatus().isCreated()
-        val c = createItem(authed, "ANC2", "C")["itemId"].asText()
+        val c = createItem(authed, "ANC2", "C", estimate = true)["itemId"].asText()
         authed.patch().uri("/api/items/$c").body(mapOf("startDate" to "2026-12-15")).exchange().expectStatus().isOk()
-        val d = createItem(authed, "ANC2", "D")["itemId"].asText()
+        val d = createItem(authed, "ANC2", "D", estimate = true)["itemId"].asText()
         authed.patch().uri("/api/items/$d").body(mapOf("startDate" to "2026-12-22")).exchange().expectStatus().isOk()
 
         val rows =

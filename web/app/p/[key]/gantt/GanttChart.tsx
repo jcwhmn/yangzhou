@@ -42,6 +42,7 @@ export function GanttChart({
   xOfT,
   xEndOf,
   wd,
+  pullDefault,
   scrollRef,
   projectKey,
   ms,
@@ -62,6 +63,8 @@ export function GanttChart({
   xOfT: (t: number) => number;
   xEndOf: (due: string | null) => number | null;
   wd: [number, number, boolean] | null;
+  /** YPJ-216(SRS 4.4):甘特缺省画图输入——缺省预估(项目设置→中档)与组开始偏移分钟;仅绘制用,不写回票 */
+  pullDefault: { estV: number; estU: string; offMin: number } | null;
   scrollRef: RefObject<HTMLDivElement | null>;
   projectKey: string;
   ms: MilestoneMarker[];
@@ -80,7 +83,13 @@ export function GanttChart({
     // YPJ-244(spec 0151 五):渲染规则 v2——case 2×2 分型 × 3 状态(用户 Obsidian 2026-11-20)
     const wsm = wd?.[0] ?? 0;
     const wem = wd?.[1] ?? 1440;
-    const estH = estimateHoursOf(r.estimateValue, r.estimateUnit, wsm, wem);
+    // YPJ-216(SRS 4.4):无预估 → 项目缺省预估(仅绘制);无开始 → 组开始+偏移
+    const estH =
+      estimateHoursOf(r.estimateValue, r.estimateUnit, wsm, wem) ??
+      (pullDefault
+        ? estimateHoursOf(pullDefault.estV, pullDefault.estU, wsm, wem)
+        : null);
+    const offMs = (pullDefault?.offMin ?? 0) * 60_000;
     const startAnchor = r.startDate ?? r.anchorDate ?? null;
     const gS = groupStartOf(r);
     const caseNo =
@@ -105,10 +114,10 @@ export function GanttChart({
             ? r.actualStart
               ? +parseLocal(r.actualStart)
               : gS
-                ? +parseLocal(gS)
+                ? +parseLocal(gS) + offMs
                 : null
             : !r.actualStart && gS
-              ? +parseLocal(gS)
+              ? +parseLocal(gS) + offMs
               : null;
     // 条 vs 点:有长度来源(due 显式或 estimate 铺算)→ 条;仅锚无长度 → 点
     const planIsBar =

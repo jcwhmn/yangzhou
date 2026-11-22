@@ -3,6 +3,11 @@
 import {
   Button,
   Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  MenuItem,
   Stack,
   Table,
   TableBody,
@@ -45,7 +50,70 @@ export default function BacklogPage() {
   const [items, setItems] = useState<Item[] | null>(null);
   const [error, setError] = useState("");
   const [newTitle, setNewTitle] = useState("");
+  // YPJ-216(SRS 途径②):拉入缺预估 → 补录对话框,提交后自动重试拉入(不弹警告)
+  const [supplement, setSupplement] = useState<{
+    itemId: string;
+    title: string;
+    v: string;
+    u: string;
+  } | null>(null);
   const { slotRef } = useProjectToolbarSlot();
+
+  async function pullToBoard(itemId: string, title = "") {
+    try {
+      await api(`/api/items/${itemId}/board-membership`, {
+        method: "PUT",
+        body: JSON.stringify({ onBoard: true }),
+      });
+      setSupplement(null);
+      api<Item[]>(`/api/projects/${key}/backlog`)
+        .then(setItems)
+        .catch(() => {});
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "拉入失败";
+      if (msg.includes("预估")) {
+        // 守卫缺预估:弹补录对话框而非报错(SRS 途径②);
+        // 预填项目缺省预估(未设回退内置中档 5day,同 EstimateFillDialog 源);仅空值时回填,不覆盖用户已输入
+        const it = (items ?? []).find((x) => x.itemId === itemId);
+        setSupplement({ itemId, title: it?.title || title, v: "", u: "hour" });
+        api<{
+          defaultEstimateValue: string | null;
+          defaultEstimateUnit: string | null;
+        }>(`/api/projects/${key}`)
+          .then((p) =>
+            setSupplement((s) =>
+              s && s.itemId === itemId && s.v === ""
+                ? {
+                    ...s,
+                    v: p.defaultEstimateValue ?? "5",
+                    u: p.defaultEstimateUnit ?? "day",
+                  }
+                : s,
+            ),
+          )
+          .catch(() => {});
+      } else {
+        setError(msg);
+      }
+    }
+  }
+
+  async function submitSupplement() {
+    if (!supplement?.v) return;
+    try {
+      await api(`/api/items/${supplement.itemId}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          estimateValue: supplement.v,
+          estimateUnit: supplement.u,
+        }),
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "预估保存失败");
+      return;
+    }
+    await pullToBoard(supplement.itemId);
+  }
 
   useEffect(() => {
     api<Item[]>(`/api/projects/${key}/backlog`)
@@ -169,18 +237,7 @@ export default function BacklogPage() {
                     <Button
                       size="small"
                       variant="outlined"
-                      onClick={() =>
-                        api(`/api/items/${it.itemId}/board-membership`, {
-                          method: "PUT",
-                          body: JSON.stringify({ onBoard: true }),
-                        })
-                          .then(() =>
-                            api<Item[]>(`/api/projects/${key}/backlog`)
-                              .then(setItems)
-                              .catch(() => {}),
-                          )
-                          .catch(() => {})
-                      }
+                      onClick={() => pullToBoard(it.itemId, it.title)}
                     >
                       {t.board.pullItem}
                     </Button>
@@ -208,6 +265,57 @@ export default function BacklogPage() {
           </Table>
         </TableContainer>
       )}
+      {/* YPJ-216(SRS 途径②):缺预估补录对话框——提交后自动重试拉入 */}
+      <Dialog
+        open={supplement != null}
+        onClose={() => setSupplement(null)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>补录预估</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ mb: 2 }}>
+            「{supplement?.title}」拉入需要预估时长,请补录:
+          </Typography>
+          <Stack direction="row" spacing={1}>
+            <TextField
+              size="small"
+              label="预估"
+              value={supplement?.v ?? ""}
+              onChange={(e) =>
+                setSupplement((s) => (s ? { ...s, v: e.target.value } : s))
+              }
+              fullWidth
+            />
+            <TextField
+              size="small"
+              select
+              label="单位"
+              value={supplement?.u ?? "hour"}
+              onChange={(e) =>
+                setSupplement((s) => (s ? { ...s, u: e.target.value } : s))
+              }
+              sx={{ width: 100 }}
+            >
+              {["hour", "day", "week"].map((u) => (
+                <MenuItem key={u} value={u}>
+                  {u}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSupplement(null)}>取消</Button>
+          <Button
+            variant="contained"
+            onClick={submitSupplement}
+            disabled={!supplement?.v}
+          >
+            确定并拉入
+          </Button>
+        </DialogActions>
+      </Dialog>
     </PageShell>
   );
 }

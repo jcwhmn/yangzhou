@@ -177,7 +177,9 @@ test("看板卡片指派入口——Popover 弹出/Esc 收起/指派成功且不
   page,
   projectKey,
 }) => {
-  const itemId = await apiCreateItem(projectKey, "AP 卡片指派");
+  const itemId = await apiCreateItem(projectKey, "AP 卡片指派", {
+    estimate: true,
+  });
   // 看板卡仅在有 active sprint 时承载(方案A):API 造 active sprint + 成员
   const sprintId = await apiCreateSprint(projectKey, "AP Sprint");
   await apiCall("PUT", `/api/items/${itemId}/group-membership`, {
@@ -210,7 +212,9 @@ test("看板卡片指派入口——Popover 弹出/Esc 收起/指派成功且不
 });
 
 test("重分配——候选列表标注当前负责人", async ({ page, projectKey }) => {
-  const itemId = await apiCreateItem(projectKey, "AP 当前标注");
+  const itemId = await apiCreateItem(projectKey, "AP 当前标注", {
+    estimate: true,
+  }); // 挂 active sprint,守卫需预估
   await apiAssignMe(itemId);
   // 看板卡仅在有 active sprint 时承载(方案A):API 造 active sprint + 成员
   const sprintId = await apiCreateSprint(projectKey, "AP Sprint");

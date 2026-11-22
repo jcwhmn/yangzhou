@@ -122,6 +122,10 @@ class ProjectService(
         val workdayEnd: String,
         /** YPJ-226(spec 0163):work=工作制(跳周末) / wall=墙钟制。 */
         val workMode: String,
+        /** YPJ-216(spec 0164):组拉入缺省(null=未设置,渲染回退中档/0)。 */
+        val defaultEstimateValue: String?,
+        val defaultEstimateUnit: String?,
+        val defaultStartOffsetMinutes: Long?,
         val statuses: List<StatusDto>,
     )
 
@@ -175,6 +179,9 @@ class ProjectService(
             project.workdayStart,
             project.workdayEnd,
             project.workMode,
+            project.defaultEstimateValue,
+            project.defaultEstimateUnit,
+            project.defaultStartOffsetMinutes,
             statusDtos,
         )
     }
@@ -202,6 +209,13 @@ class ProjectService(
         // YPJ-226(spec 0163):制式校验(work/wall);窗口与制式正交——工作制+全天窗 = 只跳周末,合法
         val newMode = request.workMode ?: project.workMode
         if (newMode !in listOf("work", "wall")) throw BadRequestException("workMode 应为 work 或 wall:$newMode")
+        // YPJ-216(spec 0164):组拉入缺省(null=不改;value 需 >0 数字,unit 枚举,offset ≥0)
+        request.defaultEstimateValue?.let { v ->
+            v.toDoubleOrNull()?.let { if (it <= 0) throw BadRequestException("defaultEstimateValue 应为正数:$v") }
+                ?: throw BadRequestException("defaultEstimateValue 应为正数:$v")
+        }
+        request.defaultEstimateUnit?.let { if (it !in listOf("hour", "day", "week")) throw BadRequestException("defaultEstimateUnit 应为 hour/day/week:$it") }
+        request.defaultStartOffsetMinutes?.let { if (it < 0) throw BadRequestException("defaultStartOffsetMinutes 应 ≥0:$it") }
         val saved =
             projects.save(
                 project.copy(
@@ -217,6 +231,9 @@ class ProjectService(
                     workdayStart = request.workdayStart ?: project.workdayStart,
                     workdayEnd = request.workdayEnd ?: project.workdayEnd,
                     workMode = newMode,
+                    defaultEstimateValue = request.defaultEstimateValue ?: project.defaultEstimateValue,
+                    defaultEstimateUnit = request.defaultEstimateUnit ?: project.defaultEstimateUnit,
+                    defaultStartOffsetMinutes = request.defaultStartOffsetMinutes ?: project.defaultStartOffsetMinutes,
                 ),
             )
         return get(saved.key)
@@ -509,6 +526,10 @@ data class UpdateProjectSettingsRequest(
     val workdayEnd: String? = null,
     /** YPJ-226(spec 0163):轴制式(work/wall;null=不改)。 */
     val workMode: String? = null,
+    /** YPJ-216(spec 0164):组拉入缺省(null=不改)。 */
+    val defaultEstimateValue: String? = null,
+    val defaultEstimateUnit: String? = null,
+    val defaultStartOffsetMinutes: Long? = null,
 )
 
 /** YPJ-226(spec 0163):新建项目缺省工作制;存量迁移默认 wall(V68)。 */

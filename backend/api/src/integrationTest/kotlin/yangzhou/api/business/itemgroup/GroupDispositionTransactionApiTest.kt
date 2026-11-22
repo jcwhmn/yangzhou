@@ -45,13 +45,26 @@ class GroupDispositionTransactionApiTest : AbstractApiTest() {
         itemId: String,
         groupId: String?,
         groupType: String? = null,
-    ) = authed
-        .put()
-        .uri("/api/items/$itemId/group-membership")
-        .body(mapOf("groupId" to groupId, "groupType" to groupType))
-        .exchange()
-        .expectBody(String::class.java)
-        .returnResult()
+    ): JsonNode {
+        // YPJ-216(spec 0164):拉入 sprint 需预估硬校验,先补预估
+        authed
+            .patch()
+            .uri("/api/items/$itemId")
+            .body(mapOf("estimateValue" to "3", "estimateUnit" to "hour"))
+            .exchange()
+            .expectStatus()
+            .isOk()
+        return json.readTree(
+            authed
+                .put()
+                .uri("/api/items/$itemId/group-membership")
+                .body(mapOf("groupId" to groupId, "groupType" to groupType))
+                .exchange()
+                .expectBody(String::class.java)
+                .returnResult()
+                .responseBody!!,
+        )
+    }
 
     private fun get(
         authed: RestTestClient,

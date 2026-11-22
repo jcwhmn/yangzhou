@@ -633,6 +633,8 @@ class ItemGroupService(
         if (target != null) {
             if (target.status in finalNames) throw ConflictException("组已完成,不能指派")
             if (stale.isEmpty() && live.size == 1 && live[0].groupObjectId == target.objectId) {
+                // YPJ-216(用户 2026-11-23 拍板 A):幂等重拉也过守卫——存量成员无日期则补铺,有显式日期原样保留
+                if (t.timed) itemService.applySprintPullSchedule(item)
                 return itemService.get(itemObjectId)
             }
         }
@@ -643,6 +645,8 @@ class ItemGroupService(
         if (target != null && live.none { it.groupObjectId == target.objectId }) {
             memberships.save(ItemGroupMember(groupObjectId = target.objectId!!, itemObjectId = item.objectId!!))
             memberHistory.recordAdd(target.objectId!!, item.objectId!!, clock.instant())
+            // YPJ-216(spec 0164):timed sprint 拉入排期守卫(同事务)
+            if (t.timed) itemService.applySprintPullSchedule(item)
         }
         return itemService.get(itemObjectId)
     }
@@ -670,6 +674,8 @@ class ItemGroupService(
                 if (rows.none { it.groupObjectId == target.objectId }) {
                     memberships.save(ItemGroupMember(groupObjectId = target.objectId!!, itemObjectId = item.objectId!!))
                     memberHistory.recordAdd(target.objectId!!, item.objectId!!, clock.instant())
+                    // YPJ-216(spec 0164):看板拉入自动挂 sprint,同排期守卫
+                    itemService.applySprintPullSchedule(item)
                 }
             }
         } else {
