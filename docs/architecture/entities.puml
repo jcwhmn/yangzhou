@@ -26,6 +26,8 @@ class Project {
   name: String
   estimateScales: TEXT? = JSON [{key,label,value,unit}] (null=内置默认)
   estimateRequired: Boolean = false
+  workday: HH:mm 窗(缺省 00:00–24:00 全天)
+  workMode ∈ {work, wall} = wall(YPJ-226)
 }
 class ProjectMember
 class Status {

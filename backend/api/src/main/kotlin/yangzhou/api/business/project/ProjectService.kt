@@ -120,6 +120,8 @@ class ProjectService(
         /** YPJ-208(spec 0138 切片 b):工作日历(HH:mm)。 */
         val workdayStart: String,
         val workdayEnd: String,
+        /** YPJ-226(spec 0163):work=工作制(跳周末) / wall=墙钟制。 */
+        val workMode: String,
         val statuses: List<StatusDto>,
     )
 
@@ -127,7 +129,7 @@ class ProjectService(
     fun create(key: String, name: String): ProjectDto {
         if (projects.existsByKey(key)) throw ConflictException("项目 key 已存在:$key")
         val workspaceObjectId = workspaceService.required().objectId!!
-        val project = projects.save(Project(workspaceObjectId = workspaceObjectId, key = key, name = name))
+        val project = projects.save(Project(workspaceObjectId = workspaceObjectId, key = key, name = name, workMode = WORK_MODE_DEFAULT))
         // 默认 workflow:To Do / In Progress / In Review / QA / Done(final)——模板系统的最小预置(V7 5 列)
         val saved = defaultStatuses(project.objectId!!).map { statuses.save(it) }
         seedDefaultRules(project.objectId!!, saved)
@@ -172,6 +174,7 @@ class ProjectService(
             project.estimateScales == null,
             project.workdayStart,
             project.workdayEnd,
+            project.workMode,
             statusDtos,
         )
     }
@@ -196,6 +199,9 @@ class ProjectService(
         if (!fullDay && java.time.LocalTime.parse(newWs).toSecondOfDay() / 60L >= endMinutes(newWe)) {
             throw BadRequestException("workdayStart 必须早于 workdayEnd($newWs >= $newWe)")
         }
+        // YPJ-226(spec 0163):制式校验(work/wall);窗口与制式正交——工作制+全天窗 = 只跳周末,合法
+        val newMode = request.workMode ?: project.workMode
+        if (newMode !in listOf("work", "wall")) throw BadRequestException("workMode 应为 work 或 wall:$newMode")
         val saved =
             projects.save(
                 project.copy(
@@ -210,6 +216,7 @@ class ProjectService(
                     estimateRequired = request.estimateRequired ?: project.estimateRequired,
                     workdayStart = request.workdayStart ?: project.workdayStart,
                     workdayEnd = request.workdayEnd ?: project.workdayEnd,
+                    workMode = newMode,
                 ),
             )
         return get(saved.key)
@@ -500,4 +507,10 @@ data class UpdateProjectSettingsRequest(
     /** YPJ-208(spec 0138 切片 b):工作日历(HH:mm;null=不改)。 */
     val workdayStart: String? = null,
     val workdayEnd: String? = null,
+    /** YPJ-226(spec 0163):轴制式(work/wall;null=不改)。 */
+    val workMode: String? = null,
 )
+
+/** YPJ-226(spec 0163):新建项目缺省工作制;存量迁移默认 wall(V68)。 */
+internal const val WORK_MODE_DEFAULT = "work"
+internal const val WORK_MODE_WORK = "work"

@@ -14,6 +14,10 @@ class WorkdayCalculatorUnitTest {
 
     private val fullDay = WorkdayCalculator(LocalTime.MIDNIGHT, LocalTime.MIDNIGHT)
 
+    // ---------- YPJ-226(spec 0163):工作制 skipWeekends=true(2026-11-20 周五/周一为 11-23/11-25... 用 2026-11 例:11-20=周五,11-21=周六,11-22=周日,11-23=周一) ----------
+
+    private val workMode = WorkdayCalculator(LocalTime.of(9, 0), LocalTime.of(18, 0), skipWeekends = true)
+
     @Test
     fun `全天窗 dueFrom 等于钟表加法——跨零点不折断`() {
         assertEquals(
@@ -35,6 +39,45 @@ class WorkdayCalculatorUnitTest {
         assertEquals(
             LocalDateTime.of(2026, 11, 18, 0, 0),
             fullDay.dueFrom(LocalDateTime.of(2026, 11, 17, 0, 0), 24.0),
+        )
+    }
+
+    @Test
+    fun `工作制周五尾量不足——跳周末落到周一`() {
+        // 周五 11-20 16:00 剩 2h,当日只余 2h?——用 17:00 起 1h:当日余 1h 恰铺满收工?改为 4h 跨周末
+        assertEquals(
+            LocalDateTime.of(2026, 11, 23, 12, 0),
+            workMode.dueFrom(LocalDateTime.of(2026, 11, 20, 17, 0), 4.0),
+        )
+    }
+
+    @Test
+    fun `工作制 start 落周六——钳到周一开工`() {
+        assertEquals(
+            LocalDateTime.of(2026, 11, 23, 13, 0),
+            workMode.dueFrom(LocalDateTime.of(2026, 11, 21, 10, 0), 4.0),
+        )
+    }
+
+    @Test
+    fun `工作制 hoursBetween 不计周末`() {
+        // 周五 18:00 后到周一 09:00:0;周五 16:00→周一 13:00 = 2h + 4h
+        assertEquals(
+            0.0,
+            workMode.hoursBetween(LocalDateTime.of(2026, 11, 20, 18, 0), LocalDateTime.of(2026, 11, 23, 9, 0)),
+        )
+        assertEquals(
+            6.0,
+            workMode.hoursBetween(LocalDateTime.of(2026, 11, 20, 16, 0), LocalDateTime.of(2026, 11, 23, 13, 0)),
+        )
+    }
+
+    @Test
+    fun `全天窗加跳周末——铺算跨周末顺延周一,窗口正交 spec 0163`() {
+        val fullDaySkip = WorkdayCalculator(LocalTime.MIDNIGHT, LocalTime.MIDNIGHT, skipWeekends = true)
+        assertEquals(
+            LocalDateTime.of(2026, 11, 24, 10, 0),
+            fullDaySkip.dueFrom(LocalDateTime.of(2026, 11, 20, 10, 0), 48.0),
         )
     }
 

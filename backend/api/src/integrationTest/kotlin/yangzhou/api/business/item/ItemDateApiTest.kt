@@ -11,6 +11,14 @@ class ItemDateApiTest : AbstractApiTest() {
     private fun setup(): Pair<RestTestClient, String> {
         val authed = bootstrapAndAuth()
         createProject(authed, "CHE")
+        // YPJ-226(spec 0163):新建项目默认工作制;本文件测墙钟制既有语义,显式回 wall
+        authed
+            .patch()
+            .uri("/api/projects/CHE/settings")
+            .body(mapOf("workMode" to "wall"))
+            .exchange()
+            .expectStatus()
+            .isOk()
         val itemId = createItem(authed, "CHE", "x")["itemId"].asText()
         return authed to itemId
     }
@@ -335,5 +343,32 @@ class ItemDateApiTest : AbstractApiTest() {
         val d = detail(authed, itemId)
         assertEquals("2026-11-23T00:00", d["startDate"].asText())
         assertEquals("2026-12-02T23:59:59", d["dueDate"].asText())
+    }
+
+    /** YPJ-226(spec 0163):工作制项目 schedule 铺算跳周末——周五起 10h 窗 9-18 → due 落周一 10:00。 */
+    @Test
+    fun `工作制项目 start 加 estimate 铺算跳周末`() {
+        val authed = bootstrapAndAuth()
+        createProject(authed, "WMD", "workmode")
+        authed
+            .patch()
+            .uri("/api/projects/WMD/settings")
+            .body(mapOf("workMode" to "work", "workdayStart" to "09:00", "workdayEnd" to "18:00"))
+            .exchange()
+            .expectStatus()
+            .isOk()
+        val itemId = createItem(authed, "WMD", "x")["itemId"].asText()
+
+        // 2026-11-20=周五:09:00 起 9h 当日铺满(收工 18:00),余 1h 跳周末 → 周一 11-23 10:00
+        authed
+            .patch()
+            .uri("/api/items/$itemId")
+            .body(mapOf("startDate" to "2026-11-20", "estimateValue" to "10", "estimateUnit" to "hour"))
+            .exchange()
+            .expectStatus()
+            .isOk()
+        val d = detail(authed, itemId)
+        assertEquals("2026-11-20T09:00", d["startDate"].asText())
+        assertEquals("2026-11-23T10:00", d["dueDate"].asText())
     }
 }
