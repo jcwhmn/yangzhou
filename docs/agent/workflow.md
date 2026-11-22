@@ -14,6 +14,10 @@
 
 ① 每个新 item 建票必带预估时长(estimateValue+estimateUnit);② item 进 sprint(backlog 拉入或建票直挂)必设预计开始时间,结束时间 = 开始 + 预估工作时长换算(DATE 粒度:不足一天=当天,跨天进一);③ 这是 dogfood 流程纪律兼未来系统强约束的先行版(甘特计划线需要,见 `docs/requirement/甘特图 SRS.md`);④ CLI 缺口(建票 --estimate、items 排期命令)见 YPJ-207,补齐前用 API 直调设置,不得留空。
 
+## 复杂票拆解(2026-11-22 用户定)
+
+复杂票(多端/多面、预估超一个会话)**用子 item 拆**:父票下建子 item(每子票带预估时长、挂当前 sprint),一子票一分支一 PR,各自走完 In Progress→In Review→Done;父票随子票全 Done 而 Done。**不做同票多切片连续 PR**(2026-11-22 YPJ-226 特例获用户同意,仅限该票,不复用)。
+
 ## sprint 收口
 
 sprint 全部票 Done 时,主动提醒用户做 sprint 收口/handoff(由用户执行);handoff 换届将 `.scratch/handoff/CURRENT.md` 挪 `.scratch/handoff/archive/YYYY-MM-DD-YPJ-N.md`,不覆盖。
