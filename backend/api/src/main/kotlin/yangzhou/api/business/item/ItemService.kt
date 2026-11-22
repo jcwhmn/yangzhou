@@ -593,10 +593,14 @@ class ItemService(
         explicitStart: LocalDateTime? = null,
         explicitDue: LocalDateTime? = null,
     ): Item {
-        if (item.estimateValue == null || item.estimateUnit == null) {
-            throw ConflictException("拉入 sprint 须先填预估时长(estimateValue + estimateUnit)")
-        }
         val project = projects.findByObjectId(item.projectObjectId) ?: return item
+        if (item.estimateValue == null || item.estimateUnit == null) {
+            // YPJ-216(SRS 4.1):仅「预估必填」项目拒绝;非必填放行(不铺算,存量日期不动;甘特按缺省画图)
+            if (project.estimateRequired) {
+                throw ConflictException("拉入组须先填预估时长(estimateValue + estimateUnit)")
+            }
+            return item
+        }
         val (ws, we) = workdayBounds(project)
         val workMode = project.workMode == "work"
         val calc = WorkdayCalculator(ws, we, skipWeekends = workMode)

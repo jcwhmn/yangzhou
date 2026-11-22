@@ -376,22 +376,22 @@ test("父自有日期不撑轴(YPJ-220 反馈):轴取子孙并集,忽略父自�
   await expect(page.getByTestId("gantt-row-day")).toBeVisible();
 });
 
-test("无 due 的 item 画起点小标记,不外延到轴末端(YPJ-220 反馈)", async ({
+test("无预估票画缺省条(项目缺省预估),不外延到轴末端(YPJ-220/SRS 4.4)", async ({
   page,
   projectKey,
 }) => {
-  // 无预估:spec 0151 case3(仅锚无长度)→ 起点小标记;带预估会变 case4 铺算条。本票不进 sprint,无需预估
+  // SRS 4.4:无预估 → 项目缺省预估(未设→中档 5day)画条;不再有「仅锚无长度」形态
   const item = await apiCreateItem(projectKey, "E2E 仅开始");
   await apiCall("PATCH", `/api/items/${item}`, { startDate: "2020-03-01" });
 
   await page.goto(`/p/${projectKey}/gantt`);
   await pickScope(page, "全部");
   await expect(page.getByText("E2E 仅开始")).toBeVisible();
-  // 本项目仅此一条已排期行;若仍外延到轴末端,条宽会是数百 px
+  // 本项目仅此一条已排期行;缺省条 = start+缺省预估铺算,非整轴外延
   const bar = page.locator('[data-testid^="gantt-bar-"]');
   await expect(bar).toHaveCount(1);
   const w = await bar.evaluate((el) => el.getBoundingClientRect().width);
-  expect(w).toBeLessThan(20);
+  expect(w).toBeGreaterThan(3);
 });
 
 // YPJ-229 回归(转正用例):今日=当前时刻居中;挂起补放段随日窗预设删除(YPJ-256)
@@ -878,7 +878,7 @@ test("工时填充+完成点+依赖锚点+实际层解耦(YPJ-244)", async ({
   await apiAssignMe(b);
   await apiCall("PATCH", `/api/items/${b}`, { statusItemId: finalId });
 
-  // 丙(#3):无 start 无 due,依赖甲(甲有 due)→ 锚点位画点(H6)
+  // 丙:无 start 无 due,依赖甲(甲有 due)→ SRS 4.4:有缺省长度 → 画缺省条(自锚点起),不再画点(H6 形态由缺省层取代)
   const c = await apiCreateItem(projectKey, "E2E 锚点丙");
   await apiCall("POST", `/api/items/${c}/dependencies`, {
     dependsOnItemId: a,
@@ -917,12 +917,13 @@ test("工时填充+完成点+依赖锚点+实际层解耦(YPJ-244)", async ({
     row(2).getByTestId(`gantt-actual-${projectKey}-2`),
   ).toBeVisible();
 
-  // 丙:锚点位画点(无 start 无 due 有 anchorDate)
+  // 丙:缺省条在(锚点起 + 缺省预估长度);anchor 点形态由缺省层取代
+  await expect(page.getByText("E2E 锚点丙").first()).toBeVisible();
   await expect(
     row(3).getByTestId(`gantt-anchor-${projectKey}-3`),
-  ).toBeVisible();
+  ).toHaveCount(0);
 
-  // 丁:三无进行中(case1)=黄条 actualStart→今天(§五 颜色2),无计划层点
+  // 丁:三无进行中 = 黄条 actualStart→今天(实际层);计划层已是缺省条(不再有 plandot)
   await expect(
     row(4).getByTestId(`gantt-actual-${projectKey}-4`),
   ).toBeVisible();
@@ -953,7 +954,7 @@ test("group 锚:case1 group 点 + case2 group 起铺算条(YPJ-244)", async ({
     estimateValue: 4,
     estimateUnit: "hour",
   });
-  // C2(#3):三无(case1 未开始)→ 蓝点 @ group 开始
+  // C2(#3):三无(原 case1)→ SRS 4.4 缺省画图:缺省条 @ group 开始(偏移缺省 0),不再画 group 点
   await apiCall("POST", `/api/projects/${projectKey}/items`, {
     title: "E2E 三无子",
     parentItemId: parent,
@@ -971,10 +972,14 @@ test("group 锚:case1 group 点 + case2 group 起铺算条(YPJ-244)", async ({
     .getByTestId(`gantt-bar-${projectKey}-2`)
     .evaluate((el) => (el.firstElementChild as HTMLElement).offsetWidth);
   expect(w).toBeGreaterThan(3);
-  // C2:group 点在
+  // C2:缺省条在(无预估 → 项目缺省预估铺算,宽度>3px 非零点);group 点已废
+  const w2 = await row(3)
+    .getByTestId(`gantt-bar-${projectKey}-3`)
+    .evaluate((el) => (el.firstElementChild as HTMLElement).offsetWidth);
+  expect(w2).toBeGreaterThan(3);
   await expect(
     row(3).getByTestId(`gantt-grouppoint-${projectKey}-3`),
-  ).toBeVisible();
+  ).toHaveCount(0);
 });
 
 // 钟表轴线性(2026-11-20 拍板):同起点 8h vs 4h,计划条宽 2:1

@@ -185,6 +185,10 @@ data class Project(
     val workdayEnd: String = "24:00",
     /** YPJ-226(spec 0163):轴制式 work=工作制(跳周末,真窗) / wall=墙钟制(钟表线性);存量默认 wall,新建 API 缺省 work。 */
     val workMode: String = "wall",
+    /** YPJ-216(spec 0164):组拉入缺省——甘特缺省画图输入;null=未设置(回退:预估取刻度中档,偏移取 0)。 */
+    val defaultEstimateValue: String? = null,
+    val defaultEstimateUnit: String? = null,
+    val defaultStartOffsetMinutes: Long? = null,
     @CreatedDate
     var createdAt: Instant = Instant.now(),
     @LastModifiedDate

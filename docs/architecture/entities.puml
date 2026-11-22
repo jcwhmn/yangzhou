@@ -28,6 +28,7 @@ class Project {
   estimateRequired: Boolean = false
   workday: HH:mm 窗(缺省 00:00–24:00 全天)
   workMode ∈ {work, wall} = wall(YPJ-226)
+  defaultEstimate: value+unit? / startOffsetMinutes?(YPJ-216 组拉入缺省,null=回退中档/组开始)
 }
 class ProjectMember
 class Status {

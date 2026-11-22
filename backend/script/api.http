@@ -567,8 +567,8 @@ Content-Type: application/json
     client.global.set("itemIdSprint", response.body.itemId);
  %}
 
-### YPJ-216(spec 0164):拉入排期守卫——直入 sprint 的票无预估 → 409
-### (预期 409:响应含「拉入 sprint 须先填预估」;同事务不落库)
+### YPJ-216(spec 0164):拉入排期守卫——预估必填项目,直入组的票无预估 → 409
+### (前置:PATCH settings {"estimateRequired":true};预期 409:响应含「拉入组须先填预估」;同事务不落库)
 POST {{host}}/api/projects/{{pkey}}/items
 Authorization: Bearer {{token}}
 Content-Type: application/json
@@ -579,7 +579,18 @@ Content-Type: application/json
   "groupType": "sprint"
 }
 
-### YPJ-216:有预估票直入 sprint → 200,start=今天,due=铺算回填(响应含 startDate/dueDate)
+### YPJ-216(spec 0164):组拉入缺省设置(甘特缺省画图输入;null=不改,未设置渲染回退中档/组开始)
+PATCH {{host}}/api/projects/{{pkey}}/settings
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "defaultEstimateValue": "3",
+  "defaultEstimateUnit": "day",
+  "defaultStartOffsetMinutes": 60
+}
+
+### YPJ-216:有预估票直入组 → 200,start=今天,due=铺算回填(响应含 startDate/dueDate)
 ### (前端:先建无日期票再 PUT membership 亦可;此处验证 create 直挂路径)
 POST {{host}}/api/projects/{{pkey}}/items
 Authorization: Bearer {{token}}

@@ -14,6 +14,11 @@ import { hmToMin } from "../utils/timeCalculations";
 export function useGanttData(key: string, scope: string, scopeIds: string[]) {
   const [rows, setRows] = useState<GanttRow[] | null>(null);
   const [wd, setWd] = useState<[number, number, boolean] | null>(null); // 五:工作日历窗(分钟;默认 09:00-18:00)+ 工作制跳周末(YPJ-226 spec 0163)
+  const [pullDefault, setPullDefault] = useState<{
+    estV: number;
+    estU: string;
+    offMin: number;
+  } | null>(null); // YPJ-216:甘特缺省画图输入
   const loadSeqRef = useRef(0); // 响应序号守卫:切范围后慢响应晚到不覆盖新状态
 
   // 范围二级选项(group/milestone/release;列表 API 均返回裸数组)。ms/rel 取全 DTO(YPJ-221 竖线旗标复用同一响应)
@@ -43,12 +48,28 @@ export function useGanttData(key: string, scope: string, scopeIds: string[]) {
       api<{ rows: GanttRow[] }>(
         `/api/projects/${key}/gantt${q ? `?${q}` : ""}`,
       ),
-      api<{ workdayStart: string; workdayEnd: string; workMode: string }>(
-        `/api/projects/${key}`,
-      ),
+      api<{
+        workdayStart: string;
+        workdayEnd: string;
+        workMode: string;
+        estimateScales: { key: string; value: number; unit: string }[];
+        defaultEstimateValue: string | null;
+        defaultEstimateUnit: string | null;
+        defaultStartOffsetMinutes: number | null;
+      }>(`/api/projects/${key}`),
     ]);
     if (seq !== loadSeqRef.current) return; // 已有更新的范围请求,丢弃过期响应
     setRows(data.rows);
+    // YPJ-216(SRS 4.4):缺省预估 = 项目设置 → 刻度「m」档 → 内置默认 5day;偏移缺省 0
+    const scales = proj.estimateScales ?? [];
+    const m = scales.find((s) => s.key === "m");
+    const estV = Number(proj.defaultEstimateValue ?? m?.value ?? 5);
+    const estU = proj.defaultEstimateUnit ?? m?.unit ?? "day";
+    setPullDefault({
+      estV,
+      estU,
+      offMin: proj.defaultStartOffsetMinutes ?? 0,
+    });
     setWd([
       hmToMin(proj.workdayStart),
       hmToMin(proj.workdayEnd),
@@ -92,5 +113,5 @@ export function useGanttData(key: string, scope: string, scopeIds: string[]) {
     [rowById],
   );
 
-  return { rows, wd, groupOpts, msOpts, relOpts, groupStartOf };
+  return { rows, wd, pullDefault, groupOpts, msOpts, relOpts, groupStartOf };
 }

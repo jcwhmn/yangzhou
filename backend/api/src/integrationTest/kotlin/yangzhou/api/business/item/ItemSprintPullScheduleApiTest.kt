@@ -111,8 +111,19 @@ class ItemSprintPullScheduleApiTest : AbstractApiTest() {
             .responseBody!!,
     )
 
+    /** YPJ-216(SRS 4.1):预估必填项目——无预估拒绝;项目设置 estimatesRequired=true。 */
+    private fun requireEstimate(authed: RestTestClient) {
+        authed
+            .patch()
+            .uri("/api/projects/SPG/settings")
+            .body(mapOf("estimateRequired" to true))
+            .exchange()
+            .expectStatus()
+            .isOk()
+    }
+
     @Test
-    fun `幂等重拉也过守卫——存量成员无日期补铺,无预估重拉 409`() {
+    fun `幂等重拉也过守卫——存量成员无日期补铺,必填无预估重拉 409`() {
         val authed = setup()
         val sid = sprint(authed)
         // 已是成员、日期被清空的存量票:重拉 → 早退分支也走守卫,补铺 start/due
@@ -126,20 +137,33 @@ class ItemSprintPullScheduleApiTest : AbstractApiTest() {
         pull(authed, id, sid) // 幂等重拉
         assertTrue(!detail(authed, id)["startDate"].isNull, "重拉应补铺日期")
 
-        // 已是成员但预估被清:重拉 → 409(守卫在早退分支同样生效)
+        // 已是成员但预估被清(在开必填前清,避免立票侧校验拦截):必填项目重拉 → 409(守卫在早退分支同样生效)
         val id2 = item(authed, "成员清预估票", "2" to "hour")
         pull(authed, id2, sid)
         patch(authed, id2, mapOf("estimateValue" to "", "estimateUnit" to ""))
+        requireEstimate(authed)
         pull(authed, id2, sid, expect = 409)
     }
 
     @Test
-    fun `无预估拉入 409`() {
+    fun `必填项目无预估拉入 409`() {
         val authed = setup()
         val sid = sprint(authed)
-        val id = item(authed, "无预估票")
+        val id = item(authed, "无预估票") // 必填开启前建票(立票侧校验 YPJ-186 另拦)
+        requireEstimate(authed)
         pull(authed, id, sid, expect = 409)
         assertTrue(detail(authed, id)["startDate"].isNull) // 无预估不落任何日期
+    }
+
+    @Test
+    fun `非必填项目无预估拉入放行——不铺算日期,存量日期不动`() {
+        val authed = setup() // 新建项目默认 estimateRequired=false
+        val sid = sprint(authed)
+        val id = item(authed, "非必填无预估票")
+        pull(authed, id, sid)
+        val d = detail(authed, id)
+        assertTrue(d["startDate"].isNull, "放行不铺算")
+        assertTrue(d["dueDate"].isNull)
     }
 
     @Test

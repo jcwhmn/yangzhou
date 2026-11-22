@@ -70,6 +70,10 @@ export function ProjectSettingsPanel({
   const [scalesIsDefault, setScalesIsDefault] = useState(true);
   const [newIdx, setNewIdx] = useState<number[]>([]); // 本次新增行:key 可编辑;已存档 key 是稳定标识锁定
   const [required, setRequired] = useState(false);
+  // YPJ-216(spec 0164):组拉入缺省——甘特缺省画图输入;留空 = 未设置(回退中档/组开始)
+  const [defV, setDefV] = useState("");
+  const [defU, setDefU] = useState("hour");
+  const [defOff, setDefOff] = useState("");
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState("");
   // 同轮 open 去重 + 首响落定:负载下 effect 可能重入,后到的重复响应不得冲值
@@ -94,6 +98,9 @@ export function ProjectSettingsPanel({
       estimateScales: EstimateScale[];
       estimateScalesIsDefault: boolean;
       estimateRequired: boolean;
+      defaultEstimateValue: string | null;
+      defaultEstimateUnit: string | null;
+      defaultStartOffsetMinutes: number | null;
     }>(`/api/projects/${projectKey}`)
       .then((p) => {
         if (settled.current) return;
@@ -104,6 +111,9 @@ export function ProjectSettingsPanel({
         setScalesIsDefault(p.estimateScalesIsDefault);
         setNewIdx([]);
         setRequired(p.estimateRequired);
+        setDefV(p.defaultEstimateValue ?? "");
+        setDefU(p.defaultEstimateUnit ?? "hour");
+        setDefOff(p.defaultStartOffsetMinutes?.toString() ?? "");
         setLoaded(true);
       })
       .catch(() => {
@@ -131,6 +141,9 @@ export function ProjectSettingsPanel({
           milestoneEnabled: milestone,
           estimateScales: scales,
           estimateRequired: required,
+          defaultEstimateValue: defV || null,
+          defaultEstimateUnit: defV ? defU : null,
+          defaultStartOffsetMinutes: defOff ? Number(defOff) : null,
         }),
       });
       setError("");
@@ -288,6 +301,37 @@ export function ProjectSettingsPanel({
               }
               label={t.settings.estimateRequired}
             />
+            {/* YPJ-216:组拉入缺省(甘特缺省画图;留空=回退中档/组开始) */}
+            <Stack direction="row" spacing={1} alignItems="center">
+              <TextField
+                size="small"
+                label="缺省预估(拉入/画图)"
+                value={defV}
+                onChange={(e) => setDefV(e.target.value)}
+                sx={{ width: 170 }}
+              />
+              <TextField
+                size="small"
+                select
+                label="单位"
+                value={defU}
+                onChange={(e) => setDefU(e.target.value)}
+                sx={{ width: 100 }}
+              >
+                {["hour", "day", "week"].map((u) => (
+                  <MenuItem key={u} value={u}>
+                    {u}
+                  </MenuItem>
+                ))}
+              </TextField>
+              <TextField
+                size="small"
+                label="组开始偏移(分钟)"
+                value={defOff}
+                onChange={(e) => setDefOff(e.target.value.replace(/[^0-9]/g, ""))}
+                sx={{ width: 150 }}
+              />
+            </Stack>
             <Alert severity="info" variant="outlined" sx={{ py: 0.5 }}>
               {t.settings.hint}
             </Alert>
