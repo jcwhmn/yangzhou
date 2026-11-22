@@ -2,7 +2,6 @@ package yangzhou.api.business.item
 
 import org.springframework.test.web.servlet.client.RestTestClient
 import yangzhou.api.AbstractApiTest
-import java.time.LocalDate
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -133,7 +132,7 @@ class ItemSprintPullScheduleApiTest : AbstractApiTest() {
         val due = java.time.LocalDateTime.parse(d["dueDate"].asText())
         assertTrue(!start.isBefore(java.time.LocalDateTime.now().minusMinutes(1)), "start 应为现在/未来:$start")
         assertTrue(due.isAfter(start), "due 应晚于 start")
-        assertTrue(java.time.Duration.between(start, due).toMinutes() == 480L, "8h 铺算:${start}~${due}")
+        assertTrue(java.time.Duration.between(start, due).toMinutes() == 480L, "8h 铺算:$start~$due")
     }
 
     @Test
