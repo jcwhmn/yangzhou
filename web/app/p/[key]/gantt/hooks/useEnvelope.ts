@@ -8,7 +8,7 @@ import { dueFromJs, estimateHoursOf } from "../utils/timeCalculations";
  * collapsed 状态留入口;hiddenByCollapse/isCompletedRow 仅内部消费不暴露。 */
 export function useEnvelope(opts: {
   rows: GanttRow[] | null;
-  wd: [number, number] | null;
+  wd: [number, number, boolean] | null;
   groupStartOf: (r: GanttRow) => string | null;
   collapsed: Set<string>;
 }) {
@@ -44,7 +44,10 @@ export function useEnvelope(opts: {
               ? +parseLocal(x.dueDate) +
                 (/^\d{4}-\d{2}-\d{2}$/.test(x.dueDate) ? DAY : 0)
               : null;
-          const estEnd = estH !== null ? dueFromJs(a, estH, wsm, wem) : null;
+          const estEnd =
+            estH !== null
+              ? dueFromJs(a, estH, wsm, wem, wd?.[2] ?? false)
+              : null;
           if (dueEnd !== null || estEnd !== null)
             consider(a, Math.max(a, dueEnd ?? estEnd!));
           else consider(a, a); // 计划点:零宽(case1 借锚点 / case3b)

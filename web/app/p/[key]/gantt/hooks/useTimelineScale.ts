@@ -18,7 +18,7 @@ import { dueFromJs, estimateHoursOf } from "../utils/timeCalculations";
  * summaryOf 经参数注入:轴范围与父行包络同源口径(SRS §7.3);zoom/center 状态留入口,本 hook 只封装行为。 */
 export function useTimelineScale(opts: {
   rows: GanttRow[] | null;
-  wd: [number, number] | null;
+  wd: [number, number, boolean] | null;
   zoom: number | null;
   setZoom: (z: number | null) => void;
   center: string;
@@ -49,10 +49,11 @@ export function useTimelineScale(opts: {
   const axis = useMemo(() => {
     const today = new Date();
     const rowsNow = rows ?? [];
+    const skipWk = wd?.[2] ?? false; // YPJ-226(spec 0163):工作制=跳周末(折叠几何)
     // 轴数据锚定与画条同口径(spec 0139/0140):父行自有日期忽略不画,取子孙排期并集;子行取自有日期
     const isParent = (r: GanttRow) =>
       rowsNow.some((x) => x.parentItemId === r.itemId);
-    const wsm = wd?.[0] ?? 0; // SRS v4 §3.2:缺省 24h 全天窗
+    const wsm = wd?.[0] ?? 0; // SRS v4 §3.2:缺省 24h 全天窗;YPJ-226 工作制窗口正交(全天窗+跳周末=只折周末)
     const wem = wd?.[1] ?? 1440;
     const dates = rowsNow.flatMap((r) => {
       // YPJ-222(spec 0147):轴范围纳入实际起止——实际条超出计划区间时不被裁出画面
@@ -94,50 +95,110 @@ export function useTimelineScale(opts: {
     const end = new Date(maxT);
     end.setHours(0, 0, 0, 0);
     const endT = +end + DAY; // 末日 24:00
-    const spanDays = Math.max((endT - +start) / DAY, 1);
+    // YPJ-226(spec 0163):工作制轴=折叠几何——非工作时段(周末+窗)零宽度。
+    // segs = 逐工作日的窗区间(ms 自轴起);cum[i] = 第 i 段前的累计工作毫秒;W = 总工作毫秒。
+    const segs: { s: number; e: number }[] = [];
+    if (skipWk) {
+      for (let t = +start; t < endT; t += DAY) {
+        const dow = new Date(t).getDay();
+        if (dow === 0 || dow === 6) continue;
+        segs.push({ s: t + wsm * 60000, e: t + wem * 60000 });
+      }
+    }
+    const cum: number[] = [];
+    let workMs = 0;
+    for (const g of segs) {
+      cum.push(workMs);
+      workMs += g.e - g.s;
+    }
+    // 缩放单位:wall=pxPerDay(每钟表日)/ work=每工作日(窗时长)。两模式共用同一钳界常量。
+    const winMs = (wem - wsm) * 60000 || DAY;
+    const spanDays = skipWk
+      ? Math.max(workMs / winMs, 1) // 工作日数
+      : Math.max((endT - +start) / DAY, 1);
     const fit = containerW > 0 ? containerW / spanDays : 20;
-    // 缺省态(zoom=null)= fit 但带下限(YPJ-234);显式 zoom 仍 clamp [fit, MAX]
     const pxPerDay = Math.min(
       Math.max(zoom ?? Math.max(fit, GANTT_MIN_PPD), fit),
       MAX_PPD,
     );
     const timelineW = spanDays * pxPerDay;
-    // 轴 = 24h 钟表线性(2026-11-20 用户拍板:「满辐 48h、8h=1/6」;工作窗轴同日否决回退,A28 台账)
-    const xOfT = (t: number) => ((t - +start) / DAY) * pxPerDay;
+    // 唯一坐标函数:t→x。wall=钟表线性(原式);work=累计工作毫秒×pxPerMs(段外鍲到邻段)。
+    const pxPerMs = pxPerDay / winMs;
+    const tToX = (t: number): number => {
+      if (!skipWk || segs.length === 0) return ((t - +start) / DAY) * pxPerDay;
+      const tc = Math.min(
+        Math.max(t, segs[0]?.s ?? +start),
+        segs[segs.length - 1]?.e ?? endT,
+      );
+      let lo = 0;
+      let hi = segs.length - 1;
+      while (lo < hi) {
+        const mid = (lo + hi + 1) >> 1;
+        if (segs[mid].s <= tc) lo = mid;
+        else hi = mid - 1;
+      }
+      const g = segs[lo];
+      const inSeg = tc >= g.s ? tc - g.s : 0;
+      return (cum[lo] + inSeg) * pxPerMs;
+    };
 
-    // 两级刻度:细刻度(小时梯子 1/2/3/6/12h,取间距≥MIN_LABEL_PX 的最小步长);粗行(月/周/日)按段宽门控
+    // 刻度行(YPJ-241 分层):wall=钟表时刻循环;work=逐工作日窗内/窗起点。门控统一用 pxPerDay(每工作日)。
     const rowsOut: HeaderRow[] = [];
-    const pxPerHour = pxPerDay / 24;
-    // 小时行:梯子取最小步长使间距≥MIN_LABEL_PX;无解(极度缩小时)整行丢弃,不吐过密标签
+    const pxPerHour = pxPerDay / (skipWk ? (wem - wsm) / 60 || 24 : 24);
+    // 小时行:梯子取最小步长使间距≥MIN_LABEL_PX;wall=钟表循环 / work=逐工作日窗内(无解整行丢弃)
     const stepH = [1, 2, 3, 6, 12].find((s) => s * pxPerHour >= MIN_LABEL_PX);
     if (pxPerDay >= MIN_LABEL_PX && stepH) {
       const ticks: Tick[] = [];
-      for (let h = 0; h <= spanDays * 24; h += stepH) {
-        const d = new Date(+start + (h * DAY) / 24);
-        const label = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-        ticks.push({
-          x: xOfT(+d),
-          label,
-          key: `h${h}`,
-        });
+      if (skipWk) {
+        for (const g of segs) {
+          for (let h = 0; h < (wem - wsm) / 60; h += stepH) {
+            const t = g.s + h * 3600000;
+            const d = new Date(t);
+            ticks.push({
+              x: tToX(t),
+              label: `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`,
+              key: `h${t}`,
+            });
+          }
+        }
+      } else {
+        for (let h = 0; h <= spanDays * 24; h += stepH) {
+          const d = new Date(+start + (h * DAY) / 24);
+          ticks.push({
+            x: tToX(+d),
+            label: `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`,
+            key: `h${h}`,
+          });
+        }
       }
       rowsOut.push({ gran: "hour", ticks });
     }
-    // 日行:每天一格 MM-DD
+    // 日行:wall=每天 MM-DD / work=每工作日窗起点
     if (pxPerDay >= MIN_LABEL_PX) {
       const ticks: Tick[] = [];
-      for (let t = +start; t < endT; t += DAY) {
-        const d = new Date(t);
-        ticks.push({
-          x: xOfT(t),
-          label: `${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`,
-          key: `d${t}`,
-        });
+      if (skipWk) {
+        for (const g of segs) {
+          const d = new Date(g.s);
+          ticks.push({
+            x: tToX(g.s),
+            label: `${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`,
+            key: `d${g.s}`,
+          });
+        }
+      } else {
+        for (let t = +start; t < endT; t += DAY) {
+          const d = new Date(t);
+          ticks.push({
+            x: tToX(t),
+            label: `${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`,
+            key: `d${t}`,
+          });
+        }
       }
       rowsOut.push({ gran: "day", ticks });
     }
-    // 周行:周一 Wnn
-    if (pxPerDay * 7 >= 90) {
+    // 周行(仅 wall;work 周末零宽度无周界):周一 Wnn
+    if (!skipWk && pxPerDay * 7 >= 90) {
       const first = new Date(+start);
       const dow = (first.getDay() + 6) % 7;
       first.setDate(first.getDate() - dow);
@@ -148,46 +209,59 @@ export function useTimelineScale(opts: {
           ((+d - +new Date(d.getFullYear(), 0, 1)) / DAY + 1) / 7,
         );
         ticks.push({
-          x: xOfT(t),
+          x: tToX(t),
           label: `W${String(week).padStart(2, "0")}`,
           key: `w${t}`,
         });
       }
       rowsOut.push({ gran: "week", ticks });
     }
-    // 月行:日界月首 YYYY-MM
-    if (pxPerDay * 30 >= 70) {
-      const ticks: Tick[] = [];
-      const cur = new Date(+start);
-      cur.setDate(1);
-      while (+cur < endT) {
-        ticks.push({
-          x: xOfT(+cur),
-          label: `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, "0")}`,
-          key: `m${+cur}`,
-        });
-        cur.setMonth(cur.getMonth() + 1);
-      }
-      rowsOut.push({ gran: "month", ticks });
-    }
-    // 保底:极缩小时只留月行(抽稀)
-    if (rowsOut.length === 0) {
-      const stepDays = Math.ceil((MIN_LABEL_PX * 1.5) / pxPerDay / 30) * 30;
+    // 月行:wall=日界月首 / work=月首工作日窗起点(工作日/月≈21)
+    const genMonthTicks = (every: number): Tick[] => {
       const ticks: Tick[] = [];
       const cur = new Date(+start);
       cur.setDate(1);
       let i = 0;
       while (+cur < endT) {
-        if (i % Math.max(stepDays / 30, 1) === 0)
-          ticks.push({
-            x: xOfT(+cur),
-            label: `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, "0")}`,
-            key: `m${+cur}`,
-          });
+        if (i % Math.max(every, 1) === 0) {
+          let tickT: number | null;
+          if (skipWk) {
+            const probe = new Date(+cur);
+            while (
+              +probe < endT &&
+              probe.getMonth() === cur.getMonth() &&
+              (probe.getDay() === 0 || probe.getDay() === 6)
+            )
+              probe.setDate(probe.getDate() + 1);
+            tickT =
+              probe.getMonth() === cur.getMonth() && +probe < endT
+                ? +probe + wsm * 60000
+                : null;
+          } else {
+            tickT = +cur;
+          }
+          if (tickT !== null)
+            ticks.push({
+              x: tToX(tickT),
+              label: `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, "0")}`,
+              key: `m${+cur}`,
+            });
+        }
         cur.setMonth(cur.getMonth() + 1);
         i++;
       }
-      rowsOut.push({ gran: "month", ticks });
+      return ticks;
+    };
+    if (pxPerDay * (skipWk ? 21 : 30) >= 70) {
+      rowsOut.push({ gran: "month", ticks: genMonthTicks(1) });
+    }
+    // 保底:极缩小时只留月行(抽稀)
+    if (rowsOut.length === 0) {
+      const stepDays = Math.ceil((MIN_LABEL_PX * 1.5) / pxPerDay / 30) * 30;
+      rowsOut.push({
+        gran: "month",
+        ticks: genMonthTicks(Math.max(stepDays / 30, 1)),
+      });
     }
     // 最多 3 行:自顶(最粗)丢弃;渲染序 = 粗→细(月在最上,时在最底)
     rowsOut.reverse();
@@ -201,18 +275,20 @@ export function useTimelineScale(opts: {
       fit,
       timelineW,
       headerRows: rowsOut,
-      todayX: xOfT(+today),
+      todayX: tToX(+today),
+      tToX,
     };
   }, [rows, zoom, containerW, wd, groupStartOf, markerDates]);
 
-  // 缩放:锚点(anchorClientX,视口坐标)下的数据时刻保持不动;null 锚 = 视口中心
+  // 缩放:锚点(anchorClientX,视口坐标)下的数据点保持不动;null 锚 = 视口中心。
+  // px 比例缩放(模式无关):x 轴线性(pxPerMs 恒定),直接按比例缩 scrollLeft,无需逆映射。
   const zoomTo = (newPpd: number, anchorClientX?: number) => {
     const el = scrollRef.current;
     if (!el) return;
     const anchorX = anchorClientX ?? el.clientWidth / 2;
-    const dataDays = (el.scrollLeft + anchorX) / axis.pxPerDay;
+    const dataX = el.scrollLeft + anchorX;
     const clamped = Math.min(Math.max(newPpd, axis.fit), MAX_PPD);
-    el.scrollLeft = Math.max(0, dataDays * clamped - anchorX);
+    el.scrollLeft = Math.max(0, (dataX * clamped) / axis.pxPerDay - anchorX);
     setZoom(clamped);
     setTimeout(saveView, 0);
   };
@@ -253,7 +329,7 @@ export function useTimelineScale(opts: {
     const x =
       center === fmtDay(new Date())
         ? axis.todayX
-        : ((+parseLocal(center) - +axis.start) / DAY) * axis.pxPerDay;
+        : axis.tToX(+parseLocal(center));
     el.scrollLeft = Math.max(0, x - el.clientWidth / 2);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [center, axis.pxPerDay, axis.start, axis.todayX, rows]);
@@ -291,23 +367,15 @@ export function useTimelineScale(opts: {
     lastCenterStartRef.current = null;
     setCenter(fmtDay(new Date()));
   };
+  // 坐标函数:统一走轴的 tToX(wall=钟表线性 / work=折叠累计,YPJ-226 spec 0163)
   const xOf = (date: string | null) =>
     date === null
       ? null
-      : Math.min(
-          axis.timelineW,
-          Math.max(
-            0,
-            ((+parseLocal(date) - +axis.start) / DAY) * axis.pxPerDay,
-          ),
-        );
+      : Math.min(axis.timelineW, Math.max(0, axis.tToX(+parseLocal(date))));
 
   // YPJ-244(五):ms 时间戳版 x 坐标(estimate 铺算末端/group 锚等非字符串时刻)
   const xOfT = (t: number) =>
-    Math.min(
-      axis.timelineW,
-      Math.max(0, ((t - +axis.start) / DAY) * axis.pxPerDay),
-    );
+    Math.min(axis.timelineW, Math.max(0, axis.tToX(t)));
 
   // YPJ-218(spec 0139)B3:条宽含当天——仅 date-only +1 天;datetime 右端=精确 due
   const xEndOf = (due: string | null) =>
@@ -317,11 +385,9 @@ export function useTimelineScale(opts: {
           axis.timelineW,
           Math.max(
             0,
-            ((+parseLocal(due) +
-              (/^\d{4}-\d{2}-\d{2}$/.test(due) ? DAY : 0) -
-              +axis.start) /
-              DAY) *
-              axis.pxPerDay,
+            axis.tToX(
+              +parseLocal(due) + (/^\d{4}-\d{2}-\d{2}$/.test(due) ? DAY : 0),
+            ),
           ),
         );
 

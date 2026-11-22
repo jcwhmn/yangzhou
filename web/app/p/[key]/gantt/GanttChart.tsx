@@ -61,7 +61,7 @@ export function GanttChart({
   xOf: (date: string | null) => number | null;
   xOfT: (t: number) => number;
   xEndOf: (due: string | null) => number | null;
-  wd: [number, number] | null;
+  wd: [number, number, boolean] | null;
   scrollRef: RefObject<HTMLDivElement | null>;
   projectKey: string;
   ms: MilestoneMarker[];
@@ -119,7 +119,7 @@ export function GanttChart({
         : r.dueDate !== null
           ? +parseLocal(r.dueDate) +
             (/^\d{4}-\d{2}-\d{2}$/.test(r.dueDate) ? DAY : 0)
-          : dueFromJs(planT, estH!, wsm, wem);
+          : dueFromJs(planT, estH!, wsm, wem, wd?.[2] ?? false);
     const left = planT === null ? 0 : xOfT(planT);
     const right = planEndT === null ? left : xOfT(planEndT);
     // 零时长条最小 3px 可见(YPJ-229;due-only 菱形是标记不受影响)

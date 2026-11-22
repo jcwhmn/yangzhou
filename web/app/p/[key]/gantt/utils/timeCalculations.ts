@@ -16,6 +16,7 @@ export function dueFromJs(
   hours: number,
   ws: number,
   we: number,
+  skipWeekends = false, // YPJ-226(spec 0163):工作制跳周末(与后端 WorkdayCalculator 同口径)
 ): number {
   if (hours <= 0) return startT;
   let day0 = new Date(startT);
@@ -23,6 +24,11 @@ export function dueFromJs(
   let cursor = Math.max(startT, +day0 + ws * 60000);
   let remain = Math.round(hours * 60) * 60000;
   for (;;) {
+    if (skipWeekends && (day0.getDay() === 0 || day0.getDay() === 6)) {
+      day0 = new Date(+day0 + DAY);
+      cursor = +day0 + ws * 60000;
+      continue;
+    }
     const dayEnd = +day0 + we * 60000;
     if (cursor >= dayEnd) {
       day0 = new Date(+day0 + DAY);

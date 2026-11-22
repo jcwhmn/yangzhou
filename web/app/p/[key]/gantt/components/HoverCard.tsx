@@ -11,7 +11,7 @@ export function HoverCard({
   wd,
 }: {
   r: GanttRow;
-  wd: [number, number] | null;
+  wd: [number, number, boolean] | null;
 }) {
   const estH = estimateHoursOf(
     r.estimateValue,
