@@ -633,6 +633,8 @@ class ItemGroupService(
         if (target != null) {
             if (target.status in finalNames) throw ConflictException("组已完成,不能指派")
             if (stale.isEmpty() && live.size == 1 && live[0].groupObjectId == target.objectId) {
+                // YPJ-216(用户 2026-11-23 拍板 A):幂等重拉也过守卫——存量成员无日期则补铺,有显式日期原样保留
+                if (t.timed) itemService.applySprintPullSchedule(item)
                 return itemService.get(itemObjectId)
             }
         }

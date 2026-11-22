@@ -112,6 +112,28 @@ class ItemSprintPullScheduleApiTest : AbstractApiTest() {
     )
 
     @Test
+    fun `幂等重拉也过守卫——存量成员无日期补铺,无预估重拉 409`() {
+        val authed = setup()
+        val sid = sprint(authed)
+        // 已是成员、日期被清空的存量票:重拉 → 早退分支也走守卫,补铺 start/due
+        val id = item(authed, "存量成员票", "3" to "day")
+        pull(authed, id, sid)
+        // 模拟存量悬浮:先清预估再清日期(顺序反了会被 H2 清除回填挡住),再补回预估——成员在、日期空
+        patch(authed, id, mapOf("estimateValue" to "", "estimateUnit" to ""))
+        patch(authed, id, mapOf("startDate" to "", "dueDate" to ""))
+        patch(authed, id, mapOf("estimateValue" to "3", "estimateUnit" to "day"))
+        assertTrue(detail(authed, id)["startDate"].isNull)
+        pull(authed, id, sid) // 幂等重拉
+        assertTrue(!detail(authed, id)["startDate"].isNull, "重拉应补铺日期")
+
+        // 已是成员但预估被清:重拉 → 409(守卫在早退分支同样生效)
+        val id2 = item(authed, "成员清预估票", "2" to "hour")
+        pull(authed, id2, sid)
+        patch(authed, id2, mapOf("estimateValue" to "", "estimateUnit" to ""))
+        pull(authed, id2, sid, expect = 409)
+    }
+
+    @Test
     fun `无预估拉入 409`() {
         val authed = setup()
         val sid = sprint(authed)
