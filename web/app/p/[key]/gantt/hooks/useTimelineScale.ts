@@ -285,38 +285,12 @@ export function useTimelineScale(opts: {
   };
   // 日窗预设 / 今日:视点日为中心,N 天撑满可视区
   // YPJ-229:数据/容器未就绪(rows 未到/容器未测宽)时点击 → 缩放静默丢失;改挂起,就绪后补放
-  const pendingWinRef = useRef<number | null | undefined>(undefined);
-  const applyDayWindow = (days: number | null) => {
-    const target =
-      days === null ? new Date() : center ? parseLocal(center) : new Date();
-    lastCenterRef.current = ""; // 同值重设也要触发居中
-    lastCenterStartRef.current = null;
-    setCenter(fmtDay(target));
-    if (days !== null && containerW > 0) setZoom(containerW / days);
-    else if (days === null) setZoom(null);
-  };
-  const goToDayWindow = (days: number | null) => {
-    if (rows === null || containerW <= 0) pendingWinRef.current = days;
-    else {
-      pendingWinRef.current = undefined; // 直接生效路径清挂起,防切范围后补放旧值
-      applyDayWindow(days);
-    }
-  };
   // YPJ-234 案乙:今日 = 只居中不重置缩放;同值重设也要触发居中(清 lastCenter refs)
   const centerOnToday = () => {
     lastCenterRef.current = "";
     lastCenterStartRef.current = null;
     setCenter(fmtDay(new Date()));
   };
-  useEffect(() => {
-    if (rows === null || containerW <= 0) return;
-    const p = pendingWinRef.current;
-    if (p === undefined) return;
-    pendingWinRef.current = undefined;
-    applyDayWindow(p);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, containerW]);
-
   const xOf = (date: string | null) =>
     date === null
       ? null
@@ -354,7 +328,6 @@ export function useTimelineScale(opts: {
   return {
     axis,
     zoomTo,
-    goToDayWindow,
     shiftCenter,
     centerOnToday,
     xOf,

@@ -164,10 +164,6 @@ test("v2 数据锚定轴 + 连续缩放(YPJ-219)", async ({ page, projectKey }) 
     "gantt-zoom-out",
     "gantt-fit",
     "gantt-today",
-    "gantt-win-1",
-    "gantt-win-2",
-    "gantt-win-3",
-    "gantt-win-5",
     "gantt-center-nav",
   ]) {
     await expect(page.getByTestId(tid)).toBeVisible();
@@ -203,15 +199,17 @@ test("v2 数据锚定轴 + 连续缩放(YPJ-219)", async ({ page, projectKey }) 
     )
     .toBeGreaterThan(before);
 
-  // 1 日预设:0–24 墙钟小时刻度(视口 1000px/天 → 2h 步长,末档 22:00;2026-11-20 拍板钟表轴)
-  await page.getByTestId("gantt-win-1").click();
-  await expect(page.getByText("00:00", { exact: true }).first()).toBeVisible();
-  await expect(page.getByText("22:00", { exact: true }).first()).toBeVisible();
+  // YPJ-256:日窗预设按钮已删,小时刻度改 zoom-in 连点(×1.5/档)到达
+  for (let i = 0; i < 14; i++) await page.getByTestId("gantt-zoom-in").click();
+  await expect(page.getByTestId("gantt-row-hour")).toBeVisible({
+    timeout: 10000,
+  });
+  await expect(page.getByText(/\d{2}:00/).first()).toBeVisible();
 
-  // 工况保持:切页再回来,日窗预设仍在(小时刻度还在)
+  // 工况保持:切页再回来,缩放位记忆保持(小时刻度还在)
   await page.goto(`/p/${projectKey}/backlog`);
   await page.goto(`/p/${projectKey}/gantt`);
-  await expect(page.getByText("00:00", { exact: true }).first()).toBeVisible();
+  await expect(page.getByTestId("gantt-row-hour")).toBeVisible();
 });
 
 test("视点日导航(YPJ-219 v2)", async ({ page, projectKey }) => {
@@ -387,8 +385,8 @@ test("无 due 的 item 画起点小标记,不外延到轴末端(YPJ-220 反馈)"
   expect(w).toBeLessThan(20);
 });
 
-// YPJ-229 回归(转正用例):加载中点日窗 → 就绪后补放;今日=当前时刻居中
-test("时线回归(YPJ-229):加载中点日窗补放 + 今日时刻居中 + 零时长条可见", async ({
+// YPJ-229 回归(转正用例):今日=当前时刻居中;挂起补放段随日窗预设删除(YPJ-256)
+test("时线回归(YPJ-229):今日时刻居中 + 零时长条可见", async ({
   page,
   projectKey,
 }) => {
@@ -412,17 +410,9 @@ test("时线回归(YPJ-229):加载中点日窗补放 + 今日时刻居中 + 零�
     groupType: "sprint",
   });
 
-  // 拦截 gantt API 延迟 1.5s,模拟慢加载;期间点 1 日
-  await page.route("**/gantt*", async (route) => {
-    await new Promise((r) => setTimeout(r, 1500));
-    await route.continue();
-  });
   await page.goto(`/p/${projectKey}/gantt`);
-  await page.getByTestId("gantt-win-1").click(); // 数据未到,应挂起
-  // 数据到达后:小时刻度出现(1 日窗补放成功),非 fit 挤压
-  await expect(page.getByText("00:00", { exact: true }).first()).toBeVisible({
-    timeout: 10000,
-  });
+  // YPJ-256:日窗预设/挂起补放机制已删;今日按钮回中(只居中不重置缩放)
+  await page.getByTestId("gantt-today").click();
   // 今日线(2px 蓝竖线)在视口内(视点日=今日 → 当前时刻居中)
   const todayVis = await page.evaluate(() => {
     const scroll = document.querySelector('[data-testid="gantt-scroll"]');
@@ -473,9 +463,9 @@ test("行标题完整呈现+标题列独立横滚 + 1 日窗宽屏不夹(YPJ-230
     .evaluate((el) => ({ scrollW: el.scrollWidth, clientW: el.clientWidth }));
   expect(pane.scrollW).toBeGreaterThan(pane.clientW); // 标题列自有横滚
 
-  // 段 2:1920 宽屏「1日」不被 MAX_PPD 夹——修复前 pxPerDay 停在 720,显示 ~1.9 天(YPJ-230 缺陷 B)
+  // 段 2:1920 宽屏缩放不被夹——zoom-in 连点后日距超旧 720 钳制且 ≤ MAX_PPD(YPJ-230 缺陷 B;预设按钮删除 YPJ-256)
   await page.setViewportSize({ width: 1920, height: 1080 });
-  await page.getByTestId("gantt-win-1").click();
+  for (let i = 0; i < 12; i++) await page.getByTestId("gantt-zoom-in").click();
   const gap = await page.getByTestId("gantt-row-day").evaluate((el) => {
     const xs = [...el.children].map((c) => (c as HTMLElement).offsetLeft);
     return xs.length > 1 ? xs[1] - xs[0] : 0;
@@ -483,7 +473,8 @@ test("行标题完整呈现+标题列独立横滚 + 1 日窗宽屏不夹(YPJ-230
   const avail = await page
     .getByTestId("gantt-scroll")
     .evaluate((el) => el.clientWidth);
-  expect(Math.abs(gap - avail)).toBeLessThanOrEqual(avail * 0.05);
+  expect(gap).toBeGreaterThanOrEqual(1000); // 超过旧 720 钳制(可读)
+  expect(gap).toBeLessThanOrEqual(2400 + 1e-6); // MAX_PPD 上限仍生效
 });
 
 test("分割线拖拽改标题列宽并记忆,双击重置(YPJ-237)", async ({
