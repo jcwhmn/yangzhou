@@ -86,7 +86,9 @@ export function GanttChart({
     // YPJ-216(SRS 4.4):无预估 → 项目缺省预估(仅绘制);无开始 → 组开始+偏移
     const estH =
       estimateHoursOf(r.estimateValue, r.estimateUnit, wsm, wem) ??
-      (pullDefault ? estimateHoursOf(pullDefault.estV, pullDefault.estU, wsm, wem) : null);
+      (pullDefault
+        ? estimateHoursOf(pullDefault.estV, pullDefault.estU, wsm, wem)
+        : null);
     const offMs = (pullDefault?.offMin ?? 0) * 60_000;
     const startAnchor = r.startDate ?? r.anchorDate ?? null;
     const gS = groupStartOf(r);

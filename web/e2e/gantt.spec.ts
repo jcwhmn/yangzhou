@@ -920,16 +920,16 @@ test("工时填充+完成点+依赖锚点+实际层解耦(YPJ-244)", async ({
   // 丙:缺省条在(锚点起 + 缺省预估长度);anchor 点形态由缺省层取代(查 0 需配对实断言,防空过)
   await expect(page.getByText("E2E 锚点丙").first()).toBeVisible();
   await expect(row(3).getByTestId(`gantt-bar-${projectKey}-3`)).toBeVisible();
-  await expect(
-    row(3).getByTestId(`gantt-anchor-${projectKey}-3`),
-  ).toHaveCount(0);
+  await expect(row(3).getByTestId(`gantt-anchor-${projectKey}-3`)).toHaveCount(
+    0,
+  );
 
   // 丁:三无进行中 = YPJ-216 缺省层(项目缺省预估)→ case2 计划缺省条(actualStart 起锚)+
   // 黄覆盖画在计划条上;doing && planIsBar 时实际层不重复画(旧「实际层黄条」被取代,2026-11-24 实锤)
   await expect(row(4).getByTestId(`gantt-bar-${projectKey}-4`)).toBeVisible();
-  await expect(
-    row(4).getByTestId(`gantt-actual-${projectKey}-4`),
-  ).toHaveCount(0);
+  await expect(row(4).getByTestId(`gantt-actual-${projectKey}-4`)).toHaveCount(
+    0,
+  );
   await expect(row(4).getByTestId(`gantt-plandot-${projectKey}-4`)).toHaveCount(
     0,
   );

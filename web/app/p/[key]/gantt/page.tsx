@@ -51,11 +51,8 @@ export default function GanttPage() {
   const [scope, setScope] = useState(savedView.scope ?? "board");
   const [scopeIds, setScopeIds] = useState<string[]>(savedView.scopeIds ?? []);
   // 数据获取与借锚(CP2a:rows/wd/二级选项随 fetch 收进 useGanttData,入口经返回值持有)
-  const { rows, wd, pullDefault, groupOpts, msOpts, relOpts, groupStartOf } = useGanttData(
-    key,
-    scope,
-    scopeIds,
-  );
+  const { rows, wd, pullDefault, groupOpts, msOpts, relOpts, groupStartOf } =
+    useGanttData(key, scope, scopeIds);
   const scrollRef = useRef<HTMLDivElement>(null);
   const {
     containerW,
