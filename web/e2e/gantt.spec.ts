@@ -480,7 +480,7 @@ test("行标题完整呈现+标题列独立横滚 + 1 日窗宽屏不夹(YPJ-230
     .getByTestId("gantt-scroll")
     .evaluate((el) => el.clientWidth);
   expect(gap).toBeGreaterThanOrEqual(1000); // 超过旧 720 钳制(可读)
-  expect(gap).toBeLessThanOrEqual(2400 + 1e-6); // MAX_PPD 上限仍生效
+  expect(gap).toBeLessThanOrEqual(4800 + 1e-6); // MAX_PPD 上限仍生效(YPJ-226 切片3:2400→4800 亚日窗)
 });
 
 test("分割线拖拽改标题列宽并记忆,双击重置(YPJ-237)", async ({

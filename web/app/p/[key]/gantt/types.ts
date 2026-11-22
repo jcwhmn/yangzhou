@@ -29,14 +29,14 @@ export const DAY = 24 * 60 * 60 * 1000;
 export const TITLE_W_DEFAULT = 280; // 标题列默认宽(=236 出厂值;237 双击重置回落此值)
 export const TITLE_W_MIN = 120;
 export const TITLE_W_LS = "yz-gantt-title-w"; // 237:标题列宽 localStorage 记忆键
-export const MAX_PPD = 2400; // 缩放上限:1日窗承诺在内容宽 ≤2680 成立(YPJ-230;1920 屏内容 1386 原被 720 夹成 ~1.9 天)
+export const MAX_PPD = 4800; // 缩放上限:YPJ-226 切片3(spec 0163)由 2400 放宽至亚日窗(4800ppd 时 30min=100px);YPJ-230 承诺收窄为缺省态(fit/GANTT_MIN_PPD 约束不变),显式缩放放行
 export const GANTT_MIN_PPD = 3; // 缺省视窗 pxPerDay 下限(YPJ-234 拍板案 B 修订:宽区间不把条压没;1 天 ≈ 3px、1 月 ≈ 91px 可读;只约束缺省态,显式缩放仍可压破至 fit)
 export const MIN_LABEL_PX = 44; // 刻度标签最小间距
 export const ZOOM_STEP = 1.5; // ± 按钮步进系数
 
 export type Tick = { x: number; label: string; key: string };
 export type HeaderRow = {
-  gran: "month" | "week" | "day" | "hour";
+  gran: "year" | "month" | "week" | "day" | "hour";
   ticks: Tick[];
 };
 
