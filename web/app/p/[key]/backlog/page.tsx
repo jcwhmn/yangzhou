@@ -179,7 +179,12 @@ export default function BacklogPage() {
                               .then(setItems)
                               .catch(() => {}),
                           )
-                          .catch(() => {})
+                          // YPJ-216:守卫 409 要浮出(无预估拉入,不再静默吞)
+                          .catch((e) =>
+                            setError(
+                              e instanceof Error ? e.message : "拉入失败",
+                            ),
+                          )
                       }
                     >
                       {t.board.pullItem}

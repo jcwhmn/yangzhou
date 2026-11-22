@@ -31,21 +31,29 @@ export default function PullDialog({
 }) {
   const [backlogItems, setBacklogItems] = useState<Item[] | null>(null);
   const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [error, setError] = useState(""); // YPJ-216:守卫 409 要浮出(无预估拉入不再静默吞,2026-11-23 手工实锤)
 
   useEffect(() => {
     if (!open) return;
     setPicked(new Set());
+    setError("");
     api<Item[]>(`/api/projects/${projectKey}/backlog`)
       .then(setBacklogItems)
       .catch(() => setBacklogItems([]));
   }, [open, projectKey]);
 
   async function confirmPull() {
-    for (const id of picked) {
-      await api(`/api/items/${id}/board-membership`, {
-        method: "PUT",
-        body: JSON.stringify({ onBoard: true }),
-      });
+    setError("");
+    try {
+      for (const id of picked) {
+        await api(`/api/items/${id}/board-membership`, {
+          method: "PUT",
+          body: JSON.stringify({ onBoard: true }),
+        });
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "拉入失败");
+      return;
     }
     onClose();
     await onPulled();
@@ -56,6 +64,13 @@ export default function PullDialog({
       <DialogTitle>{t.board.pullTitle}</DialogTitle>
       <DialogContent dividers sx={{ maxHeight: 480 }}>
         <List dense disablePadding>
+          {error && (
+            <ListItem dense disableGutters>
+              <Typography color="error" variant="body2">
+                {error}
+              </Typography>
+            </ListItem>
+          )}
           {[...(backlogItems ?? [])]
             .sort(
               (a, b) =>
