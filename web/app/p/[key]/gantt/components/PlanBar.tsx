@@ -15,7 +15,6 @@ export function PlanBar({
   dueOnly,
   caseNo,
   fillW,
-  actPct,
 }: {
   r: GanttRow;
   visible: boolean;
@@ -26,7 +25,6 @@ export function PlanBar({
   dueOnly: boolean;
   caseNo: number;
   fillW: number;
-  actPct: number | null;
 }) {
   return (
     <Box
@@ -51,12 +49,7 @@ export function PlanBar({
           }}
         >
           {fillW > 0 && (
-            <ProgressOverlay
-              fillW={fillW}
-              width={width}
-              actPct={actPct}
-              number={r.number}
-            />
+            <ProgressOverlay fillW={fillW} width={width} number={r.number} />
           )}
         </Box>
       ) : dueOnly ? (
