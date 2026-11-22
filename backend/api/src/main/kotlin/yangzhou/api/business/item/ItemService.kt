@@ -56,6 +56,7 @@ class ItemService(
     private val gitRefs: ItemGitRefRepository,
     private val feasibilityService: yangzhou.api.business.feasibility.FeasibilityService,
     private val dependencyService: yangzhou.api.business.dependency.DependencyService,
+    private val dependencies: yangzhou.persistence.repository.ItemDependencyRepository,
     private val groups: ItemGroupRepository,
     private val groupTypes: ItemGroupTypeRepository,
     private val memberships: ItemGroupMemberRepository,
@@ -204,6 +205,10 @@ class ItemService(
             if (sprint.status == "completed") throw ConflictException("sprint 已完成,不能指派")
             memberships.save(ItemGroupMember(groupObjectId = sprint.objectId!!, itemObjectId = itemId))
             memberHistory.recordAdd(sprint.objectId!!, itemId, clock.instant()) // YPJ-54 留痕(同事务,负例不落库语义不变)
+            // YPJ-216(spec 0164):timed sprint 拉入排期守卫(同事务,负例不落库)
+            if (groupTypes.findByProjectObjectIdAndTypeKey(projectObjectId, sprint.type)?.timed == true) {
+                applySprintPullSchedule(item, null, null)
+            }
         }
         return get(item.objectId)
     }
@@ -578,6 +583,73 @@ class ItemService(
             logActivity(item.objectId!!, "unassigned", oldName, null, actorId)
         }
         return get(item.objectId)
+    }
+
+    /** YPJ-216(spec 0164):sprint 拉入排期守卫——三条拉入路径(create 直挂 / replaceMembership / boardMembership)共用。
+     *  真值表:无预估 409;start 决策序 = 显式 > 存量 > 前置可推(最晚前置 due+1 顺延工作时刻)> 今天;前置全未排 409;
+     *  due = WorkdayCalculator 铺算(显式/存量 due 覆盖,不反推 estimate)。item 已有 start 视为已显式,保留不重排。 */
+    fun applySprintPullSchedule(
+        item: Item,
+        explicitStart: LocalDateTime? = null,
+        explicitDue: LocalDateTime? = null,
+    ): Item {
+        if (item.estimateValue == null || item.estimateUnit == null) {
+            throw ConflictException("拉入 sprint 须先填预估时长(estimateValue + estimateUnit)")
+        }
+        val project = projects.findByObjectId(item.projectObjectId) ?: return item
+        val (ws, we) = workdayBounds(project)
+        val workMode = project.workMode == "work"
+        val calc = WorkdayCalculator(ws, we, skipWeekends = workMode)
+        val estHours = estimateHours(item.estimateValue, item.estimateUnit, ws, we) ?: return item
+        val start: LocalDateTime =
+            explicitStart
+                ?: item.startDate
+                ?: run {
+                    val preds =
+                        dependencies
+                            .findByItemObjectId(item.objectId!!)
+                            .mapNotNull { itemRepo.findByObjectId(it.dependsOnItemObjectId) }
+                            .filter { it.deletedAt == null }
+                    if (preds.isEmpty()) {
+                        todayStart(ws, we, workMode)
+                    } else {
+                        val scheduled = preds.mapNotNull { it.dueDate }
+                        if (scheduled.isEmpty()) {
+                            throw ConflictException("前置依赖(${preds.size} 条)均未排期,无法推导开始日期;请先排前置或显式给开始日期")
+                        }
+                        nextWorkMoment(scheduled.max()!!.plusMinutes(1), ws, we, workMode)
+                    }
+                }
+        val due = explicitDue ?: item.dueDate ?: calc.dueFrom(start, estHours)
+        if (start > due) throw BadRequestException("开始日期不能晚于截止日期")
+        if (start != item.startDate || due != item.dueDate) {
+            val old = "${item.startDate ?: "—"} ~ ${item.dueDate ?: "—"}"
+            val saved = itemRepo.save(item.copy(startDate = start, dueDate = due))
+            logActivity(saved.objectId!!, "dates_changed", old, "$start ~ $due", memberService.current().objectId!!)
+            return saved
+        }
+        return item
+    }
+
+    /** 今天的工作制起点:wall=当日 00:00(既有 date-only 填充语义);work=当日窗起(周末顺延周一)。 */
+    private fun todayStart(ws: LocalTime, we: LocalTime, workMode: Boolean): LocalDateTime {
+        val day = clock.instant().atZone(java.time.ZoneId.systemDefault()).toLocalDate()
+        return nextWorkMoment(day.atStartOfDay(), ws, we, workMode)
+    }
+
+    /** YPJ-216:下一工作时刻(仅工作制生效;wall 原样返回)。周末→下周一窗起;当日窗前→窗起;窗后→次工作日窗起。 */
+    private fun nextWorkMoment(t: LocalDateTime, ws: LocalTime, we: LocalTime, workMode: Boolean): LocalDateTime {
+        if (!workMode) return t
+        val fullDay = ws == LocalTime.MIDNIGHT && we == LocalTime.MIDNIGHT
+        var day = t.toLocalDate()
+        while (day.dayOfWeek.value >= 6) day = day.plusDays(1)
+        var cand = if (t.toLocalDate() == day) maxOf(t, day.atTime(ws)) else day.atTime(ws)
+        if (!fullDay && cand.toLocalTime() >= we) {
+            day = day.plusDays(1)
+            while (day.dayOfWeek.value >= 6) day = day.plusDays(1)
+            cand = day.atTime(ws)
+        }
+        return cand
     }
 
     /** 删除 item(V9-Q9 软删):置 deleted_at,连子树;全列表类查询自动过滤;回收站可恢复/物理删。 */

@@ -9,20 +9,36 @@ import kotlin.test.assertTrue
 
 /** spec 0099 起步,0117 收窄:拉入=S0 置标记 / 有组挂 sprint(最早 active → planned 并激活);退回=清标记+移出非 completed sprint 成员行。 */
 class BoardMembershipApiTest : AbstractApiTest() {
+    private fun ensureEstimate(
+        authed: RestTestClient,
+        itemId: String,
+    ) { // YPJ-216 拉入需预估
+        authed
+            .patch()
+            .uri("/api/items/$itemId")
+            .body(mapOf("estimateValue" to "3", "estimateUnit" to "hour"))
+            .exchange()
+            .expectStatus()
+            .isOk()
+    }
+
     private fun setBoard(
         authed: RestTestClient,
         itemId: String,
         on: Boolean,
-    ): String = authed
-        .put()
-        .uri("/api/items/$itemId/board-membership")
-        .body(mapOf("onBoard" to on))
-        .exchange()
-        .expectStatus()
-        .isOk()
-        .expectBody(String::class.java)
-        .returnResult()
-        .responseBody!!
+    ): String {
+        if (on) ensureEstimate(authed, itemId) // YPJ-216 拉入需预估
+        return authed
+            .put()
+            .uri("/api/items/$itemId/board-membership")
+            .body(mapOf("onBoard" to on))
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody(String::class.java)
+            .returnResult()
+            .responseBody!!
+    }
 
     private fun createGroup(
         authed: RestTestClient,
@@ -46,6 +62,7 @@ class BoardMembershipApiTest : AbstractApiTest() {
         itemId: String,
         groupId: String,
     ) {
+        ensureEstimate(authed, itemId) // YPJ-216 拉入需预估
         authed
             .put()
             .uri("/api/items/$itemId/group-membership")
@@ -122,6 +139,9 @@ class BoardMembershipApiTest : AbstractApiTest() {
         val authed = bootstrapAndAuth()
         createProject(authed, "GRP")
         val item = createItem(authed, "GRP", "幂等 item")["itemId"].asText()
+        authed.patch().uri("/api/items/$item")
+            .body(mapOf("estimateValue" to "3", "estimateUnit" to "hour"))
+            .exchange().expectStatus().isOk() // YPJ-216 拉入需预估
         val s1 = createGroup(authed, "GRP", mapOf("typeKey" to "sprint", "name" to "S1"))
         authed
             .post()

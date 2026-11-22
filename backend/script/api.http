@@ -567,6 +567,32 @@ Content-Type: application/json
     client.global.set("itemIdSprint", response.body.itemId);
  %}
 
+### YPJ-216(spec 0164):拉入排期守卫——直入 sprint 的票无预估 → 409
+### (预期 409:响应含「拉入 sprint 须先填预估」;同事务不落库)
+POST {{host}}/api/projects/{{pkey}}/items
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "无预估票——直入 sprint 应 409",
+  "groupId": "{{sprintId}}",
+  "groupType": "sprint"
+}
+
+### YPJ-216:有预估票直入 sprint → 200,start=今天,due=铺算回填(响应含 startDate/dueDate)
+### (前端:先建无日期票再 PUT membership 亦可;此处验证 create 直挂路径)
+POST {{host}}/api/projects/{{pkey}}/items
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "有预估票——直入 sprint 自动排期",
+  "estimateValue": "4",
+  "estimateUnit": "hour",
+  "groupId": "{{sprintId}}",
+  "groupType": "sprint"
+}
+
 ### Sprint 列表(统一 /groups?type=sprint)
 GET {{host}}/api/projects/{{pkey}}/groups?type=sprint
 Authorization: Bearer {{token}}

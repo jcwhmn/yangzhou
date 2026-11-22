@@ -155,7 +155,7 @@ class ItemGroupApiTest : AbstractApiTest() {
     fun `归属替换——指派_移出_幂等_完成后拒`() {
         val authed = bootstrapAndAuth()
         createProject(authed, "GRP")
-        val item = createItem(authed, "GRP", "x")
+        val item = createItem(authed, "GRP", "x", estimate = true)
         val itemId = item["itemId"].asText()
         val s = createGroup(authed, "GRP", mapOf("typeKey" to "sprint", "name" to "S1"))
         val gid = s["groupId"].asText()
@@ -191,8 +191,8 @@ class ItemGroupApiTest : AbstractApiTest() {
     fun `backlog 谓词与完成后历史仍在`() {
         val authed = bootstrapAndAuth()
         createProject(authed, "GRP")
-        val inSprint = createItem(authed, "GRP", "in-sprint")["itemId"].asText()
-        val done = createItem(authed, "GRP", "done-item")["itemId"].asText()
+        val inSprint = createItem(authed, "GRP", "in-sprint", estimate = true)["itemId"].asText()
+        val done = createItem(authed, "GRP", "done-item", estimate = true)["itemId"].asText()
         val s = createGroup(authed, "GRP", mapOf("typeKey" to "sprint", "name" to "S1"))
         val gid = s["groupId"].asText()
 
@@ -215,7 +215,7 @@ class ItemGroupApiTest : AbstractApiTest() {
         assertEquals(0, board0["activeGroups"].size())
         assertEquals(0, board0["items"].size())
 
-        val item = createItem(authed, "GRP", "x")["itemId"].asText()
+        val item = createItem(authed, "GRP", "x", estimate = true)["itemId"].asText()
         val s1 = createGroup(authed, "GRP", mapOf("typeKey" to "sprint", "name" to "S1"))
         assign(authed, item, s1["groupId"].asText(), "sprint")
         action(authed, "GRP", s1["groupId"].asText(), "start")
@@ -242,7 +242,7 @@ class ItemGroupApiTest : AbstractApiTest() {
         val authed = bootstrapAndAuth()
         val project = createProject(authed, "GRP")
         val done = project["statuses"].first { it["name"].asText() == "Done" }["statusId"].asText()
-        val todo = createItem(authed, "GRP", "todo")
+        val todo = createItem(authed, "GRP", "todo", estimate = true)
         val doneId = json
             .readTree(
                 authed
@@ -272,7 +272,7 @@ class ItemGroupApiTest : AbstractApiTest() {
     fun `board——无 active 但有 planned sprint_成员随补集进 board`() {
         val authed = bootstrapAndAuth()
         createProject(authed, "GRP")
-        val item = createItem(authed, "GRP", "planned-member")["itemId"].asText()
+        val item = createItem(authed, "GRP", "planned-member", estimate = true)["itemId"].asText()
         val s1 = createGroup(authed, "GRP", mapOf("typeKey" to "sprint", "name" to "S1")) // 初态 planned
         assign(authed, item, s1["groupId"].asText(), "sprint")
         // 不 start:组停在 planned;成员非终态但不在 backlog(planned sprint 成员被 currentSprint 排除)
@@ -303,7 +303,7 @@ class ItemGroupApiTest : AbstractApiTest() {
         val gid = g["groupId"].asText()
         // spec 0111:phase 自底向上拿 level=2 = 父层——禁手动动作、禁挂 item(0056 平面自定义组语义在两层世界里收窄为父层语义)
         assertEquals(409, action(authed, "GRP", gid, "switch").status.value())
-        val item = createItem(authed, "GRP", "y")["itemId"].asText()
+        val item = createItem(authed, "GRP", "y", estimate = true)["itemId"].asText()
         assertEquals(409, assign(authed, item, gid, "phase").status.value())
         // 空父层组可删
         authed

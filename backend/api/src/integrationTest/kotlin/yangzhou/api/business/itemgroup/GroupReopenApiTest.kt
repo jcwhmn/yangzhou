@@ -68,7 +68,7 @@ class GroupReopenApiTest : AbstractApiTest() {
     fun `重开主链——complete 后 reopen 回 active_成员历史行不动`() {
         val authed = bootstrapAndAuth()
         createProject(authed, "RPN")
-        val item = createItem(authed, "RPN", "重开成员")
+        val item = createItem(authed, "RPN", "重开成员", estimate = true)
         val s = createGroup(authed, "RPN", mapOf("typeKey" to "sprint", "name" to "A"))
         val gid = s["groupId"].asText()
         assign(authed, item["itemId"].asText(), gid)
@@ -94,7 +94,7 @@ class GroupReopenApiTest : AbstractApiTest() {
         val gid = s["groupId"].asText()
         action(authed, "RPN", gid, "start")
         action(authed, "RPN", gid, "complete")
-        val item = createItem(authed, "RPN", "后挂成员")
+        val item = createItem(authed, "RPN", "后挂成员", estimate = true)
 
         // completed 期间挂入被既有守卫拒
         assertEquals(409, assign(authed, item["itemId"].asText(), gid).status.value())

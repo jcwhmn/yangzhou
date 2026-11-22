@@ -10,8 +10,8 @@ class TimeEntryApiTest : AbstractApiTest() {
     private fun setup(): Triple<org.springframework.test.web.servlet.client.RestTestClient, String, String> {
         val authed = bootstrapAndAuth()
         createProject(authed, "CHE")
-        val i1 = createItem(authed, "CHE", "x")["itemId"].asText()
-        val i2 = createItem(authed, "CHE", "y")["itemId"].asText()
+        val i1 = createItem(authed, "CHE", "x", estimate = true)["itemId"].asText()
+        val i2 = createItem(authed, "CHE", "y", estimate = true)["itemId"].asText()
         return Triple(authed, i1, i2)
     }
 
@@ -266,8 +266,8 @@ class TimeEntryApiTest : AbstractApiTest() {
     fun `报表——补录与起止计入——byType 显示名——byDay 含固定日——窗口过滤——空项目三空数组`() {
         val authed = bootstrapAndAuth()
         createProject(authed, "CHE")
-        val i1 = createItem(authed, "CHE", "x")["itemId"].asText()
-        val i2 = createItem(authed, "CHE", "y")["itemId"].asText()
+        val i1 = createItem(authed, "CHE", "x", estimate = true)["itemId"].asText()
+        val i2 = createItem(authed, "CHE", "y", estimate = true)["itemId"].asText()
         // 类型定义改名(byType 显示名 join 定义表)
         authed
             .patch()
@@ -323,8 +323,8 @@ class TimeEntryApiTest : AbstractApiTest() {
     fun `报表——groupId 过滤——未知组 404——窗口负例 400——未知项目 404`() {
         val authed = bootstrapAndAuth()
         createProject(authed, "CHE")
-        val i1 = createItem(authed, "CHE", "in-sprint")["itemId"].asText()
-        val i2 = createItem(authed, "CHE", "out")["itemId"].asText()
+        val i1 = createItem(authed, "CHE", "in-sprint", estimate = true)["itemId"].asText()
+        val i2 = createItem(authed, "CHE", "out", estimate = true)["itemId"].asText()
         val gid =
             json.readTree(
                 authed

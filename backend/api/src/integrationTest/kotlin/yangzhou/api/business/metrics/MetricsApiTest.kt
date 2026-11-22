@@ -60,7 +60,10 @@ class MetricsApiTest : AbstractApiTest() {
     ): String {
         val itemId = createItem(authed, "MTR", title)["itemId"].asText()
         if (assignee) put("/api/items/$itemId/assignee", mapOf("assigneeItemId" to meId))
-        if (sprintId != null) put("/api/items/$itemId/group-membership", mapOf("groupId" to sprintId, "groupType" to "sprint"))
+        if (sprintId != null) {
+            patch("/api/items/$itemId", mapOf("estimateValue" to "1", "estimateUnit" to "hour")) // YPJ-216 拉入需预估
+            put("/api/items/$itemId/group-membership", mapOf("groupId" to sprintId, "groupType" to "sprint"))
+        }
         val iid = jdbc.queryForObject("select object_id from item where object_id = ?::uuid", java.util.UUID::class.java, itemId)
         jdbc.update("update item set created_at = ?::timestamptz where object_id = ?", createdAt, iid)
         jdbc.update(
@@ -433,6 +436,7 @@ class MetricsApiTest : AbstractApiTest() {
             Int::class.java,
             iid,
         )
+        patch("/api/items/$id", mapOf("estimateValue" to "1", "estimateUnit" to "hour")) // YPJ-216 拉入需预估
         put("/api/items/$id/group-membership", mapOf("groupId" to s1, "groupType" to "sprint"))
         assertEquals(1, rows(false))
         assertEquals(1, rows(true)) // 加入:S1 在册
@@ -447,7 +451,7 @@ class MetricsApiTest : AbstractApiTest() {
     @Test
     fun create带sprintId_落episode() {
         setupProject()
-        val r = post("/api/projects/MTR/items", mapOf("title" to "c1", "sprintId" to s1))
+        val r = post("/api/projects/MTR/items", mapOf("title" to "c1", "sprintId" to s1, "estimateValue" to "1", "estimateUnit" to "hour")) // YPJ-216
         val iid =
             jdbc.queryForObject(
                 "select object_id from item where object_id = ?::uuid",

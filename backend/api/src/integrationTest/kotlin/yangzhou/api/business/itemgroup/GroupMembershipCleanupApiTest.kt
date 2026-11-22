@@ -100,8 +100,8 @@ class GroupMembershipCleanupApiTest : AbstractApiTest() {
     fun `转出清理——处置后完成组仅剩 Done 成员_被转 item 仅目标组行`() {
         val authed = bootstrapAndAuth()
         createProject(authed, "CLN")
-        val doneItem = createItem(authed, "CLN", "完成成员")
-        val movedItem = createItem(authed, "CLN", "转出成员")
+        val doneItem = createItem(authed, "CLN", "完成成员", estimate = true)
+        val movedItem = createItem(authed, "CLN", "转出成员", estimate = true)
         val a = createGroup(authed, "CLN", mapOf("typeKey" to "sprint", "name" to "A"))
         val aid = a["groupId"].asText()
         assign(authed, doneItem["itemId"].asText(), aid)
@@ -134,7 +134,7 @@ class GroupMembershipCleanupApiTest : AbstractApiTest() {
     fun `回池清理——groupId null 删同类型全行_含 completed 组`() {
         val authed = bootstrapAndAuth()
         createProject(authed, "CLN")
-        val item = createItem(authed, "CLN", "回池成员")
+        val item = createItem(authed, "CLN", "回池成员", estimate = true)
         val a = createGroup(authed, "CLN", mapOf("typeKey" to "sprint", "name" to "A"))
         val aid = a["groupId"].asText()
         assign(authed, item["itemId"].asText(), aid)
@@ -160,7 +160,7 @@ class GroupMembershipCleanupApiTest : AbstractApiTest() {
     fun `幂等加stale——item 已在目标组但残留 completed 行_再 PUT 清残行不炸唯一约束`() {
         val authed = bootstrapAndAuth()
         createProject(authed, "CLN")
-        val item = createItem(authed, "CLN", "双行成员")
+        val item = createItem(authed, "CLN", "双行成员", estimate = true)
         val a = createGroup(authed, "CLN", mapOf("typeKey" to "sprint", "name" to "A"))
         val aid = a["groupId"].asText()
         val b = createGroup(authed, "CLN", mapOf("typeKey" to "sprint", "name" to "B"))
@@ -187,7 +187,7 @@ class GroupMembershipCleanupApiTest : AbstractApiTest() {
     fun `显式移出 Done item——完成组行删_历史由 history 承载`() {
         val authed = bootstrapAndAuth()
         createProject(authed, "CLN")
-        val item = createItem(authed, "CLN", "Done 成员")
+        val item = createItem(authed, "CLN", "Done 成员", estimate = true)
         val a = createGroup(authed, "CLN", mapOf("typeKey" to "sprint", "name" to "A"))
         val aid = a["groupId"].asText()
         assign(authed, item["itemId"].asText(), aid)

@@ -131,6 +131,7 @@ class ItemServiceUnitTest {
             gitRefs = mockk(relaxed = true),
             feasibilityService = feasibilityService,
             dependencyService = mockk(relaxed = true),
+            dependencies = mockk(relaxed = true),
             groups = groups,
             groupTypes = groupTypes,
             memberships = memberships,

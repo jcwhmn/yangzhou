@@ -467,7 +467,15 @@ class ItemsApiTest : AbstractApiTest() {
     ) = authed
         .post()
         .uri("/api/projects/$key/items")
-        .body(mapOf("title" to title, "sprintId" to sprintId))
+        .body(
+            mapOf(
+                "title" to title,
+                "sprintId" to sprintId,
+                // YPJ-216(spec 0164):拉入 sprint 需预估硬校验
+                "estimateValue" to "3",
+                "estimateUnit" to "hour",
+            ),
+        )
         .exchange()
         .expectBody(String::class.java)
         .returnResult()
@@ -620,6 +628,9 @@ class ItemsApiTest : AbstractApiTest() {
         itemId: String,
         sprintId: String,
     ) {
+        authed.patch().uri("/api/items/$itemId") // YPJ-216 拉入需预估
+            .body(mapOf("estimateValue" to "3", "estimateUnit" to "hour"))
+            .exchange().expectStatus().isOk()
         authed
             .put()
             .uri("/api/items/$itemId/group-membership")

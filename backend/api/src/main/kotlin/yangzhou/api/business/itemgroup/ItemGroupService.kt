@@ -643,6 +643,8 @@ class ItemGroupService(
         if (target != null && live.none { it.groupObjectId == target.objectId }) {
             memberships.save(ItemGroupMember(groupObjectId = target.objectId!!, itemObjectId = item.objectId!!))
             memberHistory.recordAdd(target.objectId!!, item.objectId!!, clock.instant())
+            // YPJ-216(spec 0164):timed sprint 拉入排期守卫(同事务)
+            if (t.timed) itemService.applySprintPullSchedule(item)
         }
         return itemService.get(itemObjectId)
     }
@@ -670,6 +672,8 @@ class ItemGroupService(
                 if (rows.none { it.groupObjectId == target.objectId }) {
                     memberships.save(ItemGroupMember(groupObjectId = target.objectId!!, itemObjectId = item.objectId!!))
                     memberHistory.recordAdd(target.objectId!!, item.objectId!!, clock.instant())
+                    // YPJ-216(spec 0164):看板拉入自动挂 sprint,同排期守卫
+                    itemService.applySprintPullSchedule(item)
                 }
             }
         } else {
