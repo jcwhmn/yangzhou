@@ -21,7 +21,8 @@ test.describe("estimateRequired=true——三途径缺预估弹补录", () => {
     await expect(dlg).toBeVisible();
     // 预填项目缺省(未设 → 内置中档 5day);不输入直接确定也可用
     await expect(dlg.getByLabel("预估", { exact: true })).toHaveValue("5");
-    await expect(dlg.getByLabel("单位", { exact: true })).toHaveValue("day");
+    // MUI select 非输入元素,单位用选中项文本断言
+    await expect(dlg.getByText("day", { exact: true })).toBeVisible();
     await dlg.getByLabel("预估", { exact: true }).fill("2");
     await dlg.getByRole("button", { name: "确定并拉入" }).click();
     await expect(dlg).toBeHidden();
