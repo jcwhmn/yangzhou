@@ -78,17 +78,20 @@ test("日期与超期标识——详情设置日期,看板红标,甘特可见", 
   // 必须等回填已渲染再录时刻,否则回填覆盖 fill(A10 同款竞态,2026-11-18 实锤)
   const reloadResp = page.waitForResponse(
     (r) =>
-      r.url().includes(`/api/items/${itemId}`) &&
+      // 精确匹配 item GET(subitems 等子资源 GET 也含 itemId 前缀,不能混)
+      r.url().match(new RegExp(`/api/items/${itemId}$`)) !== null &&
       r.request().method() === "GET",
   );
   await page.getByRole("button", { name: "保存" }).click();
   await saveResp;
-  await reloadResp;
+  const reload = await (await reloadResp).json();
   await expectDate(page, "开始日期", "2020-01-01");
-  // YPJ-208 切片 c:时刻字段可录并随保存发出 datetime。YPJ-216 起守卫会给 due 预铺任意时刻,
-  // 「date-only→日末 23:59 回填」断言不再成立(语义转后端集成覆盖);先等回填渲染落地再录,免 A10 同款竞态
+  // YPJ-208 切片 c:时刻字段可录并随保存发出 datetime。YPJ-216 起守卫给 due 预铺任意时刻,
+  // 进页时时刻框已非空,「not toHaveValue("")」会立即通过,拦不住回填 setState 晚到覆盖 fill
+  // (A10 竞态新变体,2026-11-24 实锤:patch 发出守卫铺算时刻)。改为等输入框显出本轮回填值
+  const backfillTime = (reload.dueDate as string | null)?.slice(11, 16) ?? "";
   const dueTimeInput = page.getByLabel("截止时刻");
-  await expect(dueTimeInput).not.toHaveValue("");
+  if (backfillTime) await expect(dueTimeInput).toHaveValue(backfillTime);
   await dueTimeInput.fill("12:30");
   await expect(dueTimeInput).toHaveValue("12:30");
   const patchBody = page.waitForRequest(
