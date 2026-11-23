@@ -40,8 +40,15 @@ export default function BoardCard({
     <Card
       draggable
       onDragStart={(e) => e.dataTransfer.setData("text/plain", it.itemId)}
-      // YPJ-238:drop 落在卡上 = 列内/跨列落位(插目标后);stopPropagation 防止冒泡成列空白迁移
-      onDragOver={onCardDrop ? (e) => e.stopPropagation() : undefined}
+      // YPJ-238:drop 落在卡上 = 列内/跨列落位(插目标后);preventDefault 放行 drop,stopPropagation 防止冒泡成列空白迁移
+      onDragOver={
+        onCardDrop
+          ? (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }
+          : undefined
+      }
       onDrop={
         onCardDrop
           ? (e) => {
