@@ -15,6 +15,7 @@ export default function BoardColumn({
   projectKey,
   onRemoved,
   onAssigneeChanged,
+  onCardDrop,
 }: {
   status: Status;
   list: Item[];
@@ -25,6 +26,7 @@ export default function BoardColumn({
   projectKey: string;
   onRemoved: () => void | Promise<void>;
   onAssigneeChanged: () => void | Promise<void>;
+  onCardDrop?: (itemId: string, targetId: string) => void;
 }) {
   return (
     <Box
@@ -57,6 +59,7 @@ export default function BoardColumn({
             key={it.itemId}
             it={it}
             projectKey={projectKey}
+            onCardDrop={onCardDrop}
             removable={status.statusType !== "FINAL"}
             onRemoved={onRemoved}
             onAssigneeChanged={onAssigneeChanged}

@@ -95,6 +95,7 @@ abstract class AbstractApiTest {
             "release",
             "release_item",
             "item_dependency",
+            "board_item_order",
             "item_activity",
             "item_status_history",
             "checklist_item",

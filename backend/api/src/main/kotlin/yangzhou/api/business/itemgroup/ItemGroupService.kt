@@ -642,6 +642,10 @@ class ItemGroupService(
             memberships.delete(m)
             memberHistory.recordRemove(m.groupObjectId, m.itemObjectId, clock.instant())
         }
+        // YPJ-238:移出 level-1 sprint(退板路径之一)→ 删排序行
+        if (target == null && typeKey == level1Key(item.projectObjectId)) {
+            itemService.removeBoardOrder(item.objectId!!)
+        }
         if (target != null && live.none { it.groupObjectId == target.objectId }) {
             memberships.save(ItemGroupMember(groupObjectId = target.objectId!!, itemObjectId = item.objectId!!))
             memberHistory.recordAdd(target.objectId!!, item.objectId!!, clock.instant())
@@ -680,6 +684,8 @@ class ItemGroupService(
             }
         } else {
             itemRepo.save(item.copy(onBoard = false))
+            // YPJ-238:退板删排序行(S0 走这里;有组走 replaceMembership 同一钩子,幂等)
+            itemService.removeBoardOrder(item.objectId!!)
             if (l1 != null) replaceMembership(itemObjectId, MembershipRequest(groupId = null, groupType = l1))
         }
         return itemService.get(itemObjectId)

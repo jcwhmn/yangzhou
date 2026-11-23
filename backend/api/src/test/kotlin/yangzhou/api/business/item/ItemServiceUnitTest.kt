@@ -111,6 +111,9 @@ class ItemServiceUnitTest {
             itemAttributes,
         )
 
+    // YPJ-238:排序行查询需显式 stub,提为字段
+    private val boardOrders: yangzhou.persistence.repository.BoardItemOrderRepository = mockk(relaxed = true)
+
     private val service =
         ItemService(
             projects = projects,
@@ -140,6 +143,7 @@ class ItemServiceUnitTest {
             milestoneItems = mockk(relaxed = true),
             itemFinalize = mockk(relaxed = true),
             timeEntries = mockk(relaxed = true),
+            boardOrders = boardOrders,
             clock = Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC),
         )
 
@@ -452,6 +456,8 @@ class ItemServiceUnitTest {
 
             row = row.copy(assigneeObjectId = me.objectId) // 已有主,过开工守卫
 
+            // YPJ-238:该 item 无排序行,迁移不动 board_item_order(relaxed mock 默认值不可信,显式 stub)
+            every { boardOrders.findByProjectObjectIdAndItemObjectId(any(), any()) } returns null
             val dto =
                 service.update(
                     itemOid,

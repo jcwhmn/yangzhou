@@ -26,18 +26,32 @@ export default function BoardCard({
   removable,
   onRemoved,
   onAssigneeChanged,
+  onCardDrop,
 }: {
   it: Item;
   projectKey: string;
   removable: boolean;
   onRemoved: () => void | Promise<void>;
   onAssigneeChanged: () => void | Promise<void>;
+  onCardDrop?: (itemId: string, targetId: string) => void;
 }) {
   const router = useRouter();
   return (
     <Card
       draggable
       onDragStart={(e) => e.dataTransfer.setData("text/plain", it.itemId)}
+      // YPJ-238:drop 落在卡上 = 列内/跨列落位(插目标后);stopPropagation 防止冒泡成列空白迁移
+      onDragOver={onCardDrop ? (e) => e.stopPropagation() : undefined}
+      onDrop={
+        onCardDrop
+          ? (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              const id = e.dataTransfer.getData("text/plain");
+              if (id && id !== it.itemId) onCardDrop(id, it.itemId);
+            }
+          : undefined
+      }
       onClick={() => router.push(`/p/${projectKey}/i/${it.itemId}`)}
       sx={{
         cursor: "pointer",

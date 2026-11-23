@@ -6,6 +6,7 @@ import org.springframework.data.repository.CrudRepository
 import org.springframework.data.repository.Repository
 import yangzhou.persistence.Attachment
 import yangzhou.persistence.AttributeDefinition
+import yangzhou.persistence.BoardItemOrder
 import yangzhou.persistence.Capability
 import yangzhou.persistence.ChecklistItem
 import yangzhou.persistence.Comment
@@ -839,4 +840,21 @@ interface ItemTreeRepository : Repository<Item, Long> {
 
     @Query("SELECT parent_object_id FROM item WHERE object_id = :objectId")
     fun findParentObjectId(objectId: UUID): UUID?
+}
+
+/** YPJ-238(spec 0166):看板视图级排序记忆(项目 × item);仅派生查询,无自定义 SQL。 */
+interface BoardItemOrderRepository : CrudRepository<BoardItemOrder, Long> {
+    fun findByProjectObjectId(projectObjectId: UUID): List<BoardItemOrder>
+
+    fun findByProjectObjectIdAndItemObjectId(
+        projectObjectId: UUID,
+        itemObjectId: UUID,
+    ): BoardItemOrder?
+
+    fun findByItemObjectId(itemObjectId: UUID): BoardItemOrder?
+
+    fun deleteByProjectObjectIdAndItemObjectIdIn(
+        projectObjectId: UUID,
+        itemObjectIds: Collection<UUID>,
+    )
 }

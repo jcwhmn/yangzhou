@@ -173,6 +173,11 @@ class ItemActivity {
   oldValue: String?
   newValue: String?
 }
+class BoardItemOrder {
+  projectObjectId: UUID
+  itemObjectId: UUID
+  position: Int
+}
 class Favorite
 class ProjectView {
   name: String

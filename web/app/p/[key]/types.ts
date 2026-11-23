@@ -22,6 +22,7 @@ export type Item = {
   overdue: boolean;
   dueSoon: boolean;
   estimateValue: number | null; // YPJ-186 预估快照
+  boardOrder: number | null; // YPJ-238(spec 0166):看板排序记忆(null=未排过,沉底按编号)
   estimateUnit: string | null;
   blocked: boolean;
   sprintName: string | null;

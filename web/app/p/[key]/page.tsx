@@ -259,6 +259,37 @@ export default function BoardPage() {
     }
   }
 
+  // YPJ-238(spec 0166):拖 A 到 B 卡上 = 插到 B 后(spec 拍板);跨列同拖=先迁状态(后端钩子沉底)再 PUT 落位;按列全列重排提交
+  const reorderTo = async (
+    itemId: string,
+    targetId: string,
+    status: Status,
+  ) => {
+    const dragged = items.find((i) => i.itemId === itemId);
+    if (!dragged) return;
+    if (dragged.status !== status.name) await moveTo(itemId, status);
+    // 用全量 items 而非 filtered:assignee 过滤隐藏的卡不能被当僵尸删行
+    const col = items.filter((i) => i.status === status.name);
+    const base = col.filter((i) => i.itemId !== itemId);
+    const ti = base.findIndex((i) => i.itemId === targetId);
+    if (ti < 0) return;
+    const ordered = [...base];
+    ordered.splice(ti + 1, 0, dragged);
+    try {
+      await api(`/api/projects/${key}/board-order`, {
+        method: "PUT",
+        body: JSON.stringify({
+          status: status.name,
+          orderedItemIds: ordered.map((i) => i.itemId),
+        }),
+      });
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t.board.moveFailed);
+      await load();
+    }
+  };
+
   // S7:assignee filter (purely frontend; "unassigned" = assignee is null); sprint scope is determined by the backend board endpoint (YPJ-29)
   const filtered =
     filter === "all"
@@ -282,6 +313,15 @@ export default function BoardPage() {
     list.push(it);
     byStatusName.set(it.status, list);
   });
+  // YPJ-238(spec 0166):列内排序键 boardOrder ASC → number 兜底(沉底;自然序保持后端口径)
+  byStatusName.forEach((list) =>
+    list.sort(
+      (a, b) =>
+        (a.boardOrder ?? Number.MAX_SAFE_INTEGER) -
+          (b.boardOrder ?? Number.MAX_SAFE_INTEGER) ||
+        a.number.localeCompare(b.number, undefined, { numeric: true }),
+    ),
+  );
 
   return (
     <Box sx={{ p: 3 }}>
@@ -380,6 +420,11 @@ export default function BoardPage() {
                   setDragOver(null);
                   const itemId = e.dataTransfer.getData("text/plain");
                   if (itemId) moveTo(itemId, s);
+                }}
+                onCardDrop={(itemId, targetId) => {
+                  setDragOver(null);
+                  if (!itemId || itemId === targetId) return;
+                  void reorderTo(itemId, targetId, s);
                 }}
                 projectKey={key}
                 onRemoved={load}

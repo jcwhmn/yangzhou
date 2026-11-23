@@ -43,6 +43,18 @@ class ItemController(
         @PathVariable key: String,
     ): List<ItemService.ItemDto> = service.list(key)
 
+    /** YPJ-238(spec 0166):看板列内手工排序(按列全列重排)。 */
+    @PutMapping("/projects/{key}/board-order")
+    fun saveBoardOrder(
+        @PathVariable key: String,
+        @RequestBody request: BoardOrderRequest,
+    ) = service.saveBoardOrder(key, request.status, request.orderedItemIds)
+
+    data class BoardOrderRequest(
+        val status: String,
+        val orderedItemIds: List<UUID>,
+    )
+
     @GetMapping("/items/{itemId}")
     fun get(
         @PathVariable itemId: UUID,
