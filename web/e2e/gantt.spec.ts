@@ -1470,13 +1470,17 @@ test("YPJ-246 ppd 记忆:缩放后 reload 同密度(localStorage 跨会话)", as
   // 甘特区(scrollRef/缩放)仅在有已排期行时渲染;空态无缩放,不写记忆属预期
   const item = await apiCreateItem(projectKey, "E2E ppd 记忆底座");
   const t = new Date();
-  const day = (offset: number) =>
-    `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate() + offset).padStart(2, "0")}`;
+  const day = (offset: number) => {
+    const d = new Date(t);
+    d.setDate(d.getDate() + offset);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
   await apiCall("PATCH", `/api/items/${item}`, {
     startDate: day(-1),
     dueDate: day(1),
   });
   await page.goto(`/p/${projectKey}/gantt`);
+  await pickScope(page, "全部"); // 缺省 board 不含未入 sprint 的票
   await expect(page.getByTestId("gantt-scroll")).toBeVisible();
   await page.getByTestId("gantt-zoom-in").click();
   // effect 异步落盘(点击→渲染→useEffect),轮询等写入
