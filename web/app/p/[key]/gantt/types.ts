@@ -29,6 +29,7 @@ export const DAY = 24 * 60 * 60 * 1000;
 export const TITLE_W_DEFAULT = 280; // 标题列默认宽(=236 出厂值;237 双击重置回落此值)
 export const TITLE_W_MIN = 120;
 export const TITLE_W_LS = "yz-gantt-title-w"; // 237:标题列宽 localStorage 记忆键
+export const PPD_LS = "yz-gantt-ppd"; // 0165:缩放密度(ppd)跨会话记忆键
 export const MAX_PPD = 4800; // 缩放上限:YPJ-226 切片3(spec 0163)由 2400 放宽至亚日窗(4800ppd 时 30min=100px);YPJ-230 承诺收窄为缺省态(fit/GANTT_MIN_PPD 约束不变),显式缩放放行
 export const GANTT_MIN_PPD = 3; // 缺省视窗 pxPerDay 下限(YPJ-234 拍板案 B 修订:宽区间不把条压没;1 天 ≈ 3px、1 月 ≈ 91px 可读;只约束缺省态,显式缩放仍可压破至 fit)
 export const MIN_LABEL_PX = 44; // 刻度标签最小间距

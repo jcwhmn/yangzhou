@@ -11,7 +11,7 @@ import {
 } from "@mui/material";
 import { PageShell } from "@/components/PageShell";
 import { useParams } from "next/navigation";
-import { useRef, useState } from "react";
+import { useRef, useState, useCallback } from "react";
 import { t } from "@/lib/texts";
 import { DateInput } from "@/components/DateInput";
 
@@ -21,7 +21,15 @@ import { useGanttInteraction } from "./hooks/useGanttInteraction";
 import { useTimelineScale } from "./hooks/useTimelineScale";
 import { Splitter, TitleColumn } from "./components/TitleColumn";
 import { UnscheduledGroup } from "./components/UnscheduledGroup";
-import { ZOOM_STEP } from "./types";
+import {
+  ZOOM_STEP,
+  GANTT_MIN_PPD,
+  MAX_PPD,
+  PPD_LS,
+  type GanttRow,
+} from "./types";
+import { statusTint } from "./statusTint";
+import { LegendPopover } from "./components/LegendPopover";
 import { GanttChart } from "./GanttChart";
 import { markerDatesOf } from "./components/MilestoneLines";
 /** 单项目树形甘特(只读)。条 = start→due;只有 due 画里程碑菱形;今日线;未排期折叠组。 */
@@ -46,13 +54,32 @@ export default function GanttPage() {
       return {};
     }
   })();
-  const [zoom, setZoom] = useState<number | null>(savedView.zoom ?? null);
+  // spec 0165 SRS §3.5:ppd 跨会话记忆——会话内记忆优先,无则读 localStorage(失败静默走 fit)
+  const savedPpd = (() => {
+    try {
+      const v = Number(localStorage.getItem(PPD_LS));
+      return Number.isFinite(v) && v > 0
+        ? Math.min(Math.max(v, GANTT_MIN_PPD), MAX_PPD)
+        : null;
+    } catch {
+      return null;
+    }
+  })();
+  const [zoom, setZoom] = useState<number | null>(savedView.zoom ?? savedPpd);
   const [center, setCenter] = useState(savedView.center ?? "");
   const [scope, setScope] = useState(savedView.scope ?? "board");
   const [scopeIds, setScopeIds] = useState<string[]>(savedView.scopeIds ?? []);
   // 数据获取与借锚(CP2a:rows/wd/二级选项随 fetch 收进 useGanttData,入口经返回值持有)
-  const { rows, wd, pullDefault, groupOpts, msOpts, relOpts, groupStartOf } =
-    useGanttData(key, scope, scopeIds);
+  const {
+    rows,
+    wd,
+    pullDefault,
+    groupOpts,
+    msOpts,
+    relOpts,
+    groupStartOf,
+    tiers,
+  } = useGanttData(key, scope, scopeIds);
   const scrollRef = useRef<HTMLDivElement>(null);
   const {
     containerW,
@@ -81,6 +108,20 @@ export default function GanttPage() {
     completedRows,
     mainRows,
   } = useEnvelope({ rows, wd, groupStartOf, collapsed });
+  // spec 0165 SRS §3.3:叶行底色;父行/未排期/非 item 状态行 → null(透明)。tiers 由 useGanttData 随项目拉取
+  const tintOf = useCallback(
+    (r: GanttRow): string | null =>
+      hasKid(r)
+        ? null
+        : statusTint(
+            r.statusType,
+            r.statusType === "ACTIVE"
+              ? (tiers.map.get(r.statusName) ?? null)
+              : null,
+            tiers.count,
+          ),
+    [tiers, hasKid],
+  );
   const { axis, zoomTo, shiftCenter, centerOnToday, xOf, xOfT, xEndOf } =
     useTimelineScale({
       rows,
@@ -258,6 +299,8 @@ export default function GanttPage() {
               ▶
             </Button>
           </Stack>
+          {/* spec 0165 SRS §3.6:图例浮层(条五色 + 底色三分类) */}
+          <LegendPopover />
         </Stack>
       </Stack>
 
@@ -295,6 +338,7 @@ export default function GanttPage() {
               collapsed={collapsed}
               toggle={toggle}
               hasKid={hasKid}
+              tintOf={tintOf}
               projectKey={key}
             />
             <Splitter
@@ -312,6 +356,7 @@ export default function GanttPage() {
               onToggleCompleted={() => setShowCompleted((v) => !v)}
               collapsed={collapsed}
               hasKid={hasKid}
+              tintOf={tintOf}
               summaryOf={summaryOf}
               descendantsOf={descendantsOf}
               groupStartOf={groupStartOf}

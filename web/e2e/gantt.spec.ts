@@ -1377,3 +1377,122 @@ test("无里程碑/发布:旗标带不渲染,行位不受影响(YPJ-221 E1)", as
   await expect(page.getByTestId("gantt-flag-band")).toHaveCount(0);
   await expect(page.getByText("E2E 空态底座")).toBeVisible();
 });
+
+// ---- YPJ-246(spec 0165):行底色三分类 + 图例 + ppd 记忆 ----
+
+test("YPJ-246 行底色:START 灰蓝 / ACTIVE 浓淡随状态数分档 / FINAL 淡绿,父行透明", async ({
+  page,
+  projectKey,
+}) => {
+  const proj = await apiCall<{
+    statuses: { statusId: string; name: string; statusType: string }[];
+  }>("GET", `/api/projects/${projectKey}`);
+  const act = proj.statuses.filter((s) => s.statusType === "ACTIVE");
+  const fin = proj.statuses.find((s) => s.statusType === "FINAL");
+  const d = (offset: number) => {
+    const t = new Date();
+    t.setDate(t.getDate() + offset);
+    return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+  };
+
+  const parent = await apiCreateItem(projectKey, "E2E 底色父");
+  const start = await apiCreateItem(projectKey, "E2E 底色起点");
+  const a1 = await apiCreateItem(projectKey, "E2E 底色进行一");
+  await apiAssignMe(a1); // 迁出 START 前须指派(409 根因)
+  const a2 = await apiCreateItem(projectKey, "E2E 底色进行二");
+  await apiAssignMe(a2);
+  const done = await apiCreateItem(projectKey, "E2E 底色完成");
+  await apiAssignMe(done);
+  // 父行须有已排期子才成父(hasKid),父行断言用;返回值不消费
+  await makeChild(projectKey, "E2E 底父子", parent, d(-2), d(1));
+  for (const [id, st, s, e] of [
+    [start, null, d(-1), d(1)],
+    [a1, act[0]?.statusId, d(-1), d(1)],
+    [a2, act[1]?.statusId, d(-1), d(1)],
+    [done, fin?.statusId, d(-1), d(1)],
+  ] as [string, string | null, string, string][]) {
+    await apiCall("PATCH", `/api/items/${id}`, {
+      startDate: s,
+      dueDate: e,
+      ...(st ? { statusItemId: st } : {}),
+    });
+  }
+  await apiAssignMe(done);
+  void done;
+
+  await page.goto(`/p/${projectKey}/gantt`);
+  await pickScope(page, "全部");
+  await expandCompleted(page); // done 行在已完成组(YPJ-245)
+  for (const t of [
+    "E2E 底色起点",
+    "E2E 底色进行一",
+    "E2E 底色进行二",
+    "E2E 底色完成",
+    "E2E 底色父",
+  ])
+    await expect(page.getByText(t)).toBeVisible();
+
+  // 标题格底色:标题 Typography 的祖先链 a → Stack → 格 Box
+  const bgOf = (title: string) =>
+    page.getByText(title).evaluate((el) => {
+      const cell = el.closest("a")!.parentElement!.parentElement!;
+      return getComputedStyle(cell).backgroundColor;
+    });
+  const [bgStart, bgA1, bgA2, bgDone, bgParent] = await Promise.all([
+    bgOf("E2E 底色起点"),
+    bgOf("E2E 底色进行一"),
+    bgOf("E2E 底色进行二"),
+    bgOf("E2E 底色完成"),
+    bgOf("E2E 底色父"),
+  ]);
+  const transparent = "rgba(0, 0, 0, 0)";
+  // 四行两两互异(默认 workflow ACTIVE 有 3 态,本用例用 2 态 → 浅+中,不同档)
+  const bgs = [bgStart, bgA1, bgA2, bgDone];
+  for (let i = 0; i < bgs.length; i++)
+    for (let j = i + 1; j < bgs.length; j++)
+      expect(bgs[i], `行 ${i} vs 行 ${j}`).not.toBe(bgs[j]);
+  // 父行透明
+  expect(bgParent).toBe(transparent);
+});
+test("YPJ-246 图例浮层:按钮开、点外关", async ({ page, projectKey }) => {
+  await page.goto(`/p/${projectKey}/gantt`);
+  await page.getByTestId("gantt-legend").click();
+  await expect(page.getByTestId("gantt-legend-popover")).toBeVisible();
+  await expect(page.getByText("行底色(状态扫读)")).toBeVisible();
+  await page.mouse.click(10, 10);
+  await expect(page.getByTestId("gantt-legend-popover")).toBeHidden();
+});
+
+test("YPJ-246 ppd 记忆:缩放后 reload 同密度(localStorage 跨会话)", async ({
+  page,
+  projectKey,
+}) => {
+  // 甘特区(scrollRef/缩放)仅在有已排期行时渲染;空态无缩放,不写记忆属预期
+  const item = await apiCreateItem(projectKey, "E2E ppd 记忆底座");
+  const t = new Date();
+  const day = (offset: number) => {
+    const d = new Date(t);
+    d.setDate(d.getDate() + offset);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
+  await apiCall("PATCH", `/api/items/${item}`, {
+    startDate: day(-1),
+    dueDate: day(1),
+  });
+  await page.goto(`/p/${projectKey}/gantt`);
+  await pickScope(page, "全部"); // 缺省 board 不含未入 sprint 的票
+  await expect(page.getByTestId("gantt-scroll")).toBeVisible();
+  await page.getByTestId("gantt-zoom-in").click();
+  // effect 异步落盘(点击→渲染→useEffect),轮询等写入
+  await expect
+    .poll(() => page.evaluate(() => localStorage.getItem("yz-gantt-ppd")), {
+      timeout: 5000,
+    })
+    .not.toBeNull();
+  const saved = await page.evaluate(() => localStorage.getItem("yz-gantt-ppd"));
+  await page.reload();
+  await expect(page.getByTestId("gantt-zoom-in")).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem("yz-gantt-ppd"))).toBe(
+    saved,
+  );
+});

@@ -7,6 +7,7 @@ import {
   GANTT_MIN_PPD,
   MAX_PPD,
   MIN_LABEL_PX,
+  PPD_LS,
   ZOOM_STEP,
   type GanttRow,
   type HeaderRow,
@@ -303,6 +304,16 @@ export function useTimelineScale(opts: {
       tToX,
     };
   }, [rows, zoom, containerW, wd, groupStartOf, markerDates]);
+
+  // spec 0165 SRS §3.5:ppd 跨会话记忆——当前密度落 localStorage(fit 也属显式视窗选择),读取失败静默
+  useEffect(() => {
+    if (containerW <= 0) return; // 首测宽前的 fit 值不写
+    try {
+      localStorage.setItem(PPD_LS, String(axis.pxPerDay));
+    } catch {
+      /* 隐私模式等:无记忆可用,静默 */
+    }
+  }, [axis.pxPerDay, containerW]);
 
   // 缩放:锚点(anchorClientX,视口坐标)下的数据点保持不动;null 锚 = 视口中心。
   // px 比例缩放(模式无关):x 轴线性(pxPerMs 恒定),直接按比例缩 scrollLeft,无需逆映射。
