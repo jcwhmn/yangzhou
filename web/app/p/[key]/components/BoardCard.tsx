@@ -43,11 +43,7 @@ export default function BoardCard({
   return (
     <Card
       draggable
-      onDragStart={(e) => {
-        e.dataTransfer.setData("text/plain", it.itemId);
-        e.dataTransfer.effectAllowed = "move";
-      }}
-      data-board-item={it.itemId}
+      onDragStart={(e) => e.dataTransfer.setData("text/plain", it.itemId)}
       onClick={() => router.push(`/p/${projectKey}/i/${it.itemId}`)}
       sx={{
         cursor: "pointer",
@@ -63,7 +59,7 @@ export default function BoardCard({
         <Stack spacing={0.5}>
           <Stack direction="row" spacing={1} alignItems="center">
             {(onUp || onDown) && (
-              <Stack direction="column" sx={{ mr: -0.5 }}>
+              <Stack direction="column" sx={{ mr: 0.5 }}>
                 <IconButton
                   size="small"
                   aria-label="上移"

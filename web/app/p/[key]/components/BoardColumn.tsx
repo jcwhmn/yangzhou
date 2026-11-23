@@ -52,10 +52,9 @@ export default function BoardColumn({
       <Stack direction="row" alignItems="center" sx={{ px: 1, py: 0.5 }}>
         <Typography variant="subtitle2" sx={{ flex: 1 }}>
           {status.icon ? `${status.icon} ` : ""}
-          {status.name}({list.length})
-          {status.statusType === "FINAL" && " [终态]"}
+          {status.name}({list.length}){status.statusType === "FINAL" && " [终态]"}
         </Typography>
-        {/* YPJ-238:排序模式开关——点后卡片出上下箭头,再点关闭 */}
+        {/* YPJ-238:排序模式开关——点后卡片出上下箭头,再点退出 */}
         <Tooltip title={sorting ? "退出排序" : "排序"}>
           <IconButton
             size="small"
@@ -81,9 +80,7 @@ export default function BoardColumn({
             removable={status.statusType !== "FINAL"}
             onRemoved={onRemoved}
             onAssigneeChanged={onAssigneeChanged}
-            onUp={
-              sorting && i > 0 ? () => onMoveArrow(it.itemId, -1) : undefined
-            }
+            onUp={sorting && i > 0 ? () => onMoveArrow(it.itemId, -1) : undefined}
             onDown={
               sorting && i < list.length - 1
                 ? () => onMoveArrow(it.itemId, 1)
