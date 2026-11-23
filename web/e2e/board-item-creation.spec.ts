@@ -197,6 +197,7 @@ test("D10 详情页挂计划中组→暂不→挂载生效但未激活", async (
   await page.goto(`/p/${projectKey}/i/${itemId}`);
 
   await page.getByRole("combobox", { name: "Sprint" }).click();
+  await page.waitForTimeout(300); // MUI Menu 淡入期吞点击(仓库已知陷阱,同 pickScope)
   await page.getByRole("option", { name: /计划中B4/ }).click();
 
   const dialog = page.getByRole("dialog");
