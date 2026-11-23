@@ -260,13 +260,11 @@ export default function BoardPage() {
   }
 
   // YPJ-238:列内排序不再拖拽(用户拍板:箭头排序);按当前列显示序相邻交换后 PUT 全列。用全量 items(过滤隐藏卡不能被当僵尸删行)
-  const sortCol = (list: Item[]) =>
-    [...list].sort(
-      (a, b) =>
-        (a.boardOrder ?? Number.MAX_SAFE_INTEGER) -
-          (b.boardOrder ?? Number.MAX_SAFE_INTEGER) ||
-        a.number.localeCompare(b.number, undefined, { numeric: true }),
-    );
+  const byBoardOrder = (a: Item, b: Item) =>
+    (a.boardOrder ?? Number.MAX_SAFE_INTEGER) -
+      (b.boardOrder ?? Number.MAX_SAFE_INTEGER) ||
+    a.number.localeCompare(b.number, undefined, { numeric: true });
+  const sortCol = (list: Item[]) => [...list].sort(byBoardOrder);
   const moveByArrow = async (itemId: string, status: Status, dir: -1 | 1) => {
     const col = sortCol(items.filter((i) => i.status === status.name));
     const ti = col.findIndex((i) => i.itemId === itemId);
@@ -315,7 +313,8 @@ export default function BoardPage() {
     byStatusName.set(it.status, list);
   });
   // YPJ-238(spec 0166):列内排序键 boardOrder ASC → number 兜底(沉底;自然序保持后端口径)
-  byStatusName.forEach((list) => sortCol(list));
+  // YPJ-238 修复:sortCol 返回新数组,必须写回 map;之前返回值被丢弃导致列显示序永不变(箭头看起来"没反应")
+  byStatusName.forEach((list, name) => byStatusName.set(name, sortCol(list)));
 
   return (
     <Box sx={{ p: 3 }}>
