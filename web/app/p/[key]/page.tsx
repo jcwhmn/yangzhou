@@ -259,10 +259,10 @@ export default function BoardPage() {
     }
   }
 
-  // YPJ-238(spec 0166):拖 A 到 B 卡上 = 插到 B 后(spec 拍板);跨列同拖=先迁状态(后端钩子沉底)再 PUT 落位;按列全列重排提交
+  // YPJ-238:拖 A 到 B 卡上 = 插 B 后;targetId=null = 同列拖到空白 → 移到末尾;按列全列重排提交
   const reorderTo = async (
     itemId: string,
-    targetId: string,
+    targetId: string | null,
     status: Status,
   ) => {
     const dragged = items.find((i) => i.itemId === itemId);
@@ -271,10 +271,14 @@ export default function BoardPage() {
     // 用全量 items 而非 filtered:assignee 过滤隐藏的卡不能被当僵尸删行
     const col = items.filter((i) => i.status === status.name);
     const base = col.filter((i) => i.itemId !== itemId);
-    const ti = base.findIndex((i) => i.itemId === targetId);
-    if (ti < 0) return;
     const ordered = [...base];
-    ordered.splice(ti + 1, 0, dragged);
+    if (targetId != null) {
+      const ti = ordered.findIndex((i) => i.itemId === targetId);
+      if (ti < 0) return;
+      ordered.splice(ti + 1, 0, dragged);
+    } else {
+      ordered.push(dragged); // 列末尾
+    }
     try {
       await api(`/api/projects/${key}/board-order`, {
         method: "PUT",
@@ -410,6 +414,7 @@ export default function BoardPage() {
                 dragOver={dragOver}
                 onDragOver={(e) => {
                   e.preventDefault();
+                  e.dataTransfer.dropEffect = "move";
                   setDragOver(s.statusId);
                 }}
                 onDragLeave={() =>
@@ -419,7 +424,14 @@ export default function BoardPage() {
                   e.preventDefault();
                   setDragOver(null);
                   const itemId = e.dataTransfer.getData("text/plain");
-                  if (itemId) moveTo(itemId, s);
+                  if (!itemId) return;
+                  const dragged = items.find((i) => i.itemId === itemId);
+                  if (dragged && dragged.status === s.name) {
+                    // YPJ-238:同列空白 drop = 移到列末尾(中间卡拖尾的入口)
+                    void reorderTo(itemId, null, s);
+                  } else {
+                    moveTo(itemId, s);
+                  }
                 }}
                 onCardDrop={(itemId, targetId) => {
                   setDragOver(null);

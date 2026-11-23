@@ -39,12 +39,16 @@ export default function BoardCard({
   return (
     <Card
       draggable
-      onDragStart={(e) => e.dataTransfer.setData("text/plain", it.itemId)}
+      onDragStart={(e) => {
+        e.dataTransfer.setData("text/plain", it.itemId);
+        e.dataTransfer.effectAllowed = "move"; // 不声明时 Chrome 拖拽常显禁止标
+      }}
       // YPJ-238:drop 落在卡上 = 列内/跨列落位(插目标后);preventDefault 放行 drop,stopPropagation 防止冒泡成列空白迁移
       onDragOver={
         onCardDrop
           ? (e) => {
               e.preventDefault();
+              e.dataTransfer.dropEffect = "move";
               e.stopPropagation();
             }
           : undefined
