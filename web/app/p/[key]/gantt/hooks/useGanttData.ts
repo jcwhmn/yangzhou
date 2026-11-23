@@ -8,6 +8,7 @@ import {
   type ReleaseMarker,
 } from "../types";
 import { hmToMin } from "../utils/timeCalculations";
+import { activeTierMap } from "../statusTint";
 
 /** 甘特数据获取与借锚(YPJ-249 自 page.tsx 原样搬出,零语义变化)。
  * as-built 偏差(spec 0153 §状态拍板):rows/wd/二级选项的 useState 随 fetch 收进 hook(load/序号守卫/两个 effect 是其专属机制),入口经返回值持有;scope 状态仍留入口。 */
@@ -20,6 +21,11 @@ export function useGanttData(key: string, scope: string, scopeIds: string[]) {
     offMin: number;
   } | null>(null); // YPJ-216:甘特缺省画图输入
   const loadSeqRef = useRef(0); // 响应序号守卫:切范围后慢响应晚到不覆盖新状态
+  // spec 0165 SRS §3.2:ACTIVE 状态名→浓淡档序号(0..n-1,n=ACTIVE 状态数)
+  const [tiers, setTiers] = useState<{
+    map: Map<string, number>;
+    count: number;
+  }>({ map: new Map(), count: 0 });
 
   // 范围二级选项(group/milestone/release;列表 API 均返回裸数组)。ms/rel 取全 DTO(YPJ-221 竖线旗标复用同一响应)
   const [groupOpts, setGroupOpts] = useState<
@@ -56,6 +62,8 @@ export function useGanttData(key: string, scope: string, scopeIds: string[]) {
         defaultEstimateValue: string | null;
         defaultEstimateUnit: string | null;
         defaultStartOffsetMinutes: number | null;
+        /** spec 0165:底色浓淡档输入(响应已含,零后端改动) */
+        statuses: { name: string; statusType: string; position: number }[];
       }>(`/api/projects/${key}`),
     ]);
     if (seq !== loadSeqRef.current) return; // 已有更新的范围请求,丢弃过期响应
@@ -75,6 +83,8 @@ export function useGanttData(key: string, scope: string, scopeIds: string[]) {
       hmToMin(proj.workdayEnd),
       proj.workMode === "work",
     ]);
+    const act = (proj.statuses ?? []).filter((s) => s.statusType === "ACTIVE");
+    setTiers({ map: activeTierMap(act), count: act.length });
   }, [key, scope, scopeIds]);
 
   useEffect(() => {
@@ -113,5 +123,14 @@ export function useGanttData(key: string, scope: string, scopeIds: string[]) {
     [rowById],
   );
 
-  return { rows, wd, pullDefault, groupOpts, msOpts, relOpts, groupStartOf };
+  return {
+    rows,
+    wd,
+    pullDefault,
+    groupOpts,
+    msOpts,
+    relOpts,
+    groupStartOf,
+    tiers,
+  };
 }

@@ -17,13 +17,17 @@ export function TitleCell({
   hasKid,
   toggle,
   collapsed,
+  tintOf,
 }: {
   r: GanttRow;
   projectKey: string;
   hasKid: (r: GanttRow) => boolean;
   toggle: (itemId: string) => void;
   collapsed: Set<string>;
+  tintOf: (r: GanttRow) => string | null;
 }) {
+  const isParent = hasKid(r);
+  const tint = tintOf(r);
   return (
     <Box
       key={r.itemId}
@@ -33,6 +37,7 @@ export function TitleCell({
         minHeight: 44,
         display: "flex",
         alignItems: "center",
+        bgcolor: tint ?? "transparent", // spec 0165:状态底色(父行 null=透明)
         "&:hover": { bgcolor: "action.hover" },
       }}
     >
@@ -57,7 +62,7 @@ export function TitleCell({
           variant="outlined"
           sx={{ height: 20 }}
         />
-        {/* 标题可点进详情;自然宽不截断,列内横滚(YPJ-236) */}
+        {/* 标题可点进详情;自然宽不截断,列内横滚(YPJ-236);原生 title 悬停显全名(spec 0165 §3.5);父行字重 600(spec 0165 §3.4) */}
         <Link
           href={`/p/${projectKey}/i/${r.itemId}?from=gantt`}
           style={{ minWidth: 0 }}
@@ -68,9 +73,11 @@ export function TitleCell({
             data-testid={`gantt-title-${r.number}`}
             variant="caption"
             noWrap
+            title={r.title}
             sx={{
               color: "text.primary",
               textDecoration: "underline",
+              fontWeight: isParent ? 600 : 400,
               "&:hover": { color: "primary.main" },
             }}
           >
@@ -165,6 +172,7 @@ export function TitleColumn({
   collapsed,
   toggle,
   hasKid,
+  tintOf,
   projectKey,
 }: {
   titleW: number;
@@ -176,6 +184,7 @@ export function TitleColumn({
   collapsed: Set<string>;
   toggle: (itemId: string) => void;
   hasKid: (r: GanttRow) => boolean;
+  tintOf: (r: GanttRow) => string | null;
   projectKey: string;
 }) {
   return (
@@ -211,6 +220,7 @@ export function TitleColumn({
             hasKid={hasKid}
             toggle={toggle}
             collapsed={collapsed}
+            tintOf={tintOf}
           />
         ))}
         {completedRows.length > 0 && (
@@ -242,6 +252,7 @@ export function TitleColumn({
               hasKid={hasKid}
               toggle={toggle}
               collapsed={collapsed}
+              tintOf={tintOf}
             />
           ))}
       </Box>

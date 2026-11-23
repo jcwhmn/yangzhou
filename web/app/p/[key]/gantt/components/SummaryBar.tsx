@@ -32,9 +32,9 @@ export function SummaryBar({
       >
         <Box
           sx={{
-            height: 8,
+            height: 6,
             borderRadius: 1,
-            bgcolor: "warning.main", // YPJ-222:配色重整——汇总条灰→橙(spec 0147 Q3)
+            bgcolor: "#94A3B8", // spec 0165 §3.4:中性灰蓝降权(原 warning.main 橙不抢权重)
             opacity: 0.75,
           }}
         />

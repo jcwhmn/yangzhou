@@ -35,6 +35,7 @@ export function GanttChart({
   onToggleCompleted,
   collapsed,
   hasKid,
+  tintOf,
   summaryOf,
   descendantsOf,
   groupStartOf,
@@ -56,6 +57,8 @@ export function GanttChart({
   onToggleCompleted: () => void;
   collapsed: Set<string>;
   hasKid: (r: GanttRow) => boolean;
+  /** spec 0165:行底色(父行/非 item 状态行 → null 透明) */
+  tintOf: (r: GanttRow) => string | null;
   summaryOf: (itemId: string) => [string, string] | null;
   descendantsOf: (itemId: string) => number;
   groupStartOf: (r: GanttRow) => string | null;
@@ -180,6 +183,7 @@ export function GanttChart({
           minHeight: 44,
           display: "flex",
           alignItems: "center",
+          bgcolor: tintOf(r) ?? "transparent", // spec 0165:状态底色(父行 null=透明)
           "&:hover": { bgcolor: "action.hover" },
         }}
       >

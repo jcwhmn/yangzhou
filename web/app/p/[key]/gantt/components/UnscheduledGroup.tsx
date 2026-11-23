@@ -46,7 +46,12 @@ export function UnscheduledGroup({
     <>
       {unscheduled.length > 0 && (
         <Box sx={{ mb: 2 }}>
-          <Button size="small" variant="outlined" onClick={onToggle}>
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={onToggle}
+            sx={{ color: "text.secondary" }}
+          >
             {showUnscheduled ? "▼" : "▶"} 未排期({unscheduled.length})
           </Button>
           {showUnscheduled &&
