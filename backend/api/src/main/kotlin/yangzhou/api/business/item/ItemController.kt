@@ -43,7 +43,8 @@ class ItemController(
         @PathVariable key: String,
     ): List<ItemService.ItemDto> = service.list(key)
 
-    /** YPJ-238(spec 0166):看板列内手工排序(按列全列重排)。 */
+    /** YPJ-238(spec 0166):看板列内手工排序(按列全列重排);204 无响应体。 */
+    @ResponseStatus(HttpStatus.NO_CONTENT)
     @PutMapping("/projects/{key}/board-order")
     fun saveBoardOrder(
         @PathVariable key: String,

@@ -425,18 +425,18 @@ export default function BoardPage() {
                   setDragOver(null);
                   const itemId = e.dataTransfer.getData("text/plain");
                   if (!itemId) return;
+                  // YPJ-238:落点卡用 closest 找(卡片不再自带 dragover/drop,整列一个 preventDefault 源,零禁止标);
+                  // 拖到卡上 = 插目标后,拖到空白 = 同列移末尾/跨列仅迁移
+                  const el = (e.target as HTMLElement).closest("[data-board-item]");
+                  const targetId = el?.getAttribute("data-board-item") ?? null;
                   const dragged = items.find((i) => i.itemId === itemId);
-                  if (dragged && dragged.status === s.name) {
-                    // YPJ-238:同列空白 drop = 移到列末尾(中间卡拖尾的入口)
+                  if (targetId == null && dragged && dragged.status === s.name) {
                     void reorderTo(itemId, null, s);
-                  } else {
+                  } else if (targetId != null && targetId !== itemId) {
+                    void reorderTo(itemId, targetId, s);
+                  } else if (targetId == null) {
                     moveTo(itemId, s);
                   }
-                }}
-                onCardDrop={(itemId, targetId) => {
-                  setDragOver(null);
-                  if (!itemId || itemId === targetId) return;
-                  void reorderTo(itemId, targetId, s);
                 }}
                 projectKey={key}
                 onRemoved={load}
