@@ -2950,14 +2950,17 @@ Authorization: Bearer {{token}}
 
 ### ============ 18. YPJ-238 看板列内手工排序(spec 0166;节内自建前置) ============
 ### 建一次性项目(handler 存 key238)
-< {}
+POST {{host}}/api/projects
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
 {"key": "BO238", "name": "238 手测"}
 > {%
 client.global.set("key238", response.body.key);
 %}
 
 ### 建 item a/b/c(handler 存 itemId)
-POST {{base}}/api/projects/{{key238}}/items
+POST {{host}}/api/projects/{{key238}}/items
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
@@ -2967,7 +2970,7 @@ client.global.set("item238a", response.body.itemId);
 %}
 
 ### 238-b / 238-c(共 handler)
-POST {{base}}/api/projects/{{key238}}/items
+POST {{host}}/api/projects/{{key238}}/items
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
@@ -2977,7 +2980,7 @@ client.global.set("item238b", response.body.itemId);
 %}
 
 ###
-POST {{base}}/api/projects/{{key238}}/items
+POST {{host}}/api/projects/{{key238}}/items
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
@@ -2987,30 +2990,30 @@ client.global.set("item238c", response.body.itemId);
 %}
 
 ### [正例] 列内重排:c, a, b → 200(无响应体)
-PUT {{base}}/api/projects/{{key238}}/board-order
+PUT {{host}}/api/projects/{{key238}}/board-order
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {"status": "To Do", "orderedItemIds": ["{{item238c}}", "{{item238a}}", "{{item238b}}"]}
 
 ### [验] 列表回读 boardOrder = 0/1/2
-GET {{base}}/api/projects/{{key238}}/items
+GET {{host}}/api/projects/{{key238}}/items
 Authorization: Bearer {{token}}
 
 ### [负例] 传入不属于项目的 itemId → 400
-PUT {{base}}/api/projects/{{key238}}/board-order
+PUT {{host}}/api/projects/{{key238}}/board-order
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {"status": "To Do", "orderedItemIds": ["11111111-1111-1111-1111-111111111111"]}
 
 ### [负例] 状态不属于项目 → 400
-PUT {{base}}/api/projects/{{key238}}/board-order
+PUT {{host}}/api/projects/{{key238}}/board-order
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {"status": "不存在状态", "orderedItemIds": []}
 
 ### 清场:删一次性项目(.force 物理删)
-DELETE {{base}}/api/projects/BO238?force=true
+DELETE {{host}}/api/projects/BO238?force=true
 Authorization: Bearer {{token}}
