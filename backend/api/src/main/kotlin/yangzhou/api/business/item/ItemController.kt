@@ -43,17 +43,16 @@ class ItemController(
         @PathVariable key: String,
     ): List<ItemService.ItemDto> = service.list(key)
 
-    /** YPJ-238(spec 0166):看板列内手工排序(按列全列重排);204 无响应体。 */
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PutMapping("/projects/{key}/board-order")
-    fun saveBoardOrder(
+    /** YPJ-238(spec 0166 §3.1):看板列内箭头排序(move 交换);响应带该列全序。 */
+    @PostMapping("/projects/{key}/board-order/move")
+    fun moveBoardOrder(
         @PathVariable key: String,
-        @RequestBody request: BoardOrderRequest,
-    ) = service.saveBoardOrder(key, request.status, request.orderedItemIds)
+        @RequestBody request: MoveBoardOrderRequest,
+    ) = service.moveBoardOrder(key, request.itemId, request.dir)
 
-    data class BoardOrderRequest(
-        val status: String,
-        val orderedItemIds: List<UUID>,
+    data class MoveBoardOrderRequest(
+        val itemId: UUID,
+        val dir: String,
     )
 
     @GetMapping("/items/{itemId}")

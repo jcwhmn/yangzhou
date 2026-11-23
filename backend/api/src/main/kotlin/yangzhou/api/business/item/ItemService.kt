@@ -215,46 +215,89 @@ class ItemService(
         return get(item.objectId)
     }
 
-    /** YPJ-238(spec 0166):看板列内手工排序——按列全列重写 position,列外行不动;非法 item/状态 400 fail-fast。 */
+    /** YPJ-238(spec 0166 §3.1):看板列内箭头排序——与相邻项交换位次,至多 2 行 position 写;响应带该列全序。 */
     @Transactional
-    fun saveBoardOrder(
+    fun moveBoardOrder(
         projectKey: String,
-        status: String,
-        orderedItemIds: List<UUID>,
-    ) {
+        itemId: UUID,
+        dir: String,
+    ): MoveBoardOrderResponse {
+        if (dir != "up" && dir != "down") throw BadRequestException("dir 非法:$dir(仅 up/down)")
         val project = projects.findByKey(projectKey) ?: throw NotFoundException("项目不存在:$projectKey")
-        val projectItems = itemRepo.findByProjectObjectIdAndDeletedAtIsNullOrderByNumber(project.objectId!!)
-        val ctx = buildCtx(project, projectItems)
-        if (ctx.statusById.values.none { it.name == status }) throw BadRequestException("状态不属于该项目:$status")
-        val byObjectId = projectItems.associateBy { it.objectId!! }
-        val unknown = orderedItemIds.filter { it !in byObjectId }
-        if (unknown.isNotEmpty()) throw BadRequestException("item 不属于该项目:$unknown")
-        val existing =
-            boardOrders.findByProjectObjectId(project.objectId!!).associateBy { it.itemObjectId }
-        orderedItemIds.forEachIndexed { idx, id ->
-            val cur = existing[id]
-            if (cur == null) {
-                boardOrders.save(
-                    yangzhou.persistence.BoardItemOrder(
-                        projectObjectId = project.objectId!!,
-                        itemObjectId = id,
-                        position = idx,
-                    ),
-                )
-            } else if (cur.position != idx) {
-                boardOrders.save(cur.copy(position = idx, updatedAt = clock.instant()))
-            }
+        val item = itemRepo.findByObjectId(itemId) ?: throw NotFoundException("item 不存在:$itemId")
+        if (item.projectObjectId != project.objectId) throw NotFoundException("item 不属于该项目:$itemId")
+        // 列 = 该 item 当前 status 的看板可见子集;buildCtx 按传入列表取成员关系,不扫全项目
+        val column = itemRepo.findByProjectObjectIdAndStatusObjectId(project.objectId!!, item.statusObjectId)
+        val ctx = buildCtx(project, column)
+        val visible = column.filter { it.onBoard || it.objectId in ctx.currentSprint }
+        val rowList = boardOrders.findByItemObjectIdIn(visible.mapNotNull { it.objectId })
+        val rows = rowList.associateBy { it.itemObjectId }
+        // 显示序(含未排:沉底按编号);边界/交换判定一律基于此列表,不用未排序的 visible
+        val ordered =
+            visible.sortedWith(
+                compareBy(
+                    { rows[it.objectId]?.position ?: Int.MAX_VALUE },
+                    { it.number },
+                ),
+            )
+        val idx = ordered.indexOfFirst { it.objectId == itemId }
+        val j = idx + if (dir == "up") -1 else 1
+        if (idx < 0 || j < 0 || j >= ordered.size) return response(statusName(ctx, item), ordered)
+        // 首次触碰未排序列:未排行按显示序一次性物化(此后每次 move 恒为双行 swap;边界无操作零写入)
+        var next = (rowList.maxOfOrNull { it.position } ?: -1) + 1
+        val mutableRows = rows.toMutableMap()
+        for (it in ordered.filter { it.objectId !in rows }.sortedBy { it.number }) {
+            mutableRows[it.objectId!!] = saveRow(it, project.objectId!!, next)
+            next++
         }
-        // 删除范围 = 当前 status 等于该列且未列入 payload 的既有行(其它列不动)
-        val keep = orderedItemIds.toSet()
-        val stale =
-            existing.values.filter { row ->
-                row.itemObjectId !in keep && byObjectId[row.itemObjectId]?.let { ctx.statusName(it) } == status
-            }
-        if (stale.isNotEmpty()) {
-            boardOrders.deleteByProjectObjectIdAndItemObjectIdIn(project.objectId!!, stale.map { it.itemObjectId })
-        }
+        // 纯双行 swap(两行此时均已物化)
+        val moving = ordered[idx]
+        val neighbor = ordered[j]
+        saveRow(mutableRows[moving.objectId]!!, mutableRows[neighbor.objectId]!!.position)
+        saveRow(mutableRows[neighbor.objectId]!!, mutableRows[moving.objectId]!!.position)
+        return response(statusName(ctx, item), ordered)
     }
+
+    private fun statusName(
+        ctx: ItemCtx,
+        item: Item,
+    ): String = ctx.statusById[item.statusObjectId]?.name ?: ""
+
+    private fun response(
+        status: String,
+        ordered: List<Item>,
+    ): MoveBoardOrderResponse {
+        val all = boardOrders.findByItemObjectIdIn(ordered.mapNotNull { it.objectId }).associateBy { it.itemObjectId }
+        // 按写入后的新鲜位次排(调用方传入的 ordered 可能基于写前快照)
+        val sorted = ordered.sortedWith(compareBy({ all[it.objectId]?.position ?: Int.MAX_VALUE }, { it.number }))
+        return MoveBoardOrderResponse(
+            status,
+            sorted.map { OrderedBoardOrder(it.objectId!!, all[it.objectId]?.position) },
+        )
+    }
+
+    private fun saveRow(
+        row: yangzhou.persistence.BoardItemOrder,
+        position: Int,
+    ) {
+        if (row.position != position) boardOrders.save(row.copy(position = position, updatedAt = clock.instant()))
+    }
+
+    private fun saveRow(
+        item: Item,
+        projectObjectId: UUID,
+        position: Int,
+    ): yangzhou.persistence.BoardItemOrder = boardOrders.save(
+        yangzhou.persistence.BoardItemOrder(
+            projectObjectId = projectObjectId,
+            itemObjectId = item.objectId!!,
+            position = position,
+        ),
+    )
+
+    data class MoveBoardOrderResponse(val status: String, val ordered: List<OrderedBoardOrder>)
+
+    data class OrderedBoardOrder(val itemId: UUID, val boardOrder: Int?)
 
     /** YPJ-238:退板删行(回 backlog 无列内位次记忆);幂等。 */
     @Transactional
@@ -270,8 +313,7 @@ class ItemService(
     ) {
         val row = boardOrders.findByProjectObjectIdAndItemObjectId(projectObjectId, itemObjectId) ?: return
         val columnIds = itemRepo.findByProjectObjectIdAndStatusObjectId(projectObjectId, toStatusObjectId).mapNotNull { it.objectId }.toSet()
-        val max = boardOrders.findByProjectObjectId(projectObjectId)
-            .filter { it.itemObjectId in columnIds }
+        val max = boardOrders.findByItemObjectIdIn(columnIds)
             .maxOfOrNull { it.position } ?: -1
         boardOrders.save(row.copy(position = max + 1, updatedAt = clock.instant()))
     }

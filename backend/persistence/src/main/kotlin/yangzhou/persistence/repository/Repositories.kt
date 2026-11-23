@@ -853,6 +853,8 @@ interface BoardItemOrderRepository : CrudRepository<BoardItemOrder, Long> {
 
     fun findByItemObjectId(itemObjectId: UUID): BoardItemOrder?
 
+    fun findByItemObjectIdIn(itemObjectIds: Collection<UUID>): List<BoardItemOrder>
+
     fun deleteByProjectObjectIdAndItemObjectIdIn(
         projectObjectId: UUID,
         itemObjectIds: Collection<UUID>,

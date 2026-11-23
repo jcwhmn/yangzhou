@@ -40,7 +40,7 @@ test.describe("YPJ-238 箭头排序(S0 板上三票)", () => {
 
     // 甲下移:与相邻乙交换
     const put1 = page.waitForResponse(
-      (r) => r.url().includes("/board-order") && r.request().method() === "PUT",
+      (r) => r.url().includes("/board-order/move") && r.request().method() === "POST",
     );
     await page
       .locator(".MuiCard-root", { hasText: TITLES[0] })
@@ -61,7 +61,7 @@ test.describe("YPJ-238 箭头排序(S0 板上三票)", () => {
 
     // 甲上移:回到首位
     const put2 = page.waitForResponse(
-      (r) => r.url().includes("/board-order") && r.request().method() === "PUT",
+      (r) => r.url().includes("/board-order/move") && r.request().method() === "POST",
     );
     await page
       .locator(".MuiCard-root", { hasText: TITLES[0] })

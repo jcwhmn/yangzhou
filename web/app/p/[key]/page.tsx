@@ -266,21 +266,24 @@ export default function BoardPage() {
     a.number.localeCompare(b.number, undefined, { numeric: true });
   const sortCol = (list: Item[]) => [...list].sort(byBoardOrder);
   const moveByArrow = async (itemId: string, status: Status, dir: -1 | 1) => {
-    const col = sortCol(items.filter((i) => i.status === status.name));
-    const ti = col.findIndex((i) => i.itemId === itemId);
-    const ni = ti + dir;
-    if (ti < 0 || ni < 0 || ni >= col.length) return;
-    const ordered = [...col];
-    [ordered[ti], ordered[ni]] = [ordered[ni], ordered[ti]];
     try {
-      await api(`/api/projects/${key}/board-order`, {
-        method: "PUT",
+      // YPJ-238(spec §3.1):move 端点只动新表至多 2 行;响应 ordered 就地 patch,零全量刷新(prod 性能拍板)
+      const resp = await api<{
+        status: string;
+        ordered: { itemId: string; boardOrder: number | null }[];
+      }>(`/api/projects/${key}/board-order/move`, {
+        method: "POST",
         body: JSON.stringify({
-          status: status.name,
-          orderedItemIds: ordered.map((i) => i.itemId),
+          itemId,
+          dir: dir === -1 ? "up" : "down",
         }),
       });
-      await load();
+      const byId = new Map(resp.ordered.map((o) => [o.itemId, o.boardOrder]));
+      setItems((prev) =>
+        prev.map((i) =>
+          byId.has(i.itemId) ? { ...i, boardOrder: byId.get(i.itemId) ?? null } : i,
+        ),
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : t.board.moveFailed);
       await load();
