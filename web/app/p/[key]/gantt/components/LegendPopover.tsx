@@ -60,27 +60,29 @@ export function LegendPopover() {
         anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
         transformOrigin={{ vertical: "top", horizontal: "right" }}
       >
-        <Stack spacing={1} sx={{ p: 2, maxWidth: 260 }}>
-          <Typography variant="subtitle2">行底色(状态扫读)</Typography>
-          <Swatch color={TINT.START} label="起点状态(如 To Do)" />
-          {TINT.ACTIVE.map((c, i) => (
-            <Swatch
-              key={c}
-              color={c}
-              label={`进行中 · 浓淡档 ${i + 1}(${["浅", "较浅", "中", "较深", "深"][i]},按工序先后)`}
-            />
-          ))}
-          <Swatch color={TINT.FINAL} label="终态(如 Done)" />
-          <Typography variant="subtitle2" sx={{ mt: 1 }}>
-            条色(计划/实际细读)
-          </Typography>
-          {BAR_COLORS.map(([c, label]) => (
-            <Swatch key={c} color={c} label={label} />
-          ))}
-          <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
-            蓝竖线 = 今天
-          </Typography>
-        </Stack>
+        <Box data-testid="gantt-legend-popover">
+          <Stack spacing={1} sx={{ p: 2, maxWidth: 260 }}>
+            <Typography variant="subtitle2">行底色(状态扫读)</Typography>
+            <Swatch color={TINT.START} label="起点状态(如 To Do)" />
+            {TINT.ACTIVE.map((c, i) => (
+              <Swatch
+                key={c}
+                color={c}
+                label={`进行中 · 浓淡档 ${i + 1}(${["浅", "较浅", "中", "较深", "深"][i]},按工序先后)`}
+              />
+            ))}
+            <Swatch color={TINT.FINAL} label="终态(如 Done)" />
+            <Typography variant="subtitle2" sx={{ mt: 1 }}>
+              条色(计划/实际细读)
+            </Typography>
+            {BAR_COLORS.map(([c, label]) => (
+              <Swatch key={c} color={c} label={label} />
+            ))}
+            <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
+              蓝竖线 = 今天
+            </Typography>
+          </Stack>
+        </Box>
       </Popover>
     </>
   );

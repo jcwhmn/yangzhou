@@ -1398,8 +1398,11 @@ test("YPJ-246 行底色:START 灰蓝 / ACTIVE 浓淡随状态数分档 / FINAL �
   const parent = await apiCreateItem(projectKey, "E2E 底色父");
   const start = await apiCreateItem(projectKey, "E2E 底色起点");
   const a1 = await apiCreateItem(projectKey, "E2E 底色进行一");
+  await apiAssignMe(a1); // 迁出 START 前须指派(409 根因)
   const a2 = await apiCreateItem(projectKey, "E2E 底色进行二");
+  await apiAssignMe(a2);
   const done = await apiCreateItem(projectKey, "E2E 底色完成");
+  await apiAssignMe(done);
   // 父行须有已排期子才成父(hasKid),父行断言用;返回值不消费
   await makeChild(projectKey, "E2E 底父子", parent, d(-2), d(1));
   for (const [id, st, s, e] of [
@@ -1415,6 +1418,7 @@ test("YPJ-246 行底色:START 灰蓝 / ACTIVE 浓淡随状态数分档 / FINAL �
     });
   }
   await apiAssignMe(done);
+  void done;
 
   await page.goto(`/p/${projectKey}/gantt`);
   await pickScope(page, "全部");
@@ -1453,10 +1457,10 @@ test("YPJ-246 行底色:START 灰蓝 / ACTIVE 浓淡随状态数分档 / FINAL �
 test("YPJ-246 图例浮层:按钮开、点外关", async ({ page, projectKey }) => {
   await page.goto(`/p/${projectKey}/gantt`);
   await page.getByTestId("gantt-legend").click();
-  await expect(page.getByRole("dialog")).toBeVisible();
+  await expect(page.getByTestId("gantt-legend-popover")).toBeVisible();
   await expect(page.getByText("行底色(状态扫读)")).toBeVisible();
   await page.mouse.click(10, 10);
-  await expect(page.getByRole("dialog")).toBeHidden();
+  await expect(page.getByTestId("gantt-legend-popover")).toBeHidden();
 });
 
 test("YPJ-246 ppd 记忆:缩放后 reload 同密度(localStorage 跨会话)", async ({
@@ -1465,8 +1469,13 @@ test("YPJ-246 ppd 记忆:缩放后 reload 同密度(localStorage 跨会话)", as
 }) => {
   await page.goto(`/p/${projectKey}/gantt`);
   await page.getByTestId("gantt-zoom-in").click();
+  // effect 异步落盘(点击→渲染→useEffect),轮询等写入
+  await expect
+    .poll(() => page.evaluate(() => localStorage.getItem("yz-gantt-ppd")), {
+      timeout: 5000,
+    })
+    .not.toBeNull();
   const saved = await page.evaluate(() => localStorage.getItem("yz-gantt-ppd"));
-  expect(saved).not.toBeNull();
   await page.reload();
   await expect(page.getByTestId("gantt-zoom-in")).toBeVisible();
   expect(await page.evaluate(() => localStorage.getItem("yz-gantt-ppd"))).toBe(
