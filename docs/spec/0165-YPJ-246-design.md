@@ -48,21 +48,23 @@ app/p/[key]/gantt/
 export const TINT = {
   START: "#EEF2F6",
   FINAL: "#E7F5EC",
-  ACTIVE: ["#FFF8E1", "#FFEDB8", "#FFE28E"], // 浅→深
+  // ACTIVE 5 阶浅→深;档数 = ACTIVE 状态数 n(SRS v2 §3.2:不固定 3),取 palette[floor(i*5/n)]
+  ACTIVE: ["#FFF8E1", "#FFF2CD", "#FFEDB8", "#FFE7A3", "#FFE28E"],
 };
 /** 父行/非 item 行 → null(透明) */
 export function statusTint(
   statusType: string | null,
-  tier: number | null, // ACTIVE 浓淡档 0..2,非 ACTIVE 传 null
+  tier: number | null, // ACTIVE 浓淡档序号 0..n-1,非 ACTIVE 传 null
+  activeCount: number, // 项目 ACTIVE 状态总数 n
 ): string | null;
-/** 项目 ACTIVE 状态(按 position 升序)→ 状态名 → 档;供行计算 tier */
-export function activeTierOf(
+/** 项目 ACTIVE 状态(按 position 升序)→ 状态名 → 档序号;供行计算 tier */
+export function activeTierMap(
   activeStatuses: { name: string; position: number }[],
-  statusName: string,
-): number | null;
+): Map<string, number>;
 ```
 
-- `useGanttData` 增拉 `GET /api/projects/{key}`(statuses 已含 statusType+position,看板页同款消费),向行组装处供 `activeTierOf` 的档位映射(状态名→档);
+- `useGanttData` 的项目 DTO 增声明 `statuses`(`GET /api/projects/{key}` 响应已含 name+statusType+position,看板页同款消费,零后端改动),返回 `statusTiers`/`activeCount` 供 `statusTint`;
+- **测试注记**:web 无单测 runner(仅 Playwright),纯函数真值表由 e2e 内隐覆盖(三类行互异 + 各档互异),不新增 vitest 依赖;
 - `GanttChart` 行 Box 与 `TitleColumn` 的 `TitleCell` Box 各加 `bgcolor: tint ?? "transparent"`(父行 tint=null;悬停 `action.hover` 现有规则不动,叠加在底色上);
 - 父行判定复用既有 `hasKid(r)`。
 
@@ -133,8 +135,8 @@ export function activeTierOf(
 
 ## 七、测试映射
 
-- **单元**(web tsc 之外的纯函数):`statusTint`/`activeTierOf` 真值表(START/FINAL/ACTIVE 3 档/1 状态/2 状态/null 父行);
-- **e2e**(新增/改):造 START、ACTIVE、FINAL 三票 → 断言三行 `background-color` 互异且父行为 transparent;缩放记忆(缩放→reload→同 ppd);图例按钮开关;既有 130 用例回归;
+- **单元**(web tsc 之外的纯函数):web 无单测 runner,不新增依赖;`statusTint`/`activeTierMap` 真值表(START/FINAL/ACTIVE n=1/2/3/null 父行)由 e2e 底色断言隐式覆盖;
+- **e2e**(新增/改):造 START、ACTIVE×2、FINAL 四票 → 断言 START/两 ACTIVE/FINAL 四行 `background-color` 两两互异且父行为 transparent;缩放记忆(缩放→reload→同 ppd);图例按钮开关;既有 130 用例回归;
 - **手工**(落 `docs/testing/manual-test-cases.md` YPJ-246 节,验收清单 = SRS §四逐条):三色扫读、浓淡可辨、条色不被淹没、悬停叠加、父行降权、未排期弱化。
 
 ## 八、REST/契约
