@@ -146,12 +146,15 @@ export function useTimelineScale(opts: {
     // 刻度行(YPJ-241 分层;YPJ-265 真值表 §9.3.1):粗→细最多 4 行;日行任何密度必渲染(抽稀不删行)
     const rowsOut: HeaderRow[] = [];
     const monthVisible = pxPerDay * (skipWk ? 21 : 30) >= 70;
-    // 时行(YPJ-226 切片3 spec 0163):梯子 5–720 分钟;YPJ-265 门控 44→24px(30min 刻度下放至 pxPerDay≥1152)
+    // 时行:仅亚日工况(单日 ≥200px,日行抽稀后仍有日内空间)才出,中密度不与日行叠罗汉(YPJ-265 复验反馈)
     const pxPerMin = pxPerDay / (skipWk ? wem - wsm || 1440 : 1440);
     const winMin = skipWk ? wem - wsm : Infinity;
-    const stepMin = [5, 10, 15, 20, 30, 60, 120, 180, 360, 720].find(
-      (s) => s * pxPerMin >= 24 && s <= winMin,
-    );
+    const stepMin =
+      pxPerDay >= 200
+        ? [5, 10, 15, 20, 30, 60, 120, 180, 360, 720].find(
+            (s) => s * pxPerMin >= 24 && s <= winMin,
+          )
+        : undefined;
     if (stepMin) {
       const ticks: Tick[] = [];
       if (skipWk) {
@@ -181,8 +184,10 @@ export function useTimelineScale(opts: {
     }
     // 日行(YPJ-265):任何密度必渲染;有月行→纯日号(1/4/7),无月行→MM-DD 保月信息;密度不足抽稀(步长=能容标签的最小天数)
     {
-      const labelW = monthVisible ? 18 : 44;
-      const dayStep = Math.max(1, Math.ceil(labelW / pxPerDay));
+      // 日号最小间距 40px / MM-DD 56px(YPJ-265 复验反馈:每日一刻度太密);步长取规整值
+      const labelW = monthVisible ? 40 : 56;
+      const raw = Math.max(1, Math.ceil(labelW / pxPerDay));
+      const dayStep = [1, 2, 3, 5, 7, 14].find((s) => s >= raw) ?? 28;
       const dayLabel = (d: Date) =>
         monthVisible
           ? String(d.getDate())
