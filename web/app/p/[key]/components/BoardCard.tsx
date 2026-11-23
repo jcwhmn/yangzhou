@@ -10,6 +10,8 @@ import {
   Typography,
 } from "@mui/material";
 import UndoOutlined from "@mui/icons-material/UndoOutlined";
+import ArrowUpwardOutlined from "@mui/icons-material/ArrowUpwardOutlined";
+import ArrowDownwardOutlined from "@mui/icons-material/ArrowDownwardOutlined";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
@@ -26,12 +28,16 @@ export default function BoardCard({
   removable,
   onRemoved,
   onAssigneeChanged,
+  onUp,
+  onDown,
 }: {
   it: Item;
   projectKey: string;
   removable: boolean;
   onRemoved: () => void | Promise<void>;
   onAssigneeChanged: () => void | Promise<void>;
+  onUp?: () => void; // YPJ-238:排序模式箭头(undefined=不显示;列首无上/列尾无下)
+  onDown?: () => void;
 }) {
   const router = useRouter();
   return (
@@ -56,6 +62,34 @@ export default function BoardCard({
       <CardContent sx={{ py: 1.5, "&:last-child": { pb: 1.5 } }}>
         <Stack spacing={0.5}>
           <Stack direction="row" spacing={1} alignItems="center">
+            {(onUp || onDown) && (
+              <Stack direction="column" sx={{ mr: -0.5 }}>
+                <IconButton
+                  size="small"
+                  aria-label="上移"
+                  disabled={!onUp}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onUp?.();
+                  }}
+                  sx={{ py: 0 }}
+                >
+                  <ArrowUpwardOutlined sx={{ fontSize: 14 }} />
+                </IconButton>
+                <IconButton
+                  size="small"
+                  aria-label="下移"
+                  disabled={!onDown}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDown?.();
+                  }}
+                  sx={{ py: 0 }}
+                >
+                  <ArrowDownwardOutlined sx={{ fontSize: 14 }} />
+                </IconButton>
+              </Stack>
+            )}
             {it.parentNumber && (
               <Link
                 href={`/p/${projectKey}/i/${it.parentItemId}`}

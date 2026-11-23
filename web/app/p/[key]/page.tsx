@@ -259,26 +259,21 @@ export default function BoardPage() {
     }
   }
 
-  // YPJ-238:拖 A 到 B 卡上 = 插 B 后;targetId=null = 同列拖到空白 → 移到末尾;按列全列重排提交
-  const reorderTo = async (
-    itemId: string,
-    targetId: string | null,
-    status: Status,
-  ) => {
-    const dragged = items.find((i) => i.itemId === itemId);
-    if (!dragged) return;
-    if (dragged.status !== status.name) await moveTo(itemId, status);
-    // 用全量 items 而非 filtered:assignee 过滤隐藏的卡不能被当僵尸删行
-    const col = items.filter((i) => i.status === status.name);
-    const base = col.filter((i) => i.itemId !== itemId);
-    const ordered = [...base];
-    if (targetId != null) {
-      const ti = ordered.findIndex((i) => i.itemId === targetId);
-      if (ti < 0) return;
-      ordered.splice(ti + 1, 0, dragged);
-    } else {
-      ordered.push(dragged); // 列末尾
-    }
+  // YPJ-238:列内排序不再拖拽(用户拍板:箭头排序);按当前列显示序相邻交换后 PUT 全列。用全量 items(过滤隐藏卡不能被当僵尸删行)
+  const sortCol = (list: Item[]) =>
+    [...list].sort(
+      (a, b) =>
+        (a.boardOrder ?? Number.MAX_SAFE_INTEGER) -
+          (b.boardOrder ?? Number.MAX_SAFE_INTEGER) ||
+        a.number.localeCompare(b.number, undefined, { numeric: true }),
+    );
+  const moveByArrow = async (itemId: string, status: Status, dir: -1 | 1) => {
+    const col = sortCol(items.filter((i) => i.status === status.name));
+    const ti = col.findIndex((i) => i.itemId === itemId);
+    const ni = ti + dir;
+    if (ti < 0 || ni < 0 || ni >= col.length) return;
+    const ordered = [...col];
+    [ordered[ti], ordered[ni]] = [ordered[ni], ordered[ti]];
     try {
       await api(`/api/projects/${key}/board-order`, {
         method: "PUT",
@@ -294,6 +289,8 @@ export default function BoardPage() {
     }
   };
 
+  // YPJ-238:排序模式 = 正在调序的列名(null = 关闭)
+  const [sortingCol, setSortingCol] = useState<string | null>(null);
   // S7:assignee filter (purely frontend; "unassigned" = assignee is null); sprint scope is determined by the backend board endpoint (YPJ-29)
   const filtered =
     filter === "all"
@@ -318,14 +315,7 @@ export default function BoardPage() {
     byStatusName.set(it.status, list);
   });
   // YPJ-238(spec 0166):列内排序键 boardOrder ASC → number 兜底(沉底;自然序保持后端口径)
-  byStatusName.forEach((list) =>
-    list.sort(
-      (a, b) =>
-        (a.boardOrder ?? Number.MAX_SAFE_INTEGER) -
-          (b.boardOrder ?? Number.MAX_SAFE_INTEGER) ||
-        a.number.localeCompare(b.number, undefined, { numeric: true }),
-    ),
-  );
+  byStatusName.forEach((list) => sortCol(list));
 
   return (
     <Box sx={{ p: 3 }}>
@@ -423,24 +413,18 @@ export default function BoardPage() {
                 onDrop={(e) => {
                   e.preventDefault();
                   setDragOver(null);
+                  // YPJ-238(修订):拖拽仅跨列迁移;列内排序走排序按钮+箭头
                   const itemId = e.dataTransfer.getData("text/plain");
-                  if (!itemId) return;
-                  // YPJ-238:落点卡用 closest 找(卡片不再自带 dragover/drop,整列一个 preventDefault 源,零禁止标);
-                  // 拖到卡上 = 插目标后,拖到空白 = 同列移末尾/跨列仅迁移
-                  const el = (e.target as HTMLElement).closest("[data-board-item]");
-                  const targetId = el?.getAttribute("data-board-item") ?? null;
-                  const dragged = items.find((i) => i.itemId === itemId);
-                  if (targetId == null && dragged && dragged.status === s.name) {
-                    void reorderTo(itemId, null, s);
-                  } else if (targetId != null && targetId !== itemId) {
-                    void reorderTo(itemId, targetId, s);
-                  } else if (targetId == null) {
-                    moveTo(itemId, s);
-                  }
+                  if (itemId) moveTo(itemId, s);
                 }}
                 projectKey={key}
                 onRemoved={load}
                 onAssigneeChanged={load}
+                sorting={sortingCol === s.name}
+                onToggleSort={() =>
+                  setSortingCol(sortingCol === s.name ? null : s.name)
+                }
+                onMoveArrow={(itemId, dir) => void moveByArrow(itemId, s, dir)}
               />
             );
           })}
