@@ -143,15 +143,19 @@ export function useTimelineScale(opts: {
       return (cum[lo] + inSeg) * pxPerMs;
     };
 
-    // 刻度行(YPJ-241 分层):wall=钟表时刻循环;work=逐工作日窗内/窗起点。门控统一用 pxPerDay(每工作日)。
+    // 刻度行(YPJ-241 分层;YPJ-265 真值表 §9.3.1):粗→细最多 4 行;日行任何密度必渲染(抽稀不删行)
     const rowsOut: HeaderRow[] = [];
-    // 分钟/小时行(YPJ-226 切片3 spec 0163):梯子 5–720 分钟,取间距≥MIN_LABEL_PX 的最小步长;wall=钟表循环 / work=逐工作日窗内(步长≤窗宽)
+    const monthVisible = pxPerDay * (skipWk ? 21 : 30) >= 70;
+    // 时行:仅亚日工况(单日 ≥200px,日行抽稀后仍有日内空间)才出,中密度不与日行叠罗汉(YPJ-265 复验反馈)
     const pxPerMin = pxPerDay / (skipWk ? wem - wsm || 1440 : 1440);
     const winMin = skipWk ? wem - wsm : Infinity;
-    const stepMin = [5, 10, 15, 20, 30, 60, 120, 180, 360, 720].find(
-      (s) => s * pxPerMin >= MIN_LABEL_PX && s <= winMin,
-    );
-    if (pxPerDay >= MIN_LABEL_PX && stepMin) {
+    const stepMin =
+      pxPerDay >= 200
+        ? [5, 10, 15, 20, 30, 60, 120, 180, 360, 720].find(
+            (s) => s * pxPerMin >= 24 && s <= winMin,
+          )
+        : undefined;
+    if (stepMin) {
       const ticks: Tick[] = [];
       if (skipWk) {
         for (const g of segs) {
@@ -178,26 +182,30 @@ export function useTimelineScale(opts: {
       }
       rowsOut.push({ gran: "hour", ticks });
     }
-    // 日行:wall=每天 MM-DD / work=每工作日窗起点
-    if (pxPerDay >= MIN_LABEL_PX) {
+    // 日行(YPJ-265):任何密度必渲染;有月行→纯日号(1/4/7),无月行→MM-DD 保月信息;密度不足抽稀(步长=能容标签的最小天数)
+    {
+      // 日号最小间距 40px / MM-DD 56px(YPJ-265 复验反馈:每日一刻度太密);步长取规整值
+      const labelW = monthVisible ? 40 : 56;
+      const raw = Math.max(1, Math.ceil(labelW / pxPerDay));
+      const dayStep = [1, 2, 3, 5, 7, 14].find((s) => s >= raw) ?? 28;
+      const dayLabel = (d: Date) =>
+        monthVisible
+          ? String(d.getDate())
+          : `${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
       const ticks: Tick[] = [];
       if (skipWk) {
+        let n = 0;
         for (const g of segs) {
-          const d = new Date(g.s);
-          ticks.push({
-            x: tToX(g.s),
-            label: `${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`,
-            key: `d${g.s}`,
-          });
+          if (n % dayStep === 0) {
+            const d = new Date(g.s);
+            ticks.push({ x: tToX(g.s), label: dayLabel(d), key: `d${g.s}` });
+          }
+          n += 1;
         }
       } else {
-        for (let t = +start; t < endT; t += DAY) {
+        for (let t = +start; t < endT; t += dayStep * DAY) {
           const d = new Date(t);
-          ticks.push({
-            x: tToX(t),
-            label: `${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`,
-            key: `d${t}`,
-          });
+          ticks.push({ x: tToX(t), label: dayLabel(d), key: `d${t}` });
         }
       }
       rowsOut.push({ gran: "day", ticks });
@@ -257,7 +265,7 @@ export function useTimelineScale(opts: {
       }
       return ticks;
     };
-    if (pxPerDay * (skipWk ? 21 : 30) >= 70) {
+    if (monthVisible) {
       rowsOut.push({ gran: "month", ticks: genMonthTicks(1) });
     }
     // 年行(YPJ-226 切片3 spec 0163):极缩小时 YYYY;wall=元旦 / work=年内首个工作日窗起点;单点无意义不渲染
