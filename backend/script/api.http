@@ -3045,3 +3045,175 @@ Content-Type: application/json
 ### 清场:删一次性项目(force 物理删)
 DELETE {{host}}/api/projects/BO238?force=true
 Authorization: Bearer {{token}}
+
+### ============ 21. YPJ-274 item 关闭理由(spec 0167;节内自建前置) ============
+### 建一次性 S0 项目(自动带三态 workflow:To Do / In Progress / Done)
+POST {{host}}/api/projects
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{"key": "CR274", "name": "274 手测"}
+
+> {%
+    client.global.set("key274", response.body.key);
+    const s = response.body.statuses;
+    client.global.set("st274todo", s.find(x => x.name === "To Do").statusId);
+    client.global.set("st274prog", s.find(x => x.name === "In Progress").statusId);
+    client.global.set("st274done", s.find(x => x.name === "Done").statusId);
+    if (s.find(x => x.name === "Done").requireCloseReason !== false) throw new Error("新建状态缺省应为 false");
+    client.log("StatusDto.requireCloseReason 缺省 false ✓");
+%}
+
+### [正例] 状态开开关:In Progress → Done 须问理由
+PATCH {{host}}/api/statuses/{{st274prog}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "requireCloseReason": true }
+
+> {% if (response.body.requireCloseReason !== true) throw new Error("开关未生效"); %}
+
+### [正例] 省略 = 保持(不回退)
+PATCH {{host}}/api/statuses/{{st274prog}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "icon": "🚧" }
+
+> {% if (response.body.requireCloseReason !== true) throw new Error("省略应保持 true"); client.log("状态开关 设/保持 ✓"); %}
+
+### 建票 + 指派(离开起点态须有主)
+POST {{host}}/api/projects/{{key274}}/items
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{"title": "274-a"}
+
+> {% client.global.set("item274a", response.body.itemId); %}
+
+### 建虚拟成员(handler 存变量 member274)
+POST {{host}}/api/members
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "displayName": "274执行人{{run}}" }
+
+> {% client.global.set("member274", response.body.memberId); %}
+
+### 指派(离开起点态须有主)
+PUT {{host}}/api/items/{{item274a}}/assignee
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "assigneeItemId": "{{member274}}" }
+
+### [正例①] 转终态不带理由 → 后端写 done;活动 newValue = "Done"
+PATCH {{host}}/api/items/{{item274a}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "statusItemId": "{{st274done}}" }
+
+> {%
+    if (response.body.closeReason !== "done") throw new Error("缺省应为 done,实际:" + response.body.closeReason);
+    client.log("转终态缺省 done ✓");
+%}
+
+### 活动留痕:status_changed newValue 纯 "Done"(不带括号)
+GET {{host}}/api/items/{{item274a}}/activity
+Authorization: Bearer {{token}}
+
+> {%
+    const a = response.body.find(x => x.kind === "status_changed");
+    if (!a || a.newValue !== "Done") throw new Error("活动应为 Done,实际:" + JSON.stringify(a));
+    client.log("done 活动不带括号 ✓");
+%}
+
+### [正例②] reopen → 理由清空
+PATCH {{host}}/api/items/{{item274a}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "statusItemId": "{{st274prog}}" }
+
+> {% if (response.body.closeReason !== null) throw new Error("reopen 应清空,实际:" + response.body.closeReason); client.log("reopen 清空 ✓"); %}
+
+### [正例③] 转终态带理由 + 备注 → 写入;活动 newValue 带理由:备注
+PATCH {{host}}/api/items/{{item274a}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "statusItemId": "{{st274done}}", "closeReason": "superseded", "closeNote": "被 274-b 取代" }
+
+> {%
+    if (response.body.closeReason !== "superseded" || response.body.closeNote !== "被 274-b 取代") throw new Error("理由/备注未写入");
+    client.log("转终态带理由+备注 ✓");
+%}
+
+GET {{host}}/api/items/{{item274a}}/activity
+Authorization: Bearer {{token}}
+
+> {%
+    const a = response.body.filter(x => x.kind === "status_changed").pop();
+    if (a.newValue !== "Done(被取代:被 274-b 取代)") throw new Error("活动应为 Done(被取代:…),实际:" + a.newValue);
+    client.log("活动带理由 ✓");
+%}
+
+### [正例④] 终态票只改理由(不动状态)→ close_reason_changed 活动
+PATCH {{host}}/api/items/{{item274a}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "closeReason": "done" }
+
+> {%
+    if (response.body.closeReason !== "done" || response.body.closeNote !== null) throw new Error("改回 done 应清 note");
+    client.log("改回 done 清 note ✓");
+%}
+
+GET {{host}}/api/items/{{item274a}}/activity
+Authorization: Bearer {{token}}
+
+> {%
+    const a = response.body.filter(x => x.kind === "close_reason_changed").pop();
+    if (!a || a.oldValue !== "被取代" || a.newValue !== "完成") throw new Error("close_reason_changed 异常:" + JSON.stringify(a));
+    client.log("close_reason_changed 留痕 ✓");
+%}
+
+### [负例①] 非终态带理由 → 400
+PATCH {{host}}/api/items/{{item274a}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "statusItemId": "{{st274prog}}", "closeReason": "wontfix" }
+
+> {% client.assert(response.status === 400, "非终态带理由应 400,实际 " + response.status); %}
+
+### [负例②] 非法枚举 → 400
+PATCH {{host}}/api/items/{{item274a}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "closeReason": "nope" }
+
+> {% client.assert(response.status === 400, "非法枚举应 400,实际 " + response.status); %}
+
+### [负例③] 非终态票只改理由 → 400
+PATCH {{host}}/api/items/{{item274a}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "statusItemId": "{{st274prog}}" }
+
+### (接上,此时为 In Progress)
+PATCH {{host}}/api/items/{{item274a}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "closeReason": "wontfix" }
+
+> {% client.assert(response.status === 400, "非终态票改理由应 400,实际 " + response.status); %}
+
+### 清场:删一次性项目(force 物理删)
+DELETE {{host}}/api/projects/{{key274}}?force=true
+Authorization: Bearer {{token}}
