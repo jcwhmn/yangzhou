@@ -34,7 +34,8 @@
   3. **L1 组**:其余票(必在 planned L1 组,spec 0098)→ `GET /groups` 取 L1 类型组,逐组 `/groups/{id}/items` 找到含该 item 的组 → 该组 number 序;
 - L1 组多挂(同一 item 在多个 planned L1 组):按组 `createdAt` 序取首个命中(⚠ 断言:正常流程一票只挂一个 L1 组,请人复核);
 - 跳转 = `router.push('/p/{key}/i/{number}')`(编号 URL,详情页既有编号直达能力)。
-- 跳转 = `router.push('/p/{key}/i/{number}')`(编号 URL,详情页既有编号直达能力)。
+- **多选责任人过滤已立票 YPJ-277**(2026-11-25 用户提出 A+B 场景;现状单选,本票按单选谓词接入,localStorage 键预留升级为 JSON 数组);
+- 导航读的是前端 cache(localStorage 过滤态),不回源校验数据库新鲜度(用户拍板 2026-11-25):切票后不做额外一致性检查。
 
 ## 四、分支真值表
 
