@@ -45,6 +45,7 @@ private fun usage() {
           items create <KEY> <标题> [--desc 文本] [--sprint 名称|UUID] [--req 属性[>=N]]... [--json]   建 item(需求可分级)
           items list <KEY> [--json]                    项目 item 列表
           items move <ITEM_ID> <状态名> [--reason done|wontfix|expired|duplicate|superseded] [--note 文本]   改状态(经 workflow 校验;转终态可带关闭理由,缺省 done)
+          items boardorder <KEY-N> <目标序号>          看板列内排序到目标序号(1-based;目标位及其后整体后延)
           items schedule <KEY-N> <start> [--due <due>]  排期(yyyy-MM-dd 或 yyyy-MM-dd'T'HH:mm;date-only 由后端按工作日界缺省:start 00:00、due 当日日末 23:59:59(SRS v4 24h 全天窗))
           items comment <KEY-N|itemId> <文本...>        给 item 加评论
           items show <KEY-N|itemId> [--json]            单票详情
@@ -544,6 +545,32 @@ private fun run(args: List<String>) {
             println("已排期:${body["number"].asString()} ${body["startDate"].asString()} ~ ${body["dueDate"].asString()}")
         }
 
+        "items boardorder" -> {
+            // YPJ-273(spec 0273):列内排序到目标序号,拔出插入语义;复用 move 端点(spec 0166 §3.1),不新增 REST
+            val itemId = resolveItemId(api, rest.getOrNull(0) ?: error("缺少 item ID(支持 YPJ-58 或 UUID)"))
+            val target = rest.getOrNull(1)?.toIntOrNull()
+                ?: error("缺少/非法目标序号(1-based 整数)")
+            require(target >= 1) { "目标序号须 ≥ 1" }
+            val item = api.json("GET", "/api/items/$itemId")
+            val key = item["number"].asString().substringBefore("-")
+            fun move(dir: String) = api.json("POST", "/api/projects/$key/board-order/move", mapOf("itemId" to itemId, "dir" to dir))
+
+            // 探测位次:up 在列首是无操作;否则交换已发生,用 down 精确撤回(swap 对称)
+            val probe = move("up")
+            val ordered = mutableListOf<String>()
+            probe["ordered"].forEach { ordered.add(it["itemId"].asString()) }
+            val columnSize = ordered.size
+            val idx = ordered.indexOf(itemId)
+            val current = if (idx == 0) 1 else idx + 2
+            // 撤回响应即原位快照;current==target 时零步进,直接用
+            var snap = if (idx != 0) move("down") else probe
+            if (target > columnSize) error("目标序号 $target 超出列长 $columnSize")
+            // 步进到目标位:最后一次响应即最终 ordered(不可再补 move——每次调用都真交换,曾致 target≥2 多走一位)
+            for (dir in boardorderMoves(current, target)) snap = move(dir)
+            if (flags.containsKey("json")) return printRaw(snap.toString())
+            println("已排序:${item["number"].asString()} → 第 $target 位(列 $columnSize 项)")
+        }
+
         "items move" -> {
             val itemId = resolveItemId(api, rest.getOrNull(0) ?: error("缺少 item ID(支持 YPJ-58 或 UUID)"))
             val statusName = rest.getOrNull(1) ?: error("缺少目标状态名")
@@ -749,3 +776,9 @@ private fun printJson(body: tools.jackson.databind.JsonNode, flags: Map<String, 
 }
 
 private fun printRaw(json: String) = println(json)
+
+/** YPJ-273:从 current 位到 target 位的相邻交换序列(1-based;探测撤回后的净步进;不可含末次"取快照"调用——move 每次都真交换) */
+internal fun boardorderMoves(current: Int, target: Int): List<String> = buildList {
+    repeat(current - target) { add("up") }
+    repeat(target - current) { add("down") }
+}
