@@ -14,6 +14,7 @@ import {
   Tab,
   Tabs,
   TextField,
+  Tooltip,
   Typography,
 } from "@mui/material";
 
@@ -39,6 +40,8 @@ import { SignalChip } from "@/components/Verdict";
 import { AssignPopover } from "@/components/AssignPopover";
 
 import { DateInput } from "@/components/DateInput";
+import CloseReasonDialog from "@/components/CloseReasonDialog";
+import { shouldAsk, type CloseReason } from "@/lib/closeReason";
 import { EstimateField } from "@/components/EstimateField";
 import { EstimateScale } from "@/lib/estimate";
 
@@ -177,6 +180,13 @@ export default function ItemDetailPage() {
   const [releaseId, setReleaseId] = useState<string | null>(null);
 
   const [saved, setSaved] = useState(false);
+
+  // YPJ-275:关闭理由弹窗——mode move=转终态(带目标状态) / edit=终态票改理由
+  const [closeAsk, setCloseAsk] = useState<{
+    mode: "move" | "edit";
+    target?: Status;
+  } | null>(null);
+  const [closeError, setCloseError] = useState("");
 
   const [sprintHint, setSprintHint] = useState(""); // YPJ-120:开始动作自动入 sprint 的轻提示
   const [launchAskId, setLaunchAskId] = useState<string | null>(null); // YPJ-104:挂 planned 后提示激活(spec 0105)
@@ -511,6 +521,13 @@ export default function ItemDetailPage() {
 
     if (!target) return;
 
+    // YPJ-275:源状态要求理由 ∧ 目标终态 → 弹窗,不直接迁移
+    if (item && shouldAsk(statuses, item.status, target)) {
+      setCloseError("");
+      setCloseAsk({ mode: "move", target });
+      return;
+    }
+
     try {
       const resp = await api<{ autoAssignedSprintName?: string | null }>(
         `/api/items/${itemId}`,
@@ -531,6 +548,29 @@ export default function ItemDetailPage() {
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "更新失败");
+    }
+  }
+
+  /** YPJ-275:弹窗确认——move=带理由迁移终态;edit=终态票只改理由;失败原地报错不关窗 */
+  async function confirmClose(reason: CloseReason, note: string | null) {
+    if (!closeAsk || !item) return;
+    const body =
+      closeAsk.mode === "move"
+        ? {
+            statusItemId: closeAsk.target!.statusId,
+            closeReason: reason,
+            closeNote: reason === "done" ? null : note,
+          }
+        : { closeReason: reason, closeNote: reason === "done" ? null : note };
+    try {
+      await api(`/api/items/${itemId}`, {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      });
+      setCloseAsk(null);
+      await load();
+    } catch (e) {
+      setCloseError(e instanceof Error ? e.message : "保存失败");
     }
   }
 
@@ -901,6 +941,25 @@ export default function ItemDetailPage() {
 
           options={statuses.map((s) => ({ value: s.name, label: s.name }))}
         />
+
+        {statuses.find((s) => s.name === item.status)?.statusType ===
+          "FINAL" && (
+          <Tooltip title={t.closeReason.editTitle}>
+            <Chip
+              size="small"
+              onClick={() => {
+                setCloseError("");
+                setCloseAsk({ mode: "edit" });
+              }}
+              color={item.closeReason === "done" ? "default" : "warning"}
+              label={
+                (item.closeReason &&
+                  t.closeReason[item.closeReason as CloseReason]) ??
+                item.closeReason
+              }
+            />
+          </Tooltip>
+        )}
       </Stack>
 
       {error && (
@@ -1382,6 +1441,21 @@ export default function ItemDetailPage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <CloseReasonDialog
+        open={closeAsk !== null}
+        title={
+          closeAsk?.mode === "move" && item
+            ? t.closeReason.closeTitle(item.number)
+            : t.closeReason.editTitle
+        }
+        initialReason={(item?.closeReason as CloseReason) ?? "done"}
+        initialNote={item?.closeNote ?? ""}
+        error={closeError}
+        confirmLabel={t.closeReason.save}
+        onCancel={() => setCloseAsk(null)}
+        onConfirm={confirmClose}
+      />
 
       <Snackbar
         open={warnMsg !== null}

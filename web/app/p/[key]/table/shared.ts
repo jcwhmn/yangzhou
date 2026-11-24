@@ -18,6 +18,7 @@ export type Item = {
   estimateUnit: string | null;
   blocked: boolean;
   sprintName: string | null;
+  closeReason: string | null; // YPJ-275:终态票恒非空(后端回填 done);非终态 null
   totalMinutes: number; // YPJ-182 时间合计(分钟),列表响应才带
   attributes: { name: string; value: string | null }[];
 };

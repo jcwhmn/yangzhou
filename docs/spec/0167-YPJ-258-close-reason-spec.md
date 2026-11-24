@@ -189,15 +189,15 @@ reason≠done:状态 chip 旁加小标签,文案 = 理由中文(不做/过期/�
 ## 八、验收标准
 
 - [x] 状态配置 requireCloseReason 可设/改/读;存量默认 false;
-- [ ] 源状态 true 时,看板与详情页转终态弹窗;false 时不弹,行为同现状;
+- [x] 源状态 true 时,看板与详情页转终态弹窗;false 时不弹,行为同现状;
 - [x] 转终态不带理由 → done;带 → 写入;非终态带理由 → 400;非法枚举 → 400;
 - [x] reopen 清空;终态票只改理由可改,改回 done 清 note;
-- [ ] 详情页修改入口;列表/看板 reason≠done 有标识;
+- [x] 详情页修改入口;列表/看板 reason≠done 有标识;
 - [x] CLI 透传 + requireCloseReason=true 时提示;
 - [x] 活动留痕:转终态非 done → `status_changed` 带理由(±备注);改理由 → `close_reason_changed`;done/reopen 形如现状(§4.4);
 - [x] 回收站恢复终态票 → close_reason 补 done(§4.3 口径);
 - [x] 迁移 V71(两表 DDL + 存量终态票回填,软删除不回填)+ api.http §21 用例(YPJ-274);
-- [ ] e2e 覆盖 §五 弹窗/标识分支(YPJ-275)。
+- [x] e2e 覆盖 §五 弹窗/标识分支(YPJ-275)。
 
 ## 九、开放决策
 
@@ -209,4 +209,5 @@ reason≠done:状态 chip 旁加小标签,文案 = 理由中文(不做/过期/�
 | D2 | reopen 清空理由 | **已拍板**(2026-11-24 用户):清空 |
 | D4 | 活动留痕(item_activity) | **已拍板**(2026-11-24 用户):都要写——转终态扩 `status_changed` newValue,改理由记 `close_reason_changed`(§4.4) |
 | D5 | 存量终态票迁移回填 done;软删除不回填;非终态留 NULL | **已拍板**(2026-11-24 用户) |
+| D7 | 未指派票直迁终态豁免开工门禁(开工须有主仅限去进行态;决定不做/放弃的票无需先指派) | **已拍板**(2026-11-25 用户,e2e 验证时发现裸票无法关闭) |
 | D4 | 带非 done 理由转终态是否写一条 activity | 待定(与 YPJ-263 汇合) |

@@ -566,6 +566,21 @@ class ItemServiceUnitTest {
         }
 
         @Test
+        fun `未指派离开起点态直迁终态——豁免开工门禁（2026-11-25 用户拍板：决定不做即可关）`() {
+            // row 保持未指派；To Do(START)→ Done(FINAL) 不再 409，转终态写 done
+            every {
+                statuses.findByProjectObjectIdAndObjectId(projectObjectId, any())
+            } answers { listOf(startStatus, doneStatus).firstOrNull { it.objectId == secondArg<UUID>() } }
+            every { statuses.findByProjectObjectIdOrderByPosition(projectObjectId) } returns listOf(startStatus, doneStatus)
+            every { boardOrders.findByProjectObjectIdAndItemObjectId(any(), any()) } returns null
+
+            val dto = moveTo(doneStatus)
+
+            assertEquals("Done", dto.status)
+            assertEquals("done", row.closeReason)
+        }
+
+        @Test
         fun `WIP 已满——409`() {
             val wipStatus = targetStatus.copy(wipLimit = 1)
 

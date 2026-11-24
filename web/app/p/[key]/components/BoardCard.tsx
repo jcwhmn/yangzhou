@@ -19,6 +19,7 @@ import { t } from "@/lib/texts";
 import { estimateText } from "@/lib/estimate";
 import { fmtDate } from "@/lib/dates";
 import { AssignPopover } from "@/components/AssignPopover";
+import type { CloseReason } from "@/lib/closeReason";
 import type { Item } from "../types";
 
 /** 看板卡:chips 行/标题/due+est/requirements;移出内置(原 page setBoardItem(false) 随迁,onRemoved 上行),drag dataTransfer 键名逐字节保留。 */
@@ -134,6 +135,17 @@ export default function BoardCard({
                 />
               )}
             </AssignPopover>
+            {it.closeReason && it.closeReason !== "done" && (
+              // YPJ-275:非完成关闭标识(spec 0167 §7.3;done 不加,现状零打挪)
+              <Chip
+                size="small"
+                color="warning"
+                variant="outlined"
+                label={t.closeReason.reasonLabel(
+                  t.closeReason[it.closeReason as CloseReason],
+                )}
+              />
+            )}
             {removable && (
               <Tooltip title={t.board.remove}>
                 <IconButton
