@@ -5,6 +5,9 @@ import { expect, test } from "./support/fixtures";
 import { apiCall, apiCreateItem } from "./support/helpers";
 
 test.describe("YPJ-275 关闭理由(前端)", () => {
+  // S0(无 level-1 类型)= 无 sprint 概念,建票即可上看板(同 board-order.spec 先例;非 S0 需 active sprint 才可挂板)
+  test.use({ s0: true });
+
   const TITLE = "CR 关闭甲";
 
   /** 建票并上看板(默认落 To Do) */
