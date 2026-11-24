@@ -173,7 +173,9 @@ class GithubSyncService(
             logActivity(itemObjectId, current?.name, "WIP 满跳过:${target.name}($event $detail)")
             return
         }
-        val saved = items.save(item.copy(statusObjectId = target.objectId))
+        // YPJ-274(spec 0167):自动化入口转终态不带理由 → done
+        val closeReason = if (target.statusType == yangzhou.persistence.StatusType.FINAL) "done" else null
+        val saved = items.save(item.copy(statusObjectId = target.objectId, closeReason = closeReason, closeNote = null))
         logActivity(itemObjectId, current?.name, "${target.name}($event $detail)")
         historyRepo.save(
             ItemStatusHistory(

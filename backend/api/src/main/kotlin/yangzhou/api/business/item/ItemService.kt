@@ -115,6 +115,8 @@ class ItemService(
         val sprintName: String? = null,
         val boardOrder: Int? = null, // YPJ-238(spec 0166):看板排序记忆(null=未排过,前端沉底)
         val onBoard: Boolean = false,
+        val closeReason: String? = null, // YPJ-274(spec 0167):终态票恒非空(done 缺省);null=未处于终态
+        val closeNote: String? = null,
         val autoAssignedSprintName: String? = null, // YPJ-120 仅 PATCH 触发自动挂载时非空
         val warnings: List<String> = emptyList(), // YPJ-243(spec 0150):互算警告,仅 PATCH 响应携带
         /** 票 2(US-M7):gate 多归属回显,仅详情回填(列表批量代价高)。 */
@@ -392,6 +394,8 @@ class ItemService(
         priorityText: String? = null,
         estimateValueText: String? = null,
         estimateUnitText: String? = null,
+        closeReason: String? = null,
+        closeNote: String? = null,
     ): ItemDto {
         val item = itemRepo.findByObjectId(itemId) ?: throw NotFoundException("item 不存在")
         val project = projectOf(item.projectObjectId)
@@ -400,6 +404,19 @@ class ItemService(
         val projectObjectId = project.objectId ?: error("no id")
         val actorId = memberService.current().objectId!!
         var autoSprintName: String? = null // YPJ-120 自动挂载的 sprint 名;仅本次 PATCH 触发时非空
+        // YPJ-274(spec 0167):理由合法性先校验——非法枚举/非终态带理由(无 statusItemId 时按当前状态判)400
+        if (closeReason != null && closeReason !in CLOSE_REASONS) throw BadRequestException("closeReason 非法:$closeReason")
+        if (closeNote != null && closeNote.length > 2000) throw BadRequestException("closeNote 超长(≤2000)")
+        val targetStatusForReason =
+            if (statusItemId != null) statuses.findByProjectObjectIdAndObjectId(projectObjectId, statusItemId) ?: throw BadRequestException("状态不属于该项目") else null
+        if (closeReason != null && statusItemId == null && statuses.findByProjectObjectIdAndObjectId(projectObjectId, current.statusObjectId)?.statusType != StatusType.FINAL) {
+            throw BadRequestException("仅终态 item 可设置关闭理由")
+        }
+        val reasonForTransition =
+            if (statusItemId != null && targetStatusForReason?.statusType == StatusType.FINAL) closeReason ?: "done" else null
+        if (statusItemId != null && closeReason != null && targetStatusForReason?.statusType != StatusType.FINAL) {
+            throw BadRequestException("仅转终态可填关闭理由")
+        }
         if (statusItemId != null) {
             val status =
                 statuses.findByProjectObjectIdAndObjectId(projectObjectId, statusItemId)
@@ -422,7 +439,20 @@ class ItemService(
                 if (wipCount >= limit) throw ConflictException("该列 WIP 已满:$wipCount/$limit")
             }
             current = itemRepo.save(current.copy(statusObjectId = status.objectId))
-            logActivity(current.objectId!!, "status_changed", oldStatus?.name, status.name, actorId)
+            // YPJ-274(spec 0167):转终态写理由(不带=done);reopen 清空。终态票恒非空
+            if (reasonForTransition != null) {
+                current = itemRepo.save(current.copy(closeReason = reasonForTransition, closeNote = closeNote?.takeIf { reasonForTransition != "done" }))
+            } else if (oldStatus?.statusType == StatusType.FINAL && status.statusType != StatusType.FINAL) {
+                current = itemRepo.save(current.copy(closeReason = null, closeNote = null))
+            }
+            val reasonLabel =
+                if (reasonForTransition != null && reasonForTransition != "done") {
+                    val note = closeNote?.takeIf { it.isNotBlank() }?.let { ":$it" } ?: ""
+                    "(${CLOSE_REASON_LABELS[reasonForTransition]}${note.take(100)})"
+                } else {
+                    ""
+                }
+            logActivity(current.objectId!!, "status_changed", oldStatus?.name, status.name + reasonLabel, actorId)
             if (status.objectId != oldStatus?.objectId) {
                 // YPJ-238:迁移有序行 → 新列末尾 max+1
                 repositionAtEnd(projectObjectId, current.objectId!!, status.objectId)
@@ -465,6 +495,10 @@ class ItemService(
             if (status.statusType == StatusType.FINAL && oldStatus?.statusType != StatusType.FINAL) {
                 itemFinalize.onFinalized(current.objectId!!)
             }
+        } else if (closeReason != null && closeReason != current.closeReason) {
+            // YPJ-274(spec 0167):终态票事后改理由(不动状态);改回 done 清 note。前置校验已确保当前为终态
+            logActivity(current.objectId!!, "close_reason_changed", CLOSE_REASON_LABELS[current.closeReason] ?: current.closeReason, CLOSE_REASON_LABELS[closeReason] ?: closeReason, actorId)
+            current = itemRepo.save(current.copy(closeReason = closeReason, closeNote = closeNote?.takeIf { closeReason != "done" }))
         }
 
         if (parentItemId != null) {
@@ -789,7 +823,10 @@ class ItemService(
         at: Instant,
     ) = subtreeUpdate(rootId, at)
 
-    private fun restoreSubtree(rootId: Long) = subtreeUpdate(rootId, null)
+    private fun restoreSubtree(rootId: Long) {
+        itemTree.updateSubtreeDeletedAt(rootId, null)
+        itemTree.backfillCloseReasonInSubtree(rootId) // YPJ-274:恢复终态票补 done
+    }
 
     /** 物理删(回收站彻底删除):需求无级联先手动清(子树全量),item 子树随后真删。 */
     @Transactional
@@ -986,6 +1023,8 @@ class ItemService(
             sprintId = latestSprint[item.objectId]?.objectId,
             sprintName = latestSprint[item.objectId]?.name,
             onBoard = item.onBoard,
+            closeReason = item.closeReason,
+            closeNote = item.closeNote,
             externalRef = item.externalRef,
             parentItemId = item.parentObjectId,
             requirements =
@@ -1058,7 +1097,13 @@ data class UpdateItemRequest(
     val priority: String? = null,
     val estimateValue: String? = null, // YPJ-186(spec 0128):预估三态
     val estimateUnit: String? = null,
+    val closeReason: String? = null, // YPJ-274(spec 0167):仅转终态或终态票可带
+    val closeNote: String? = null,
 )
+
+/** YPJ-274(spec 0167):关闭理由封闭枚举(与 ck_item_close_reason 一致)及中文文案(活动留痕/CLI 用)。 */
+val CLOSE_REASONS = setOf("done", "wontfix", "expired", "duplicate", "superseded")
+val CLOSE_REASON_LABELS = mapOf("done" to "完成", "wontfix" to "不做", "expired" to "过期", "duplicate" to "重复", "superseded" to "被取代")
 
 /** dueSoon/overdue 纯函数(时钟纪律:today 由注入 Clock 提供,可测;spec 0051)。 */
 /** YPJ-208(spec 0138 切片 b):解析项目工作日历(非法存值兑退缺省;SRS v4 §3.2 缺省全天窗,信任边界在 settings 写入)。 */

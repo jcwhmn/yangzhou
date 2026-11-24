@@ -111,5 +111,7 @@ class ItemController(
         request.priority,
         request.estimateValue,
         request.estimateUnit,
+        request.closeReason,
+        request.closeNote,
     )
 }
