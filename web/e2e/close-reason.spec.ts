@@ -10,6 +10,33 @@ test.describe("YPJ-275 关闭理由(前端)", () => {
 
   const TITLE = "CR 关闭甲";
 
+  /** 拖卡进列:locator.dragTo 触发不了 Chromium 原生 HTML5 DnD(实跑 2 连挂,卡片原地不动),
+   *  故同一次 evaluate 内用共享 DataTransfer 派发 dragstart→drop——React 合成事件靠原生冒泡触发,
+   *  moveTo 读 dataTransfer.getData 拿到 itemId;断言仍只看界面结果(A48 口径)。 */
+  async function dragCardToColumn(
+    page: import("@playwright/test").Page,
+    title: string,
+    targetText: string,
+  ) {
+    await page.evaluate(
+      ({ title, targetText }) => {
+        const card = [...document.querySelectorAll(".MuiCard-root")].find(
+          (el) => el.textContent?.includes(title),
+        );
+        const target = [...document.querySelectorAll("h6")].find((el) =>
+          el.textContent?.includes(targetText),
+        );
+        if (!card || !target) throw new Error("拖拽源/目标没找到");
+        const dt = new DataTransfer();
+        const opts = { bubbles: true, cancelable: true, dataTransfer: dt };
+        card.dispatchEvent(new DragEvent("dragstart", opts));
+        target.dispatchEvent(new DragEvent("drop", opts));
+        card.dispatchEvent(new DragEvent("dragend", opts));
+      },
+      { title, targetText },
+    );
+  }
+
   /** 建票并上看板(默认落 To Do) */
   async function seedItem(projectKey: string, title: string) {
     const id = await apiCreateItem(projectKey, title);
@@ -47,9 +74,7 @@ test.describe("YPJ-275 关闭理由(前端)", () => {
     ).toBeVisible();
 
     // 拖卡进 Done 列 → 弹窗,默认选「完成」
-    await page
-      .locator(".MuiCard-root", { hasText: TITLE })
-      .dragTo(page.getByText("Done(0)"));
+    await dragCardToColumn(page, TITLE, "Done(0)");
     const dialog = page.getByRole("dialog");
     await expect(
       dialog.getByRole("combobox", { name: "关闭原因" }),
@@ -95,9 +120,7 @@ test.describe("YPJ-275 关闭理由(前端)", () => {
       page.locator(".MuiCard-root", { hasText: "CR 关闭乙" }),
     ).toBeVisible();
 
-    await page
-      .locator(".MuiCard-root", { hasText: "CR 关闭乙" })
-      .dragTo(page.getByText("Done(0)"));
+    await dragCardToColumn(page, "CR 关闭乙", "Done(0)");
 
     await expect(page.getByRole("dialog")).toHaveCount(0);
     // 迁移生效:Done 列计数变 1;现状零打扰:后端写 done,卡片无理由标识
