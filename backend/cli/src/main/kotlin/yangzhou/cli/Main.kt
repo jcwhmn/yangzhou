@@ -778,8 +778,7 @@ private fun printJson(body: tools.jackson.databind.JsonNode, flags: Map<String, 
 private fun printRaw(json: String) = println(json)
 
 /** YPJ-273:从 current 位到 target 位的相邻交换序列(1-based;探测撤回后的净步进;不可含末次"取快照"调用——move 每次都真交换) */
-internal fun boardorderMoves(current: Int, target: Int): List<String> =
-    buildList {
-        repeat(current - target) { add("up") }
-        repeat(target - current) { add("down") }
-    }
+internal fun boardorderMoves(current: Int, target: Int): List<String> = buildList {
+    repeat(current - target) { add("up") }
+    repeat(target - current) { add("down") }
+}
