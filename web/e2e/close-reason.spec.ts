@@ -2,7 +2,7 @@
 // 设开关 → 拖卡进 Done 弹窗 → 选不做+备注 → 卡片标识 → 详情页理由可见可改 → 改回完成;
 // 开关关不弹(现状零打扰)。后端分支(枚举白名单/400/reopen 清空)由 CloseReasonApiTest 覆盖,此处不重复。
 import { expect, test } from "./support/fixtures";
-import { apiCall, apiCreateItem } from "./support/helpers";
+import { apiCall, apiAssignMe, apiCreateItem } from "./support/helpers";
 
 test.describe("YPJ-275 关闭理由(前端)", () => {
   // S0(无 level-1 类型)= 无 sprint 概念,建票即可上看板(同 board-order.spec 先例;非 S0 需 active sprint 才可挂板)
@@ -37,9 +37,10 @@ test.describe("YPJ-275 关闭理由(前端)", () => {
     );
   }
 
-  /** 建票并上看板(默认落 To Do) */
+  /** 建票并上看板(默认落 To Do);自指派绕开工门禁——未指派票不可离开 START(409 开工前请先指派) */
   async function seedItem(projectKey: string, title: string) {
     const id = await apiCreateItem(projectKey, title);
+    await apiAssignMe(id);
     await apiCall("PUT", `/api/items/${id}/board-membership`, {
       onBoard: true,
     });
