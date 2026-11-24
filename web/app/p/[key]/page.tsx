@@ -20,6 +20,8 @@ import {
 } from "@/lib/sprints";
 import useBoardData from "./hooks/useBoardData";
 import PullDialog from "./components/PullDialog";
+import CloseReasonDialog from "@/components/CloseReasonDialog";
+import { shouldAsk, type CloseReason } from "@/lib/closeReason";
 import type { Filter, Item, SprintLite, Status } from "./types";
 
 export default function BoardPage() {
@@ -67,6 +69,13 @@ export default function BoardPage() {
   );
   const [launchPick, setLaunchPick] = useState("");
   const [launchName, setLaunchName] = useState("");
+  // YPJ-275:转终态弹窗(源状态 requireCloseReason=true);取消 = 卡片不动(不乐观更新)
+  const [closeAsk, setCloseAsk] = useState<{
+    itemId: string;
+    itemNumber: string;
+    status: Status;
+  } | null>(null);
+  const [closeError, setCloseError] = useState("");
 
   async function addItem(e: React.FormEvent) {
     e.preventDefault();
@@ -233,6 +242,11 @@ export default function BoardPage() {
   async function moveTo(itemId: string, status: Status) {
     const item = items.find((i) => i.itemId === itemId);
     if (!item || item.status === status.name) return;
+    if (shouldAsk(statuses, item.status, status)) {
+      setCloseError("");
+      setCloseAsk({ itemId, itemNumber: item.number, status });
+      return;
+    }
     try {
       setItems((prev) =>
         prev.map((i) =>
@@ -256,6 +270,25 @@ export default function BoardPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : t.board.moveFailed);
       await load();
+    }
+  }
+
+  /** YPJ-275:弹窗确认 = PATCH 带理由迁移;失败原地报错不关窗 */
+  async function confirmClose(reason: CloseReason, note: string | null) {
+    if (!closeAsk) return;
+    try {
+      await api(`/api/items/${closeAsk.itemId}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          statusItemId: closeAsk.status.statusId,
+          closeReason: reason,
+          closeNote: reason === "done" ? null : note,
+        }),
+      });
+      setCloseAsk(null);
+      await load();
+    } catch (err) {
+      setCloseError(err instanceof Error ? err.message : t.board.moveFailed);
     }
   }
 
@@ -457,6 +490,17 @@ export default function BoardPage() {
         projectKey={key}
         onClose={() => setPullOpen(false)}
         onPulled={load}
+      />
+      <CloseReasonDialog
+        open={closeAsk !== null}
+        title={
+          closeAsk
+            ? t.closeReason.closeTitle(closeAsk.itemNumber)
+            : t.closeReason.label
+        }
+        error={closeError}
+        onCancel={() => setCloseAsk(null)}
+        onConfirm={confirmClose}
       />
     </Box>
   );

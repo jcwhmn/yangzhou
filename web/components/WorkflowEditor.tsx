@@ -8,8 +8,10 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  FormControlLabel,
   IconButton,
   Stack,
+  Switch,
   TextField,
   Typography,
 } from "@mui/material";
@@ -24,6 +26,7 @@ type Status = {
   icon: string | null;
   statusType: string;
   position: number;
+  requireCloseReason: boolean; // YPJ-275
 };
 type Transition = { from: string; to: string; function: string };
 
@@ -264,6 +267,21 @@ export function WorkflowEditor({
                     patch(s.statusId, { position: Number(e.target.value) });
                 }}
                 sx={{ width: 80 }}
+              />
+              <FormControlLabel
+                control={
+                  <Switch
+                    size="small"
+                    checked={s.requireCloseReason}
+                    onChange={(e) =>
+                      patch(s.statusId, {
+                        requireCloseReason: e.target.checked,
+                      })
+                    }
+                  />
+                }
+                label={t.closeReason.askClose}
+                sx={{ ml: 0, mr: 0, whiteSpace: "nowrap" }}
               />
               <IconButton
                 size="small"
