@@ -1,6 +1,6 @@
 # 0167 · YPJ-258 item 关闭理由 SRS
 
-> 状态:草案,待拍板(§八)。REST 增量以运行时 `/v3/api-docs`(springdoc,OpenAPI 3.1.0)实况为准,§六按真实 schema 切 diff。
+> 状态:后端切片 YPJ-274 已合(PR #259);前端切片 YPJ-275 待开。REST 增量以运行时 `/v3/api-docs`(springdoc,OpenAPI 3.1.0)实况为准,§六按真实 schema 切 diff。
 
 ## 一、目的与范围
 
@@ -188,15 +188,16 @@ reason≠done:状态 chip 旁加小标签,文案 = 理由中文(不做/过期/�
 
 ## 八、验收标准
 
-- [ ] 状态配置 requireCloseReason 可设/改/读;存量默认 false;
+- [x] 状态配置 requireCloseReason 可设/改/读;存量默认 false;
 - [ ] 源状态 true 时,看板与详情页转终态弹窗;false 时不弹,行为同现状;
-- [ ] 转终态不带理由 → done;带 → 写入;非终态带理由 → 400;非法枚举 → 400;
-- [ ] reopen 清空;终态票只改理由可改,改回 done 清 note;
+- [x] 转终态不带理由 → done;带 → 写入;非终态带理由 → 400;非法枚举 → 400;
+- [x] reopen 清空;终态票只改理由可改,改回 done 清 note;
 - [ ] 详情页修改入口;列表/看板 reason≠done 有标识;
-- [ ] CLI 透传 + requireCloseReason=true 时提示;
-- [ ] 活动留痕:转终态非 done → `status_changed` 带理由(±备注);改理由 → `close_reason_changed`;done/reopen 形如现状(§4.4);
-- [ ] 回收站恢复终态票 → close_reason 补 done(§4.3 口径);
-- [ ] 迁移 V71(两表 DDL + 存量终态票回填,软删除不回填)+ api.http 用例 + e2e 覆盖 §五。
+- [x] CLI 透传 + requireCloseReason=true 时提示;
+- [x] 活动留痕:转终态非 done → `status_changed` 带理由(±备注);改理由 → `close_reason_changed`;done/reopen 形如现状(§4.4);
+- [x] 回收站恢复终态票 → close_reason 补 done(§4.3 口径);
+- [x] 迁移 V71(两表 DDL + 存量终态票回填,软删除不回填)+ api.http §21 用例(YPJ-274);
+- [ ] e2e 覆盖 §五 弹窗/标识分支(YPJ-275)。
 
 ## 九、开放决策
 
