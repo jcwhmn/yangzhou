@@ -71,6 +71,20 @@ update item i
 
 口径:存量终态票全视为正常完成——历史上是否有非完成关闭无法追溯,接受(2026-11-24 用户拍板)。
 
+### 4.4 活动留痕(item_activity;2026-11-24 用户拍板 D2/D4)
+
+reopen 清空两列。留痕复用现有 `status_changed`,不新增转终态 kind——理由只在转终态那一刻有意义,单独一条会和 `status_changed` 挨着重复:
+
+| 事件 | kind | oldValue | newValue |
+|---|---|---|---|
+| 转终态,reason=done | `status_changed` | 源状态名 | `Done`(现状不变) |
+| 转终态,reason≠done 无备注 | `status_changed` | 源状态名 | `Done(不做)` |
+| 转终态,reason≠done 带备注 | `status_changed` | 源状态名 | `Done(不做:被 YPJ-xxx 取代)` |
+| reopen(终态→非终态) | `status_changed` | 终态名 | 目标状态名(现状不变;理由列已清) |
+| 终态票事后改理由(含改回 done) | `close_reason_changed` | 旧理由文案 | 新理由文案 |
+
+备注入 newValue 截断 ≤100 字符(活动行是摘要,全文看详情页)。
+
 ## 五、分支真值表
 
 | 场景 | 行为 |
@@ -79,8 +93,8 @@ update item i
 | 同上,**源状态 requireCloseReason=true** | **弹窗**(§七 UI):下拉默认 `done`,选非 done 出备注框;确认后 PATCH 带 closeReason(+note);取消 = 不迁移 |
 | 任意入口转终态,带 closeReason=枚举值 | 写该值(+note) |
 | 带非法 closeReason / 转非终态却带 closeReason | 400 |
-| PATCH 终态票只改 closeReason(不动状态) | 更新;改回 done 清 note |
-| reopen | 清空两列 |
+| PATCH 终态票只改 closeReason(不动状态) | 更新;改回 done 清 note;记 `close_reason_changed` |
+| reopen | 清空两列;`status_changed` 照常 |
 | CLI `items move <ID> <终态名>` | 不弹;不带 --reason 即 `done`;源状态 requireCloseReason=true 时 **CLI 提示**「源状态要求理由,已记 done;用 --reason 指定」 |
 | CLI `--note` 无 `--reason` 或 `--reason done` | CLI 报错 |
 | 详情页:终态票 | 状态旁显示理由文案(+备注);下拉可改,非 done 显示备注框 |
@@ -180,6 +194,7 @@ reason≠done:状态 chip 旁加小标签,文案 = 理由中文(不做/过期/�
 - [ ] reopen 清空;终态票只改理由可改,改回 done 清 note;
 - [ ] 详情页修改入口;列表/看板 reason≠done 有标识;
 - [ ] CLI 透传 + requireCloseReason=true 时提示;
+- [ ] 活动留痕:转终态非 done → `status_changed` 带理由(±备注);改理由 → `close_reason_changed`;done/reopen 形如现状(§4.4);
 - [ ] 回收站恢复终态票 → close_reason 补 done(§4.3 口径);
 - [ ] 迁移 V71(两表 DDL + 存量终态票回填,软删除不回填)+ api.http 用例 + e2e 覆盖 §五。
 
@@ -190,6 +205,7 @@ reason≠done:状态 chip 旁加小标签,文案 = 理由中文(不做/过期/�
 | D1 | 契约:复用 PATCH item 加字段,零新端点 | 已拍板 |
 | D3 | 枚举:done + 4 非完成值 | 已拍板 |
 | D6 | 弹窗策略:按源状态 requireCloseReason 配置 | 已拍板 |
-| D2 | reopen 清空理由 | 推荐 A 清空;待确认 |
+| D2 | reopen 清空理由 | **已拍板**(2026-11-24 用户):清空 |
+| D4 | 活动留痕(item_activity) | **已拍板**(2026-11-24 用户):都要写——转终态扩 `status_changed` newValue,改理由记 `close_reason_changed`(§4.4) |
 | D5 | 存量终态票迁移回填 done;软删除不回填;非终态留 NULL | **已拍板**(2026-11-24 用户) |
 | D4 | 带非 done 理由转终态是否写一条 activity | 待定(与 YPJ-263 汇合) |
