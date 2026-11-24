@@ -6,6 +6,7 @@ export type Status = {
   icon: string | null;
   statusType: string;
   position: number;
+  requireCloseReason: boolean; // YPJ-275:迁出到终态时前端须弹窗问关闭理由
 };
 export type Item = {
   itemId: string;
@@ -26,6 +27,8 @@ export type Item = {
   estimateUnit: string | null;
   blocked: boolean;
   sprintName: string | null;
+  closeReason: string | null; // YPJ-275:终态票恒非空(后端回填 done);非终态 null
+  closeNote: string | null;
 };
 
 export type Filter = "all" | "unassigned" | "blocked" | string; // string = memberId

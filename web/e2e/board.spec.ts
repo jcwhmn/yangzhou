@@ -264,7 +264,8 @@ test("V13-S4 详情切状态 409——错误浮出且状态不变", async ({
   const itemId = await apiCreateItem(projectKey, "E2E 无主 item");
   await page.goto(`/p/${projectKey}/i/${itemId}`);
   await page.getByRole("combobox", { name: "item 状态" }).click();
-  await page.getByRole("option", { name: "Done" }).click();
+  // D7(spec 0167):直迁终态豁免开工门禁 → 409 样本改用 START→ACTIVE(仍须有主)
+  await page.getByRole("option", { name: "In Progress" }).click();
   // V4-S3 规则:开工须有主;JCW-160-E:错误浮出而非静默
   await expect(page.getByText("开工前请先指派负责人")).toBeVisible();
   await expect(page.getByRole("combobox", { name: "item 状态" })).toHaveValue(

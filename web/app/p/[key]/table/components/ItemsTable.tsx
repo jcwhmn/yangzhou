@@ -14,7 +14,9 @@ import {
   Typography,
 } from "@mui/material";
 import { AssignPopover } from "@/components/AssignPopover";
+import { Stack } from "@mui/material";
 import { t } from "@/lib/texts";
+import type { CloseReason } from "@/lib/closeReason";
 import { estimateText } from "@/lib/estimate";
 import { PAGE_SIZES, type ColumnDef, type Item, type SortKey } from "../shared";
 
@@ -107,7 +109,24 @@ export default function ItemsTable({
                         <Typography variant="body2">{it.title}</Typography>
                       </Link>
                     ) : c.id === "status" ? (
-                      it.status
+                      it.closeReason && it.closeReason !== "done" ? (
+                        // YPJ-275:非完成关闭标识(spec 0167 §7.3)
+                        <Stack
+                          direction="row"
+                          spacing={0.5}
+                          alignItems="center"
+                        >
+                          <Typography variant="body2">{it.status}</Typography>
+                          <Chip
+                            size="small"
+                            color="warning"
+                            variant="outlined"
+                            label={t.closeReason[it.closeReason as CloseReason]}
+                          />
+                        </Stack>
+                      ) : (
+                        it.status
+                      )
                     ) : c.id === "priority" ? (
                       (it.priority ?? "")
                     ) : c.id === "estimate" ? (

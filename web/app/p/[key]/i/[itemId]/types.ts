@@ -5,6 +5,7 @@ export type Status = {
   name: string;
   statusType: string;
   position: number;
+  requireCloseReason: boolean; // YPJ-275:迁出到终态时前端须弹窗问关闭理由
 };
 
 /** YPJ-177(spec 0123):item type 定义(动态下拉)。 */
@@ -70,6 +71,10 @@ export type Item = {
   dueSoon: boolean;
 
   blocked: boolean;
+
+  closeReason: string | null; // YPJ-275:终态票恒非空(后端回填 done);非终态 null
+
+  closeNote: string | null;
 
   createdAt: string | null;
 };
