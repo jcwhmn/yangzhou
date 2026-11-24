@@ -428,8 +428,14 @@ class ItemService(
             if (oldStatus != null) {
                 workflow.assertTransitionAllowed(projectObjectId, oldStatus.objectId!!, status.objectId!!)
             }
-            // 开工须有主:离开起点状态前必须已指派(V4-S3)
-            if (current.assigneeObjectId == null && oldStatus?.statusType == StatusType.START && status.statusType != StatusType.START) {
+            // 开工须有主:离开起点状态去进行态前必须已指派(V4-S3);
+            // 直迁终态豁免(2026-11-25 用户拍板:决定不做/放弃的票不该被强制先指派)
+            if (
+                current.assigneeObjectId == null &&
+                oldStatus?.statusType == StatusType.START &&
+                status.statusType != StatusType.START &&
+                status.statusType != StatusType.FINAL
+            ) {
                 throw ConflictException("开工前请先指派负责人")
             }
             // WIP 限制:目标列已有 item 数 >= 上限 → 409(V5-W1)
