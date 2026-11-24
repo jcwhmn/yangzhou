@@ -561,6 +561,9 @@ private fun run(args: List<String>) {
             probe["ordered"].forEach { ordered.add(it["itemId"].asString()) }
             val columnSize = ordered.size
             val idx = ordered.indexOf(itemId)
+            require(idx >= 0) {
+                "${item["number"].asString()} 不在看板列(未挂 active sprint 或未上看板);请先 items assign / 上看板再排序"
+            } // A49 后续:不在列的票会静默"成功"(idx=-1 被当第 1 位),必须拦截
             val current = if (idx == 0) 1 else idx + 2
             // 撤回响应即原位快照;current==target 时零步进,直接用
             var snap = if (idx != 0) move("down") else probe
