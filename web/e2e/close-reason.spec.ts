@@ -37,7 +37,7 @@ test.describe("YPJ-275 关闭理由(前端)", () => {
     );
   }
 
-  /** 建票并上看板(默认落 To Do);自指派绕开工门禁——未指派票不可离开 START(409 开工前请先指派) */
+  /** 建票并上看板（默认落 To Do）；自指派保持确定性——D7 豁免后裸票也能直迁终态，但旧镜像仍拦 */
   async function seedItem(projectKey: string, title: string) {
     const id = await apiCreateItem(projectKey, title);
     await apiAssignMe(id);
