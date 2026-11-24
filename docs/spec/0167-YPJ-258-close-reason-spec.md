@@ -1,132 +1,173 @@
 # 0167 · YPJ-258 item 关闭理由 SRS
 
+> 状态:草案,待拍板(§八)。REST 增量以运行时 `/v3/api-docs`(springdoc,OpenAPI 3.1.0)实况为准,§六按真实 schema 切 diff。
+
 ## 一、目的与范围
 
-item 转终态(FINAL)时记录「关闭理由」:预设枚举(缺省=完成)+ 可选备注,承载"非完成性收口"(不做/过期/重复/被取代)。不填即完成,不打扰正常路径。
+item 转终态(FINAL)时记录「关闭理由」:预设枚举(缺省=完成)+ 可选备注,承载"非完成性收口"(不做/过期/重复/被取代)。是否询问理由由 **workflow 源状态**配置决定,正常路径不打扰。
 
-范围:迁移、PATCH 契约扩展(请求 DTO 加字段,零新端点)、detail 页展示与修改入口、列表/看板标识、CLI `items move` 透传。不改 workflow 状态机,不弹强制窗。
+范围:迁移(status 配置列 + item 理由列)、状态配置契约扩展、PATCH item 契约扩展、看板/详情页转终态弹窗、详情页修改入口、列表标识、CLI 透传。不改 workflow 状态机迁移规则。
 
 ## 二、术语
 
-- **终态(FINAL)**:`status.status_type = 'final'` 的状态,项目内可多个。
-- **关闭理由(closeReason)**:封闭枚举,含 `done`(完成)为缺省;终态票恒有值。
-- **关闭备注(closeNote)**:自由文本,仅随非 done 理由存在。
+- **终态(FINAL)**:`status.status_type = 'final'`,项目内可多个。
+- **关闭理由(closeReason)**:封闭枚举,`done` 为缺省;终态票恒有值。
+- **需问理由(requireCloseReason)**:状态级布尔配置。从该状态迁出到任一终态时,前端弹窗询问;后端校验非 done 或显式 done 皆可,只是不再静默缺省。
 
-## 三、数据语义
+## 三、枚举表
 
-迁移 V71(SQL identity + 命名约束),`item` 表加两列:
+| 值 | 中文 | 何时用 | 备注 |
+|---|---|---|---|
+| `done` | 完成 | 正常做完(缺省) | 不存 note |
+| `wontfix` | 不做 | 决定不做(优先级/方向变化) | 可填 note |
+| `expired` | 过期 | 时效已过,做了也无意义 | 可填 note |
+| `duplicate` | 重复 | 与另一票重复(建议 note 写票号) | 可填 note |
+| `superseded` | 被取代 | 被新票/新方案替代(建议 note 写替代票号) | 可填 note |
+
+文案外置;DB 存枚举值,CHECK 约束封闭。
+
+## 四、数据语义
+
+### 4.1 状态配置(迁移 V71)
+
+`status` 表加列 `require_close_reason BOOLEAN NOT NULL DEFAULT false`。
+
+- 语义:从此状态迁出到终态时,前端**必须**弹窗让用户选理由(默认选中 `done`,不静默)。
+- 存量状态全 false → 行为与现状一致,零打扰;项目自己按需打开。
+- 管理入口:项目设置的状态编辑表单加开关(与 wipLimit 同区)。
+
+### 4.2 item 理由(同迁移 V71)
+
+`item` 表加两列:
 
 - `close_reason VARCHAR(20) NULL`,`CONSTRAINT ck_item_close_reason CHECK (close_reason IN ('done','wontfix','expired','duplicate','superseded'))`
 - `close_note TEXT NULL`
 
 不变式:
-- 任何入口转终态(看板拖列 / 详情页改状态 / CLI `items move` / import)时,若未指定理由 → 后端写 `done`(缺省);指定则写指定值。终态票 `close_reason` 恒非空。
-- `close_note` 仅随非 done 理由写入;reason=done 时忽略/清空 note。
-- reopen(终态→非终态,经任何入口)→ 清空两列(D2);再关再按当时输入定。
-- 存量已 Done 票:迁移回填 `close_reason = 'done'`(存量正常完成,与缺省一致;非完成关闭的存量无法追溯,接受)。
-- 删 item → 列随行走,无额外钩子。
+- 任何入口转终态:带 closeReason 写该值;不带 → 写 `done`。终态票 `close_reason` 恒非空。
+- `close_note` 仅随非 done 理由存;reason=done 时清空 note。
+- reopen(终态→非终态,任何入口)→ 清空两列。
+- 存量已 Done 票:迁移回填 `close_reason = 'done'`。
+- 删 item → 列随行走。
 
-## 四、分支真值表
+## 五、分支真值表
 
 | 场景 | 行为 |
 |---|---|
-| 任意入口转终态,不带 closeReason | 状态迁移 + `close_reason = done` |
-| 任意入口转终态,带 closeReason=枚举值 | 写该值(+note 若有) |
-| 带非法 closeReason | 400(Bean Validation) |
-| 转非终态却带 closeReason | 400(统一错误形状:仅转终态可填) |
-| PATCH 终态票只改 closeReason/closeNote(不动状态) | 更新理由(reason→done 则清 note) |
+| 看板拖列/详情页改状态 → 终态,**源状态 requireCloseReason=false** | 直接迁移,后端写 `done`(现状零打扰) |
+| 同上,**源状态 requireCloseReason=true** | **弹窗**(§七 UI):下拉默认 `done`,选非 done 出备注框;确认后 PATCH 带 closeReason(+note);取消 = 不迁移 |
+| 任意入口转终态,带 closeReason=枚举值 | 写该值(+note) |
+| 带非法 closeReason / 转非终态却带 closeReason | 400 |
+| PATCH 终态票只改 closeReason(不动状态) | 更新;改回 done 清 note |
 | reopen | 清空两列 |
-| detail 页:终态票 | 显示理由文案(+备注);旁边下拉可改理由,非 done 时显示备注输入 |
-| 列表/看板:终态票 reason≠done | 状态旁「非完成关闭」标识(reason 文案) |
-| 列表/看板:reason=done | 无额外标识(现状) |
-| CLI `items move <ID> <终态名> [--reason <枚举>] [--note 文本]` | 透传进 PATCH;--note 无 --reason 或 reason=done → CLI 报错 |
+| CLI `items move <ID> <终态名>` | 不弹;不带 --reason 即 `done`;源状态 requireCloseReason=true 时 **CLI 提示**「源状态要求理由,已记 done;用 --reason 指定」 |
+| CLI `--note` 无 `--reason` 或 `--reason done` | CLI 报错 |
+| 详情页:终态票 | 状态旁显示理由文案(+备注);下拉可改,非 done 显示备注框 |
+| 列表/看板:终态票 reason≠done | 状态旁「非完成关闭」标识(理由文案) |
+| 列表/看板:reason=done | 无标识(现状) |
 
-## 五、REST 契约(OpenAPI,只写增量;既有 `PATCH /api/items/{itemId}`)
+## 六、REST 契约(OpenAPI 增量;基于 `/v3/api-docs` 实况切 diff)
+
+完整文档 = 运行中后端 `GET /v3/api-docs`(JSON)/`/v3/api-docs.yaml`;UI 在 `/scalar-ui.html`。下面只列本票**改动点**(`+` 新增),schema 名与实况一致。
+
+### 6.1 状态配置:`UpdateStatusRequest` / `CreateStatusRequest` / `StatusDto`
 
 ```yaml
-openapi: 3.0.3
-info: { title: YPJ-258 增量, version: '0167' }
-paths:
-  /api/items/{itemId}:
-    parameters:
-      - name: itemId
-        in: path
-        required: true
-        schema: { type: string, format: uuid }
-    patch:
-      tags: [items]
-      summary: 改 item(既有端点;本票请求体加 closeReason/closeNote)
-      operationId: patchItem
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchItemRequest'
-      responses:
-        '200':
-          description: 更新后的 item
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ItemDto'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-components:
-  schemas:
-    PatchItemRequest:
-      type: object
-      description: 既有字段(statusItemId/title/description/assigneeObjectId/…)略;仅列增量
-      properties:
-        statusItemId:
-          type: string
-          format: uuid
-          nullable: true
-          description: 目标状态;转终态且未带 closeReason → 后端写 done
-        closeReason:
-          allOf: [{ $ref: '#/components/schemas/CloseReason' }]
-          nullable: true
-          description: 仅目标状态为终态时允许;非终态带此字段 → 400
-        closeNote:
-          type: string
-          nullable: true
-          maxLength: 2000
-          description: 仅随非 done 理由存;reason=done 时忽略
-    CloseReason:
-      type: string
-      enum: [done, wontfix, expired, duplicate, superseded]
-      x-enum-labels: { done: 完成, wontfix: 不做, expired: 过期, duplicate: 重复, superseded: 被取代 }
-    ItemDto:
-      type: object
-      description: 既有 DTO,仅列增量字段
-      properties:
-        closeReason:
-          allOf: [{ $ref: '#/components/schemas/CloseReason' }]
-          nullable: true
-          description: 终态票恒非空(存量迁移回填 done);非终态 null
-        closeNote:
-          type: string
-          nullable: true
-  responses:
-    BadRequest:
-      description: 非终态带理由 / 枚举非法 / 备注超长 / 仅改理由但票非终态(统一错误形状 code/message/path/fields)
+# 现状(实况):name, icon, statusType, position;Update 无 required
+UpdateStatusRequest:
+  properties:
+    name: { type: string }
+    icon: { type: string }
+    statusType: { type: string, enum: [START, FINAL, ACTIVE] }
+    position: { type: integer, format: int32 }
++   requireCloseReason: { type: boolean }   # 从此状态迁出到终态时前端须弹窗
+CreateStatusRequest:
+  properties:
+    # …同上 4 字段…
++   requireCloseReason: { type: boolean, default: false }
+StatusDto:
+  properties:
+    statusId: { type: string, format: uuid }
+    name: { type: string }
+    icon: { type: string }
+    statusType: { type: string, enum: [START, FINAL, ACTIVE] }
+    position: { type: integer, format: int32 }
++   requireCloseReason: { type: boolean }
 ```
 
-## 六、验收标准
+### 6.2 item:`UpdateItemRequest` / `ItemDto`(`PATCH /api/items/{itemId}` 等)
 
-- [ ] 任意入口转终态不带理由 → `done`;带理由 → 写入;非终态带理由 → 400;非法枚举 → 400;
-- [ ] reopen 清空;再关按输入;
-- [ ] 终态票 PATCH 只改理由可改;改回 done 清 note;
-- [ ] detail 页终态票显示理由,可改;非 done 可填备注;
-- [ ] 列表/看板 reason≠done 有「非完成关闭」标识;
-- [ ] CLI `items move` 支持 --reason/--note;
-- [ ] 迁移 V71(含存量回填 done)+ api.http 用例 + e2e 覆盖上表。
+```yaml
+UpdateItemRequest:   # 实况 10 字段:title description type statusItemId parentItemId startDate dueDate priority estimateValue estimateUnit
+  properties:
++   closeReason:
++     type: string
++     nullable: true
++     enum: [done, wontfix, expired, duplicate, superseded]
++     description: 仅目标状态为终态时允许;转终态不带 → 后端写 done
++   closeNote:
++     type: string
++     nullable: true
++     maxLength: 2000
++     description: 仅随非 done 理由存;reason=done 时忽略并清空
+ItemDto:             # 实况 31 字段,略
+  properties:
++   closeReason: { type: string, nullable: true, enum: [done, wontfix, expired, duplicate, superseded] }   # 终态恒非空
++   closeNote: { type: string, nullable: true }
+```
 
-## 七、开放决策(动工前须用户拍板)
+错误(统一形状 code/message/path/fields):转非终态带 closeReason → 400;枚举非法 → 400;note 超长 → 400。
+
+## 七、窗口 UI
+
+### 7.1 转终态弹窗(仅源状态 requireCloseReason=true)
+
+触发:看板拖列落到终态列 / 详情页状态改为终态。
+
+```text
+┌─ 关闭 YPJ-258 ─────────────────────────┐
+│ 关闭原因   [ 完成              ▾]      │
+│ ┌───────────────────────────────────┐  │
+│ │ 备注(可选)                        │  │
+│ └───────────────────────────────────┘  │   ← 选 done 时隐藏
+│                     [取消]  [确认关闭] │
+└─────────────────────────────────────────┘
+```
+
+- 下拉默认 `done`,焦点在下拉;回车 = 确认。
+- 选非 done → 下方展开备注框(多行,≤2000);切回 done → 收起并清内容。
+- 确认 → PATCH `{statusItemId, closeReason, closeNote?}`;失败原地报错不关窗。
+- 取消 → 不迁移;看板卡片回原列。
+
+### 7.2 详情页修改(终态票,不弹窗)
+
+状态行右侧:理由文案 chip(`完成` 灰 / 非完成 带色);hover 出「修改」。点开为行内 popover:同 7.1 的下拉 + 条件备注框 + 保存。保存 = PATCH 仅 `{closeReason, closeNote?}`。
+
+### 7.3 列表/看板标识
+
+reason≠done:状态 chip 旁加小标签,文案 = 理由中文(不做/过期/重复/被取代),颜色统一(非完成)。reason=done 不加。
+
+### 7.4 状态设置
+
+项目设置 → 状态编辑:在 wipLimit 旁加开关「转终态时询问关闭原因」。
+
+## 八、验收标准
+
+- [ ] 状态配置 requireCloseReason 可设/改/读;存量默认 false;
+- [ ] 源状态 true 时,看板与详情页转终态弹窗;false 时不弹,行为同现状;
+- [ ] 转终态不带理由 → done;带 → 写入;非终态带理由 → 400;非法枚举 → 400;
+- [ ] reopen 清空;终态票只改理由可改,改回 done 清 note;
+- [ ] 详情页修改入口;列表/看板 reason≠done 有标识;
+- [ ] CLI 透传 + requireCloseReason=true 时提示;
+- [ ] 迁移 V71(两表,含存量 Done 回填)+ api.http 用例 + e2e 覆盖 §五。
+
+## 九、开放决策
 
 | # | 事项 | 状态 |
 |---|---|---|
-| D1 | 契约形状:复用 PATCH 加字段,零新端点 | **已拍板**(2026-11-24 用户) |
-| D2 | reopen 时理由清空 | 推荐 A 清空;待确认 |
-| D3 | 枚举集:done + 4 非完成值 | **已拍板**(2026-11-24 用户) |
-| D4 | 活动留痕:转终态带非 done 理由是否写一条 activity | 待定(与 YPJ-263 汇合处) |
-| D5 | 存量 Done 票迁移回填 `done` | 推荐(与缺省一致);待确认 |
+| D1 | 契约:复用 PATCH item 加字段,零新端点 | 已拍板 |
+| D3 | 枚举:done + 4 非完成值 | 已拍板 |
+| D6 | 弹窗策略:按源状态 requireCloseReason 配置 | 已拍板 |
+| D2 | reopen 清空理由 | 推荐清空;待确认 |
+| D5 | 存量 Done 票迁移回填 done | 推荐;待确认 |
+| D4 | 带非 done 理由转终态是否写一条 activity | 待定(与 YPJ-263 汇合) |
