@@ -431,8 +431,13 @@ export default function ItemDetailPage() {
       ).catch(() => null);
       const me = board?.items.find((i) => i.itemId === itemId);
       if (board && me) {
-        list = visible(board.items.filter((i) => i.status === me.status)).sort(
-          byBoardOrder,
+        // 用户拍板 2026-11-25:跨列连续浏览——状态按看板列序(workflow),列内 boardOrder 序,列尾接下一列首
+        const rank = new Map(statuses.map((st, i) => [st.name, i]));
+        list = visible(board.items).sort(
+          (a, b) =>
+            (rank.get(a.status) ?? Number.MAX_SAFE_INTEGER) -
+              (rank.get(b.status) ?? Number.MAX_SAFE_INTEGER) ||
+            byBoardOrder(a, b),
         );
       } else {
         const backlog = await api<Item[]>(`/api/projects/${key}/backlog`).catch(
@@ -468,7 +473,7 @@ export default function ItemDetailPage() {
     return () => {
       dead = true;
     };
-  }, [item, itemId, key, sprints]);
+  }, [item, itemId, key, sprints, statuses]);
 
   // Ctrl+←/→ 桶内导航;文本编辑焦点让位(spec 0168)
   useEffect(() => {

@@ -1,11 +1,11 @@
 # 0168 — YPJ-257 详情页上一条/下一条导航(按看板列序,SRS:需求+设计合一)
 
-> 票:YPJ-257(item detail 页上一条/下一条导航,按看板列序)
+> 票:YPJ-257(item detail 页上一条/下一条导航(看板跨列连续/backlog/L1 组))
 > 上游:spec 0166(列内排序键口径)、spec 0098(board ∩ backlog = ∅)
 
 ## 一、目的与范围
 
-详情页(`web/app/p/[key]/i/[itemId]/page.tsx`)支持在同看板列内 consecutive 浏览:**Ctrl+← 上一条 / Ctrl+→ 下一条**(2026-11-25 用户拍板,原「左右键」否决)。解决「详情页想看下一条才发现没实现」的诉求。
+详情页(`web/app/p/[key]/i/[itemId]/page.tsx`)支持桶内 consecutive 浏览(看板桶=跨列连续):**Ctrl+← 上一条 / Ctrl+→ 下一条**(2026-11-25 用户拍板,原「左右键」否决)。解决「详情页想看下一条才发现没实现」的诉求。
 
 ### 1.1 范围补充(2026-11-25 用户追加)
 导航不限于看板列:票在 **backlog** 或 **level-1 group(planned sprint)** 内时,同样可前后浏览(各自容器内的序)。
@@ -19,7 +19,7 @@
 
 | 术语 | 义 |
 |---|---|
-| 看板列序 | 同 spec 0166:status 分桶,列内 `boardOrder ?? MAX_SAFE_INTEGER` ASC → number 自然序(前端 `byBoardOrder`,YPJ-238) |
+| 看板序 | **跨列连续浏览(用户拍板 2026-11-25,取代初版「仅当前列」)**:状态按看板列序(workflow status 顺序),列内 `boardOrder ?? MAX_SAFE_INTEGER` ASC → number 自然序;列尾接下一列首 |
 | 在看板 | item 出现在 `GET /api/projects/{key}/board` 的 `items` 里 |
 | backlog 序 | `GET /api/projects/{key}/backlog`,number 自然序(后端 `OrderByNumber`,现有页无重排) |
 | L1 组序 | `GET /api/projects/{key}/groups/{groupId}/items`,number 自然序(同上,组员无 position) |
@@ -29,7 +29,7 @@
 
 - 数据源 = 现成 `GET /api/projects/{key}/board`(`ItemGroupService.board(key)` → `BoardDto{activeGroups, items}`),零后端改动;
 - 桶解析(依次尝试,命中即停):
-  1. **看板列**:`board.items` 含该 item → 同 `status` 过滤 → `byBoardOrder` 排序;
+  1. **看板**:`board.items` 含该 item → 全看板跨列连续序(状态列序 × 列内 boardOrder);
   2. **backlog**:`GET /backlog` 含该 item → number 序;
   3. **L1 组**:其余票(必在 planned L1 组,spec 0098)→ `GET /groups` 取 L1 类型组,逐组 `/groups/{id}/items` 找到含该 item 的组 → 该组 number 序;
 - L1 组多挂(同一 item 在多个 planned L1 组):按组 `createdAt` 序取首个命中(⚠ 断言:正常流程一票只挂一个 L1 组,请人复核);
@@ -41,10 +41,10 @@
 
 | 场景 | 行为 |
 |---|---|
-| Ctrl+→,当前有下一条 | push 下一(number URL) |
-| Ctrl+←,当前有上一条 | push 上一(number URL) |
-| Ctrl+→ 于列尾 | 无操作(不循环) |
-| Ctrl+← 于列首 | 无操作(不循环) |
+| Ctrl+→,当前有下一条 | push 下一(number URL);看板桶跨列时= 下一列首 |
+| Ctrl+←,当前有上一条 | push 上一(number URL);看板桶跨列时= 上一列尾 |
+| Ctrl+→ 于看板末列尾 / 桶尾 | 无操作(不循环) |
+| Ctrl+← 于看板首列首 / 桶首 | 无操作(不循环) |
 | 焦点在 input/textarea/contenteditable | 让位,不拦截(常识项,不拍板) |
 | item 不在任何桶(理论上不存在:非终态票必在看板/backlog/L1 组之一;终态票在 Done 列) | 导航不可用(形态待拍板 ①:隐藏 vs 禁用) |
 | 桶内仅 1 条 | 前后均无邻居,等价列尾/列首 |
@@ -52,7 +52,7 @@
 
 ## 五、验收标准
 
-- [ ] 三种桶内 Ctrl+→/← 均按各自序切换:看板列(boardOrder)/ backlog(number)/ L1 组(number);桶首/尾不循环;
+- [ ] 三种桶内 Ctrl+→/← 均按各自序切换:看板(跨列连续:状态列序 × boardOrder)/ backlog(number)/ L1 组(number);首/尾不循环;
 - [ ] 文本编辑聚焦时不触发;
 - [ ] 不在看板的票导航不可用;
 - [ ] `npx tsc --noEmit` + `npm run format` 绿;
