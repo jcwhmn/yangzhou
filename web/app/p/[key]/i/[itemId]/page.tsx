@@ -406,6 +406,9 @@ export default function ItemDetailPage() {
     total: number;
   } | null>(null);
 
+  // 首/尾边界轻提示(用户拍板 2026-11-25:无反应要有感知)
+  const [navEdge, setNavEdge] = useState<string | null>(null);
+
   useEffect(() => {
     if (!item) return;
     let dead = false;
@@ -444,14 +447,16 @@ export default function ItemDetailPage() {
           () => [],
         );
         if (visible(backlog).some((i) => i.itemId === itemId)) {
-          list = visible(backlog).sort(numeric);
+          // 同页显示口径:API 返回序(number 字典序),不重排
+          list = visible(backlog);
         } else {
           for (const g of sprints.filter((s) => s.status !== "completed")) {
             const members = await api<Item[]>(
               `/api/projects/${key}/groups/${g.sprintId}/items`,
             ).catch(() => []);
             if (visible(members).some((i) => i.itemId === itemId)) {
-              list = visible(members).sort(numeric);
+              // 同组页表格口径:API 返回序,不重排
+              list = visible(members);
               break;
             }
           }
@@ -492,6 +497,9 @@ export default function ItemDetailPage() {
       if (target) {
         e.preventDefault();
         router.push(`/p/${key}/i/${target}`);
+      } else {
+        e.preventDefault();
+        setNavEdge(e.key === "ArrowLeft" ? t.item.navFirst : t.item.navLast);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -1598,6 +1606,17 @@ export default function ItemDetailPage() {
         onCancel={() => setCloseAsk(null)}
         onConfirm={confirmClose}
       />
+
+      <Snackbar
+        open={navEdge !== null}
+        autoHideDuration={2000}
+        onClose={() => setNavEdge(null)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert severity="info" onClose={() => setNavEdge(null)}>
+          {navEdge}
+        </Alert>
+      </Snackbar>
 
       <Snackbar
         open={warnMsg !== null}

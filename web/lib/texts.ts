@@ -93,6 +93,8 @@ export const t = {
     number_not_found: "未找到该编号的 item",
     prevTip: "上一条(Ctrl+←)",
     nextTip: "下一条(Ctrl+→)",
+    navFirst: "已经是第一条",
+    navLast: "已经是最后一条",
     description: "描述",
     status: "状态",
     type: "类型",
