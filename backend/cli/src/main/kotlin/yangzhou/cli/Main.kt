@@ -562,12 +562,12 @@ private fun run(args: List<String>) {
             val columnSize = ordered.size
             val idx = ordered.indexOf(itemId)
             val current = if (idx == 0) 1 else idx + 2
-            if (idx != 0) move("down")
+            // 撤回响应即原位快照;current==target 时零步进,直接用
+            var snap = if (idx != 0) move("down") else probe
             if (target > columnSize) error("目标序号 $target 超出列长 $columnSize")
-            repeat(current - target) { move("up") }
-            repeat(target - current) { move("down") }
-            val done = move(if (current >= target) "up" else "down") // 末次调用拿最终 ordered(--json 用)
-            if (flags.containsKey("json")) return printRaw(done.toString())
+            // 步进到目标位:最后一次响应即最终 ordered(不可再补 move——每次调用都真交换,曾致 target≥2 多走一位)
+            for (dir in boardorderMoves(current, target)) snap = move(dir)
+            if (flags.containsKey("json")) return printRaw(snap.toString())
             println("已排序:${item["number"].asString()} → 第 $target 位(列 $columnSize 项)")
         }
 
@@ -776,3 +776,10 @@ private fun printJson(body: tools.jackson.databind.JsonNode, flags: Map<String, 
 }
 
 private fun printRaw(json: String) = println(json)
+
+/** YPJ-273:从 current 位到 target 位的相邻交换序列(1-based;探测撤回后的净步进;不可含末次"取快照"调用——move 每次都真交换) */
+internal fun boardorderMoves(current: Int, target: Int): List<String> =
+    buildList {
+        repeat(current - target) { add("up") }
+        repeat(target - current) { add("down") }
+    }
