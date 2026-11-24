@@ -18,6 +18,8 @@ import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 /** YPJ-89 单测补齐;YPJ-138(spec 0097 S1)适配:出边内嵌 status.transitions JSON,status_transition 表删除。 */
 class WorkflowServiceUnitTest {
@@ -42,13 +44,13 @@ class WorkflowServiceUnitTest {
     inner class CreateStatus {
         @Test
         fun duplicateNameRejected() {
-            assertFailsWith<ConflictException> { service.createStatus("CHE", "To Do", null, StatusType.ACTIVE, null) }
+            assertFailsWith<ConflictException> { service.createStatus("CHE", "To Do", null, StatusType.ACTIVE, null, false) }
         }
 
         @Test
         fun positionAutoAppended() {
             every { statuses.save(any()) } answers { firstArg<Status>().copy(id = 3L, objectId = UUID(0, 3)) }
-            assertEquals(2, service.createStatus("CHE", "QA", null, StatusType.ACTIVE, null).position) // max+1
+            assertEquals(2, service.createStatus("CHE", "QA", null, StatusType.ACTIVE, null, false).position) // max+1
         }
     }
 
@@ -58,7 +60,20 @@ class WorkflowServiceUnitTest {
         fun integrityViolationBecomesConflict() {
             every { statuses.findByObjectId(done.objectId) } returns done
             every { statuses.save(any()) } throws DataIntegrityViolationException("uk")
-            assertFailsWith<ConflictException> { service.updateStatus(done.objectId, "Renamed", null, null, null) }
+            assertFailsWith<ConflictException> { service.updateStatus(done.objectId, "Renamed", null, null, null, null) }
+        }
+
+        @Test
+        fun requireCloseReasonDefaultsAndUpdates() {
+            // YPJ-274:缺省 false;PATCH false→true→省略保持 true
+            every { statuses.save(any()) } answers { firstArg<Status>().copy(id = 9L) }
+            every { statuses.findByProjectObjectIdOrderByPosition(UUID(0, 1)) } returns listOf(todo, done)
+            var stored = done
+            every { statuses.findByObjectId(done.objectId) } answers { stored }
+            every { statuses.save(any()) } answers { firstArg<Status>().copy(id = 9L).also { stored = it } }
+            assertTrue(service.updateStatus(done.objectId, null, null, null, null, true).requireCloseReason)
+            assertTrue(service.updateStatus(done.objectId, null, null, null, null, null).requireCloseReason) // 省略=保持
+            assertFalse(service.updateStatus(done.objectId, null, null, null, null, false).requireCloseReason)
         }
 
         @Test
@@ -69,7 +84,7 @@ class WorkflowServiceUnitTest {
             // 保存后重载:START 归零 → 护栏 409(事务内回滚)
             every { statuses.findByProjectObjectIdOrderByPosition(UUID(0, 1)) } returns
                 listOf(onlyStart.copy(statusType = StatusType.ACTIVE), done)
-            assertFailsWith<ConflictException> { service.updateStatus(onlyStart.objectId, null, null, StatusType.ACTIVE, null) }
+            assertFailsWith<ConflictException> { service.updateStatus(onlyStart.objectId, null, null, StatusType.ACTIVE, null, null) }
         }
     }
 
