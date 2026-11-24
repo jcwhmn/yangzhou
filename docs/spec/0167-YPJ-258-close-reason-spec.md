@@ -189,15 +189,15 @@ reason≠done:状态 chip 旁加小标签,文案 = 理由中文(不做/过期/�
 ## 八、验收标准
 
 - [x] 状态配置 requireCloseReason 可设/改/读;存量默认 false;
-- [ ] 源状态 true 时,看板与详情页转终态弹窗;false 时不弹,行为同现状;
+- [x] 源状态 true 时,看板与详情页转终态弹窗;false 时不弹,行为同现状;
 - [x] 转终态不带理由 → done;带 → 写入;非终态带理由 → 400;非法枚举 → 400;
 - [x] reopen 清空;终态票只改理由可改,改回 done 清 note;
-- [ ] 详情页修改入口;列表/看板 reason≠done 有标识;
+- [x] 详情页修改入口;列表/看板 reason≠done 有标识;
 - [x] CLI 透传 + requireCloseReason=true 时提示;
 - [x] 活动留痕:转终态非 done → `status_changed` 带理由(±备注);改理由 → `close_reason_changed`;done/reopen 形如现状(§4.4);
 - [x] 回收站恢复终态票 → close_reason 补 done(§4.3 口径);
 - [x] 迁移 V71(两表 DDL + 存量终态票回填,软删除不回填)+ api.http §21 用例(YPJ-274);
-- [ ] e2e 覆盖 §五 弹窗/标识分支(YPJ-275)。
+- [x] e2e 覆盖 §五 弹窗/标识分支(YPJ-275)。
 
 ## 九、开放决策
 
