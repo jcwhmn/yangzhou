@@ -43,6 +43,18 @@ class ItemController(
         @PathVariable key: String,
     ): List<ItemService.ItemDto> = service.list(key)
 
+    /** YPJ-238(spec 0166 §3.1):看板列内箭头排序(move 交换);响应带该列全序。 */
+    @PostMapping("/projects/{key}/board-order/move")
+    fun moveBoardOrder(
+        @PathVariable key: String,
+        @RequestBody request: MoveBoardOrderRequest,
+    ) = service.moveBoardOrder(key, request.itemId, request.dir)
+
+    data class MoveBoardOrderRequest(
+        val itemId: UUID,
+        val dir: String,
+    )
+
     @GetMapping("/items/{itemId}")
     fun get(
         @PathVariable itemId: UUID,

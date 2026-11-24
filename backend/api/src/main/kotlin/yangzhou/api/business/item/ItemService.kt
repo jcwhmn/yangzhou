@@ -57,6 +57,7 @@ class ItemService(
     private val feasibilityService: yangzhou.api.business.feasibility.FeasibilityService,
     private val dependencyService: yangzhou.api.business.dependency.DependencyService,
     private val dependencies: yangzhou.persistence.repository.ItemDependencyRepository,
+    private val boardOrders: yangzhou.persistence.repository.BoardItemOrderRepository,
     private val groups: ItemGroupRepository,
     private val groupTypes: ItemGroupTypeRepository,
     private val memberships: ItemGroupMemberRepository,
@@ -112,6 +113,7 @@ class ItemService(
         val createdAt: String? = null,
         val sprintId: UUID? = null,
         val sprintName: String? = null,
+        val boardOrder: Int? = null, // YPJ-238(spec 0166):看板排序记忆(null=未排过,前端沉底)
         val onBoard: Boolean = false,
         val autoAssignedSprintName: String? = null, // YPJ-120 仅 PATCH 触发自动挂载时非空
         val warnings: List<String> = emptyList(), // YPJ-243(spec 0150):互算警告,仅 PATCH 响应携带
@@ -213,6 +215,109 @@ class ItemService(
         return get(item.objectId)
     }
 
+    /** YPJ-238(spec 0166 §3.1):看板列内箭头排序——与相邻项交换位次,至多 2 行 position 写;响应带该列全序。 */
+    @Transactional
+    fun moveBoardOrder(
+        projectKey: String,
+        itemId: UUID,
+        dir: String,
+    ): MoveBoardOrderResponse {
+        if (dir != "up" && dir != "down") throw BadRequestException("dir 非法:$dir(仅 up/down)")
+        val project = projects.findByKey(projectKey) ?: throw NotFoundException("项目不存在:$projectKey")
+        val item = itemRepo.findByObjectId(itemId) ?: throw NotFoundException("item 不存在:$itemId")
+        if (item.projectObjectId != project.objectId) throw NotFoundException("item 不属于该项目:$itemId")
+        // 列 = 该 item 当前 status 的看板可见子集;buildCtx 按传入列表取成员关系,不扫全项目
+        val column = itemRepo.findByProjectObjectIdAndStatusObjectId(project.objectId!!, item.statusObjectId)
+        val ctx = buildCtx(project, column)
+        val visible = column.filter { it.onBoard || it.objectId in ctx.currentSprint }
+        val rowList = boardOrders.findByItemObjectIdIn(visible.mapNotNull { it.objectId })
+        val rows = rowList.associateBy { it.itemObjectId }
+        // 显示序(含未排:沉底按编号);边界/交换判定一律基于此列表,不用未排序的 visible
+        val ordered =
+            visible.sortedWith(
+                compareBy(
+                    { rows[it.objectId]?.position ?: Int.MAX_VALUE },
+                    { it.number },
+                ),
+            )
+        val idx = ordered.indexOfFirst { it.objectId == itemId }
+        val j = idx + if (dir == "up") -1 else 1
+        if (idx < 0 || j < 0 || j >= ordered.size) return response(statusName(ctx, item), ordered)
+        // 首次触碰未排序列:未排行按显示序一次性物化(此后每次 move 恒为双行 swap;边界无操作零写入)
+        var next = (rowList.maxOfOrNull { it.position } ?: -1) + 1
+        val mutableRows = rows.toMutableMap()
+        for (it in ordered.filter { it.objectId !in rows }.sortedBy { it.number }) {
+            mutableRows[it.objectId!!] = saveRow(it, project.objectId!!, next)
+            next++
+        }
+        // 纯双行 swap(两行此时均已物化)
+        val moving = ordered[idx]
+        val neighbor = ordered[j]
+        saveRow(mutableRows[moving.objectId]!!, mutableRows[neighbor.objectId]!!.position)
+        saveRow(mutableRows[neighbor.objectId]!!, mutableRows[moving.objectId]!!.position)
+        return response(statusName(ctx, item), ordered)
+    }
+
+    private fun statusName(
+        ctx: ItemCtx,
+        item: Item,
+    ): String = ctx.statusById[item.statusObjectId]?.name ?: ""
+
+    private fun response(
+        status: String,
+        ordered: List<Item>,
+    ): MoveBoardOrderResponse {
+        val all = boardOrders.findByItemObjectIdIn(ordered.mapNotNull { it.objectId }).associateBy { it.itemObjectId }
+        // 按写入后的新鲜位次排(调用方传入的 ordered 可能基于写前快照)
+        val sorted = ordered.sortedWith(compareBy({ all[it.objectId]?.position ?: Int.MAX_VALUE }, { it.number }))
+        return MoveBoardOrderResponse(
+            status,
+            sorted.map { OrderedBoardOrder(it.objectId!!, all[it.objectId]?.position) },
+        )
+    }
+
+    private fun saveRow(
+        row: yangzhou.persistence.BoardItemOrder,
+        position: Int,
+    ) {
+        if (row.position != position) boardOrders.save(row.copy(position = position, updatedAt = clock.instant()))
+    }
+
+    private fun saveRow(
+        item: Item,
+        projectObjectId: UUID,
+        position: Int,
+    ): yangzhou.persistence.BoardItemOrder = boardOrders.save(
+        yangzhou.persistence.BoardItemOrder(
+            projectObjectId = projectObjectId,
+            itemObjectId = item.objectId!!,
+            position = position,
+        ),
+    )
+
+    data class MoveBoardOrderResponse(val status: String, val ordered: List<OrderedBoardOrder>)
+
+    data class OrderedBoardOrder(val itemId: UUID, val boardOrder: Int?)
+
+    /** YPJ-238:退板删行(回 backlog 无列内位次记忆);幂等。 */
+    @Transactional
+    fun removeBoardOrder(itemObjectId: UUID) {
+        boardOrders.findByItemObjectId(itemObjectId)?.let { boardOrders.delete(it) }
+    }
+
+    /** YPJ-238:状态迁移 → 已有 order 行重置到新列末尾(该列 max+1);无行不动(沉底)。CLI 同批迁移逐次调,相对序自然保持。 */
+    private fun repositionAtEnd(
+        projectObjectId: UUID,
+        itemObjectId: UUID,
+        toStatusObjectId: UUID,
+    ) {
+        val row = boardOrders.findByProjectObjectIdAndItemObjectId(projectObjectId, itemObjectId) ?: return
+        val columnIds = itemRepo.findByProjectObjectIdAndStatusObjectId(projectObjectId, toStatusObjectId).mapNotNull { it.objectId }.toSet()
+        val max = boardOrders.findByItemObjectIdIn(columnIds)
+            .maxOfOrNull { it.position } ?: -1
+        boardOrders.save(row.copy(position = max + 1, updatedAt = clock.instant()))
+    }
+
     fun list(
         projectKey: String,
         backlogOnly: Boolean = false,
@@ -241,10 +346,14 @@ class ItemService(
                 it.objectId!! to
                     it.name
             }
+        // YPJ-238(spec 0166):看板排序记忆回填(无行 = null,前端沉底按编号)
+        val boardOrderMap =
+            boardOrders.findByProjectObjectId(project.objectId!!).associate { it.itemObjectId to it.position }
         return visible.map {
             ctx.toDto(it).copy(
                 parentNumber = it.parentObjectId?.let(numberById::get),
                 totalMinutes = minutesByItem[it.objectId] ?: 0L,
+                boardOrder = boardOrderMap[it.objectId],
                 attributes =
                 attrsByItem[it.objectId].orEmpty().map { a ->
                     ItemAttributeDto(attrNames[a.attributeDefinitionObjectId] ?: "?", a.value)
@@ -315,6 +424,8 @@ class ItemService(
             current = itemRepo.save(current.copy(statusObjectId = status.objectId))
             logActivity(current.objectId!!, "status_changed", oldStatus?.name, status.name, actorId)
             if (status.objectId != oldStatus?.objectId) {
+                // YPJ-238:迁移有序行 → 新列末尾 max+1
+                repositionAtEnd(projectObjectId, current.objectId!!, status.objectId)
                 historyRepo.save(
                     ItemStatusHistory(
                         itemObjectId = current.objectId!!,
@@ -850,6 +961,8 @@ class ItemService(
         val finalIds: Set<UUID> = statusById.filterValues { it.statusType == StatusType.FINAL }.keys
         private val statusNames = statusById.mapValues { it.value.name }
         private val memberNames = memberMap.mapValues { it.value.displayName }
+
+        fun statusName(item: Item): String? = statusNames[item.statusObjectId]
 
         fun toDto(item: Item): ItemDto = ItemDto(
             itemId = item.objectId,

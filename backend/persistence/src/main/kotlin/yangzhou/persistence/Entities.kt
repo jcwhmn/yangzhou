@@ -544,6 +544,18 @@ data class ItemGroupMemberHistory(
     val removedAt: Instant? = null,
 )
 
+/** YPJ-238(spec 0166):看板视图级排序记忆(项目 × item);方案 B,与组归属脱钩;item 删除级联清。 */
+@Table("board_item_order")
+data class BoardItemOrder(
+    @Id val id: Long? = null,
+    val objectId: UUID = UUID.randomUUID(),
+    val projectObjectId: UUID,
+    val itemObjectId: UUID,
+    val position: Int,
+    val createdAt: Instant = Instant.now(),
+    val updatedAt: Instant = Instant.now(),
+)
+
 /** V14 Milestone:项目时间轴目标节点(PRD §9);非 ItemGroup;0..1 in_progress 由 ux_milestone_project_current 硬约束。 */
 @Table("milestone")
 data class Milestone(

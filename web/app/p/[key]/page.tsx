@@ -259,6 +259,41 @@ export default function BoardPage() {
     }
   }
 
+  // YPJ-238:列内排序不再拖拽(用户拍板:箭头排序);按当前列显示序相邻交换后 PUT 全列。用全量 items(过滤隐藏卡不能被当僵尸删行)
+  const byBoardOrder = (a: Item, b: Item) =>
+    (a.boardOrder ?? Number.MAX_SAFE_INTEGER) -
+      (b.boardOrder ?? Number.MAX_SAFE_INTEGER) ||
+    a.number.localeCompare(b.number, undefined, { numeric: true });
+  const sortCol = (list: Item[]) => [...list].sort(byBoardOrder);
+  const moveByArrow = async (itemId: string, status: Status, dir: -1 | 1) => {
+    try {
+      // YPJ-238(spec §3.1):move 端点只动新表至多 2 行;响应 ordered 就地 patch,零全量刷新(prod 性能拍板)
+      const resp = await api<{
+        status: string;
+        ordered: { itemId: string; boardOrder: number | null }[];
+      }>(`/api/projects/${key}/board-order/move`, {
+        method: "POST",
+        body: JSON.stringify({
+          itemId,
+          dir: dir === -1 ? "up" : "down",
+        }),
+      });
+      const byId = new Map(resp.ordered.map((o) => [o.itemId, o.boardOrder]));
+      setItems((prev) =>
+        prev.map((i) =>
+          byId.has(i.itemId)
+            ? { ...i, boardOrder: byId.get(i.itemId) ?? null }
+            : i,
+        ),
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t.board.moveFailed);
+      await load();
+    }
+  };
+
+  // YPJ-238:排序模式 = 正在调序的列名(null = 关闭)
+  const [sortingCol, setSortingCol] = useState<string | null>(null);
   // S7:assignee filter (purely frontend; "unassigned" = assignee is null); sprint scope is determined by the backend board endpoint (YPJ-29)
   const filtered =
     filter === "all"
@@ -282,6 +317,9 @@ export default function BoardPage() {
     list.push(it);
     byStatusName.set(it.status, list);
   });
+  // YPJ-238(spec 0166):列内排序键 boardOrder ASC → number 兜底(沉底;自然序保持后端口径)
+  // YPJ-238 修复:sortCol 返回新数组,必须写回 map;之前返回值被丢弃导致列显示序永不变(箭头看起来"没反应")
+  byStatusName.forEach((list, name) => byStatusName.set(name, sortCol(list)));
 
   return (
     <Box sx={{ p: 3 }}>
@@ -370,6 +408,7 @@ export default function BoardPage() {
                 dragOver={dragOver}
                 onDragOver={(e) => {
                   e.preventDefault();
+                  e.dataTransfer.dropEffect = "move";
                   setDragOver(s.statusId);
                 }}
                 onDragLeave={() =>
@@ -378,12 +417,18 @@ export default function BoardPage() {
                 onDrop={(e) => {
                   e.preventDefault();
                   setDragOver(null);
+                  // YPJ-238(修订):拖拽仅跨列迁移;列内排序走排序按钮+箭头
                   const itemId = e.dataTransfer.getData("text/plain");
                   if (itemId) moveTo(itemId, s);
                 }}
                 projectKey={key}
                 onRemoved={load}
                 onAssigneeChanged={load}
+                sorting={sortingCol === s.name}
+                onToggleSort={() =>
+                  setSortingCol(sortingCol === s.name ? null : s.name)
+                }
+                onMoveArrow={(itemId, dir) => void moveByArrow(itemId, s, dir)}
               />
             );
           })}

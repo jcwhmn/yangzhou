@@ -1,6 +1,7 @@
 "use client";
 
-import { Box, Stack, Typography } from "@mui/material";
+import { Box, IconButton, Stack, Tooltip, Typography } from "@mui/material";
+import SortOutlined from "@mui/icons-material/SortOutlined";
 import type { Item, Status } from "../types";
 import BoardCard from "./BoardCard";
 
@@ -15,6 +16,9 @@ export default function BoardColumn({
   projectKey,
   onRemoved,
   onAssigneeChanged,
+  sorting,
+  onToggleSort,
+  onMoveArrow,
 }: {
   status: Status;
   list: Item[];
@@ -25,6 +29,9 @@ export default function BoardColumn({
   projectKey: string;
   onRemoved: () => void | Promise<void>;
   onAssigneeChanged: () => void | Promise<void>;
+  sorting: boolean;
+  onToggleSort: () => void;
+  onMoveArrow: (itemId: string, dir: -1 | 1) => void;
 }) {
   return (
     <Box
@@ -42,17 +49,31 @@ export default function BoardColumn({
         borderColor: dragOver === status.statusId ? "primary.main" : "divider",
       }}
     >
-      <Typography variant="subtitle2" sx={{ px: 1, py: 0.5 }}>
-        {status.icon ? `${status.icon} ` : ""}
-        {status.name}({list.length}){status.statusType === "FINAL" && " [终态]"}
-      </Typography>
+      <Stack direction="row" alignItems="center" sx={{ px: 1, py: 0.5 }}>
+        <Typography variant="subtitle2" sx={{ flex: 1 }}>
+          {status.icon ? `${status.icon} ` : ""}
+          {status.name}({list.length})
+          {status.statusType === "FINAL" && " [终态]"}
+        </Typography>
+        {/* YPJ-238:排序模式开关——点后卡片出上下箭头,再点退出 */}
+        <Tooltip title={sorting ? "退出排序" : "排序"}>
+          <IconButton
+            size="small"
+            aria-label={sorting ? "退出排序" : "排序"}
+            onClick={onToggleSort}
+            color={sorting ? "primary" : "default"}
+          >
+            <SortOutlined fontSize="inherit" />
+          </IconButton>
+        </Tooltip>
+      </Stack>
       <Stack spacing={1}>
         {list.length === 0 && (
           <Typography variant="caption" color="text.secondary" sx={{ px: 1 }}>
             (空)
           </Typography>
         )}
-        {list.map((it) => (
+        {list.map((it, i) => (
           <BoardCard
             key={it.itemId}
             it={it}
@@ -60,6 +81,14 @@ export default function BoardColumn({
             removable={status.statusType !== "FINAL"}
             onRemoved={onRemoved}
             onAssigneeChanged={onAssigneeChanged}
+            onUp={
+              sorting && i > 0 ? () => onMoveArrow(it.itemId, -1) : undefined
+            }
+            onDown={
+              sorting && i < list.length - 1
+                ? () => onMoveArrow(it.itemId, 1)
+                : undefined
+            }
           />
         ))}
       </Stack>
