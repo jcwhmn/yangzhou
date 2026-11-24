@@ -3091,21 +3091,14 @@ Content-Type: application/json
 
 > {% client.global.set("item274a", response.body.itemId); %}
 
-### 建虚拟成员(handler 存变量 member274)
-POST {{host}}/api/members
-Authorization: Bearer {{token}}
-Content-Type: application/json
-
-{ "displayName": "274执行人{{run}}" }
-
-> {% client.global.set("member274", response.body.memberId); %}
-
-### 指派(离开起点态须有主)
+### 自指派(离开起点态须有主;创建者在池,meId 登录时已回填——同 §19 惯例)
 PUT {{host}}/api/items/{{item274a}}/assignee
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
-{ "assigneeItemId": "{{member274}}" }
+{ "assigneeItemId": "{{meId}}" }
+
+> {% client.assert(response.status === 200, "指派应 200,实际 " + response.status); %}
 
 ### [正例①] 转终态不带理由 → 后端写 done;活动 newValue = "Done"
 PATCH {{host}}/api/items/{{item274a}}
