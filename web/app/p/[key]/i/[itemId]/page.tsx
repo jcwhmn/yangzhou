@@ -9,6 +9,7 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  IconButton,
   Snackbar,
   Stack,
   Tab,
@@ -17,6 +18,10 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
+
+import ChevronLeftOutlined from "@mui/icons-material/ChevronLeftOutlined";
+
+import ChevronRightOutlined from "@mui/icons-material/ChevronRightOutlined";
 
 import { PageShell } from "@/components/PageShell";
 
@@ -389,6 +394,92 @@ export default function ItemDetailPage() {
 
     loadSubitems();
   }, [load, loadSubitems]);
+
+  // YPJ-257(spec 0168):桶内 consecutive 浏览——桶 = 看板列(boardOrder 序)→ backlog(number 序)→ planned L1 组(number 序);
+  // spec 0098:board ∩ backlog = ∅,planned 组成员两处皆不在;多组命中取首个(createdAt 序,正常一票一 L1 组)
+  const [nav, setNav] = useState<{
+    prev: string | null;
+    next: string | null;
+    index: number;
+    total: number;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!item) return;
+    let dead = false;
+    (async () => {
+      const numeric = (a: Item, b: Item) =>
+        a.number.localeCompare(b.number, undefined, { numeric: true });
+      const byBoardOrder = (a: Item, b: Item) =>
+        (a.boardOrder ?? Number.MAX_SAFE_INTEGER) -
+          (b.boardOrder ?? Number.MAX_SAFE_INTEGER) || numeric(a, b);
+      let list: Item[] | null = null;
+      const board = await api<{ items: Item[] }>(
+        `/api/projects/${key}/board`,
+      ).catch(() => null);
+      const me = board?.items.find((i) => i.itemId === itemId);
+      if (board && me) {
+        list = board.items
+          .filter((i) => i.status === me.status)
+          .sort(byBoardOrder);
+      } else {
+        const backlog = await api<Item[]>(`/api/projects/${key}/backlog`).catch(
+          () => [],
+        );
+        if (backlog.some((i) => i.itemId === itemId)) {
+          list = backlog.sort(numeric);
+        } else {
+          for (const g of sprints.filter((s) => s.status !== "completed")) {
+            const members = await api<Item[]>(
+              `/api/projects/${key}/groups/${g.sprintId}/items`,
+            ).catch(() => []);
+            if (members.some((i) => i.itemId === itemId)) {
+              list = members.sort(numeric);
+              break;
+            }
+          }
+        }
+      }
+      if (dead) return;
+      if (!list) {
+        setNav(null);
+        return;
+      }
+      const idx = list.findIndex((i) => i.itemId === itemId);
+      setNav({
+        prev: idx > 0 ? list[idx - 1].number : null,
+        next: idx < list.length - 1 ? list[idx + 1].number : null,
+        index: idx,
+        total: list.length,
+      });
+    })();
+    return () => {
+      dead = true;
+    };
+  }, [item, itemId, key, sprints]);
+
+  // Ctrl+←/→ 桶内导航;文本编辑焦点让位(spec 0168)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!e.ctrlKey || (e.key !== "ArrowLeft" && e.key !== "ArrowRight"))
+        return;
+      const el = e.target as HTMLElement | null;
+      if (
+        el &&
+        (el.isContentEditable ||
+          ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName))
+      )
+        return;
+      if (!nav) return;
+      const target = e.key === "ArrowLeft" ? nav.prev : nav.next;
+      if (target) {
+        e.preventDefault();
+        router.push(`/p/${key}/i/${target}`);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [nav, key, router]);
 
   async function addSubitem() {
     if (!newSubTitle.trim()) return;
@@ -941,6 +1032,40 @@ export default function ItemDetailPage() {
 
           options={statuses.map((s) => ({ value: s.name, label: s.name }))}
         />
+
+        {nav && nav.total > 1 && (
+          <Stack direction="row" spacing={0.5} alignItems="center">
+            {nav.prev && (
+              <Tooltip title={t.item.prevTip}>
+                <IconButton
+                  size="small"
+                  aria-label="previous item"
+                  href={`/p/${key}/i/${nav.prev}`}
+                >
+                  <ChevronLeftOutlined fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              sx={{ whiteSpace: "nowrap" }}
+            >
+              {nav.index + 1} / {nav.total}
+            </Typography>
+            {nav.next && (
+              <Tooltip title={t.item.nextTip}>
+                <IconButton
+                  size="small"
+                  aria-label="next item"
+                  href={`/p/${key}/i/${nav.next}`}
+                >
+                  <ChevronRightOutlined fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
+          </Stack>
+        )}
 
         {statuses.find((s) => s.name === item.status)?.statusType ===
           "FINAL" && (

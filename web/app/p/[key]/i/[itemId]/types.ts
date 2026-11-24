@@ -38,6 +38,8 @@ export type Item = {
 
   requirements: { attribute: string; minLevel: number | null }[];
 
+  boardOrder?: number | null; // YPJ-257:看板桶排序键(同看板页口径,spec 0168)
+
   attributes: { attribute: string; value: string }[] | null;
 
   startDate: string | null;

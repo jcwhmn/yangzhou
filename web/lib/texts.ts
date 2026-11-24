@@ -91,6 +91,8 @@ export const t = {
   item: {
     title: "标题",
     number_not_found: "未找到该编号的 item",
+    prevTip: "上一条(Ctrl+←)",
+    nextTip: "下一条(Ctrl+→)",
     description: "描述",
     status: "状态",
     type: "类型",
