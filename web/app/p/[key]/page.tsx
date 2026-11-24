@@ -59,6 +59,18 @@ export default function BoardPage() {
   const [dragOver, setDragOver] = useState<string | null>(null);
   const [sprintInfo, setSprintInfo] = useState(""); // YPJ-120:开始动作自动入 sprint 的轻提示
   const [filter, setFilter] = useState<Filter>("all");
+  // YPJ-257(spec 0168):filter 落 localStorage,详情页桶内导航同谓词过滤;SSR 安全,挂载后回读
+  useEffect(() => {
+    const saved = localStorage.getItem(
+      `yz.board.filter.${key}`,
+    ) as Filter | null;
+    if (saved) setFilter(saved);
+  }, [key]);
+  const changeFilter: (f: Filter) => void = (f) => {
+    setFilter(f);
+    if (f === "all") localStorage.removeItem(`yz.board.filter.${key}`);
+    else localStorage.setItem(`yz.board.filter.${key}`, f);
+  };
   const [sprintPickOpen, setSprintPickOpen] = useState(false);
   const [pendingTitle, setPendingTitle] = useState("");
   const [pullOpen, setPullOpen] = useState(false);
@@ -414,7 +426,7 @@ export default function BoardPage() {
 
       <FilterChips
         filter={filter}
-        onFilterChange={setFilter}
+        onFilterChange={changeFilter}
         memberOptions={memberOptions}
         onOpenPull={() => setPullOpen(true)}
       />

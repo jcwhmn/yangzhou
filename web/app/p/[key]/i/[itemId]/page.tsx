@@ -50,6 +50,8 @@ import { shouldAsk, type CloseReason } from "@/lib/closeReason";
 import { EstimateField } from "@/components/EstimateField";
 import { EstimateScale } from "@/lib/estimate";
 
+import type { Filter } from "../../types";
+
 import {
   type Status,
   type ItemTypeLite,
@@ -414,27 +416,37 @@ export default function ItemDetailPage() {
         (a.boardOrder ?? Number.MAX_SAFE_INTEGER) -
           (b.boardOrder ?? Number.MAX_SAFE_INTEGER) || numeric(a, b);
       let list: Item[] | null = null;
+      // 同看板 S7 assignee 过滤(单选 chip,localStorage 持久化,YPJ-257):导航只在过滤后的可见集内
+      const f = localStorage.getItem(`yz.board.filter.${key}`) as Filter | null;
+      const visible = (l: Item[]) =>
+        !f || f === "all"
+          ? l
+          : f === "unassigned"
+            ? l.filter((i) => !i.assignee)
+            : f === "blocked"
+              ? l.filter((i) => i.blocked)
+              : l.filter((i) => i.assignee === f);
       const board = await api<{ items: Item[] }>(
         `/api/projects/${key}/board`,
       ).catch(() => null);
       const me = board?.items.find((i) => i.itemId === itemId);
       if (board && me) {
-        list = board.items
-          .filter((i) => i.status === me.status)
-          .sort(byBoardOrder);
+        list = visible(board.items.filter((i) => i.status === me.status)).sort(
+          byBoardOrder,
+        );
       } else {
         const backlog = await api<Item[]>(`/api/projects/${key}/backlog`).catch(
           () => [],
         );
-        if (backlog.some((i) => i.itemId === itemId)) {
-          list = backlog.sort(numeric);
+        if (visible(backlog).some((i) => i.itemId === itemId)) {
+          list = visible(backlog).sort(numeric);
         } else {
           for (const g of sprints.filter((s) => s.status !== "completed")) {
             const members = await api<Item[]>(
               `/api/projects/${key}/groups/${g.sprintId}/items`,
             ).catch(() => []);
-            if (members.some((i) => i.itemId === itemId)) {
-              list = members.sort(numeric);
+            if (visible(members).some((i) => i.itemId === itemId)) {
+              list = visible(members).sort(numeric);
               break;
             }
           }
