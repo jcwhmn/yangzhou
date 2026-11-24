@@ -281,7 +281,9 @@ export default function BoardPage() {
       const byId = new Map(resp.ordered.map((o) => [o.itemId, o.boardOrder]));
       setItems((prev) =>
         prev.map((i) =>
-          byId.has(i.itemId) ? { ...i, boardOrder: byId.get(i.itemId) ?? null } : i,
+          byId.has(i.itemId)
+            ? { ...i, boardOrder: byId.get(i.itemId) ?? null }
+            : i,
         ),
       );
     } catch (err) {

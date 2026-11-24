@@ -15,14 +15,18 @@ test.describe("YPJ-238 箭头排序(S0 板上三票)", () => {
   async function visibleOrder(page: import("@playwright/test").Page) {
     return page.locator(".MuiCard-root").evaluateAll(
       (els, titles) =>
-        els.map((e) =>
-          titles.find((t) => (e as HTMLElement).innerText.includes(t)) ?? "?",
+        els.map(
+          (e) =>
+            titles.find((t) => (e as HTMLElement).innerText.includes(t)) ?? "?",
         ),
       TITLES, // evaluateAll 闭包变量不序列化,必须作实参传入(A48 教训延伸:断言也要过真跑)
     );
   }
 
-  test("箭头交换_界面顺序变_刷新持久_退出排序", async ({ page, projectKey }) => {
+  test("箭头交换_界面顺序变_刷新持久_退出排序", async ({
+    page,
+    projectKey,
+  }) => {
     for (const title of TITLES) {
       const id = await apiCreateItem(projectKey, title);
       await apiCall("PUT", `/api/items/${id}/board-membership`, {
@@ -40,18 +44,18 @@ test.describe("YPJ-238 箭头排序(S0 板上三票)", () => {
 
     // 甲下移:与相邻乙交换
     const put1 = page.waitForResponse(
-      (r) => r.url().includes("/board-order/move") && r.request().method() === "POST",
+      (r) =>
+        r.url().includes("/board-order/move") &&
+        r.request().method() === "POST",
     );
     await page
       .locator(".MuiCard-root", { hasText: TITLES[0] })
       .getByRole("button", { name: "下移" })
       .click();
     await put1;
-    await expect.poll(() => visibleOrder(page)).toEqual([
-      TITLES[1],
-      TITLES[0],
-      TITLES[2],
-    ]);
+    await expect
+      .poll(() => visibleOrder(page))
+      .toEqual([TITLES[1], TITLES[0], TITLES[2]]);
 
     // 刷新:顺序持久(排序是服务端记忆,不是前端态);排序模式是 UI 态,刷新后需重进
     await page.reload();
@@ -61,7 +65,9 @@ test.describe("YPJ-238 箭头排序(S0 板上三票)", () => {
 
     // 甲上移:回到首位
     const put2 = page.waitForResponse(
-      (r) => r.url().includes("/board-order/move") && r.request().method() === "POST",
+      (r) =>
+        r.url().includes("/board-order/move") &&
+        r.request().method() === "POST",
     );
     await page
       .locator(".MuiCard-root", { hasText: TITLES[0] })
