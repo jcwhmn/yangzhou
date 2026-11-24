@@ -38,17 +38,38 @@ item 转终态(FINAL)时记录「关闭理由」:预设枚举(缺省=完成)+ �
 
 ### 4.2 item 理由(同迁移 V71)
 
-`item` 表加两列:
+`item` 表加两列,**可空**:NULL = 票未处于终态(未关或已 reopen),这是列的自然状态,不是缺数据。
 
 - `close_reason VARCHAR(20) NULL`,`CONSTRAINT ck_item_close_reason CHECK (close_reason IN ('done','wontfix','expired','duplicate','superseded'))`
 - `close_note TEXT NULL`
 
 不变式:
-- 任何入口转终态:带 closeReason 写该值;不带 → 写 `done`。终态票 `close_reason` 恒非空。
+- 任何入口转终态:带 closeReason 写该值;不带 → 写 `done`。**终态票 `close_reason` 恒非空**——应用层不变式(CHECK 跨行做不到,不上 trigger)。
 - `close_note` 仅随非 done 理由存;reason=done 时清空 note。
 - reopen(终态→非终态,任何入口)→ 清空两列。
-- 存量已 Done 票:迁移回填 `close_reason = 'done'`。
 - 删 item → 列随行走。
+
+### 4.3 存量数据(Flyway V71 同文件 DDL + DML)
+
+只回填**未删除的终态票**为 `done`;非终态票留 NULL(正确状态,非缺数据);软删除票(`deleted_at IS NOT NULL`)不回填(2026-11-24 用户拍板),回收站恢复终态票时由恢复逻辑补 `done`。
+
+```sql
+alter table status add column require_close_reason boolean not null default false;
+alter table item add column close_reason varchar(20);
+alter table item add column close_note text;
+alter table item
+  add constraint ck_item_close_reason
+  check (close_reason in ('done', 'wontfix', 'expired', 'duplicate', 'superseded'));
+
+update item i
+   set close_reason = 'done'
+  from status s
+ where s.object_id = i.status_object_id
+   and s.status_type = 'final'
+   and i.deleted_at is null;
+```
+
+口径:存量终态票全视为正常完成——历史上是否有非完成关闭无法追溯,接受(2026-11-24 用户拍板)。
 
 ## 五、分支真值表
 
@@ -159,7 +180,8 @@ reason≠done:状态 chip 旁加小标签,文案 = 理由中文(不做/过期/�
 - [ ] reopen 清空;终态票只改理由可改,改回 done 清 note;
 - [ ] 详情页修改入口;列表/看板 reason≠done 有标识;
 - [ ] CLI 透传 + requireCloseReason=true 时提示;
-- [ ] 迁移 V71(两表,含存量 Done 回填)+ api.http 用例 + e2e 覆盖 §五。
+- [ ] 回收站恢复终态票 → close_reason 补 done(§4.3 口径);
+- [ ] 迁移 V71(两表 DDL + 存量终态票回填,软删除不回填)+ api.http 用例 + e2e 覆盖 §五。
 
 ## 九、开放决策
 
@@ -168,6 +190,6 @@ reason≠done:状态 chip 旁加小标签,文案 = 理由中文(不做/过期/�
 | D1 | 契约:复用 PATCH item 加字段,零新端点 | 已拍板 |
 | D3 | 枚举:done + 4 非完成值 | 已拍板 |
 | D6 | 弹窗策略:按源状态 requireCloseReason 配置 | 已拍板 |
-| D2 | reopen 清空理由 | 推荐清空;待确认 |
-| D5 | 存量 Done 票迁移回填 done | 推荐;待确认 |
+| D2 | reopen 清空理由 | 推荐 A 清空;待确认 |
+| D5 | 存量终态票迁移回填 done;软删除不回填;非终态留 NULL | **已拍板**(2026-11-24 用户) |
 | D4 | 带非 done 理由转终态是否写一条 activity | 待定(与 YPJ-263 汇合) |
