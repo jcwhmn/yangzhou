@@ -96,10 +96,12 @@ test.describe("YPJ-275 关闭理由(前端)", () => {
       page.locator(".MuiCard-root", { hasText: TITLE }),
     ).toContainText("非完成关闭:不做");
 
-    // 详情页:理由 chip 可见;点开改回完成
+    // 详情页:理由 chip 可见(Tooltip 使 accessible name =「修改关闭理由」,文案才是理由)
     await page.goto(`/p/${projectKey}/i/${itemId}`);
-    await expect(page.getByRole("button", { name: "不做" })).toBeVisible();
-    await page.getByRole("button", { name: "不做" }).click();
+    const reasonChip = page.getByRole("button", { name: "修改关闭理由" });
+    await expect(reasonChip).toBeVisible();
+    await expect(reasonChip).toHaveText("不做");
+    await reasonChip.click();
     const editDialog = page.getByRole("dialog");
     await expect(
       editDialog.getByRole("combobox", { name: "关闭原因" }),
@@ -109,9 +111,8 @@ test.describe("YPJ-275 关闭理由(前端)", () => {
     await page.getByRole("option", { name: "完成" }).click();
     await editDialog.getByRole("button", { name: "保存" }).click();
 
-    // chip 变「完成」(done 灰);备注清空是后端口径,界面不再展示备注框
-    await expect(page.getByRole("button", { name: "完成" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "不做" })).toHaveCount(0);
+    // chip 文案变「完成」(done 灰,理由不再带色);accessible name 仍是「修改关闭理由」
+    await expect(reasonChip).toHaveText("完成");
   });
 
   test("开关关_拖进Done不弹_直接迁移零打扰", async ({ page, projectKey }) => {
@@ -121,7 +122,15 @@ test.describe("YPJ-275 关闭理由(前端)", () => {
       page.locator(".MuiCard-root", { hasText: "CR 关闭乙" }),
     ).toBeVisible();
 
+    // 等 PATCH 落定再查库——乐观更新让 Done(1) 先于 PATCH 可见,直查拿到旧状态
+    const patchDone = page.waitForResponse(
+      (r) =>
+        r.url().includes(`/api/items/${itemId}`) &&
+        r.request().method() === "PATCH",
+    );
     await dragCardToColumn(page, "CR 关闭乙", "Done(0)");
+    const resp = await patchDone;
+    expect(resp.status()).toBe(200);
 
     await expect(page.getByRole("dialog")).toHaveCount(0);
     // 迁移生效:Done 列计数变 1;现状零打扰:后端写 done,卡片无理由标识
