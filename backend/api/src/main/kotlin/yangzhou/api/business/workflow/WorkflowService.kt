@@ -36,6 +36,7 @@ class WorkflowService(
         val statusType: StatusType,
         val transitions: List<TransitionDto>,
         val position: Int,
+        val requireCloseReason: Boolean,
     )
 
     data class TransitionDto(val from: String, val to: String, val function: String = "switch")
@@ -48,7 +49,7 @@ class WorkflowService(
     // ---------- Status ----------
 
     @Transactional
-    fun createStatus(projectKey: String, name: String, icon: String?, statusType: StatusType, position: Int?): StatusDto {
+    fun createStatus(projectKey: String, name: String, icon: String?, statusType: StatusType, position: Int?, requireCloseReason: Boolean): StatusDto {
         val project = projects.findByKey(projectKey) ?: throw NotFoundException("项目不存在:$projectKey")
         leaderGuard.requireLeader(project.objectId!!)
         val projectObjectId = project.objectId!!
@@ -61,13 +62,14 @@ class WorkflowService(
                 icon = icon,
                 statusType = statusType,
                 position = position ?: ((existing.maxOfOrNull { it.position } ?: -1) + 1),
+                requireCloseReason = requireCloseReason,
             ),
         )
         return saved.toDto()
     }
 
     @Transactional
-    fun updateStatus(statusId: UUID, name: String?, icon: String?, statusType: StatusType?, position: Int?): StatusDto {
+    fun updateStatus(statusId: UUID, name: String?, icon: String?, statusType: StatusType?, position: Int?, requireCloseReason: Boolean?): StatusDto {
         val status = statuses.findByObjectId(statusId) ?: throw NotFoundException("状态不存在")
         leaderGuard.requireLeader(status.projectObjectId)
         try {
@@ -77,6 +79,7 @@ class WorkflowService(
                     icon = icon ?: status.icon,
                     statusType = statusType ?: status.statusType,
                     position = position ?: status.position,
+                    requireCloseReason = requireCloseReason ?: status.requireCloseReason,
                 ),
             )
             assertHasStartAndFinal(updated.projectObjectId)
@@ -167,6 +170,7 @@ class WorkflowService(
         statusType,
         parseTransitions(this).map { (fn, to) -> TransitionDto(name, to, fn) },
         position,
+        requireCloseReason,
     )
 }
 
@@ -175,6 +179,7 @@ data class CreateStatusRequest(
     val icon: String? = null,
     val statusType: StatusType = StatusType.ACTIVE,
     val position: Int? = null,
+    val requireCloseReason: Boolean = false,
 )
 
 data class UpdateStatusRequest(
@@ -182,6 +187,7 @@ data class UpdateStatusRequest(
     val icon: String? = null,
     val statusType: StatusType? = null,
     val position: Int? = null,
+    val requireCloseReason: Boolean? = null,
 )
 
 data class ReplaceTransitionsRequest(val transitions: List<WorkflowService.TransitionDto> = emptyList())

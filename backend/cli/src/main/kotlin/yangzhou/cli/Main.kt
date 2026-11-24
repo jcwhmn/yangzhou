@@ -5,6 +5,10 @@ import java.io.FileOutputStream
 import java.io.PrintStream
 
 /** CLI 入口:yz <noun> <verb> [args] [--flags]。瘦壳——逻辑全在 API,这里只有编排与展示。 */
+
+/** YPJ-274(spec 0167):关闭理由枚举与中文文案;与 ck_item_close_reason 一致(CLI 是瘦客户端,不依赖 api 模块)。 */
+private val CLOSE_REASONS = setOf("done", "wontfix", "expired", "duplicate", "superseded")
+private val CLOSE_REASON_LABELS = mapOf("done" to "完成", "wontfix" to "不做", "expired" to "过期", "duplicate" to "重复", "superseded" to "被取代")
 fun main(args: Array<String>) {
     // Windows 控制台 GBK 兜底:强制 UTF-8 输出(中文判定行不乱码)
     System.setOut(PrintStream(FileOutputStream(FileDescriptor.out), true, "UTF-8"))
@@ -40,7 +44,7 @@ private fun usage() {
           projects list [--json]                       项目列表
           items create <KEY> <标题> [--desc 文本] [--sprint 名称|UUID] [--req 属性[>=N]]... [--json]   建 item(需求可分级)
           items list <KEY> [--json]                    项目 item 列表
-          items move <ITEM_ID> <状态名>                改状态(经 workflow 校验)
+          items move <ITEM_ID> <状态名> [--reason done|wontfix|expired|duplicate|superseded] [--note 文本]   改状态(经 workflow 校验;转终态可带关闭理由,缺省 done)
           items boardorder <KEY-N> <目标序号>          看板列内排序到目标序号(1-based;目标位及其后整体后延)
           items schedule <KEY-N> <start> [--due <due>]  排期(yyyy-MM-dd 或 yyyy-MM-dd'T'HH:mm;date-only 由后端按工作日界缺省:start 00:00、due 当日日末 23:59:59(SRS v4 24h 全天窗))
           items comment <KEY-N|itemId> <文本...>        给 item 加评论
@@ -570,15 +574,33 @@ private fun run(args: List<String>) {
         "items move" -> {
             val itemId = resolveItemId(api, rest.getOrNull(0) ?: error("缺少 item ID(支持 YPJ-58 或 UUID)"))
             val statusName = rest.getOrNull(1) ?: error("缺少目标状态名")
+            // YPJ-274(spec 0167):关闭理由随转终态;--note 依赖非 done 的 --reason。枚举与 ck_item_close_reason 一致(CLI 不依赖 api 模块)
+            val reason = flags["reason"]
+            val note = flags["note"]
+            require(reason == null || reason in CLOSE_REASONS) { "--reason 须为 ${CLOSE_REASONS.joinToString("/")}" }
+            require(note == null || reason != null && reason != "done") { "--note 需搭配非 done 的 --reason" }
             // 状态名 → statusId:从 item 所属项目取状态表
             val item = api.json("GET", "/api/items/$itemId")
             val project = api.json("GET", "/api/projects/${item["number"].asString().substringBefore("-")}")
-            val statusId = project["statuses"]
-                .firstOrNull { it["name"].asString().equals(statusName, ignoreCase = true) }
-                ?.get("statusId")?.asString()
-                ?: error("项目无此状态:$statusName(可用:${project["statuses"].joinToString("/") { s -> s["name"].asString() }})")
-            val body = api.json("PATCH", "/api/items/$itemId", mapOf("statusItemId" to statusId))
-            println("已迁移:${body["number"].asString()} → ${body["status"].asString()}")
+            val statusId =
+                project["statuses"]
+                    .firstOrNull { it["name"].asString().equals(statusName, ignoreCase = true) }
+                    ?.get("statusId")?.asString()
+                    ?: error("项目无此状态:$statusName(可用:${project["statuses"].joinToString("/") { s -> s["name"].asString() }})")
+            val body =
+                api.json(
+                    "PATCH", "/api/items/$itemId",
+                    buildMap {
+                        put("statusItemId", statusId)
+                        reason?.let { put("closeReason", it) }
+                        note?.let { put("closeNote", it) }
+                    },
+                )
+            val reasonText = body["closeReason"]?.takeUnless { it.isNull }?.asString()?.let { CLOSE_REASON_LABELS[it] ?: it }
+            println("已迁移:${body["number"].asString()} → ${body["status"].asString()}${reasonText?.let { "($it)" } ?: ""}")
+            // 源状态要求理由而未给:不拦(已记 done),提示用 --reason 指定(ItemDto 无 statusItemId,按状态名匹配)
+            val sourceRequires = project["statuses"].firstOrNull { it["name"].asString() == item["status"].asString() }?.get("requireCloseReason")?.asString()
+            if (reason == null && sourceRequires == "true") System.err.println("提示:源状态要求关闭理由,已记「完成」;用 --reason 指定")
         }
 
         "items branch" -> {

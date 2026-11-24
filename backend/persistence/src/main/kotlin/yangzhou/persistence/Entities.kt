@@ -239,6 +239,7 @@ data class Status(
     val transitions: String = "[]", // YPJ-138(spec 0097 S1):出边 JSON 内嵌 [{"function","target"}],空数组 = 自由迁移
     val wipLimit: Int? = null,
     val position: Int = 0,
+    val requireCloseReason: Boolean = false, // YPJ-274(spec 0167):从此状态迁出到终态时前端须弹窗问关闭理由
     @CreatedDate
     var createdAt: Instant = Instant.now(),
     @LastModifiedDate
@@ -269,6 +270,8 @@ data class Item(
     val estimateValue: Double? = null, // YPJ-186(spec 0128):预估快照(选档=写档值;unit 封闭枚举 CHECK)
     val estimateUnit: String? = null,
     val onBoard: Boolean = false,
+    val closeReason: String? = null, // YPJ-274(spec 0167):终态票恒非空(done 缺省);NULL = 未处于终态。枚举见 ck_item_close_reason
+    val closeNote: String? = null,
     val deletedAt: Instant? = null,
     @CreatedDate
     var createdAt: Instant = Instant.now(),
