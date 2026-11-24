@@ -104,7 +104,7 @@ class ProjectService(
 
     private val log = LoggerFactory.getLogger(ProjectService::class.java)
 
-    data class StatusDto(val statusId: UUID, val name: String, val icon: String?, val statusType: StatusType, val position: Int)
+    data class StatusDto(val statusId: UUID, val name: String, val icon: String?, val statusType: StatusType, val position: Int, val requireCloseReason: Boolean = false) // YPJ-274:前端据源状态决定转终态是否弹窗
     data class ProjectDto(
         val projectId: UUID,
         val key: String,
@@ -162,7 +162,7 @@ class ProjectService(
     fun get(key: String): ProjectDto {
         val project = projects.findByKey(key) ?: throw NotFoundException("项目不存在:$key")
         val statusDtos = statuses.findByProjectObjectIdOrderByPosition(project.objectId!!).map {
-            StatusDto(it.objectId, it.name, it.icon, it.statusType, it.position)
+            StatusDto(it.objectId, it.name, it.icon, it.statusType, it.position, it.requireCloseReason)
         }
         val scales = EstimateScales.parse(mapper, project.estimateScales)
         return ProjectDto(

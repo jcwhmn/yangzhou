@@ -435,6 +435,69 @@ class ItemServiceUnitTest {
     inner class Update {
         private val targetStatus = Status(id = 150, projectObjectId = projectObjectId, name = "In Progress", position = 2)
 
+        // YPJ-274(spec 0167):关闭理由分支
+        private fun moveTo(status: Status, reason: String? = null, note: String? = null) = service.update(itemOid, title = null, description = null, type = null, statusItemId = status.objectId, parentItemId = null, closeReason = reason, closeNote = note)
+
+        private fun stubTransition(vararg chain: Status) {
+            every { statuses.findByProjectObjectIdAndObjectId(projectObjectId, any()) } answers { chain.firstOrNull { it.objectId == secondArg<UUID>() } }
+            every { statuses.findByProjectObjectIdOrderByPosition(projectObjectId) } returns chain.toList()
+            every { boardOrders.findByProjectObjectIdAndItemObjectId(any(), any()) } returns null
+            row = row.copy(assigneeObjectId = me.objectId)
+        }
+
+        @Test
+        fun `转终态不带理由——写 done,活动不带括号`() {
+            stubTransition(startStatus, doneStatus)
+            moveTo(doneStatus)
+            assertEquals("done", row.closeReason)
+            val act = slot<ItemActivity>()
+            verify { activityRepo.save(capture(act)) }
+            assertEquals("status_changed", act.captured.kind)
+            assertEquals("Done", act.captured.newValue)
+        }
+
+        @Test
+        fun `转终态带理由与备注——写入,活动 newValue 带理由和备注`() {
+            stubTransition(startStatus, doneStatus)
+            moveTo(doneStatus, reason = "superseded", note = "被 YPJ-1 取代")
+            assertEquals("superseded", row.closeReason)
+            assertEquals("被 YPJ-1 取代", row.closeNote)
+            val act = slot<ItemActivity>()
+            verify { activityRepo.save(capture(act)) }
+            assertEquals("Done(被取代:被 YPJ-1 取代)", act.captured.newValue)
+        }
+
+        @Test
+        fun `reopen——清空理由与备注`() {
+            stubTransition(startStatus, targetStatus, doneStatus)
+            row = row.copy(statusObjectId = doneStatus.objectId, closeReason = "wontfix", closeNote = "x")
+            moveTo(targetStatus)
+            assertEquals(null, row.closeReason)
+            assertEquals(null, row.closeNote)
+        }
+
+        @Test
+        fun `终态票只改理由——记 close_reason_changed 且改回 done 清 note`() {
+            row = row.copy(statusObjectId = doneStatus.objectId, closeReason = "wontfix", closeNote = "x")
+            every { statuses.findByProjectObjectIdAndObjectId(projectObjectId, doneStatus.objectId) } returns doneStatus
+            service.update(itemOid, title = null, description = null, type = null, statusItemId = null, parentItemId = null, closeReason = "done")
+            assertEquals("done", row.closeReason)
+            assertEquals(null, row.closeNote)
+            val act = slot<ItemActivity>()
+            verify { activityRepo.save(capture(act)) }
+            assertEquals("close_reason_changed", act.captured.kind)
+            assertEquals("不做", act.captured.oldValue)
+            assertEquals("完成", act.captured.newValue)
+        }
+
+        @Test
+        fun `非终态带理由 400,非法枚举 400,非终态票只改理由 400`() {
+            stubTransition(startStatus, targetStatus, doneStatus)
+            assertEquals("仅转终态可填关闭理由", assertFailsWith<BadRequestException> { moveTo(targetStatus, reason = "wontfix") }.message)
+            assertEquals("closeReason 非法:nope", assertFailsWith<BadRequestException> { moveTo(doneStatus, reason = "nope") }.message)
+            assertEquals("仅终态 item 可设置关闭理由", assertFailsWith<BadRequestException> { service.update(itemOid, null, null, null, null, null, closeReason = "wontfix") }.message)
+        }
+
         @Test
         fun `改 title——save 新值并留 title_changed 活动`() {
             service.update(itemOid, title = "改名", description = null, type = null, statusItemId = null, parentItemId = null)

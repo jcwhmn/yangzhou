@@ -37,6 +37,7 @@ class Status {
   statusType ∈ {START, FINAL, ACTIVE}
   transitions: JSON [{function,target}]
   position: Int
+  requireCloseReason: Boolean
 }
 class ItemStatusHistory {
   from: UUID?
@@ -84,6 +85,8 @@ class Item {
   estimateValue: Double?
   estimateUnit: String?
   on_board: Boolean
+  closeReason ∈ {done, wontfix, expired, duplicate, superseded} : String?
+  closeNote: String?
   children: List<Item>
 }
 class Notification {

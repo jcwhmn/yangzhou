@@ -816,6 +816,20 @@ interface ItemTreeRepository : Repository<Item, Long> {
         at: java.time.Instant?,
     ): Int
 
+    /** YPJ-274(spec 0167 §4.3):回收站恢复后,子树内无理由的终态票补 done(存量软删除票迁移未回填)。 */
+    @Modifying
+    @Query(
+        """WITH RECURSIVE subtree AS (
+            SELECT id, object_id FROM item WHERE id = :rootId
+            UNION ALL
+            SELECT i.id, i.object_id FROM item i JOIN subtree s ON i.parent_object_id = s.object_id
+        )
+        UPDATE item SET close_reason = 'done'
+         WHERE id IN (SELECT id FROM subtree) AND close_reason IS NULL
+           AND status_object_id IN (SELECT object_id FROM status WHERE status_type = 'FINAL')""",
+    )
+    fun backfillCloseReasonInSubtree(rootId: Long): Int
+
     @Modifying
     @Query(
         """WITH RECURSIVE subtree AS (
