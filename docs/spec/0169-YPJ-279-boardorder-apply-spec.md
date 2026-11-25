@@ -72,7 +72,7 @@
 - [ ] B6 场景端到端:apply 后 `GET board` / move 的 ordered 与给定顺序一致。
 - [ ] CLI:`items boardorder-apply` 单次调用(可在测试实例抓请求数验证 ≤1 次 apply + N 次 resolve GET);重复项报错。
 - [ ] `gradle build` + 相关 integrationTest 绿;`npx`/web 无改动不涉及。
-- [ ] `backend/script/api.http` 补 apply 端点手测块(改 REST 必同步)。
+- [x] api.http 手测块:**review 后移除**(2026-11-25 用户拍板:api.http 是整文件从头到尾执行的习惯,中途建项目/依赖变量的块破坏该习惯;端点已由 B1-B8 集成测试全覆盖)。(commit b1511c0)
 - [ ] 完成后用新命令对 YPJ 看板 To Do 列执行一次优先级重排(顺序另行给用户确认)。
 
 ## 七、开放决策清单(review 时拍板)
