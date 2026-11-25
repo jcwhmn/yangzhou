@@ -63,11 +63,6 @@ import {
   type Activity,
   type ReqRow,
   type AttrRow,
-  type CommentDto,
-  type Dep,
-  type Checklist,
-  type TimeEntry,
-  type SuggestedEntry,
   type SearchHit,
   UUID_RE,
 } from "./types";
@@ -82,6 +77,20 @@ import { TimeLogTab } from "./components/TimeLogTab";
 import { AttributesTab } from "./components/AttributesTab";
 import { GithubTab } from "./components/GithubTab";
 import { SubitemsBlock } from "./components/SubitemsBlock";
+
+import { useItemNav } from "./hooks/useItemNav";
+
+import { useItemComments } from "./hooks/useItemComments";
+
+import { useItemTime } from "./hooks/useItemTime";
+
+import { useItemDependencies } from "./hooks/useItemDependencies";
+
+import { useItemChecklist } from "./hooks/useItemChecklist";
+
+import { useSubitems } from "./hooks/useSubitems";
+
+import { useItemRelease } from "./hooks/useItemRelease";
 
 export default function ItemDetailPage() {
   const { key, itemId: paramId } = useParams<{ key: string; itemId: string }>();
@@ -177,15 +186,6 @@ export default function ItemDetailPage() {
 
   const [milestones, setMilestones] = useState<MilestoneLite[]>([]);
 
-  // YPJ-201(US-R4,spec 0134):release 挂接——下拉只含 planned;released 历史不可达
-  type ReleaseLite = {
-    releaseId: string;
-    name: string;
-    status: string;
-  };
-  const [releases, setReleases] = useState<ReleaseLite[]>([]);
-  const [releaseId, setReleaseId] = useState<string | null>(null);
-
   const [saved, setSaved] = useState(false);
 
   // YPJ-275:关闭理由弹窗——mode move=转终态(带目标状态) / edit=终态票改理由
@@ -212,40 +212,6 @@ export default function ItemDetailPage() {
 
   const [reqOpen, setReqOpen] = useState(false);
 
-  const [comments, setComments] = useState<CommentDto[]>([]);
-
-  const [newComment, setNewComment] = useState("");
-
-  const [timeLog, setTimeLog] = useState<{
-    entries: TimeEntry[];
-    totalMinutes: number;
-  } | null>(null);
-
-  const [manualMinutes, setManualMinutes] = useState("");
-
-  const [manualNote, setManualNote] = useState("");
-
-  const [suggestions, setSuggestions] = useState<SuggestedEntry[] | null>(null);
-
-  const [suggestionsBusy, setSuggestionsBusy] = useState(false);
-
-  const [deps, setDeps] = useState<Dep[] | null>(null);
-
-  const [depBlocked, setDepBlocked] = useState(false);
-
-  const [depAddOpen, setDepAddOpen] = useState(false);
-
-  const [checklist, setChecklist] = useState<Checklist | null>(null);
-
-  const [newCheckText, setNewCheckText] = useState("");
-
-  const [subitems, setSubitems] = useState<Item[] | null>(null);
-
-  const [newSubTitle, setNewSubTitle] = useState("");
-  const [subPolicyDialog, setSubPolicyDialog] = useState(false); // YPJ-218 spec 0139:加子时父自有时间线策略
-  // 已有子的父不持有自有时间线:时间线框禁用(spec 0139 定案)
-  const timelineLocked = (subitems ?? []).length > 0;
-
   const [tab, setTab] = useState(0);
 
   const [back, setBack] = useState(() => resolveBack(null, key));
@@ -257,35 +223,6 @@ export default function ItemDetailPage() {
 
     setBack(resolveBack(from, key));
   }, [key]);
-
-  // release 挂接独立拉取(不并首屏 Promise.all,避免动脆弱的下拉菜单时序)
-  useEffect(() => {
-    if (!itemId) return;
-    api<{ releaseId: string | null }>(`/api/items/${itemId}/release-membership`)
-      .then((m) => setReleaseId(m.releaseId))
-      .catch(() => setReleaseId(null));
-  }, [itemId]);
-
-  useEffect(() => {
-    api<ReleaseLite[]>(`/api/projects/${key}/releases`)
-      .then((rs) => setReleases(rs.filter((r) => r.status === "planned")))
-      .catch(() => setReleases([]));
-  }, [key]);
-
-  async function setReleaseMembership(next: string | null) {
-    try {
-      const m = await api<{ releaseId: string | null }>(
-        `/api/items/${itemId}/release-membership`,
-        {
-          method: "PUT",
-          body: JSON.stringify({ releaseId: next }),
-        },
-      );
-      setReleaseId(m.releaseId);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "挂接失败");
-    }
-  }
 
   const load = useCallback(async () => {
     if (!itemId) return;
@@ -356,223 +293,86 @@ export default function ItemDetailPage() {
 
     setFeasibility(feas);
     setActivity(acts);
-
-    setComments(await api<CommentDto[]>(`/api/items/${itemId}/comments`));
-
-    api<{ entries: TimeEntry[]; totalMinutes: number }>(
-      `/api/items/${itemId}/time-entries`,
-    )
-      .then(setTimeLog)
-
-      .catch(() => {});
-
-    api<{ dependencies: Dep[]; blocked: boolean }>(
-      `/api/items/${itemId}/dependencies`,
-    )
-      .then((d) => {
-        setDeps(d.dependencies);
-        setDepBlocked(d.blocked);
-      })
-
-      .catch(() => {});
-  }, [key, itemId]);
-
-  // YPJ-84:子条目 = 直接 children,复用全量列表客户端过滤(不加后端端点,spec 0071)
-
-  const loadSubitems = useCallback(async () => {
-    if (!itemId) return;
-
-    try {
-      const list = await api<Item[]>(`/api/projects/${key}/items`);
-
-      setSubitems(list.filter((i) => i.parentItemId === itemId));
-    } catch {
-      // 同依赖区:页签内列表,加载失败静默
-    }
   }, [key, itemId]);
 
   useEffect(() => {
     load().catch((e) => setError(e.message));
+  }, [load]);
 
-    loadSubitems();
-  }, [load, loadSubitems]);
+  // ---- 领域 hooks(YPJ-257 页面重构:评论/工时/依赖/清单/子条目/release/导航)----
+  const { comments, newComment, setNewComment, addComment, removeComment } =
+    useItemComments(itemId);
 
-  // YPJ-257(spec 0168):桶内 consecutive 浏览——桶 = 看板列(boardOrder 序)→ backlog(number 序)→ planned L1 组(number 序);
-  // spec 0098:board ∩ backlog = ∅,planned 组成员两处皆不在;多组命中取首个(createdAt 序,正常一票一 L1 组)
-  const [nav, setNav] = useState<{
-    prev: string | null;
-    next: string | null;
-    index: number;
-    total: number;
-  } | null>(null);
+  const { releases, releaseId, setReleaseMembership } = useItemRelease(
+    key,
+    itemId,
+    setError,
+  );
 
-  // 首/尾边界轻提示(用户拍板 2026-11-25:无反应要有感知)
-  const [navEdge, setNavEdge] = useState<string | null>(null);
+  const {
+    timeLog,
+    manualMinutes,
+    setManualMinutes,
+    manualNote,
+    setManualNote,
+    suggestions,
+    suggestionsBusy,
+    startTimer,
+    stopTimer,
+    addManual,
+    loadSuggestions,
+    logSuggestion,
+  } = useItemTime(itemId, setError, load);
 
-  useEffect(() => {
-    if (!item) return;
-    let dead = false;
-    (async () => {
-      const numeric = (a: Item, b: Item) =>
-        a.number.localeCompare(b.number, undefined, { numeric: true });
-      const byBoardOrder = (a: Item, b: Item) =>
-        (a.boardOrder ?? Number.MAX_SAFE_INTEGER) -
-          (b.boardOrder ?? Number.MAX_SAFE_INTEGER) || numeric(a, b);
-      let list: Item[] | null = null;
-      // 同看板 S7 assignee 过滤(单选 chip,localStorage 持久化,YPJ-257):导航只在过滤后的可见集内
-      const f = localStorage.getItem(`yz.board.filter.${key}`) as Filter | null;
-      const visible = (l: Item[]) =>
-        !f || f === "all"
-          ? l
-          : f === "unassigned"
-            ? l.filter((i) => !i.assignee)
-            : f === "blocked"
-              ? l.filter((i) => i.blocked)
-              : l.filter((i) => i.assignee === f);
-      const board = await api<{ items: Item[] }>(
-        `/api/projects/${key}/board`,
-      ).catch(() => null);
-      const me = board?.items.find((i) => i.itemId === itemId);
-      if (board && me) {
-        // 用户拍板 2026-11-25:跨列连续浏览——状态按看板列序(workflow),列内 boardOrder 序,列尾接下一列首
-        const rank = new Map(statuses.map((st, i) => [st.name, i]));
-        list = visible(board.items).sort(
-          (a, b) =>
-            (rank.get(a.status) ?? Number.MAX_SAFE_INTEGER) -
-              (rank.get(b.status) ?? Number.MAX_SAFE_INTEGER) ||
-            byBoardOrder(a, b),
-        );
-      } else {
-        const backlog = await api<Item[]>(`/api/projects/${key}/backlog`).catch(
-          () => [],
-        );
-        if (visible(backlog).some((i) => i.itemId === itemId)) {
-          // 同页显示口径:API 返回序(number 字典序),不重排
-          list = visible(backlog);
-        } else {
-          for (const g of sprints.filter((s) => s.status !== "completed")) {
-            const members = await api<Item[]>(
-              `/api/projects/${key}/groups/${g.sprintId}/items`,
-            ).catch(() => []);
-            if (visible(members).some((i) => i.itemId === itemId)) {
-              // 同组页表格口径:API 返回序,不重排
-              list = visible(members);
-              break;
-            }
-          }
-        }
-      }
-      if (dead) return;
-      if (!list) {
-        setNav(null);
-        return;
-      }
-      const idx = list.findIndex((i) => i.itemId === itemId);
-      setNav({
-        prev: idx > 0 ? list[idx - 1].number : null,
-        next: idx < list.length - 1 ? list[idx + 1].number : null,
-        index: idx,
-        total: list.length,
-      });
-    })();
-    return () => {
-      dead = true;
-    };
-  }, [item, itemId, key, sprints, statuses]);
+  const {
+    deps,
+    depBlocked,
+    depAddOpen,
+    setDepAddOpen,
+    addDependency,
+    removeDep,
+  } = useItemDependencies(itemId, setError);
 
-  // Ctrl+←/→ 桶内导航;文本编辑焦点让位(spec 0168)
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (!e.ctrlKey || (e.key !== "ArrowLeft" && e.key !== "ArrowRight"))
-        return;
-      const el = e.target as HTMLElement | null;
-      if (
-        el &&
-        (el.isContentEditable ||
-          ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName))
-      )
-        return;
-      if (!nav) return;
-      const target = e.key === "ArrowLeft" ? nav.prev : nav.next;
-      if (target) {
-        e.preventDefault();
-        router.push(`/p/${key}/i/${target}`);
-      } else {
-        e.preventDefault();
-        setNavEdge(e.key === "ArrowLeft" ? t.item.navFirst : t.item.navLast);
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [nav, key, router]);
+  const {
+    checklist,
+    newCheckText,
+    setNewCheckText,
+    addCheckEntry,
+    toggleCheckEntry,
+    removeCheckEntry,
+  } = useItemChecklist(itemId, setError);
 
-  async function addSubitem() {
-    if (!newSubTitle.trim()) return;
-
-    // YPJ-218(spec 0139):父无子且自有时间线时,加子先弹策略选择(迁移默认);有子时时间线框已禁用,直接建
-    if ((subitems ?? []).length === 0 && (startDate || dueDate)) {
-      setSubPolicyDialog(true);
-      return;
-    }
-    await createSubitem(newSubTitle.trim());
-  }
-
-  async function createSubitem(title: string) {
-    try {
-      await api(`/api/projects/${key}/items`, {
-        method: "POST",
-
-        body: JSON.stringify({
-          title,
-          parentItemId: itemId,
-        }),
-      });
-
-      setNewSubTitle("");
-
-      await loadSubitems();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "创建失败");
-    }
-  }
-
-  // 定案②迁移:子「{父标题}·原排期」承接父原时间线(POST 后 PATCH 补日期),父清空后再建新子
-  async function addSubitemWithPolicy(policy: "ignore" | "migrate") {
-    setSubPolicyDialog(false);
-    const title = newSubTitle.trim();
-    if (!title) return;
-
-    try {
-      if (policy === "migrate") {
-        const legacy = (await api<{ itemId: string }>(
-          `/api/projects/${key}/items`,
-          {
-            method: "POST",
-            body: JSON.stringify({
-              title: `${item?.title ?? "父 item"}·原排期`,
-              parentItemId: itemId,
-            }),
-          },
-        )) as { itemId: string };
-        await api(`/api/items/${legacy.itemId}`, {
-          method: "PATCH",
-          body: JSON.stringify({ startDate, dueDate }),
-        });
-      }
-      await api(`/api/items/${itemId}`, {
-        method: "PATCH",
-        body: JSON.stringify({ startDate: "", dueDate: "" }),
-      });
+  const {
+    subitems,
+    newSubTitle,
+    setNewSubTitle,
+    subPolicyDialog,
+    setSubPolicyDialog,
+    timelineLocked,
+    addSubitem,
+    addSubitemWithPolicy,
+  } = useSubitems(
+    itemId,
+    key,
+    item?.title ?? "父 item",
+    { startDate, dueDate },
+    () => {
       setStartDate("");
       setStartTime("");
       setDueDate("");
       setDueTime("");
-      await createSubitem(title);
-      await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "创建失败");
-    }
-  }
+    },
+    setError,
+    load,
+  );
+
+  const { nav, navEdge, setNavEdge } = useItemNav(
+    item,
+    itemId,
+    key,
+    sprints,
+    statuses,
+  );
 
   const flashSaved = () => {
     setSaved(true);
@@ -775,202 +575,6 @@ export default function ItemDetailPage() {
     await load();
 
     flashSaved();
-  }
-
-  async function addComment() {
-    if (!newComment.trim()) return;
-
-    await api(`/api/items/${itemId}/comments`, {
-      method: "POST",
-      body: JSON.stringify({ body: newComment.trim() }),
-    });
-
-    setNewComment("");
-
-    setComments(await api<CommentDto[]>(`/api/items/${itemId}/comments`));
-  }
-
-  async function removeComment(commentId: string) {
-    await api(`/api/comments/${commentId}`, { method: "DELETE" });
-
-    setComments((prev) => prev.filter((c) => c.commentId !== commentId));
-  }
-
-  async function startTimer() {
-    setError("");
-
-    try {
-      await api(`/api/items/${itemId}/time-entries`, {
-        method: "POST",
-        body: JSON.stringify({ minutes: null }),
-      });
-
-      await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t.time.failed);
-    }
-  }
-
-  async function loadSuggestions() {
-    setError("");
-
-    setSuggestionsBusy(true);
-
-    try {
-      setSuggestions(
-        await api<SuggestedEntry[]>(
-          `/api/items/${itemId}/time-entry-suggestions`,
-        ),
-      );
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t.time.failed);
-    } finally {
-      setSuggestionsBusy(false);
-    }
-  }
-
-  async function logSuggestion(s: SuggestedEntry) {
-    setError("");
-
-    setSuggestionsBusy(true);
-
-    try {
-      await api(`/api/items/${itemId}/time-entries`, {
-        method: "POST",
-
-        body: JSON.stringify({
-          minutes: null,
-          startedAt: s.startedAt,
-          endedAt: s.endedAt,
-          note: s.note,
-        }),
-      });
-
-      setSuggestions((prev) => (prev ?? []).filter((x) => x.ref !== s.ref));
-
-      await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t.time.failed);
-    } finally {
-      setSuggestionsBusy(false);
-    }
-  }
-
-  async function stopTimer(entryId: string) {
-    setError("");
-
-    try {
-      await api(`/api/time-entries/${entryId}/stop`, { method: "POST" });
-
-      await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t.time.failed);
-    }
-  }
-
-  async function addManual() {
-    const m = Number(manualMinutes);
-
-    if (!m || m <= 0) return;
-
-    setError("");
-
-    try {
-      await api(`/api/items/${itemId}/time-entries`, {
-        method: "POST",
-
-        body: JSON.stringify({ minutes: m, note: manualNote.trim() || null }),
-      });
-
-      setManualMinutes("");
-
-      setManualNote("");
-
-      await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t.time.failed);
-    }
-  }
-
-  async function addDependency(dependsOnItemId: string) {
-    if (!dependsOnItemId) return;
-
-    setError("");
-
-    try {
-      await api(`/api/items/${itemId}/dependencies`, {
-        method: "POST",
-
-        body: JSON.stringify({ dependsOnItemId }),
-      });
-
-      setDepAddOpen(false);
-
-      const d = await api<{ dependencies: Dep[]; blocked: boolean }>(
-        `/api/items/${itemId}/dependencies`,
-      );
-
-      setDeps(d.dependencies);
-      setDepBlocked(d.blocked);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "添加失败");
-    }
-  }
-
-  async function removeDep(rowId: string) {
-    await api(`/api/dependencies/${rowId}`, { method: "DELETE" }).catch(
-      () => {},
-    );
-
-    const d = await api<{ dependencies: Dep[]; blocked: boolean }>(
-      `/api/items/${itemId}/dependencies`,
-    );
-
-    setDeps(d.dependencies);
-    setDepBlocked(d.blocked);
-  }
-
-  async function reloadChecklist() {
-    setChecklist(
-      await api<Checklist>(`/api/items/${itemId}/checklist`).catch(() => null),
-    );
-  }
-
-  async function addCheckEntry() {
-    if (!newCheckText.trim()) return;
-
-    setError("");
-
-    try {
-      await api(`/api/items/${itemId}/checklist`, {
-        method: "POST",
-
-        body: JSON.stringify({ text: newCheckText.trim() }),
-      });
-
-      setNewCheckText("");
-
-      await reloadChecklist();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "添加失败");
-    }
-  }
-
-  async function toggleCheckEntry(entryId: string, done: boolean) {
-    await api(`/api/checklist/${entryId}`, {
-      method: "PATCH",
-      body: JSON.stringify({ done }),
-    }).catch(() => {});
-
-    await reloadChecklist();
-  }
-
-  async function removeCheckEntry(entryId: string) {
-    await api(`/api/checklist/${entryId}`, { method: "DELETE" }).catch(
-      () => {},
-    );
-
-    await reloadChecklist();
   }
 
   if (!item) {
