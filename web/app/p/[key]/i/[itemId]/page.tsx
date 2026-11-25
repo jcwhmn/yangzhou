@@ -18,40 +18,21 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
-
-import ChevronLeftOutlined from "@mui/icons-material/ChevronLeftOutlined";
-
-import ChevronRightOutlined from "@mui/icons-material/ChevronRightOutlined";
-
 import { PageShell } from "@/components/PageShell";
-
 import { Dropdown } from "@/components/Dropdown";
-
 import Link from "next/link";
-
 import { useParams, useRouter } from "next/navigation";
-
 import { useCallback, useEffect, useState } from "react";
-
 import { api } from "@/lib/api";
-
 import { resolveBack } from "@/lib/back";
-
 import { t } from "@/lib/texts";
 import { listSprints, sprintAction, assignSprint } from "@/lib/sprints";
-
-import { SignalChip } from "@/components/Verdict";
-
-import { AssignPopover } from "@/components/AssignPopover";
-
 import { DateInput } from "@/components/DateInput";
 import CloseReasonDialog from "@/components/CloseReasonDialog";
 import { shouldAsk, type CloseReason } from "@/lib/closeReason";
 import { EstimateField } from "@/components/EstimateField";
 import { EstimateScale } from "@/lib/estimate";
-
 import type { Filter } from "../../types";
-
 import {
   type Status,
   type ItemTypeLite,
@@ -66,7 +47,6 @@ import {
   type SearchHit,
   UUID_RE,
 } from "./types";
-
 import { RequirementsDialog } from "./components/RequirementsDialog";
 import { CommentsTab } from "./components/CommentsTab";
 import { ActivityTab } from "./components/ActivityTab";
@@ -77,19 +57,14 @@ import { TimeLogTab } from "./components/TimeLogTab";
 import { AttributesTab } from "./components/AttributesTab";
 import { GithubTab } from "./components/GithubTab";
 import { SubitemsBlock } from "./components/SubitemsBlock";
+import { ItemHeader } from "./components/ItemHeader";
 
 import { useItemNav } from "./hooks/useItemNav";
-
 import { useItemComments } from "./hooks/useItemComments";
-
 import { useItemTime } from "./hooks/useItemTime";
-
 import { useItemDependencies } from "./hooks/useItemDependencies";
-
 import { useItemChecklist } from "./hooks/useItemChecklist";
-
 import { useSubitems } from "./hooks/useSubitems";
-
 import { useItemRelease } from "./hooks/useItemRelease";
 
 export default function ItemDetailPage() {
@@ -589,132 +564,22 @@ export default function ItemDetailPage() {
 
   return (
     <PageShell>
-      <Link href={back.href} style={{ textDecoration: "none" }}>
-        <Typography variant="body2" color="primary" gutterBottom>
-          {back.label}
-        </Typography>
-      </Link>
-
-      <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
-        {item.parentNumber && (
-          <Link
-            href={`/p/${key}/i/${item.parentItemId}`}
-            style={{ textDecoration: "none" }}
-          >
-            <Typography
-              variant="body2"
-              color="primary"
-              sx={{ whiteSpace: "nowrap" }}
-            >
-              {item.parentNumber} ›
-            </Typography>
-          </Link>
-        )}
-
-        <Chip label={item.number} />
-
-        {feasibility && <SignalChip signal={feasibility.signal} />}
-
-        {item.assignee ? (
-          <AssignPopover
-            itemId={itemId}
-            assignee={item.assignee}
-            onChanged={load}
-          >
-            {(onClick) => (
-              <Chip
-                size="small"
-                label={`👤 ${item.assignee}`}
-                onClick={onClick}
-                onDelete={() => assign(null)}
-              />
-            )}
-          </AssignPopover>
-        ) : (
-          <AssignPopover itemId={itemId} assignee={null} onChanged={load}>
-            {(onClick) => (
-              <Chip
-                size="small"
-
-                variant="outlined"
-
-                label={t.assign.open}
-
-                onClick={onClick}
-
-                sx={{ opacity: 0.55 }}
-              />
-            )}
-          </AssignPopover>
-        )}
-
-        <Dropdown
-          ariaLabel="item 状态"
-
-          size="small"
-
-          value={item.status}
-
-          onChange={(v) => moveStatus(v)}
-
-          sx={{ minWidth: 160 }}
-
-          options={statuses.map((s) => ({ value: s.name, label: s.name }))}
-        />
-
-        {nav && nav.total > 1 && (
-          <Stack direction="row" spacing={0.5} alignItems="center">
-            {nav.prev && (
-              <Tooltip title={t.item.prevTip}>
-                <IconButton
-                  size="small"
-                  aria-label="previous item"
-                  href={`/p/${key}/i/${nav.prev}`}
-                >
-                  <ChevronLeftOutlined fontSize="small" />
-                </IconButton>
-              </Tooltip>
-            )}
-            <Typography
-              variant="body2"
-              color="text.secondary"
-              sx={{ whiteSpace: "nowrap" }}
-            >
-              {nav.index + 1} / {nav.total}
-            </Typography>
-            {nav.next && (
-              <Tooltip title={t.item.nextTip}>
-                <IconButton
-                  size="small"
-                  aria-label="next item"
-                  href={`/p/${key}/i/${nav.next}`}
-                >
-                  <ChevronRightOutlined fontSize="small" />
-                </IconButton>
-              </Tooltip>
-            )}
-          </Stack>
-        )}
-
-        {statuses.find((s) => s.name === item.status)?.statusType ===
-          "FINAL" && (
-          <Tooltip title={t.closeReason.editTitle}>
-            <Chip
-              size="small"
-              onClick={() => {
-                setCloseError("");
-                setCloseAsk({ mode: "edit" });
-              }}
-              color={item.closeReason === "done" ? "default" : "warning"}
-              label={
-                (item.closeReason &&
-                  t.closeReason[item.closeReason as CloseReason]) ??
-                item.closeReason
-              }
-            />
-          </Tooltip>
-        )}
-      </Stack>
+      <ItemHeader
+        back={back}
+        item={item}
+        keyStr={String(key)}
+        itemId={String(itemId)}
+        feasibility={feasibility}
+        statuses={statuses}
+        nav={nav}
+        onAssign={assign}
+        onMoveStatus={moveStatus}
+        onLoad={load}
+        onEditCloseReason={() => {
+          setCloseError("");
+          setCloseAsk({ mode: "edit" });
+        }}
+      />
 
       {error && (
         <Typography color="error" sx={{ mb: 1 }}>
@@ -734,15 +599,10 @@ export default function ItemDetailPage() {
 
             <TextField
               label={t.item.description}
-
               value={description}
-
               onChange={(e) => setDescription(e.target.value)}
-
               multiline
-
               minRows={2}
-
               fullWidth
             />
 
@@ -809,15 +669,10 @@ export default function ItemDetailPage() {
 
               <Dropdown
                 label={t.item.priority}
-
                 size="small"
-
                 value={priority}
-
                 onChange={(v) => setPriority(v)}
-
                 sx={{ width: 110 }}
-
                 options={[
                   { value: "", label: "无" },
                   ...["P0", "P1", "P2", "P3"].map((p) => ({
@@ -830,19 +685,12 @@ export default function ItemDetailPage() {
               {sprints.length > 0 && (
                 <Dropdown
                   label={t.item.sprint}
-
                   size="small"
-
                   value={item.sprintId ?? ""}
-
                   onChange={(v) => applySprint(v || null)}
-
                   sx={{ width: 170 }}
-
                   clearable
-
                   options={sprints
-
                     .filter(
                       (s) =>
                         s.status !== "completed" ||
@@ -947,13 +795,9 @@ export default function ItemDetailPage() {
 
             <Dropdown
               label={t.item.type}
-
               value={type}
-
               onChange={(v) => setType(v)}
-
               sx={{ width: 200 }}
-
               options={
                 // YPJ-177:动态定义(name 显示);历史值不在定义内时兜底回显
                 [
@@ -1012,14 +856,11 @@ export default function ItemDetailPage() {
 
               <Button
                 size="small"
-
                 color="error"
-
                 onClick={() => {
                   if (confirm(`删除 item ${item.number}?`)) {
                     api(`/api/items/${itemId}`, { method: "DELETE" })
                       .then(() => (window.location.href = back.href))
-
                       .catch((e) => setError(e.message));
                   }
                 }}
@@ -1086,11 +927,8 @@ export default function ItemDetailPage() {
 
           <RequirementsDialog
             open={reqOpen}
-
             onClose={() => setReqOpen(false)}
-
             onSave={saveRequirements}
-
             attributes={attributes}
           />
 
