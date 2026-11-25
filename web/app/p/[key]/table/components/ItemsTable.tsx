@@ -169,6 +169,18 @@ export default function ItemsTable({
                       >
                         {it.dueDate ?? ""}
                       </span>
+                    ) : c.id === "startedAt" ? (
+                      it.startedAt ? (
+                        new Date(it.startedAt).toLocaleString("zh-CN")
+                      ) : (
+                        ""
+                      )
+                    ) : c.id === "completedAt" ? (
+                      it.completedAt ? (
+                        new Date(it.completedAt).toLocaleString("zh-CN")
+                      ) : (
+                        ""
+                      )
                     ) : c.id === "overdue" ? (
                       it.overdue ? (
                         "是"

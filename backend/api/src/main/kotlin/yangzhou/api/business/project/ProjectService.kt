@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import tools.jackson.databind.ObjectMapper
 import yangzhou.api.business.github.VcsEvent
+import yangzhou.api.business.item.LifecycleTimes
 import yangzhou.api.business.workspace.WorkspaceService
 import yangzhou.api.error.BadRequestException
 import yangzhou.api.error.ConflictException
@@ -378,11 +379,11 @@ class ProjectService(
             { item -> borrowedAnchorOf(item) },
         ) { item ->
             // 状态史 createdAt 为 Instant,排序锚取本地墙钟(与前端渲染同口径)
-            // actualStart=首次迁出 START;actualEnd=迁入 FINAL(多次返工取最近一次,SRS §3.4/§6.6——0150 首次口径核对入 YPJ-245)
+            // YPJ-132:口径单点 LifecycleTimes(0150 §3.4/§6.6;首次迁出 START/最近迁入 FINAL,YPJ-245 校准)
             val hist = histories[item.objectId].orEmpty()
-            val aS = hist.firstOrNull { h -> h.toStatusObjectId !in startIds }?.createdAt
+            val aS = LifecycleTimes.startedAt(hist, startIds)
                 ?.let { LocalDateTime.ofInstant(it, java.time.ZoneId.systemDefault()) }
-            val aE = hist.lastOrNull { h -> h.toStatusObjectId in finalIds }?.createdAt
+            val aE = LifecycleTimes.completedAt(hist, finalIds)
                 ?.let { LocalDateTime.ofInstant(it, java.time.ZoneId.systemDefault()) }
             aS to aE
         }.flatMap { item ->
@@ -403,9 +404,9 @@ class ProjectService(
                 estimateValue = item.estimateValue,
                 estimateUnit = item.estimateUnit,
                 depth = depthOf(item),
-                actualStart = hist.firstOrNull { it.toStatusObjectId !in startIds }?.createdAt?.toString(),
-                // SRS §3.4/§6.6:actualEnd = 最近一次迁入 FINAL(多次返工取最近;0150 首次口径修订 2026-11-21 评审 P1-4)
-                actualEnd = hist.lastOrNull { it.toStatusObjectId in finalIds }?.createdAt?.toString(),
+                actualStart = LifecycleTimes.startedAt(hist, startIds)?.toString(),
+                // SRS §3.4/§6.6:actualEnd = 最近一次迁入 FINAL(多次返工取最近;0150 首次口径修订 2026-11-21 评审 P1-4)——YPJ-132 起公式单点 LifecycleTimes
+                actualEnd = LifecycleTimes.completedAt(hist, finalIds)?.toString(),
                 assigneeName = item.assigneeObjectId?.let { assigneeNames[it] },
                 anchorDate = anchors[item.objectId]?.toString(),
                 checklistDone = cc?.done?.toInt(),

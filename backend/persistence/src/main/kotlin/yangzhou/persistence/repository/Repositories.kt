@@ -109,6 +109,9 @@ interface ItemActivityRepository : CrudRepository<ItemActivity, Long> {
 interface ItemStatusHistoryRepository : CrudRepository<ItemStatusHistory, Long> {
     fun findByItemObjectIdOrderByCreatedAtAsc(item_object_id: UUID): List<ItemStatusHistory>
 
+    /** YPJ-132(spec 0171):批量取生命周期派生用迁移行;created_at+id 排序与 forProject 同序(序即破并列序)。 */
+    fun findByItemObjectIdInOrderByCreatedAtAscIdAsc(item_object_ids: Collection<UUID>): List<ItemStatusHistory>
+
     fun countByActorMemberObjectId(actorMemberObjectId: UUID?): Long
 
     /** YPJ-222(spec 0147):项目内全部状态迁移行(软删 item 排除),供甘特实际起止推导;序即破并列序。 */

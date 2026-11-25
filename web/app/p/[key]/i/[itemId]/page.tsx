@@ -997,6 +997,25 @@ export default function ItemDetailPage() {
                 : "—"}
             </Typography>
 
+            {/* YPJ-132(spec 0171):生命周期时刻,纯派生;276 右 sidebar 落地时迁入 */}
+            <Typography variant="caption" color="text.secondary">
+              实际开始
+            </Typography>
+            <Typography variant="body2" sx={{ mb: 2 }}>
+              {item.startedAt
+                ? new Date(item.startedAt).toLocaleString("zh-CN")
+                : "—"}
+            </Typography>
+
+            <Typography variant="caption" color="text.secondary">
+              实际完成
+            </Typography>
+            <Typography variant="body2" sx={{ mb: 2 }}>
+              {item.completedAt
+                ? new Date(item.completedAt).toLocaleString("zh-CN")
+                : "—"}
+            </Typography>
+
             <Stack spacing={1} alignItems="flex-start">
               {item.overdue && (
                 <Chip size="small" color="error" label="已超期" />
