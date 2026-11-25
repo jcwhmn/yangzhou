@@ -123,6 +123,9 @@ class ItemService(
         val milestoneIds: List<UUID> = emptyList(),
         /** YPJ-182(spec 0130):时间合计(分钟),仅列表填充;口径同 minutesOf。 */
         val totalMinutes: Long = 0,
+        /** YPJ-132(spec 0171):生命周期时刻,纯派生(与甘特 0150 同口径);详情/列表均填。 */
+        val startedAt: String? = null,
+        val completedAt: String? = null,
     )
 
     @Transactional
@@ -422,11 +425,18 @@ class ItemService(
         // YPJ-238(spec 0166):看板排序记忆回填(无行 = null,前端沉底按编号)
         val boardOrderMap =
             boardOrders.findByProjectObjectId(project.objectId!!).associate { it.itemObjectId to it.position }
+        // YPJ-132(spec 0171):生命周期时刻批量派生(公式单点 LifecycleTimes,与甘特同口径)
+        val historiesByItem =
+            historyRepo.findByItemObjectIdInOrderByCreatedAtAscIdAsc(visible.mapNotNull { it.objectId })
+                .groupBy { it.itemObjectId }
         return visible.map {
+            val hist = historiesByItem[it.objectId].orEmpty()
             ctx.toDto(it).copy(
                 parentNumber = it.parentObjectId?.let(numberById::get),
                 totalMinutes = minutesByItem[it.objectId] ?: 0L,
                 boardOrder = boardOrderMap[it.objectId],
+                startedAt = LifecycleTimes.startedAt(hist, ctx.startIds)?.toString(),
+                completedAt = LifecycleTimes.completedAt(hist, ctx.finalIds)?.toString(),
                 attributes =
                 attrsByItem[it.objectId].orEmpty().map { a ->
                     ItemAttributeDto(attrNames[a.attributeDefinitionObjectId] ?: "?", a.value)
@@ -441,8 +451,11 @@ class ItemService(
         val ctx = buildCtx(project, listOf(item))
         // 已软删 item 不在 list()(回收站预览语义):toDto 内加 [已删除] 前缀
         val parentNumber = item.parentObjectId?.let { itemRepo.findByObjectId(it) }?.let { "${project.key}-${it.number}" }
+        val hist = historyRepo.findByItemObjectIdOrderByCreatedAtAsc(item.objectId!!) // YPJ-132 派生
         return ctx.toDto(item).copy(
             parentNumber = parentNumber,
+            startedAt = LifecycleTimes.startedAt(hist, ctx.startIds)?.toString(),
+            completedAt = LifecycleTimes.completedAt(hist, ctx.finalIds)?.toString(),
             gitRefs =
             gitRefs.findByItemObjectId(item.objectId!!).map {
                 GitRefDto(it.kind, it.repo, it.ref, it.url, it.state)
@@ -1073,6 +1086,7 @@ class ItemService(
         val latestSprint: Map<UUID, yangzhou.persistence.ItemGroup>,
     ) {
         val finalIds: Set<UUID> = statusById.filterValues { it.statusType == StatusType.FINAL }.keys
+        val startIds: Set<UUID> = statusById.filterValues { it.statusType == StatusType.START }.keys // YPJ-132 生命周期派生用
         private val statusNames = statusById.mapValues { it.value.name }
         private val memberNames = memberMap.mapValues { it.value.displayName }
 

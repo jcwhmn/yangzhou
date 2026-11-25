@@ -11,6 +11,8 @@ export type Item = {
   feasSignal: "GREEN" | "YELLOW" | "RED" | null;
   startDate: string | null;
   dueDate: string | null;
+  startedAt?: string | null; // YPJ-132 派生:首次迁出 START(Instant ISO)
+  completedAt?: string | null; // YPJ-132 派生:最近迁入 FINAL(Instant ISO)
   overdue: boolean;
   dueSoon: boolean;
   priority: string | null;
@@ -51,6 +53,8 @@ export const COLUMN_DEFS: ColumnDef[] = [
   { id: "assignee", label: "负责人", visible: true },
   { id: "startDate", label: "开始", visible: true },
   { id: "dueDate", label: "截止", visible: true },
+  { id: "startedAt", label: "实际开始", visible: false }, // YPJ-132
+  { id: "completedAt", label: "实际完成", visible: false }, // YPJ-132
   { id: "overdue", label: "超期", visible: true },
   { id: "feasSignal", label: "可行性", visible: true },
   { id: "blocked", label: "阻塞", visible: false },

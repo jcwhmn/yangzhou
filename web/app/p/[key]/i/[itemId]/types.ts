@@ -46,6 +46,10 @@ export type Item = {
 
   dueDate: string | null;
 
+  startedAt?: string | null; // YPJ-132 派生:首次迁出 START(Instant ISO)
+
+  completedAt?: string | null; // YPJ-132 派生:最近迁入 FINAL(Instant ISO)
+
   gitRefs: {
     kind: string;
     repo: string;
