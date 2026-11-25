@@ -548,7 +548,7 @@ private fun run(args: List<String>) {
         }
 
         "items boardorder" -> {
-            // YPJ-273(spec 0273):列内排序到目标序号,拔出插入语义;复用 move 端点(spec 0166 §3.1),不新增 REST
+            // YPJ-273(spec 0170):列内排序到目标序号,拔出插入语义;复用 move 端点(spec 0166 §3.1),不新增 REST
             val itemId = resolveItemId(api, rest.getOrNull(0) ?: error("缺少 item ID(支持 YPJ-58 或 UUID)"))
             val target = rest.getOrNull(1)?.toIntOrNull()
                 ?: error("缺少/非法目标序号(1-based 整数)")
