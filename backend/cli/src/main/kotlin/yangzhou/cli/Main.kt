@@ -560,17 +560,21 @@ private fun run(args: List<String>) {
         }
 
         "items boardorder-apply" -> {
-            // YPJ-279:整列重排——参数顺序即目标顺序,逐票定位到 1..n;零后端改动,复用 move 步进
+            // YPJ-279(spec 0169):整列重排——参数顺序即目标顺序,单次调 apply 端点(宽容:重复后序覆盖/无效忽略/跨列合法)
             val refs = rest.filterNotNull().ifEmpty { error("缺少目标顺序的 item 列表(按目标顺序罗列 KEY-N,空格分隔)") }
             val ids = refs.map { resolveItemId(api, it) }
-            require(ids.size == ids.distinct().size) { "列表有重复 item" }
-            var snap: JsonNode? = null
-            ids.forEachIndexed { i, itemId ->
-                snap = boardorderPlace(api, itemId, i + 1)
-                val n = api.json("GET", "/api/items/$itemId")["number"].asString()
-                println("${i + 1}. $n → 第 ${i + 1} 位")
-            }
-            if (flags.containsKey("json")) return printRaw(snap.toString())
+            val key = api.json("GET", "/api/items/${ids.first()}")["number"].asString().substringBefore("-")
+            val body = api.json("POST", "/api/projects/$key/board-order/apply", mapOf("itemIds" to ids))
+            if (flags.containsKey("json")) return printRaw(body.toString())
+            body["report"]["applied"].map { it.asString() }.forEachIndexed { i, n -> println("${i + 1}. $n") }
+            fun arr(p: String): List<String> = buildList { body["report"][p].forEach { add(it.asString()) } }
+            val applied = arr("applied")
+            val ignored = arr("ignored")
+            val deduped = arr("deduped")
+            applied.forEachIndexed { i, n -> println("${i + 1}. $n") }
+            if (ignored.isNotEmpty()) println("忽略(无效/未上板):${ignored.joinToString(", ")}")
+            if (deduped.isNotEmpty()) println("重复(后序覆盖):${deduped.joinToString(", ")}")
+            println("最终顺序:${applied.joinToString(" → ")}")
         }
 
         "items move" -> {
@@ -785,7 +789,7 @@ internal fun boardorderMoves(current: Int, target: Int): List<String> = buildLis
     repeat(target - current) { add("down") }
 }
 
-/** YPJ-279:把 item 定位到看板目标序号(1-based);返回最终 ordered 快照。逻辑平移自 YPJ-273 的 boardorder 分支 */
+/** YPJ-279(spec 0169):把 item 定位到看板目标序号(1-based);返回最终 ordered 快照。逻辑平移自 YPJ-273(spec 0170)的 boardorder 分支 */
 private fun boardorderPlace(api: ApiClient, itemId: String, target: Int): JsonNode {
     val item = api.json("GET", "/api/items/$itemId")
     val key = item["number"].asString().substringBefore("-")

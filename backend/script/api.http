@@ -3210,3 +3210,47 @@ Content-Type: application/json
 ### 清场:删一次性项目(force 物理删)
 DELETE {{host}}/api/projects/{{key274}}?force=true
 Authorization: Bearer {{token}}
+
+### ============================================================
+### YPJ-279(spec 0169):board-order/apply 整列重排(宽容语义)
+### ============================================================
+
+### [正例] 按目标顺序重排全列:c,a,b;响应 ordered + report(applied/ignored/deduped)
+POST {{host}}/api/projects/{{key238}}/board-order/apply
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "itemIds": ["{{item238c}}", "{{item238a}}", "{{item238b}}"] }
+
+> {%
+    const r = response.body;
+    if (r.report.applied.join() !== ["238-3","238-1","238-2"].join()) throw new Error("applied 异常:" + JSON.stringify(r.report));
+    client.log("apply 全列重排 ✓ report=" + JSON.stringify(r.report));
+%}
+
+### [宽容] 重复(后序覆盖)+ 无效忽略:ghost uuid 不存在也被忽略
+POST {{host}}/api/projects/{{key238}}/board-order/apply
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "itemIds": ["{{item238a}}", "{{item238b}}", "{{item238a}}", "00000000-0000-0000-0000-000000000000"] }
+
+> {%
+    const r = response.body;
+    if (r.report.applied.join() !== ["238-2","238-1"].join()) throw new Error("dedupe 后 applied 异常:" + JSON.stringify(r.report));
+    if (r.report.deduped.length !== 1 || r.report.ignored.length !== 1) throw new Error("report 异常:" + JSON.stringify(r.report));
+    client.log("apply 宽容语义 ✓ deduped=" + JSON.stringify(r.report.deduped) + " ignored=" + JSON.stringify(r.report.ignored));
+%}
+
+### [负例] 空列表 → 400
+POST {{host}}/api/projects/{{key238}}/board-order/apply
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "itemIds": [] }
+
+> {% client.assert(response.status === 400, "空列表应 400,实际 " + response.status); %}
+
+### 清场:删一次性项目(force 物理删)
+DELETE {{host}}/api/projects/{{key238}}?force=true
+Authorization: Bearer {{token}}

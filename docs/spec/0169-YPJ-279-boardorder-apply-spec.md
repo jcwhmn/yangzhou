@@ -28,7 +28,7 @@
 
 1. **去重**:同一 item 出现多次,以后面的顺序为准(后者覆盖前者),即保留末次出现位置。
 2. **忽略无效项**:不存在 / 不属该项目 / 未上看板的 item 直接忽略,不报错、不阻断。
-3. **定位**:有效 item(去重后)按给定顺序写 `position = 1..n`;跨列允许——位次按 item 逐行存,各列视图只看自己成员,列表内同列成员的相对序即目标序。
+3. **定位**:有效 item(去重后)按给定顺序写 `position = 0..n-1`(沿 0166 既有 0-based 口径);跨列允许——位次按 item 逐行存,各列视图只看自己成员,列表内同列成员的相对序即目标序。
 4. **未列入的列内成员**:按当前显示序(既有 position ?? MAX 沉底 + 编号自然序)接在 n 之后,一次性物化(沿 0166「首次触碰物化」模式)。
 5. 事务内完成;无效项不产生任何写入。
 
@@ -39,7 +39,7 @@
   "status": "...",
   "ordered": [{ "itemId": "...", "boardOrder": 1 }, ...],   // 受影响各列重写后的新序
   "report": {
-    "applied": ["YPJ-a", ...],     // 实际生效的目标顺序(编号)
+    "applied": ["YPJ-a", ...],     // 实际生效的目标顺序(编号,按列表原序;未上板的有效项不算 applied)
     "ignored": ["YPJ-b", ...],     // 无效被忽略(不存在/不属项目/未上看板)
     "deduped": ["YPJ-c", ...]      // 重复且被后者覆盖、不再生效的早期出现
   }
@@ -68,7 +68,7 @@
 
 ## 六、验收标准
 
-- [ ] 集成测试(AbstractApiTest):B1-B8 全分支绿;B3/B4 断言 200 且 report 字段正确;B5 断言 400 且库内 board_item_order 无任何写入。
+- [x] 集成测试(AbstractApiTest):B1-B8 全分支绿;B3/B4 断言 200 且 report 字段正确;B5 断言 400 且库内 board_item_order 无任何写入。(2026-11-25 本地 `:api:integrationTest --tests BoardOrderApplyApiTest` 绿)
 - [ ] B6 场景端到端:apply 后 `GET board` / move 的 ordered 与给定顺序一致。
 - [ ] CLI:`items boardorder-apply` 单次调用(可在测试实例抓请求数验证 ≤1 次 apply + N 次 resolve GET);重复项报错。
 - [ ] `gradle build` + 相关 integrationTest 绿;`npx`/web 无改动不涉及。
