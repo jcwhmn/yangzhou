@@ -1,5 +1,6 @@
 package yangzhou.cli
 
+import tools.jackson.databind.JsonNode
 import java.io.FileDescriptor
 import java.io.FileOutputStream
 import java.io.PrintStream
@@ -46,6 +47,7 @@ private fun usage() {
           items list <KEY> [--json]                    项目 item 列表
           items move <ITEM_ID> <状态名> [--reason done|wontfix|expired|duplicate|superseded] [--note 文本]   改状态(经 workflow 校验;转终态可带关闭理由,缺省 done)
           items boardorder <KEY-N> <目标序号>          看板列内排序到目标序号(1-based;目标位及其后整体后延)
+  items boardorder-apply <KEY-N>...            整列重排:参数顺序即目标顺序,逐票定位到 1..n(YPJ-279)
           items schedule <KEY-N> <start> [--due <due>]  排期(yyyy-MM-dd 或 yyyy-MM-dd'T'HH:mm;date-only 由后端按工作日界缺省:start 00:00、due 当日日末 23:59:59(SRS v4 24h 全天窗))
           items comment <KEY-N|itemId> <文本...>        给 item 加评论
           items show <KEY-N|itemId> [--json]            单票详情
@@ -552,26 +554,23 @@ private fun run(args: List<String>) {
                 ?: error("缺少/非法目标序号(1-based 整数)")
             require(target >= 1) { "目标序号须 ≥ 1" }
             val item = api.json("GET", "/api/items/$itemId")
-            val key = item["number"].asString().substringBefore("-")
-            fun move(dir: String) = api.json("POST", "/api/projects/$key/board-order/move", mapOf("itemId" to itemId, "dir" to dir))
-
-            // 探测位次:up 在列首是无操作;否则交换已发生,用 down 精确撤回(swap 对称)
-            val probe = move("up")
-            val ordered = mutableListOf<String>()
-            probe["ordered"].forEach { ordered.add(it["itemId"].asString()) }
-            val columnSize = ordered.size
-            val idx = ordered.indexOf(itemId)
-            require(idx >= 0) {
-                "${item["number"].asString()} 不在看板列(未挂 active sprint 或未上看板);请先 items assign / 上看板再排序"
-            } // A49 后续:不在列的票会静默"成功"(idx=-1 被当第 1 位),必须拦截
-            val current = if (idx == 0) 1 else idx + 2
-            // 撤回响应即原位快照;current==target 时零步进,直接用
-            var snap = if (idx != 0) move("down") else probe
-            if (target > columnSize) error("目标序号 $target 超出列长 $columnSize")
-            // 步进到目标位:最后一次响应即最终 ordered(不可再补 move——每次调用都真交换,曾致 target≥2 多走一位)
-            for (dir in boardorderMoves(current, target)) snap = move(dir)
+            val snap = boardorderPlace(api, itemId, target)
             if (flags.containsKey("json")) return printRaw(snap.toString())
-            println("已排序:${item["number"].asString()} → 第 $target 位(列 $columnSize 项)")
+            println("已排序:${item["number"].asString()} → 第 $target 位(列 ${snap["ordered"].size()} 项)")
+        }
+
+        "items boardorder-apply" -> {
+            // YPJ-279:整列重排——参数顺序即目标顺序,逐票定位到 1..n;零后端改动,复用 move 步进
+            val refs = rest.filterNotNull().ifEmpty { error("缺少目标顺序的 item 列表(按目标顺序罗列 KEY-N,空格分隔)") }
+            val ids = refs.map { resolveItemId(api, it) }
+            require(ids.size == ids.distinct().size) { "列表有重复 item" }
+            var snap: JsonNode? = null
+            ids.forEachIndexed { i, itemId ->
+                snap = boardorderPlace(api, itemId, i + 1)
+                val n = api.json("GET", "/api/items/$itemId")["number"].asString()
+                println("${i + 1}. $n → 第 ${i + 1} 位")
+            }
+            if (flags.containsKey("json")) return printRaw(snap.toString())
         }
 
         "items move" -> {
@@ -784,4 +783,28 @@ private fun printRaw(json: String) = println(json)
 internal fun boardorderMoves(current: Int, target: Int): List<String> = buildList {
     repeat(current - target) { add("up") }
     repeat(target - current) { add("down") }
+}
+
+/** YPJ-279:把 item 定位到看板目标序号(1-based);返回最终 ordered 快照。逻辑平移自 YPJ-273 的 boardorder 分支 */
+private fun boardorderPlace(api: ApiClient, itemId: String, target: Int): JsonNode {
+    val item = api.json("GET", "/api/items/$itemId")
+    val key = item["number"].asString().substringBefore("-")
+    fun move(dir: String) = api.json("POST", "/api/projects/$key/board-order/move", mapOf("itemId" to itemId, "dir" to dir))
+
+    // 探测位次:up 在列首是无操作;否则交换已发生,用 down 精确撤回(swap 对称)
+    val probe = move("up")
+    val ordered = mutableListOf<String>()
+    probe["ordered"].forEach { ordered.add(it["itemId"].asString()) }
+    val columnSize = ordered.size
+    val idx = ordered.indexOf(itemId)
+    require(idx >= 0) {
+        "${item["number"].asString()} 不在看板列(未挂 active sprint 或未上看板);请先 items assign / 上看板再排序"
+    } // A49 后续:不在列的票会静默"成功"(idx=-1 被当第 1 位),必须拦截
+    val current = if (idx == 0) 1 else idx + 2
+    // 撤回响应即原位快照;current==target 时零步进,直接用
+    var snap = if (idx != 0) move("down") else probe
+    if (target > columnSize) error("目标序号 $target 超出列长 $columnSize")
+    // 步进到目标位:最后一次响应即最终 ordered(不可再补 move——每次调用都真交换,曾致 target≥2 多走一位)
+    for (dir in boardorderMoves(current, target)) snap = move(dir)
+    return snap
 }
