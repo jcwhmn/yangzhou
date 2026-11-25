@@ -3,9 +3,11 @@
 // 候选来源与 AssignPopover 同源(/candidates);判据在调用方(409 + message 含「指派」)。
 import {
   Box,
+  Button,
   Chip,
   CircularProgress,
   Dialog,
+  DialogActions,
   DialogContent,
   DialogTitle,
   Stack,
@@ -77,6 +79,9 @@ export function AssignBeforeMoveDialog({
           );
         })}
       </DialogContent>
+      <DialogActions>
+        <Button onClick={onCancel}>{t.assign.cancel}</Button>
+      </DialogActions>
     </Dialog>
   );
 }
