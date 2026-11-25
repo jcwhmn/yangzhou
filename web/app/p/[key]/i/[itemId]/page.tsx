@@ -23,12 +23,14 @@ import { Dropdown } from "@/components/Dropdown";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import { resolveBack } from "@/lib/back";
 import { t } from "@/lib/texts";
 import { listSprints, sprintAction, assignSprint } from "@/lib/sprints";
 import { DateInput } from "@/components/DateInput";
 import CloseReasonDialog from "@/components/CloseReasonDialog";
+import AssignBeforeMoveDialog from "@/components/AssignBeforeMoveDialog";
+import type { AssignCandidate } from "@/components/AssignPopover";
 import { shouldAsk, type CloseReason } from "@/lib/closeReason";
 import { EstimateField } from "@/components/EstimateField";
 import { EstimateScale } from "@/lib/estimate";
@@ -169,6 +171,45 @@ export default function ItemDetailPage() {
     target?: Status;
   } | null>(null);
   const [closeError, setCloseError] = useState("");
+
+  // YPJ-280:开工须有主 409 → 弹窗补指派,选人后同目标状态迁移
+  const [moveAssign, setMoveAssign] = useState<Status | null>(null);
+  const [moveAssignCands, setMoveAssignCands] = useState<
+    AssignCandidate[] | null
+  >(null);
+
+  const isAssignConflict = (err: unknown) =>
+    err instanceof ApiError &&
+    err.status === 409 &&
+    err.message.includes("指派");
+
+  function askMoveAssign(target: Status) {
+    setMoveAssignCands(null);
+    setMoveAssign(target);
+    api<AssignCandidate[]>(`/api/items/${itemId}/candidates`)
+      .then(setMoveAssignCands)
+      .catch(() => setMoveAssignCands([]));
+  }
+
+  async function confirmMoveAssign(memberId: string) {
+    if (!moveAssign) return;
+    try {
+      await api(`/api/items/${itemId}/assignee`, {
+        method: "PUT",
+        body: JSON.stringify({ assigneeItemId: memberId }),
+      });
+      await api(`/api/items/${itemId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ statusItemId: moveAssign.statusId }),
+      });
+      setMoveAssign(null);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "更新失败");
+      setMoveAssign(null);
+      await load();
+    }
+  }
 
   const [sprintHint, setSprintHint] = useState(""); // YPJ-120:开始动作自动入 sprint 的轻提示
   const [launchAskId, setLaunchAskId] = useState<string | null>(null); // YPJ-104:挂 planned 后提示激活(spec 0105)
@@ -438,6 +479,11 @@ export default function ItemDetailPage() {
         setTimeout(() => setSprintHint(""), 6000);
       }
     } catch (e) {
+      if (isAssignConflict(e)) {
+        // YPJ-280:补指派弹窗接手,不再原地报错
+        askMoveAssign(target);
+        return;
+      }
       setError(e instanceof Error ? e.message : "更新失败");
     }
   }
@@ -1066,6 +1112,15 @@ export default function ItemDetailPage() {
         confirmLabel={t.closeReason.save}
         onCancel={() => setCloseAsk(null)}
         onConfirm={confirmClose}
+      />
+
+      <AssignBeforeMoveDialog
+        open={moveAssign !== null}
+        itemNumber={item?.number ?? ""}
+        targetStatusName={moveAssign?.name ?? ""}
+        candidates={moveAssignCands}
+        onPick={(m) => void confirmMoveAssign(m)}
+        onCancel={() => setMoveAssign(null)}
       />
 
       <Snackbar

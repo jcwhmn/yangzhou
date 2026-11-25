@@ -10,7 +10,7 @@ import LaunchDialog from "./components/LaunchDialog";
 import { useParams } from "next/navigation";
 import { useEffect } from "react";
 import { useState } from "react";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import { t } from "@/lib/texts";
 import {
   sprintAction,
@@ -21,6 +21,8 @@ import {
 import useBoardData from "./hooks/useBoardData";
 import PullDialog from "./components/PullDialog";
 import CloseReasonDialog from "@/components/CloseReasonDialog";
+import AssignBeforeMoveDialog from "@/components/AssignBeforeMoveDialog";
+import type { AssignCandidate } from "@/components/AssignPopover";
 import { shouldAsk, type CloseReason } from "@/lib/closeReason";
 import type { Filter, Item, SprintLite, Status } from "./types";
 
@@ -88,6 +90,50 @@ export default function BoardPage() {
     status: Status;
   } | null>(null);
   const [closeError, setCloseError] = useState("");
+  // YPJ-280:开工须有主 409 → 弹窗补指派,选人后同目标状态迁移
+  const [moveAssign, setMoveAssign] = useState<{
+    itemId: string;
+    itemNumber: string;
+    status: Status;
+  } | null>(null);
+  const [moveAssignCands, setMoveAssignCands] = useState<
+    AssignCandidate[] | null
+  >(null);
+
+  const isAssignConflict = (err: unknown) =>
+    err instanceof ApiError &&
+    err.status === 409 &&
+    err.message.includes("指派");
+
+  function askMoveAssign(itemId: string, itemNumber: string, status: Status) {
+    setMoveAssignCands(null);
+    setMoveAssign({ itemId, itemNumber, status });
+    api<AssignCandidate[]>(`/api/items/${itemId}/candidates`)
+      .then(setMoveAssignCands)
+      .catch(() => setMoveAssignCands([]));
+  }
+
+  async function confirmMoveAssign(memberId: string) {
+    if (!moveAssign) return;
+    try {
+      await api(`/api/items/${moveAssign.itemId}/assignee`, {
+        method: "PUT",
+        body: JSON.stringify({ assigneeItemId: memberId }),
+      });
+      await api(`/api/items/${moveAssign.itemId}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          statusItemId: moveAssign.status.statusId,
+        }),
+      });
+      setMoveAssign(null);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t.board.moveFailed);
+      setMoveAssign(null);
+      await load();
+    }
+  }
 
   async function addItem(e: React.FormEvent) {
     e.preventDefault();
@@ -280,6 +326,11 @@ export default function BoardPage() {
         setTimeout(() => setSprintInfo(""), 6000);
       }
     } catch (err) {
+      if (isAssignConflict(err)) {
+        await load(); // YPJ-280:先回滚乐观更新再弹窗
+        askMoveAssign(itemId, item.number, status);
+        return;
+      }
       setError(err instanceof Error ? err.message : t.board.moveFailed);
       await load();
     }
@@ -513,6 +564,14 @@ export default function BoardPage() {
         error={closeError}
         onCancel={() => setCloseAsk(null)}
         onConfirm={confirmClose}
+      />
+      <AssignBeforeMoveDialog
+        open={moveAssign !== null}
+        itemNumber={moveAssign?.itemNumber ?? ""}
+        targetStatusName={moveAssign?.status.name ?? ""}
+        candidates={moveAssignCands}
+        onPick={(m) => void confirmMoveAssign(m)}
+        onCancel={() => setMoveAssign(null)}
       />
     </Box>
   );
