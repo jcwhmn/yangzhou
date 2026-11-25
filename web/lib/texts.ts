@@ -268,6 +268,10 @@ export const t = {
     anyway: "仍然指派",
     unmetWarning: "存在未满足项(缺能力/差距/未评级),指派后请关注。",
   },
+  assignBeforeMove: {
+    title: (item: string, status: string) =>
+      `转入「${status}」前请先指派负责人(${item})`,
+  },
   groupTypes: {
     title: "分组类型管理",
     hint: "项目分组的类型;level-1(时间盒)即 Sprint 语义——backlog/board/图表数据源,恰一个。",
