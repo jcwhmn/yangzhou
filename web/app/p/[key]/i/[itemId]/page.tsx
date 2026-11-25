@@ -9,6 +9,7 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  IconButton,
   Snackbar,
   Stack,
   Tab,
@@ -17,34 +18,21 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
-
 import { PageShell } from "@/components/PageShell";
-
 import { Dropdown } from "@/components/Dropdown";
-
 import Link from "next/link";
-
 import { useParams, useRouter } from "next/navigation";
-
 import { useCallback, useEffect, useState } from "react";
-
 import { api } from "@/lib/api";
-
 import { resolveBack } from "@/lib/back";
-
 import { t } from "@/lib/texts";
 import { listSprints, sprintAction, assignSprint } from "@/lib/sprints";
-
-import { SignalChip } from "@/components/Verdict";
-
-import { AssignPopover } from "@/components/AssignPopover";
-
 import { DateInput } from "@/components/DateInput";
 import CloseReasonDialog from "@/components/CloseReasonDialog";
 import { shouldAsk, type CloseReason } from "@/lib/closeReason";
 import { EstimateField } from "@/components/EstimateField";
 import { EstimateScale } from "@/lib/estimate";
-
+import type { Filter } from "../../types";
 import {
   type Status,
   type ItemTypeLite,
@@ -56,15 +44,9 @@ import {
   type Activity,
   type ReqRow,
   type AttrRow,
-  type CommentDto,
-  type Dep,
-  type Checklist,
-  type TimeEntry,
-  type SuggestedEntry,
   type SearchHit,
   UUID_RE,
 } from "./types";
-
 import { RequirementsDialog } from "./components/RequirementsDialog";
 import { CommentsTab } from "./components/CommentsTab";
 import { ActivityTab } from "./components/ActivityTab";
@@ -75,6 +57,15 @@ import { TimeLogTab } from "./components/TimeLogTab";
 import { AttributesTab } from "./components/AttributesTab";
 import { GithubTab } from "./components/GithubTab";
 import { SubitemsBlock } from "./components/SubitemsBlock";
+import { ItemHeader } from "./components/ItemHeader";
+
+import { useItemNav } from "./hooks/useItemNav";
+import { useItemComments } from "./hooks/useItemComments";
+import { useItemTime } from "./hooks/useItemTime";
+import { useItemDependencies } from "./hooks/useItemDependencies";
+import { useItemChecklist } from "./hooks/useItemChecklist";
+import { useSubitems } from "./hooks/useSubitems";
+import { useItemRelease } from "./hooks/useItemRelease";
 
 export default function ItemDetailPage() {
   const { key, itemId: paramId } = useParams<{ key: string; itemId: string }>();
@@ -170,15 +161,6 @@ export default function ItemDetailPage() {
 
   const [milestones, setMilestones] = useState<MilestoneLite[]>([]);
 
-  // YPJ-201(US-R4,spec 0134):release 挂接——下拉只含 planned;released 历史不可达
-  type ReleaseLite = {
-    releaseId: string;
-    name: string;
-    status: string;
-  };
-  const [releases, setReleases] = useState<ReleaseLite[]>([]);
-  const [releaseId, setReleaseId] = useState<string | null>(null);
-
   const [saved, setSaved] = useState(false);
 
   // YPJ-275:关闭理由弹窗——mode move=转终态(带目标状态) / edit=终态票改理由
@@ -205,40 +187,6 @@ export default function ItemDetailPage() {
 
   const [reqOpen, setReqOpen] = useState(false);
 
-  const [comments, setComments] = useState<CommentDto[]>([]);
-
-  const [newComment, setNewComment] = useState("");
-
-  const [timeLog, setTimeLog] = useState<{
-    entries: TimeEntry[];
-    totalMinutes: number;
-  } | null>(null);
-
-  const [manualMinutes, setManualMinutes] = useState("");
-
-  const [manualNote, setManualNote] = useState("");
-
-  const [suggestions, setSuggestions] = useState<SuggestedEntry[] | null>(null);
-
-  const [suggestionsBusy, setSuggestionsBusy] = useState(false);
-
-  const [deps, setDeps] = useState<Dep[] | null>(null);
-
-  const [depBlocked, setDepBlocked] = useState(false);
-
-  const [depAddOpen, setDepAddOpen] = useState(false);
-
-  const [checklist, setChecklist] = useState<Checklist | null>(null);
-
-  const [newCheckText, setNewCheckText] = useState("");
-
-  const [subitems, setSubitems] = useState<Item[] | null>(null);
-
-  const [newSubTitle, setNewSubTitle] = useState("");
-  const [subPolicyDialog, setSubPolicyDialog] = useState(false); // YPJ-218 spec 0139:加子时父自有时间线策略
-  // 已有子的父不持有自有时间线:时间线框禁用(spec 0139 定案)
-  const timelineLocked = (subitems ?? []).length > 0;
-
   const [tab, setTab] = useState(0);
 
   const [back, setBack] = useState(() => resolveBack(null, key));
@@ -250,35 +198,6 @@ export default function ItemDetailPage() {
 
     setBack(resolveBack(from, key));
   }, [key]);
-
-  // release 挂接独立拉取(不并首屏 Promise.all,避免动脆弱的下拉菜单时序)
-  useEffect(() => {
-    if (!itemId) return;
-    api<{ releaseId: string | null }>(`/api/items/${itemId}/release-membership`)
-      .then((m) => setReleaseId(m.releaseId))
-      .catch(() => setReleaseId(null));
-  }, [itemId]);
-
-  useEffect(() => {
-    api<ReleaseLite[]>(`/api/projects/${key}/releases`)
-      .then((rs) => setReleases(rs.filter((r) => r.status === "planned")))
-      .catch(() => setReleases([]));
-  }, [key]);
-
-  async function setReleaseMembership(next: string | null) {
-    try {
-      const m = await api<{ releaseId: string | null }>(
-        `/api/items/${itemId}/release-membership`,
-        {
-          method: "PUT",
-          body: JSON.stringify({ releaseId: next }),
-        },
-      );
-      setReleaseId(m.releaseId);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "挂接失败");
-    }
-  }
 
   const load = useCallback(async () => {
     if (!itemId) return;
@@ -349,114 +268,86 @@ export default function ItemDetailPage() {
 
     setFeasibility(feas);
     setActivity(acts);
-
-    setComments(await api<CommentDto[]>(`/api/items/${itemId}/comments`));
-
-    api<{ entries: TimeEntry[]; totalMinutes: number }>(
-      `/api/items/${itemId}/time-entries`,
-    )
-      .then(setTimeLog)
-
-      .catch(() => {});
-
-    api<{ dependencies: Dep[]; blocked: boolean }>(
-      `/api/items/${itemId}/dependencies`,
-    )
-      .then((d) => {
-        setDeps(d.dependencies);
-        setDepBlocked(d.blocked);
-      })
-
-      .catch(() => {});
-  }, [key, itemId]);
-
-  // YPJ-84:子条目 = 直接 children,复用全量列表客户端过滤(不加后端端点,spec 0071)
-
-  const loadSubitems = useCallback(async () => {
-    if (!itemId) return;
-
-    try {
-      const list = await api<Item[]>(`/api/projects/${key}/items`);
-
-      setSubitems(list.filter((i) => i.parentItemId === itemId));
-    } catch {
-      // 同依赖区:页签内列表,加载失败静默
-    }
   }, [key, itemId]);
 
   useEffect(() => {
     load().catch((e) => setError(e.message));
+  }, [load]);
 
-    loadSubitems();
-  }, [load, loadSubitems]);
+  // ---- 领域 hooks(YPJ-257 页面重构:评论/工时/依赖/清单/子条目/release/导航)----
+  const { comments, newComment, setNewComment, addComment, removeComment } =
+    useItemComments(itemId);
 
-  async function addSubitem() {
-    if (!newSubTitle.trim()) return;
+  const { releases, releaseId, setReleaseMembership } = useItemRelease(
+    key,
+    itemId,
+    setError,
+  );
 
-    // YPJ-218(spec 0139):父无子且自有时间线时,加子先弹策略选择(迁移默认);有子时时间线框已禁用,直接建
-    if ((subitems ?? []).length === 0 && (startDate || dueDate)) {
-      setSubPolicyDialog(true);
-      return;
-    }
-    await createSubitem(newSubTitle.trim());
-  }
+  const {
+    timeLog,
+    manualMinutes,
+    setManualMinutes,
+    manualNote,
+    setManualNote,
+    suggestions,
+    suggestionsBusy,
+    startTimer,
+    stopTimer,
+    addManual,
+    loadSuggestions,
+    logSuggestion,
+  } = useItemTime(itemId, setError, load);
 
-  async function createSubitem(title: string) {
-    try {
-      await api(`/api/projects/${key}/items`, {
-        method: "POST",
+  const {
+    deps,
+    depBlocked,
+    depAddOpen,
+    setDepAddOpen,
+    addDependency,
+    removeDep,
+  } = useItemDependencies(itemId, setError);
 
-        body: JSON.stringify({
-          title,
-          parentItemId: itemId,
-        }),
-      });
+  const {
+    checklist,
+    newCheckText,
+    setNewCheckText,
+    addCheckEntry,
+    toggleCheckEntry,
+    removeCheckEntry,
+  } = useItemChecklist(itemId, setError);
 
-      setNewSubTitle("");
-
-      await loadSubitems();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "创建失败");
-    }
-  }
-
-  // 定案②迁移:子「{父标题}·原排期」承接父原时间线(POST 后 PATCH 补日期),父清空后再建新子
-  async function addSubitemWithPolicy(policy: "ignore" | "migrate") {
-    setSubPolicyDialog(false);
-    const title = newSubTitle.trim();
-    if (!title) return;
-
-    try {
-      if (policy === "migrate") {
-        const legacy = (await api<{ itemId: string }>(
-          `/api/projects/${key}/items`,
-          {
-            method: "POST",
-            body: JSON.stringify({
-              title: `${item?.title ?? "父 item"}·原排期`,
-              parentItemId: itemId,
-            }),
-          },
-        )) as { itemId: string };
-        await api(`/api/items/${legacy.itemId}`, {
-          method: "PATCH",
-          body: JSON.stringify({ startDate, dueDate }),
-        });
-      }
-      await api(`/api/items/${itemId}`, {
-        method: "PATCH",
-        body: JSON.stringify({ startDate: "", dueDate: "" }),
-      });
+  const {
+    subitems,
+    newSubTitle,
+    setNewSubTitle,
+    subPolicyDialog,
+    setSubPolicyDialog,
+    timelineLocked,
+    addSubitem,
+    addSubitemWithPolicy,
+  } = useSubitems(
+    itemId,
+    key,
+    item?.title ?? "父 item",
+    { startDate, dueDate },
+    () => {
       setStartDate("");
       setStartTime("");
       setDueDate("");
       setDueTime("");
-      await createSubitem(title);
-      await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "创建失败");
-    }
-  }
+    },
+    setError,
+    load,
+  );
+
+  const { nav, navEdge, setNavEdge } = useItemNav(
+    item,
+    itemId,
+    key,
+    sprints,
+    statuses,
+  );
 
   const flashSaved = () => {
     setSaved(true);
@@ -661,202 +552,6 @@ export default function ItemDetailPage() {
     flashSaved();
   }
 
-  async function addComment() {
-    if (!newComment.trim()) return;
-
-    await api(`/api/items/${itemId}/comments`, {
-      method: "POST",
-      body: JSON.stringify({ body: newComment.trim() }),
-    });
-
-    setNewComment("");
-
-    setComments(await api<CommentDto[]>(`/api/items/${itemId}/comments`));
-  }
-
-  async function removeComment(commentId: string) {
-    await api(`/api/comments/${commentId}`, { method: "DELETE" });
-
-    setComments((prev) => prev.filter((c) => c.commentId !== commentId));
-  }
-
-  async function startTimer() {
-    setError("");
-
-    try {
-      await api(`/api/items/${itemId}/time-entries`, {
-        method: "POST",
-        body: JSON.stringify({ minutes: null }),
-      });
-
-      await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t.time.failed);
-    }
-  }
-
-  async function loadSuggestions() {
-    setError("");
-
-    setSuggestionsBusy(true);
-
-    try {
-      setSuggestions(
-        await api<SuggestedEntry[]>(
-          `/api/items/${itemId}/time-entry-suggestions`,
-        ),
-      );
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t.time.failed);
-    } finally {
-      setSuggestionsBusy(false);
-    }
-  }
-
-  async function logSuggestion(s: SuggestedEntry) {
-    setError("");
-
-    setSuggestionsBusy(true);
-
-    try {
-      await api(`/api/items/${itemId}/time-entries`, {
-        method: "POST",
-
-        body: JSON.stringify({
-          minutes: null,
-          startedAt: s.startedAt,
-          endedAt: s.endedAt,
-          note: s.note,
-        }),
-      });
-
-      setSuggestions((prev) => (prev ?? []).filter((x) => x.ref !== s.ref));
-
-      await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t.time.failed);
-    } finally {
-      setSuggestionsBusy(false);
-    }
-  }
-
-  async function stopTimer(entryId: string) {
-    setError("");
-
-    try {
-      await api(`/api/time-entries/${entryId}/stop`, { method: "POST" });
-
-      await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t.time.failed);
-    }
-  }
-
-  async function addManual() {
-    const m = Number(manualMinutes);
-
-    if (!m || m <= 0) return;
-
-    setError("");
-
-    try {
-      await api(`/api/items/${itemId}/time-entries`, {
-        method: "POST",
-
-        body: JSON.stringify({ minutes: m, note: manualNote.trim() || null }),
-      });
-
-      setManualMinutes("");
-
-      setManualNote("");
-
-      await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t.time.failed);
-    }
-  }
-
-  async function addDependency(dependsOnItemId: string) {
-    if (!dependsOnItemId) return;
-
-    setError("");
-
-    try {
-      await api(`/api/items/${itemId}/dependencies`, {
-        method: "POST",
-
-        body: JSON.stringify({ dependsOnItemId }),
-      });
-
-      setDepAddOpen(false);
-
-      const d = await api<{ dependencies: Dep[]; blocked: boolean }>(
-        `/api/items/${itemId}/dependencies`,
-      );
-
-      setDeps(d.dependencies);
-      setDepBlocked(d.blocked);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "添加失败");
-    }
-  }
-
-  async function removeDep(rowId: string) {
-    await api(`/api/dependencies/${rowId}`, { method: "DELETE" }).catch(
-      () => {},
-    );
-
-    const d = await api<{ dependencies: Dep[]; blocked: boolean }>(
-      `/api/items/${itemId}/dependencies`,
-    );
-
-    setDeps(d.dependencies);
-    setDepBlocked(d.blocked);
-  }
-
-  async function reloadChecklist() {
-    setChecklist(
-      await api<Checklist>(`/api/items/${itemId}/checklist`).catch(() => null),
-    );
-  }
-
-  async function addCheckEntry() {
-    if (!newCheckText.trim()) return;
-
-    setError("");
-
-    try {
-      await api(`/api/items/${itemId}/checklist`, {
-        method: "POST",
-
-        body: JSON.stringify({ text: newCheckText.trim() }),
-      });
-
-      setNewCheckText("");
-
-      await reloadChecklist();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "添加失败");
-    }
-  }
-
-  async function toggleCheckEntry(entryId: string, done: boolean) {
-    await api(`/api/checklist/${entryId}`, {
-      method: "PATCH",
-      body: JSON.stringify({ done }),
-    }).catch(() => {});
-
-    await reloadChecklist();
-  }
-
-  async function removeCheckEntry(entryId: string) {
-    await api(`/api/checklist/${entryId}`, { method: "DELETE" }).catch(
-      () => {},
-    );
-
-    await reloadChecklist();
-  }
-
   if (!item) {
     return (
       <Box sx={{ p: 3 }}>
@@ -869,98 +564,22 @@ export default function ItemDetailPage() {
 
   return (
     <PageShell>
-      <Link href={back.href} style={{ textDecoration: "none" }}>
-        <Typography variant="body2" color="primary" gutterBottom>
-          {back.label}
-        </Typography>
-      </Link>
-
-      <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
-        {item.parentNumber && (
-          <Link
-            href={`/p/${key}/i/${item.parentItemId}`}
-            style={{ textDecoration: "none" }}
-          >
-            <Typography
-              variant="body2"
-              color="primary"
-              sx={{ whiteSpace: "nowrap" }}
-            >
-              {item.parentNumber} ›
-            </Typography>
-          </Link>
-        )}
-
-        <Chip label={item.number} />
-
-        {feasibility && <SignalChip signal={feasibility.signal} />}
-
-        {item.assignee ? (
-          <AssignPopover
-            itemId={itemId}
-            assignee={item.assignee}
-            onChanged={load}
-          >
-            {(onClick) => (
-              <Chip
-                size="small"
-                label={`👤 ${item.assignee}`}
-                onClick={onClick}
-                onDelete={() => assign(null)}
-              />
-            )}
-          </AssignPopover>
-        ) : (
-          <AssignPopover itemId={itemId} assignee={null} onChanged={load}>
-            {(onClick) => (
-              <Chip
-                size="small"
-
-                variant="outlined"
-
-                label={t.assign.open}
-
-                onClick={onClick}
-
-                sx={{ opacity: 0.55 }}
-              />
-            )}
-          </AssignPopover>
-        )}
-
-        <Dropdown
-          ariaLabel="item 状态"
-
-          size="small"
-
-          value={item.status}
-
-          onChange={(v) => moveStatus(v)}
-
-          sx={{ minWidth: 160 }}
-
-          options={statuses.map((s) => ({ value: s.name, label: s.name }))}
-        />
-
-        {statuses.find((s) => s.name === item.status)?.statusType ===
-          "FINAL" && (
-          <Tooltip title={t.closeReason.editTitle}>
-            <Chip
-              size="small"
-              onClick={() => {
-                setCloseError("");
-                setCloseAsk({ mode: "edit" });
-              }}
-              color={item.closeReason === "done" ? "default" : "warning"}
-              label={
-                (item.closeReason &&
-                  t.closeReason[item.closeReason as CloseReason]) ??
-                item.closeReason
-              }
-            />
-          </Tooltip>
-        )}
-      </Stack>
+      <ItemHeader
+        back={back}
+        item={item}
+        keyStr={String(key)}
+        itemId={String(itemId)}
+        feasibility={feasibility}
+        statuses={statuses}
+        nav={nav}
+        onAssign={assign}
+        onMoveStatus={moveStatus}
+        onLoad={load}
+        onEditCloseReason={() => {
+          setCloseError("");
+          setCloseAsk({ mode: "edit" });
+        }}
+      />
 
       {error && (
         <Typography color="error" sx={{ mb: 1 }}>
@@ -980,15 +599,10 @@ export default function ItemDetailPage() {
 
             <TextField
               label={t.item.description}
-
               value={description}
-
               onChange={(e) => setDescription(e.target.value)}
-
               multiline
-
               minRows={2}
-
               fullWidth
             />
 
@@ -1055,15 +669,10 @@ export default function ItemDetailPage() {
 
               <Dropdown
                 label={t.item.priority}
-
                 size="small"
-
                 value={priority}
-
                 onChange={(v) => setPriority(v)}
-
                 sx={{ width: 110 }}
-
                 options={[
                   { value: "", label: "无" },
                   ...["P0", "P1", "P2", "P3"].map((p) => ({
@@ -1076,19 +685,12 @@ export default function ItemDetailPage() {
               {sprints.length > 0 && (
                 <Dropdown
                   label={t.item.sprint}
-
                   size="small"
-
                   value={item.sprintId ?? ""}
-
                   onChange={(v) => applySprint(v || null)}
-
                   sx={{ width: 170 }}
-
                   clearable
-
                   options={sprints
-
                     .filter(
                       (s) =>
                         s.status !== "completed" ||
@@ -1193,13 +795,9 @@ export default function ItemDetailPage() {
 
             <Dropdown
               label={t.item.type}
-
               value={type}
-
               onChange={(v) => setType(v)}
-
               sx={{ width: 200 }}
-
               options={
                 // YPJ-177:动态定义(name 显示);历史值不在定义内时兜底回显
                 [
@@ -1258,14 +856,11 @@ export default function ItemDetailPage() {
 
               <Button
                 size="small"
-
                 color="error"
-
                 onClick={() => {
                   if (confirm(`删除 item ${item.number}?`)) {
                     api(`/api/items/${itemId}`, { method: "DELETE" })
                       .then(() => (window.location.href = back.href))
-
                       .catch((e) => setError(e.message));
                   }
                 }}
@@ -1332,11 +927,8 @@ export default function ItemDetailPage() {
 
           <RequirementsDialog
             open={reqOpen}
-
             onClose={() => setReqOpen(false)}
-
             onSave={saveRequirements}
-
             attributes={attributes}
           />
 
@@ -1458,9 +1050,21 @@ export default function ItemDetailPage() {
       />
 
       <Snackbar
+        open={navEdge !== null}
+        autoHideDuration={2000}
+        onClose={() => setNavEdge(null)}
+        anchorOrigin={{ vertical: "top", horizontal: "right" }}
+      >
+        <Alert severity="info" onClose={() => setNavEdge(null)}>
+          {navEdge}
+        </Alert>
+      </Snackbar>
+
+      <Snackbar
         open={warnMsg !== null}
         autoHideDuration={8000}
         onClose={() => setWarnMsg(null)}
+        anchorOrigin={{ vertical: "top", horizontal: "right" }}
         data-testid="item-warnings"
       >
         <Alert severity="warning" onClose={() => setWarnMsg(null)}>
