@@ -12,7 +12,7 @@
 
 ## 票卡排期纪律(2026-11-17 定,用户拍板)
 
-① 每个新 item 建票必带预估时长(estimateValue+estimateUnit);② item 进 sprint(backlog 拉入或建票直挂)必设预计开始时间,结束时间 = 开始 + 预估工作时长换算(DATE 粒度:不足一天=当天,跨天进一);③ 这是 dogfood 流程纪律兼未来系统强约束的先行版(甘特计划线需要,见 `docs/requirement/甘特图 SRS.md`);④ CLI 缺口(建票 --estimate、items 排期命令)见 YPJ-207,补齐前用 API 直调设置,不得留空。
+① 每个新 item 建票必带预估时长(estimateValue+estimateUnit);② item 进 sprint(backlog 拉入或建票直挂)必设预计开始时间,结束时间 = 开始 + 预估工作时长换算(DATE 粒度:不足一天=当天,跨天进一);③ 这是 dogfood 流程纪律兼未来系统强约束的先行版(甘特计划线需要,见 `docs/requirement/甘特图 SRS.md`);④ CLI 已支撑(2026-11-25 核实):建票 `--estimate 4h/2d/1w`(YPJ-186)、`items schedule`(YPJ-208/0138,due 缺省按 start+estimate 铺算);原缺口票 YPJ-207 已关闭(superseded)。
 
 ## 复杂票拆解(2026-11-22 用户定)
 
