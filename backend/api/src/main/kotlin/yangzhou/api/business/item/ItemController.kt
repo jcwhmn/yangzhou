@@ -1,6 +1,7 @@
 package yangzhou.api.business.item
 
 import jakarta.validation.Valid
+import jakarta.validation.constraints.NotEmpty
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
@@ -53,6 +54,17 @@ class ItemController(
     data class MoveBoardOrderRequest(
         val itemId: UUID,
         val dir: String,
+    )
+
+    /** YPJ-279(spec 0169):整列重排——宽容语义(重复后序覆盖/无效忽略/跨列合法),响应带 report。 */
+    @PostMapping("/projects/{key}/board-order/apply")
+    fun applyBoardOrder(
+        @PathVariable key: String,
+        @Valid @RequestBody request: ApplyBoardOrderRequest,
+    ) = service.applyBoardOrder(key, request.itemIds)
+
+    data class ApplyBoardOrderRequest(
+        @field:NotEmpty val itemIds: List<UUID>,
     )
 
     @GetMapping("/items/{itemId}")

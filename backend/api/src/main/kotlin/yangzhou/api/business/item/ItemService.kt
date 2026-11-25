@@ -265,6 +265,77 @@ class ItemService(
         item: Item,
     ): String = ctx.statusById[item.statusObjectId]?.name ?: ""
 
+    /** YPJ-279(spec 0169):整列重排——宽容语义:重复后序覆盖、无效忽略、跨列逐列重写;未列入成员保持相对序接后。 */
+    @Transactional
+    fun applyBoardOrder(
+        projectKey: String,
+        rawIds: List<UUID>,
+    ): ApplyBoardOrderResponse {
+        val project = projects.findByKey(projectKey) ?: throw NotFoundException("项目不存在:$projectKey")
+        // 去重:保留末次出现(后序覆盖前序);被覆盖的早期出现进报告
+        val lastIndex = HashMap<UUID, Int>()
+        rawIds.forEachIndexed { i, id -> lastIndex[id] = i }
+        val deduped = rawIds.filterIndexed { i, id -> lastIndex[id] == i }
+        val dedupedReport =
+            rawIds.filterIndexed { i, id -> lastIndex[id] != i }
+                .map { itemRepo.findByObjectId(it)?.let { i -> "${project.key}-${i.number}" } ?: it.toString() }
+        // 宽容解析:不存在/不属该项目 → 忽略
+        val valid =
+            deduped.mapNotNull { id ->
+                itemRepo.findByObjectId(id)?.takeIf { it.projectObjectId == project.objectId }
+            }
+        val validIds = valid.mapNotNull { it.objectId }.toSet()
+        val ignored =
+            deduped.filter { it !in validIds }
+                .map { itemRepo.findByObjectId(it)?.let { i -> "${project.key}-${i.number}" } ?: it.toString() }
+        // 逐列重写:同列成员按列表相对序在前,未列入按显示序接后(物化);各列位次独立从 0 起
+        val appliedIds = mutableSetOf<UUID>()
+        val orderedOut = mutableListOf<OrderedBoardOrder>()
+        var firstStatus: String? = null
+        for ((_, members) in valid.groupBy { it.statusObjectId!! }) {
+            val column = itemRepo.findByProjectObjectIdAndStatusObjectId(project.objectId!!, members[0].statusObjectId!!)
+            val ctx = buildCtx(project, column)
+            val visible = column.filter { it.onBoard || it.objectId in ctx.currentSprint }
+            val visibleIds = visible.mapNotNull { it.objectId }.toSet()
+            val applied = members.filter { visibleIds.contains(it.objectId) }
+            if (applied.isEmpty()) continue
+            if (firstStatus == null) firstStatus = statusName(ctx, applied[0])
+            applied.forEach { appliedIds.add(it.objectId!!) }
+            val rows = boardOrders.findByItemObjectIdIn(visible.mapNotNull { it.objectId }).associateBy { it.itemObjectId }
+            val rest =
+                visible.filter { it.objectId !in applied.map { x -> x.objectId } }
+                    .sortedWith(compareBy({ rows[it.objectId]?.position ?: Int.MAX_VALUE }, { it.number }))
+            var next = 0
+            for (it in applied + rest) {
+                val row = rows[it.objectId]
+                val pos = next++
+                if (row != null) saveRow(row, pos) else saveRow(it, project.objectId!!, pos)
+                orderedOut.add(OrderedBoardOrder(it.objectId!!, pos))
+            }
+        }
+        if (appliedIds.isEmpty()) throw BadRequestException("itemIds 无有效可排项(全部无效或为空)")
+        // 报告按列表原序;有效但未上板的也算忽略
+        val appliedNumbers = valid.filter { it.objectId in appliedIds }.map { "${project.key}-${it.number}" }
+        val offBoard = valid.filter { it.objectId !in appliedIds }.map { "${project.key}-${it.number}" }
+        return ApplyBoardOrderResponse(
+            firstStatus ?: "",
+            orderedOut,
+            ApplyReport(applied = appliedNumbers, ignored = ignored + offBoard, deduped = dedupedReport),
+        )
+    }
+
+    data class ApplyBoardOrderResponse(
+        val status: String,
+        val ordered: List<OrderedBoardOrder>,
+        val report: ApplyReport,
+    )
+
+    data class ApplyReport(
+        val applied: List<String>,
+        val ignored: List<String>,
+        val deduped: List<String>,
+    )
+
     private fun response(
         status: String,
         ordered: List<Item>,
