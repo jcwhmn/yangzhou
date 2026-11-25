@@ -3224,7 +3224,7 @@ Content-Type: application/json
 
 > {%
     const r = response.body;
-    if (r.report.applied.join() !== ["238-3","238-1","238-2"].join()) throw new Error("applied 异常:" + JSON.stringify(r.report));
+    if (r.report.applied.join() !== ["BO238-3","BO238-1","BO238-2"].join()) throw new Error("applied 异常:" + JSON.stringify(r.report));
     client.log("apply 全列重排 ✓ report=" + JSON.stringify(r.report));
 %}
 
@@ -3237,7 +3237,7 @@ Content-Type: application/json
 
 > {%
     const r = response.body;
-    if (r.report.applied.join() !== ["238-2","238-1"].join()) throw new Error("dedupe 后 applied 异常:" + JSON.stringify(r.report));
+    if (r.report.applied.join() !== ["BO238-2","BO238-1"].join()) throw new Error("dedupe 后 applied 异常:" + JSON.stringify(r.report));
     if (r.report.deduped.length !== 1 || r.report.ignored.length !== 1) throw new Error("report 异常:" + JSON.stringify(r.report));
     client.log("apply 宽容语义 ✓ deduped=" + JSON.stringify(r.report.deduped) + " ignored=" + JSON.stringify(r.report.ignored));
 %}
