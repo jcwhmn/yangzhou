@@ -1611,7 +1611,7 @@ export default function ItemDetailPage() {
         open={navEdge !== null}
         autoHideDuration={2000}
         onClose={() => setNavEdge(null)}
-        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+        anchorOrigin={{ vertical: "top", horizontal: "right" }}
       >
         <Alert severity="info" onClose={() => setNavEdge(null)}>
           {navEdge}
@@ -1622,6 +1622,7 @@ export default function ItemDetailPage() {
         open={warnMsg !== null}
         autoHideDuration={8000}
         onClose={() => setWarnMsg(null)}
+        anchorOrigin={{ vertical: "top", horizontal: "right" }}
         data-testid="item-warnings"
       >
         <Alert severity="warning" onClose={() => setWarnMsg(null)}>
