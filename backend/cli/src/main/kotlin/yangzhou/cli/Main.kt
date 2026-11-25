@@ -566,7 +566,6 @@ private fun run(args: List<String>) {
             val key = api.json("GET", "/api/items/${ids.first()}")["number"].asString().substringBefore("-")
             val body = api.json("POST", "/api/projects/$key/board-order/apply", mapOf("itemIds" to ids))
             if (flags.containsKey("json")) return printRaw(body.toString())
-            body["report"]["applied"].map { it.asString() }.forEachIndexed { i, n -> println("${i + 1}. $n") }
             fun arr(p: String): List<String> = buildList { body["report"][p].forEach { add(it.asString()) } }
             val applied = arr("applied")
             val ignored = arr("ignored")
