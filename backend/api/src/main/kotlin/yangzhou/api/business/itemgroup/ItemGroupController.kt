@@ -85,6 +85,12 @@ class ItemGroupController(
         @PathVariable groupId: UUID,
     ): ItemGroupService.GroupDto = service.getGroup(key, groupId)
 
+    @GetMapping("/projects/{key}/groups/{groupId}/timeline")
+    fun timeline(
+        @PathVariable key: String,
+        @PathVariable groupId: UUID,
+    ): List<ItemGroupService.GroupTimelineDto> = service.getGroupTimeline(key, groupId)
+
     @PatchMapping("/projects/{key}/groups/{groupId}")
     fun updateGroup(
         @PathVariable key: String,

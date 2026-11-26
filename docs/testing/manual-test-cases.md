@@ -358,3 +358,12 @@
 | M-269-6 | 存量组 | 打开本票上线前建的旧组 | 不留白:实际开始回落首 item 开始;FINAL 组实际完成回落末 item 完成、执行时长显示区间;活动组显示「进行中 X」 |
 | M-269-7 | 空成员组 | 无成员组 start→complete | 首/末 item 恒“—”,页面无异常(无回落数据时字段仍可为“—”) |
 | M-269-8 | release 回归 | releases 列表及 release 相关操作 | 行为不变,无报错 |
+
+## YPJ-284 ItemGroup 生命周期历史段(开发中,待 review)
+
+| # | 场景 | 操作 | 期望 |
+|---|---|---|---|
+| M-284-1 | 时间线 DESC | 新建组 → 加成员 → start → complete → reopen → 看详情页下方 | 「时间线」从上到下:操作(completed→active)、操作(active→completed)、操作(planned→active)、成员 · + YPJ-N item名、创建(planned) |
+| M-284-2 | 成员移出 | 把成员移出组(回 backlog) | 顶部出现「成员 · − YPJ-N item名」行 |
+| M-284-3 | 存量组 | 打开本票上线前建的旧组 | 成员史(2026-10-12 起)使时间线非空;底部有「创建」行(取自 item_group.created_at,无 from→to);页面无异常 |
+| M-284-4 | 级联可见性 | 子组改挂到别的父 → 看旧父组详情历史段(或:子组动作触发父组联动) | cascade 迁移行,标签「联动」 |

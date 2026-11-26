@@ -617,6 +617,10 @@ Authorization: Bearer {{token}}
 GET {{host}}/api/projects/{{pkey}}/groups/{{sprintId}}
 Authorization: Bearer {{token}}
 
+### 组时间线(YPJ-284/spec 0175):DESC 后进先见;kind=status(组迁移)/member(+加入/−移出);存量组经成员史即有数据
+GET {{host}}/api/projects/{{pkey}}/groups/{{sprintId}}/timeline
+Authorization: Bearer {{token}}
+
 ### 开始 Sprint(动作端点:planned→active;PATCH 不再管 status)
 POST {{host}}/api/projects/{{pkey}}/groups/{{sprintId}}/actions/start
 Authorization: Bearer {{token}}

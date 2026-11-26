@@ -87,6 +87,20 @@ class ItemGroupService(
         val lastItemCompletedAt: String? = null,
     )
 
+    /** YPJ-284(spec 0175):组时间线行——kind=status(组迁移)/member(成员进出);统一时间列,DESC 出参。
+     *  itemNumber 仅 member 行(item 成员);存量组无 created 史行时由后端合成创建行(to=null)。 */
+    data class GroupTimelineDto(
+        val objectId: UUID,
+        val kind: String,
+        val createdAt: String,
+        val from: String? = null,
+        val to: String? = null,
+        val source: String? = null,
+        val itemTitle: String? = null,
+        val itemNumber: Int? = null,
+        val action: String? = null,
+    )
+
     data class CreateGroupRequest(
         val typeKey: String?,
         val name: String?,
@@ -381,6 +395,62 @@ class ItemGroupService(
             firstItemStartedAt = firstStart?.toString(),
             lastItemCompletedAt = lastEnd?.toString(),
         )
+    }
+
+    /** YPJ-284(spec 0175):组时间线(DESC 后进先见)——组迁移 + 成员进出(join=added_at/leave=removed_at 各一行);
+     *  态名/物名解析,破损兜底 "-" 不 500;子组成员回退组名。 */
+    fun getGroupTimeline(
+        key: String,
+        groupId: UUID,
+    ): List<GroupTimelineDto> {
+        val g = findGroup(key, groupId)
+        val names = groupStatuses.findByGroupTypeIdOrderByPosition(typeOf(key, g.type).id!!).associateBy { it.objectId }
+        val rows = ArrayList<GroupTimelineDto>()
+        groupStatusHistories.findByGroupObjectIdOrderByCreatedAtAscIdAsc(g.objectId!!).mapTo(rows) {
+            GroupTimelineDto(
+                objectId = it.objectId,
+                kind = "status",
+                createdAt = it.createdAt.toString(),
+                from = it.fromGroupStatusObjectId?.let { id -> names[id]?.name },
+                to = names[it.toGroupStatusObjectId]?.name ?: "-",
+                source = it.source,
+            )
+        }
+        val mh = memberHistory.findByGroupObjectId(g.objectId!!)
+        if (mh.isNotEmpty()) {
+            val ids = mh.map { it.itemObjectId }.toSet()
+            val titles = itemRepo.findAllByObjectIdIn(ids).associateBy { it.objectId }
+            val groupNames =
+                ids.minus(titles.keys).takeIf { it.isNotEmpty() }?.let { groups.findAllByObjectIdIn(it) }
+                    ?.associateBy { it.objectId }
+            mh.forEach { m ->
+                val it0 = titles[m.itemObjectId]
+                val name = it0?.title ?: groupNames?.get(m.itemObjectId)?.name ?: "-"
+                rows += GroupTimelineDto(
+                    objectId = m.objectId,
+                    kind = "member",
+                    createdAt = m.addedAt.toString(),
+                    itemTitle = name,
+                    itemNumber = it0?.number,
+                    action = "join",
+                )
+                m.removedAt?.let { rm ->
+                    rows += GroupTimelineDto(
+                        objectId = m.objectId,
+                        kind = "member",
+                        createdAt = rm.toString(),
+                        itemTitle = name,
+                        itemNumber = it0?.number,
+                        action = "leave",
+                    )
+                }
+            }
+        }
+        // 存量组无 created 史行:从实体 createdAt 合成创建行(不造 from→to,显示仅「创建」)
+        if (rows.none { it.source == "created" }) {
+            rows += GroupTimelineDto(objectId = g.objectId!!, kind = "status", createdAt = g.createdAt.toString(), source = "created")
+        }
+        return rows.sortedWith(compareByDescending { it.createdAt })
     }
 
     /** YPJ-269(spec 0174):类型 workflow 的 START/FINAL 态 objectId 集(组生命周期派生边界)。 */

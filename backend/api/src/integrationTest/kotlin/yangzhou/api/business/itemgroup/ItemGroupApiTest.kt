@@ -208,6 +208,73 @@ class ItemGroupApiTest : AbstractApiTest() {
     }
 
     @Test
+    fun `组时间线——DESC_全动作_名称解析`() {
+        val authed = bootstrapAndAuth()
+        createProject(authed, "GRP")
+        val s = createGroup(authed, "GRP", mapOf("typeKey" to "sprint", "name" to "S1"))
+        val gid = s["groupId"].asText()
+        action(authed, "GRP", gid, "start")
+        action(authed, "GRP", gid, "complete")
+        action(authed, "GRP", gid, "reopen")
+
+        val rows = get(authed, "/api/projects/GRP/groups/$gid/timeline")
+        assertEquals(4, rows.size())
+        // DESC:后进先见——reopen/complete/start/创建 依次向下
+        assertEquals("status", rows[0]["kind"].asText())
+        assertEquals("active", rows[0]["to"].asText()) // 0108:reopen=completed→active(重开撤销内部收尾判断)
+        assertEquals("completed", rows[1]["to"].asText())
+        assertEquals("planned", rows[2]["from"].asText())
+        assertEquals("created", rows[3]["source"].asText())
+        assertEquals("planned", rows[3]["to"].asText())
+        // DESC:后发生的在上
+        assertTrue(rows[0]["createdAt"].asText() >= rows[3]["createdAt"].asText())
+    }
+
+    @Test
+    fun `组时间线——成员进出_join_leave_带名`() {
+        val authed = bootstrapAndAuth()
+        createProject(authed, "GRP")
+        val s = createGroup(authed, "GRP", mapOf("typeKey" to "sprint", "name" to "S1"))
+        val gid = s["groupId"].asText()
+        val it1 = createItem(authed, "GRP", "i1", estimate = true)["itemId"].asText()
+        assign(authed, it1, gid, "sprint")
+        assign(authed, it1, null, "sprint") // groupId=null+type=摘除
+
+        val rows = get(authed, "/api/projects/GRP/groups/$gid/timeline")
+        assertEquals(3, rows.size()) // leave, join, created(DESC)
+        assertEquals("leave", rows[0]["action"].asText())
+        assertEquals("join", rows[1]["action"].asText())
+        assertEquals("i1", rows[1]["itemTitle"].asText())
+        assertTrue(rows[1]["itemNumber"].asInt() > 0)
+        assertEquals("created", rows[2]["source"].asText())
+    }
+
+    @Test
+    fun `组时间线——无史存量组空数组_未知组404`() {
+        val authed = bootstrapAndAuth()
+        createProject(authed, "GRP")
+        val s = createGroup(authed, "GRP", mapOf("typeKey" to "sprint", "name" to "S1"))
+        val gid = s["groupId"].asText()
+        // 模拟存量组:两张史表清空(端点空态,不报错)
+        jdbc.update("delete from group_status_history where group_object_id = ?", java.util.UUID.fromString(gid))
+        jdbc.update("delete from item_group_member_history where group_object_id = ?", java.util.UUID.fromString(gid))
+        // 纯空组:无史行也合成「创建」行(item_group.created_at,不造 from→to)
+        val synth = get(authed, "/api/projects/GRP/groups/$gid/timeline")
+        assertEquals(1, synth.size())
+        assertEquals("created", synth[0]["source"].asText())
+        assertTrue(synth[0]["to"] == null || synth[0]["to"].isNull)
+
+        val r =
+            authed
+                .get()
+                .uri("/api/projects/GRP/groups/${java.util.UUID.randomUUID()}/timeline")
+                .exchange()
+                .expectBody(String::class.java)
+                .returnResult()
+        assertEquals(404, r.status.value())
+    }
+
+    @Test
     fun `board——active sprint 成员并集_非 sprint active 组不进`() {
         val authed = bootstrapAndAuth()
         createProject(authed, "GRP")

@@ -31,6 +31,7 @@ import { DispositionDialog } from "./components/DispositionDialog";
 import { SprintHeader } from "./components/SprintHeader";
 import { SprintItemsTable } from "./components/SprintItemsTable";
 import { GroupSidebar } from "./components/GroupSidebar";
+import { GroupHistoryLog } from "./components/GroupHistoryLog";
 
 /**
  * V12-S3 Sprint 落地页(spec 0010,grill 裁决 1/2):
@@ -334,6 +335,7 @@ export default function SprintPage() {
       }
       setAddOpen(false);
       setItems(await api<Item[]>(`/api/projects/${key}/groups/${id}/items`));
+      sprintVer.current += 1; // YPJ-284:成员进出影响时间线,信号重拉
     } catch (e) {
       setError(e instanceof Error ? e.message : "更新失败");
     } finally {
@@ -397,82 +399,90 @@ export default function SprintPage() {
         <Typography color="text.secondary">加载中…</Typography>
       )}
       {sprint && (
-        <Box sx={{ display: "flex", gap: 4, alignItems: "flex-start" }}>
-          <Box sx={{ flex: 1, minWidth: 0 }}>
-            <SprintHeader
-              sprint={sprint}
-              items={items}
-              wf={wf}
-              l1Key={l1Key}
-              parentSel={parentSel}
-              typeName={typeName}
-              onReparent={(target) => void reparent(target)}
-              onAction={actionClick}
-              onOpenAdd={openAdd}
-            />
+        <>
+          <Box sx={{ display: "flex", gap: 4, alignItems: "flex-start" }}>
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <SprintHeader
+                sprint={sprint}
+                items={items}
+                wf={wf}
+                l1Key={l1Key}
+                parentSel={parentSel}
+                typeName={typeName}
+                onReparent={(target) => void reparent(target)}
+                onAction={actionClick}
+                onOpenAdd={openAdd}
+              />
 
-            <SprintChartSection
-              projectKey={key}
-              groupId={id}
-              items={items}
-              statusOrder={statuses.map((s) => s.name)}
-            />
-
-            {items !== null && items.length > 0 && (
-              <SprintItemsTable
+              <SprintChartSection
                 projectKey={key}
                 groupId={id}
                 items={items}
-                onAssigneeChanged={() =>
-                  api<Item[]>(`/api/projects/${key}/sprints/${id}/items`)
-                    .then(setItems)
-                    .catch(() => {})
-                }
+                statusOrder={statuses.map((s) => s.name)}
               />
-            )}
-            <AddMembersDialog
-              open={addOpen}
-              projectKey={key}
-              candidates={candidates}
-              selected={selected}
-              busy={busy}
-              onToggle={toggleCandidate}
-              onClose={() => setAddOpen(false)}
-              onApply={applyMembership}
-            />
-            <ConfirmFlowDialog
-              confirmFlow={confirmFlow}
-              groupId={id}
-              typeName={typeName}
+
+              {items !== null && items.length > 0 && (
+                <SprintItemsTable
+                  projectKey={key}
+                  groupId={id}
+                  items={items}
+                  onAssigneeChanged={() =>
+                    api<Item[]>(`/api/projects/${key}/sprints/${id}/items`)
+                      .then(setItems)
+                      .catch(() => {})
+                  }
+                />
+              )}
+              <AddMembersDialog
+                open={addOpen}
+                projectKey={key}
+                candidates={candidates}
+                selected={selected}
+                busy={busy}
+                onToggle={toggleCandidate}
+                onClose={() => setAddOpen(false)}
+                onApply={applyMembership}
+              />
+              <ConfirmFlowDialog
+                confirmFlow={confirmFlow}
+                groupId={id}
+                typeName={typeName}
+                sprint={sprint}
+                groups={groups}
+                items={items}
+                statuses={statuses}
+                onClose={() => setConfirmFlow(null)}
+                onConfirm={confirmFlowConfirm}
+              />
+              {/* 0106:非终态成员处置——目标组决策树 + 逐行覆写回 Backlog(D2/D3);0107 行内显式按钮 + 提交前摘要(方案A,消除 checkbox 误勾事故) */}
+              <DispositionDialog
+                disp={disp}
+                sprintName={sprint?.name ?? ""}
+                busy={busy}
+                onClose={closeDisp}
+                onPick={pickDisp}
+                onNewName={renameDisp}
+                onToggleRow={toggleRowDisp}
+                onBacklogAll={doBacklogAll}
+                onConfirm={confirmDisposition}
+              />
+            </Box>
+            {/* YPJ-269(spec 0174):右栏只读生命周期仪表;final=组状态是否 FINAL(回落与进行中时长判定) */}
+            <GroupSidebar
               sprint={sprint}
-              groups={groups}
-              items={items}
-              statuses={statuses}
-              onClose={() => setConfirmFlow(null)}
-              onConfirm={confirmFlowConfirm}
-            />
-            {/* 0106:非终态成员处置——目标组决策树 + 逐行覆写回 Backlog(D2/D3);0107 行内显式按钮 + 提交前摘要(方案A,消除 checkbox 误勾事故) */}
-            <DispositionDialog
-              disp={disp}
-              sprintName={sprint?.name ?? ""}
-              busy={busy}
-              onClose={closeDisp}
-              onPick={pickDisp}
-              onNewName={renameDisp}
-              onToggleRow={toggleRowDisp}
-              onBacklogAll={doBacklogAll}
-              onConfirm={confirmDisposition}
+              final={
+                (wf.find((s) => s.statusType === "FINAL")?.name ?? "") ===
+                sprint.status
+              }
             />
           </Box>
-          {/* YPJ-269(spec 0174):右栏只读生命周期仪表;final=组状态是否 FINAL(回落与进行中时长判定) */}
-          <GroupSidebar
-            sprint={sprint}
-            final={
-              (wf.find((s) => s.statusType === "FINAL")?.name ?? "") ===
-              sprint.status
-            }
+          {/* YPJ-284(spec 0175):详情页下方时间线(组迁移+成员进出);ver bump 重拉,存量组经成员史即有数据 */}
+          <GroupHistoryLog
+            projectKey={key}
+            groupId={id}
+            ver={sprintVer.current}
           />
-        </Box>
+        </>
       )}
     </PageShell>
   );
