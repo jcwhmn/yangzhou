@@ -101,3 +101,9 @@ group 详情页(sprint/[id])
 ```
 
 用例编号 M-269-1…8 见 manual-test-cases.md(开发中,待 review 节)。
+
+## As-built(2026-11-26 完工)
+
+- 实现与 §2/口径修订一致;PR #267。改动:V72 `group_status_history`(独立史表,additive,存量不回填)、`GroupLifecycleTimes`(读时派生)、`ItemGroupService` 5 写点接入 + GroupDto 4 派生字段、web `GroupSidebar.tsx`/`FactRow.tsx`(新)、`page.tsx`(动作后重拉详情)、`types.ts`/`sprints.ts` 透传。
+- **施工实锤**:口径修订(史缺失回落首/末 item 派生值)全部在前端 GroupSidebar 组装,后端四派生字段未动;final 判定用页内 workflow FINAL 态名。存量组回落链依赖 item 史(V31 起),item 史也缺时仍显 "—"(M-269-7)。
+- 单测 GroupLifecycleTimesTest + 集成 ItemGroupApiTest 绿;M-269-1…8 手工验收过(用户 LGTM)。验收中踩坑:prod 容器构建早于口径修订提交 17 分钟,旧 bundle 无回落逻辑导致「实际开始/执行时长空」——重建容器即愈,代码零改动。
