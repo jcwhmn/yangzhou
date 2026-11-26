@@ -1,4 +1,5 @@
-// YPJ-257 页面重构(纯结构):详情页头部行(返回链接 + 票号/信号/指派/状态/导航/关票理由 chips)自 page 下沉
+// YPJ-257 页面重构(纯结构):详情页头部行自 page 下沉
+// YPJ-276(spec 0173):瘦身为纯导航——返回/父票链/票号/桶内 prev-next;状态/负责人/信号迁右栏 ItemSidebar
 "use client";
 
 import { Chip, IconButton, Stack, Tooltip, Typography } from "@mui/material";
@@ -11,15 +12,7 @@ import Link from "next/link";
 
 import { t } from "@/lib/texts";
 
-import { SignalChip } from "@/components/Verdict";
-
-import { AssignPopover } from "@/components/AssignPopover";
-
-import { Dropdown } from "@/components/Dropdown";
-
-import type { CloseReason } from "@/lib/closeReason";
-
-import type { Feasibility, Item, Status } from "../types";
+import type { Item } from "../types";
 
 type Nav = {
   prev: string | null;
@@ -32,26 +25,12 @@ export function ItemHeader({
   back,
   item,
   keyStr,
-  itemId,
-  feasibility,
-  statuses,
   nav,
-  onAssign,
-  onMoveStatus,
-  onLoad,
-  onEditCloseReason,
 }: {
   back: { href: string; label: string };
   item: Item;
   keyStr: string;
-  itemId: string;
-  feasibility: Feasibility | null;
-  statuses: Status[];
   nav: Nav;
-  onAssign: (memberId: string | null) => void;
-  onMoveStatus: (statusName: string) => void;
-  onLoad: () => void;
-  onEditCloseReason: () => void;
 }) {
   return (
     <>
@@ -76,43 +55,6 @@ export function ItemHeader({
           </Link>
         )}
         <Chip label={item.number} />
-        {feasibility && <SignalChip signal={feasibility.signal} />}
-        {item.assignee ? (
-          <AssignPopover
-            itemId={itemId}
-            assignee={item.assignee}
-            onChanged={onLoad}
-          >
-            {(onClick) => (
-              <Chip
-                size="small"
-                label={`👤 ${item.assignee}`}
-                onClick={onClick}
-                onDelete={() => onAssign(null)}
-              />
-            )}
-          </AssignPopover>
-        ) : (
-          <AssignPopover itemId={itemId} assignee={null} onChanged={onLoad}>
-            {(onClick) => (
-              <Chip
-                size="small"
-                variant="outlined"
-                label={t.assign.open}
-                onClick={onClick}
-                sx={{ opacity: 0.55 }}
-              />
-            )}
-          </AssignPopover>
-        )}
-        <Dropdown
-          ariaLabel="item 状态"
-          size="small"
-          value={item.status}
-          onChange={(v) => onMoveStatus(v)}
-          sx={{ minWidth: 160 }}
-          options={statuses.map((s) => ({ value: s.name, label: s.name }))}
-        />
         {nav && nav.total > 1 && (
           <Stack direction="row" spacing={0.5} alignItems="center">
             {nav.prev && (
@@ -145,21 +87,6 @@ export function ItemHeader({
               </Tooltip>
             )}
           </Stack>
-        )}
-        {statuses.find((s) => s.name === item.status)?.statusType ===
-          "FINAL" && (
-          <Tooltip title={t.closeReason.editTitle}>
-            <Chip
-              size="small"
-              onClick={onEditCloseReason}
-              color={item.closeReason === "done" ? "default" : "warning"}
-              label={
-                (item.closeReason &&
-                  t.closeReason[item.closeReason as CloseReason]) ??
-                item.closeReason
-              }
-            />
-          </Tooltip>
         )}
       </Stack>
     </>

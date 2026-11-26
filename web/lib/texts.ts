@@ -272,6 +272,10 @@ export const t = {
     title: (item: string, status: string) =>
       `转入「${status}」前请先指派负责人(${item})`,
   },
+  sidebar: {
+    signals: "信号",
+    timelogDetail: "工时明细 →",
+  },
   groupTypes: {
     title: "分组类型管理",
     hint: "项目分组的类型;level-1(时间盒)即 Sprint 语义——backlog/board/图表数据源,恰一个。",

@@ -635,12 +635,15 @@ export default function ProjectLayout({
             flexDirection: "column",
           }}
         >
-          <ProjectToolbar
-            projectKey={String(key)}
-            fav={fav}
-            onToggleFav={toggleFav}
-            onOpenSettings={() => setSettingsHubOpen(true)}
-          />
+          {/* YPJ-276(用户拍板):详情页不渲染顶栏(工时/收藏/设置三 icon 撤离,右栏顶到页首);其余页(quick-add 槽)保持整条 */}
+          {!/^\/p\/[^/]+\/i\/[^/]+$/.test(pathname) && (
+            <ProjectToolbar
+              projectKey={String(key)}
+              fav={fav}
+              onToggleFav={toggleFav}
+              onOpenSettings={() => setSettingsHubOpen(true)}
+            />
+          )}
           <Box sx={{ flex: 1, minWidth: 0 }}>{children}</Box>
         </Box>
         <Dialog

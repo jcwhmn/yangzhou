@@ -257,7 +257,7 @@ test("看板刷新按钮可用", async ({ page, projectKey }) => {
   ).toBeVisible();
 });
 
-test("V13-S4 详情切状态 409——错误浮出且状态不变", async ({
+test("V13-S4 详情切状态 409——补指派弹窗浮出,取消后状态不变(YPJ-280)", async ({
   page,
   projectKey,
 }) => {
@@ -266,8 +266,11 @@ test("V13-S4 详情切状态 409——错误浮出且状态不变", async ({
   await page.getByRole("combobox", { name: "item 状态" }).click();
   // D7(spec 0167):直迁终态豁免开工门禁 → 409 样本改用 START→ACTIVE(仍须有主)
   await page.getByRole("option", { name: "In Progress" }).click();
-  // V4-S3 规则:开工须有主;JCW-160-E:错误浮出而非静默
-  await expect(page.getByText("开工前请先指派负责人")).toBeVisible();
+  // V4-S3 规则:开工须有主;YPJ-280:409 → 补指派弹窗而非报错条
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText("请先指派负责人");
+  await page.keyboard.press("Escape"); // 取消 = 无副作用
   await expect(page.getByRole("combobox", { name: "item 状态" })).toHaveValue(
     "To Do",
   );

@@ -4,7 +4,6 @@ import {
   Alert,
   Box,
   Button,
-  Chip,
   Dialog,
   DialogActions,
   DialogContent,
@@ -19,21 +18,18 @@ import {
   Typography,
 } from "@mui/material";
 import { PageShell } from "@/components/PageShell";
-import { Dropdown } from "@/components/Dropdown";
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { resolveBack } from "@/lib/back";
 import { t } from "@/lib/texts";
 import { listSprints, sprintAction, assignSprint } from "@/lib/sprints";
-import { DateInput } from "@/components/DateInput";
+import { ItemSidebar } from "./components/ItemSidebar";
 import CloseReasonDialog from "@/components/CloseReasonDialog";
 import AssignBeforeMoveDialog from "@/components/AssignBeforeMoveDialog";
 import type { AssignCandidate } from "@/components/AssignPopover";
 import { shouldAsk, type CloseReason } from "@/lib/closeReason";
-import { EstimateField } from "@/components/EstimateField";
-import { EstimateScale } from "@/lib/estimate";
+import type { EstimateScale } from "@/lib/estimate";
 import type { Filter } from "../../types";
 import {
   type Status,
@@ -610,22 +606,7 @@ export default function ItemDetailPage() {
 
   return (
     <PageShell>
-      <ItemHeader
-        back={back}
-        item={item}
-        keyStr={String(key)}
-        itemId={String(itemId)}
-        feasibility={feasibility}
-        statuses={statuses}
-        nav={nav}
-        onAssign={assign}
-        onMoveStatus={moveStatus}
-        onLoad={load}
-        onEditCloseReason={() => {
-          setCloseError("");
-          setCloseAsk({ mode: "edit" });
-        }}
-      />
+      <ItemHeader back={back} item={item} keyStr={String(key)} nav={nav} />
 
       {error && (
         <Typography color="error" sx={{ mb: 1 }}>
@@ -652,254 +633,7 @@ export default function ItemDetailPage() {
               fullWidth
             />
 
-            <Stack direction="row" spacing={1} alignItems="flex-start">
-              {/* YPJ-218 spec 0139:已有子的父不持有自有时间线——四框禁用,保存原样回传 */}
-              <DateInput
-                label="开始日期"
-                size="small"
-                value={startDate}
-                onChange={setStartDate}
-                sx={{ width: 200 }}
-                disabled={timelineLocked}
-              />
-
-              {/* YPJ-208 切片 c:时刻录入(datetime 语义;空=date-only 由后端按日历默认) */}
-              <TextField
-                label="开始时刻"
-                size="small"
-                type="time"
-                value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
-                sx={{ width: 130 }}
-                slotProps={{ inputLabel: { shrink: true } }}
-                disabled={timelineLocked}
-              />
-
-              <DateInput
-                label="截止日期"
-                size="small"
-                value={dueDate}
-                onChange={(v) => {
-                  setDueDate(v);
-                  setDueDirty(true);
-                  setLastEdited("due");
-                }}
-                sx={{ width: 200 }}
-                disabled={timelineLocked}
-              />
-
-              <TextField
-                label="截止时刻"
-                size="small"
-                type="time"
-                value={dueTime}
-                onChange={(e) => {
-                  setDueTime(e.target.value);
-                  setDueDirty(true);
-                  setLastEdited("due");
-                }}
-                sx={{ width: 130 }}
-                slotProps={{ inputLabel: { shrink: true } }}
-                disabled={timelineLocked}
-              />
-
-              {timelineLocked && (
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  sx={{ alignSelf: "center" }}
-                >
-                  已有子项,时间线由子项汇总
-                </Typography>
-              )}
-
-              <Dropdown
-                label={t.item.priority}
-                size="small"
-                value={priority}
-                onChange={(v) => setPriority(v)}
-                sx={{ width: 110 }}
-                options={[
-                  { value: "", label: "无" },
-                  ...["P0", "P1", "P2", "P3"].map((p) => ({
-                    value: p,
-                    label: p,
-                  })),
-                ]}
-              />
-
-              {sprints.length > 0 && (
-                <Dropdown
-                  label={t.item.sprint}
-                  size="small"
-                  value={item.sprintId ?? ""}
-                  onChange={(v) => applySprint(v || null)}
-                  sx={{ width: 170 }}
-                  clearable
-                  options={sprints
-                    .filter(
-                      (s) =>
-                        s.status !== "completed" ||
-                        s.sprintId === item.sprintId,
-                    )
-
-                    .sort(
-                      (a, b) =>
-                        ["active", "planned", "completed"].indexOf(a.status) -
-                        ["active", "planned", "completed"].indexOf(b.status),
-                    )
-
-                    .map((s) => ({
-                      value: s.sprintId,
-
-                      label: s.name,
-
-                      disabled: s.status === "completed",
-
-                      chip: {
-                        label:
-                          t.projectNav.sprintStatus[
-                            s.status as keyof typeof t.projectNav.sprintStatus
-                          ],
-
-                        color:
-                          s.status === "active"
-                            ? "primary"
-                            : s.status === "planned"
-                              ? "warning"
-                              : "default",
-                      },
-                    }))}
-                />
-              )}
-
-              {item.sprintId && (
-                <Link
-                  href={`/p/${key}/sprint/${item.sprintId}`}
-                  style={{ textDecoration: "none", alignSelf: "center" }}
-                >
-                  <Typography variant="caption" color="primary">
-                    {item.sprintName}
-                  </Typography>
-                </Link>
-              )}
-            </Stack>
-
-            {milestones.length > 0 && (
-              <Stack
-                direction="row"
-                spacing={0.5}
-                alignItems="center"
-                flexWrap="wrap"
-                useFlexGap
-              >
-                <Typography variant="caption" color="text.secondary">
-                  {t.item.milestones}
-                </Typography>
-                {milestones.map((ms) => (
-                  <Chip
-                    key={ms.milestoneId}
-                    data-testid="item-milestone-chip"
-                    label={ms.name}
-                    size="small"
-                    color={
-                      item?.milestoneIds?.includes(ms.milestoneId)
-                        ? "primary"
-                        : "default"
-                    }
-                    variant={
-                      item?.milestoneIds?.includes(ms.milestoneId)
-                        ? "filled"
-                        : "outlined"
-                    }
-                    onClick={() => toggleMilestone(ms.milestoneId)}
-                  />
-                ))}
-              </Stack>
-            )}
-
-            {/* YPJ-201:release 挂接——单选下拉;无归属显空串;released 不在选项 */}
-            <Dropdown
-              label={t.item.release}
-              value={releaseId ?? ""}
-              onChange={(v) => setReleaseMembership(v || null)}
-              clearable={releaseId !== null}
-              sx={{ width: 260 }}
-              options={[
-                { value: "", label: t.releases.stageNone },
-                ...releases.map((r) => ({
-                  value: r.releaseId,
-                  label: r.name,
-                })),
-                // 已挂的 release 已不在 planned(已发布)→ 兜底回显,防选中态丢 label
-                ...(releaseId &&
-                !releases.some((r) => r.releaseId === releaseId)
-                  ? [{ value: releaseId, label: t.releases.released }]
-                  : []),
-              ]}
-            />
-
-            <Dropdown
-              label={t.item.type}
-              value={type}
-              onChange={(v) => setType(v)}
-              sx={{ width: 200 }}
-              options={
-                // YPJ-177:动态定义(name 显示);历史值不在定义内时兜底回显
-                [
-                  ...typeOptions.map((tp) => ({
-                    value: tp.typeKey,
-                    label: tp.name,
-                  })),
-                  ...(type && !typeOptions.some((tp) => tp.typeKey === type)
-                    ? [{ value: type, label: type }]
-                    : []),
-                ]
-              }
-            />
-
-            <Stack
-              direction="row"
-              spacing={1}
-              alignItems="center"
-              flexWrap="wrap"
-              useFlexGap
-            >
-              <EstimateField
-                scales={estScales}
-                required={estRequired}
-                value={estValue}
-                unit={estUnit}
-                onChange={(v, u) => {
-                  setEstValue(v);
-                  setEstUnit(u);
-                  setEstDirty(true);
-                  setLastEdited("est");
-                }}
-              />
-            </Stack>
-
             <Stack direction="row" spacing={1} alignItems="center">
-              <Button
-                variant="contained"
-                onClick={saveBasics}
-                disabled={estInvalid}
-              >
-                {t.item.save}
-              </Button>
-
-              {saved && (
-                <Typography variant="body2" color="text.secondary">
-                  {t.item.saved}
-                </Typography>
-              )}
-
-              {sprintHint && (
-                <Typography variant="body2" color="success.main">
-                  {sprintHint}
-                </Typography>
-              )}
-
               <Button
                 size="small"
                 color="error"
@@ -1031,52 +765,66 @@ export default function ItemDetailPage() {
               onCreated={load}
             />
           )}
-
-          <Box sx={{ width: 240, flexShrink: 0 }}>
-            <Typography variant="caption" color="text.secondary">
-              创建
-            </Typography>
-
-            <Typography variant="body2" sx={{ mb: 2 }}>
-              {item.createdAt
-                ? new Date(item.createdAt).toLocaleString("zh-CN")
-                : "—"}
-            </Typography>
-
-            {/* YPJ-132(spec 0171):生命周期时刻,纯派生;276 右 sidebar 落地时迁入 */}
-            <Typography variant="caption" color="text.secondary">
-              实际开始
-            </Typography>
-            <Typography variant="body2" sx={{ mb: 2 }}>
-              {item.startedAt
-                ? new Date(item.startedAt).toLocaleString("zh-CN")
-                : "—"}
-            </Typography>
-
-            <Typography variant="caption" color="text.secondary">
-              实际完成
-            </Typography>
-            <Typography variant="body2" sx={{ mb: 2 }}>
-              {item.completedAt
-                ? new Date(item.completedAt).toLocaleString("zh-CN")
-                : "—"}
-            </Typography>
-
-            <Stack spacing={1} alignItems="flex-start">
-              {item.overdue && (
-                <Chip size="small" color="error" label="已超期" />
-              )}
-
-              {item.dueSoon && !item.overdue && (
-                <Chip size="small" color="warning" label="临期(3 天内)" />
-              )}
-
-              {item.blocked && (
-                <Chip size="small" color="error" label="被阻塞" />
-              )}
-            </Stack>
-          </Box>
         </Box>
+        <ItemSidebar
+          projectKey={String(key)}
+          item={item}
+          statuses={statuses}
+          itemId={String(itemId)}
+          onLoad={load}
+          onMoveStatus={moveStatus}
+          onAssign={assign}
+          onEditCloseReason={() => {
+            setCloseError("");
+            setCloseAsk({ mode: "edit" });
+          }}
+          startDate={startDate}
+          startTime={startTime}
+          dueDate={dueDate}
+          dueTime={dueTime}
+          timelineLocked={timelineLocked}
+          onStartDate={setStartDate}
+          onStartTime={setStartTime}
+          onDueDate={(v) => {
+            setDueDate(v);
+            setDueDirty(true);
+            setLastEdited("due");
+          }}
+          onDueTime={(v) => {
+            setDueTime(v);
+            setDueDirty(true);
+            setLastEdited("due");
+          }}
+          priority={priority}
+          onPriorityChange={setPriority}
+          sprints={sprints}
+          onSprintChange={applySprint}
+          milestones={milestones}
+          onToggleMilestone={toggleMilestone}
+          releaseId={releaseId}
+          releases={releases}
+          onReleaseChange={setReleaseMembership}
+          type={type}
+          typeOptions={typeOptions}
+          onTypeChange={setType}
+          estScales={estScales}
+          estRequired={estRequired}
+          estValue={estValue}
+          estUnit={estUnit}
+          onEstimateChange={(v, u) => {
+            setEstValue(v);
+            setEstUnit(u);
+            setEstDirty(true);
+            setLastEdited("est");
+          }}
+          estInvalid={estInvalid}
+          onSave={saveBasics}
+          saved={saved}
+          sprintHint={sprintHint}
+          feasibility={feasibility}
+          timeLog={timeLog}
+          onGoTimelog={() => setTab(t.item.detailTabs.indexOf("工时"))}
+        />
       </Box>
       {/* YPJ-104:挂 planned 且无活动 sprint → 提示激活(spec 0105) */}
       <Dialog open={launchAskId !== null} onClose={() => setLaunchAskId(null)}>
