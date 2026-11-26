@@ -464,8 +464,14 @@ export default function SprintPage() {
               onConfirm={confirmDisposition}
             />
           </Box>
-          {/* YPJ-269(spec 0174):右栏只读生命周期仪表,计划起止在 header 不双真相源 */}
-          <GroupSidebar sprint={sprint} />
+          {/* YPJ-269(spec 0174):右栏只读生命周期仪表;final=组状态是否 FINAL(回落与进行中时长判定) */}
+          <GroupSidebar
+            sprint={sprint}
+            final={
+              (wf.find((s) => s.statusType === "FINAL")?.name ?? "") ===
+              sprint.status
+            }
+          />
         </Box>
       )}
     </PageShell>
