@@ -102,3 +102,10 @@ props: {
 ## 6. 验证边界
 
 agent 侧:`npm run format` + `tsc` 绿,就地 commit。用户侧:dev 3001 手工用例过 → PR。
+
+## 7. As-built(2026-11-26 完工)
+
+- 实现与 §3 一致,方案 A(纯前端两调)。改动:`web/components/AssignBeforeMoveDialog.tsx`(新)、`web/app/p/[key]/page.tsx`、`web/app/p/[key]/i/[itemId]/page.tsx`、`web/lib/texts.ts`。后端零改动。
+- 409 判据确为 `err.status === 409 && message.includes("指派")`;候选行直接点行即选(非按钮式)。
+- 验收中发现弹窗无显式取消按钮(spec §4 图本就画了 [取消],实现遗漏)→ PR #265 补 `DialogActions` 取消按钮,对齐 CloseReasonDialog 双轨惯例。
+- 手工用例全部通过(含豁免/回归/WIP 满 409 不误弹);e2e 全过。PR #264 + #265 已合。
