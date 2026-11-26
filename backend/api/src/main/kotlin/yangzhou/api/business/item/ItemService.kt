@@ -222,7 +222,8 @@ class ItemService(
     }
 
     /** YPJ-238(spec 0166 §3.1):看板列内箭头排序——与相邻项交换位次,至多 2 行 position 写;响应带该列全序。
-     * YPJ-285:可见口径对齐看板展示(仅 active sprint 成员 ∨ onBoard)——planned 组成员不上板,不参与交换。 */
+     * YPJ-285:可见口径对齐看板展示(仅 active sprint 成员 ∨ onBoard)——planned 组成员不上板,不参与交换。
+     * YPJ-286:project 行锁串行化(166 多用户前置;锁序 spec 0096——第一把锁必须是 project 行)。 */
     @Transactional
     fun moveBoardOrder(
         projectKey: String,
@@ -231,6 +232,7 @@ class ItemService(
     ): MoveBoardOrderResponse {
         val direction = DisplayEnum.parse<BoardMoveDirection>(dir)
         val project = projects.findByKey(projectKey) ?: throw NotFoundException("项目不存在:$projectKey")
+        projects.lockByObjectId(project.objectId!!) // YPJ-286:并发防护(丢更新竞态),锁序同上
         val item = itemRepo.findByObjectId(itemId) ?: throw NotFoundException("item 不存在:$itemId")
         if (item.projectObjectId != project.objectId) throw NotFoundException("item 不属于该项目:$itemId")
         // 列 = 该 item 当前 status 的看板可见子集;buildCtx 按传入列表取成员关系,不扫全项目
@@ -276,13 +278,15 @@ class ItemService(
         item: Item,
     ): String = ctx.statusById[item.statusObjectId]?.name ?: ""
 
-    /** YPJ-279(spec 0169):整列重排——宽容语义:重复后序覆盖、无效忽略、跨列逐列重写;未列入成员保持相对序接后。 */
+    /** YPJ-279(spec 0169):整列重排——宽容语义:重复后序覆盖、无效忽略、跨列逐列重写;未列入成员保持相对序接后。
+     * YPJ-286:project 行锁串行化(166 多用户前置;锁序 spec 0096——第一把锁必须是 project 行)。 */
     @Transactional
     fun applyBoardOrder(
         projectKey: String,
         rawIds: List<UUID>,
     ): ApplyBoardOrderResponse {
         val project = projects.findByKey(projectKey) ?: throw NotFoundException("项目不存在:$projectKey")
+        projects.lockByObjectId(project.objectId!!) // YPJ-286:并发防护(丢更新竞态),锁序同上
         // 去重:保留末次出现(后序覆盖前序);被覆盖的早期出现进报告
         val lastIndex = HashMap<UUID, Int>()
         rawIds.forEachIndexed { i, id -> lastIndex[id] = i }
