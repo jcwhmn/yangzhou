@@ -4,11 +4,12 @@
 
 ## Issue 工作流(PR 模式;票在 YPJ 项目,2026-10-06 起 Linear 冻结只读)
 
-1. 开工:`git checkout main && git pull --ff-only`(分支经 yz 创建,见下);同时 `yz assign YPJ-{N} me && yz items move YPJ-{N} "In Progress"`(开工须有主,未 assign 会被 move 409 拒);开工票**必须挂当前 sprint**(`yz items assign YPJ-{N} <当前sprint>`;立票可不挂留 backlog,但开工动作必须含挂 sprint——不允许悬空票:sprint 过程零痕迹=回顾漏计,YPJ-174 裸闭案例,2026-11-13 用户定,废除 10-24「不自动挂」口径);**分支经 yz 创建并关联 item**(2026-10-12 定,YPJ-27 起 CLI 直建:`yz items branch YPJ-{N} <type>/YPJ-{N}[-依赖票号][-英文slug] --base main`,命名=spec 0036 v2(`cwjiang/` 前缀规则已废弃,2026-10-16 用户纠正);`yz log` 依赖该关联;本地对应 `git fetch && git switch` 跟踪远端新分支)
-2. 实现带测试,跑全相关验证
-3. PR:`gh pr create --base main --title "YPJ-{N}: ..."`;开出后 `yz items move YPJ-N "In Review"`
-4. **停**,等用户审阅合并
-5. 合并后同回合完成:`git checkout main && git pull --ff-only` → 删远程分支(`git push origin --delete <branch>`;**本地分支永久保留不删**,2026-11-01 定,过程考古走 `git log <本地分支>`;`gh pr merge --delete-branch` 连本地一起删,**禁用**;GitHub 侧 refs/pull/N/head 仍可回溯,YPJ-69)→ **YPJ 移 Done**(`yz items move YPJ-{N} "Done"`,非可选)→ 扫父 item:子票全 Done 则父票 Done,否则 In Progress。PR 已合而 item 停 In Progress = 流程破损态。
+1. 开工:`git checkout main && git pull --ff-only`(分支经 yz 创建,见下);同时 `yz assign YPJ-{N} me && yz items move YPJ-{N} "In Progress"`(开工须有主,未 assign 会被 move 409 拒);开工票**必须挂当前 sprint**(`yz items assign YPJ-{N} <当前sprint>`;立票可不挂留 backlog,但开工动作必须含挂 sprint--不允许悬空票:sprint 过程零痕迹=回顾漏计,YPJ-174 裸闭案例,2026-11-13 用户定,废除 10-24「不自动挂」口径);**分支经 yz 创建并关联 item**(2026-10-12 定,YPJ-27 起 CLI 直建:`yz items branch YPJ-{N} <type>/YPJ-{N}[-依赖票号][-英文slug] --base main`,命名=spec 0036 v2(`cwjiang/` 前缀规则已废弃,2026-10-16 用户纠正);`yz log` 依赖该关联;本地对应 `git fetch && git switch` 跟踪远端新分支）；**做哪张票以当前看板 To Do 顺序为准**——handoff/队列快照可能过期，开工前重新核对，不按旧快照径自动工（2026-11-28 YPJ-135 误序教训））
+2. **spec 门(编码硬门,2026-11-28 立;YPJ-284 偷跑、YPJ-135 复发教训)**:读票面判断票性;凡功能/行为变更票,先立 spec(`docs/spec/00NN`,三件套与「用户过目后才编码」见 development.md)并 commit+push;**spec 提交必须先于任何实现提交**。票面标注「spec 编号接续」的 task 票同样先 spec。自检句:本分支第一个代码 commit 之前,spec 文件的 commit 已存在?
+3. 实现带测试,跑全相关验证
+4. PR:`gh pr create --base main --title "YPJ-{N}: ..."`;开出后 `yz items move YPJ-N "In Review"`
+5. **停**,等用户审阅合并
+6. 合并后同回合完成:`git checkout main && git pull --ff-only` → 删远程分支(`git push origin --delete <branch>`;**本地分支永久保留不删**,2026-11-01 定,过程考古走 `git log <本地分支>`;`gh pr merge --delete-branch` 连本地一起删,**禁用**;GitHub 侧 refs/pull/N/head 仍可回溯,YPJ-69)→ **YPJ 移 Done**(`yz items move YPJ-{N} "Done"`,非可选)→ 扫父 item:子票全 Done 则父票 Done,否则 In Progress。PR 已合而 item 停 In Progress = 流程破损态。
 
 ## 票卡排期纪律(2026-11-17 定,用户拍板)
 
