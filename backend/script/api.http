@@ -617,6 +617,10 @@ Authorization: Bearer {{token}}
 GET {{host}}/api/projects/{{pkey}}/groups/{{sprintId}}
 Authorization: Bearer {{token}}
 
+### 组状态迁移时间线(YPJ-284):ASC;from=null=初始进入;动作 start/complete/reopen 后重跑,应依次追加
+GET {{host}}/api/projects/{{pkey}}/groups/{{sprintId}}/status-history
+Authorization: Bearer {{token}}
+
 ### 开始 Sprint(动作端点:planned→active;PATCH 不再管 status)
 POST {{host}}/api/projects/{{pkey}}/groups/{{sprintId}}/actions/start
 Authorization: Bearer {{token}}

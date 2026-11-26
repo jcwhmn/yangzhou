@@ -87,6 +87,15 @@ class ItemGroupService(
         val lastItemCompletedAt: String? = null,
     )
 
+    /** YPJ-284:组状态迁移行(ASC 时间线);from=null=初始进入;状态名已解析,前端零映射。 */
+    data class GroupStatusHistoryDto(
+        val objectId: UUID,
+        val from: String? = null,
+        val to: String,
+        val source: String,
+        val createdAt: String,
+    )
+
     data class CreateGroupRequest(
         val typeKey: String?,
         val name: String?,
@@ -381,6 +390,24 @@ class ItemGroupService(
             firstItemStartedAt = firstStart?.toString(),
             lastItemCompletedAt = lastEnd?.toString(),
         )
+    }
+
+    /** YPJ-284:组状态迁移时间线(ASC);破损态名兑底 "-" 不 500(工作流编辑可能删态)。 */
+    fun getGroupStatusHistory(
+        key: String,
+        groupId: UUID,
+    ): List<GroupStatusHistoryDto> {
+        val g = findGroup(key, groupId)
+        val names = groupStatuses.findByGroupTypeIdOrderByPosition(typeOf(key, g.type).id!!).associateBy { it.objectId }
+        return groupStatusHistories.findByGroupObjectIdOrderByCreatedAtAscIdAsc(g.objectId!!).map {
+            GroupStatusHistoryDto(
+                objectId = it.objectId,
+                from = it.fromGroupStatusObjectId?.let { id -> names[id]?.name },
+                to = names[it.toGroupStatusObjectId]?.name ?: "-",
+                source = it.source,
+                createdAt = it.createdAt.toString(),
+            )
+        }
     }
 
     /** YPJ-269(spec 0174):类型 workflow 的 START/FINAL 态 objectId 集(组生命周期派生边界)。 */
