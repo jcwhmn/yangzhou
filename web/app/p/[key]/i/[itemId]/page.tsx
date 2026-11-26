@@ -765,67 +765,66 @@ export default function ItemDetailPage() {
               onCreated={load}
             />
           )}
-
-          <ItemSidebar
-            projectKey={String(key)}
-            item={item}
-            statuses={statuses}
-            itemId={String(itemId)}
-            onLoad={load}
-            onMoveStatus={moveStatus}
-            onAssign={assign}
-            onEditCloseReason={() => {
-              setCloseError("");
-              setCloseAsk({ mode: "edit" });
-            }}
-            startDate={startDate}
-            startTime={startTime}
-            dueDate={dueDate}
-            dueTime={dueTime}
-            timelineLocked={timelineLocked}
-            onStartDate={setStartDate}
-            onStartTime={setStartTime}
-            onDueDate={(v) => {
-              setDueDate(v);
-              setDueDirty(true);
-              setLastEdited("due");
-            }}
-            onDueTime={(v) => {
-              setDueTime(v);
-              setDueDirty(true);
-              setLastEdited("due");
-            }}
-            priority={priority}
-            onPriorityChange={setPriority}
-            sprints={sprints}
-            onSprintChange={applySprint}
-            milestones={milestones}
-            onToggleMilestone={toggleMilestone}
-            releaseId={releaseId}
-            releases={releases}
-            onReleaseChange={setReleaseMembership}
-            type={type}
-            typeOptions={typeOptions}
-            onTypeChange={setType}
-            estScales={estScales}
-            estRequired={estRequired}
-            estValue={estValue}
-            estUnit={estUnit}
-            onEstimateChange={(v, u) => {
-              setEstValue(v);
-              setEstUnit(u);
-              setEstDirty(true);
-              setLastEdited("est");
-            }}
-            estInvalid={estInvalid}
-            onSave={saveBasics}
-            saved={saved}
-            sprintHint={sprintHint}
-            feasibility={feasibility}
-            timeLog={timeLog}
-            onGoTimelog={() => setTab(t.item.detailTabs.indexOf("工时"))}
-          />
         </Box>
+        <ItemSidebar
+          projectKey={String(key)}
+          item={item}
+          statuses={statuses}
+          itemId={String(itemId)}
+          onLoad={load}
+          onMoveStatus={moveStatus}
+          onAssign={assign}
+          onEditCloseReason={() => {
+            setCloseError("");
+            setCloseAsk({ mode: "edit" });
+          }}
+          startDate={startDate}
+          startTime={startTime}
+          dueDate={dueDate}
+          dueTime={dueTime}
+          timelineLocked={timelineLocked}
+          onStartDate={setStartDate}
+          onStartTime={setStartTime}
+          onDueDate={(v) => {
+            setDueDate(v);
+            setDueDirty(true);
+            setLastEdited("due");
+          }}
+          onDueTime={(v) => {
+            setDueTime(v);
+            setDueDirty(true);
+            setLastEdited("due");
+          }}
+          priority={priority}
+          onPriorityChange={setPriority}
+          sprints={sprints}
+          onSprintChange={applySprint}
+          milestones={milestones}
+          onToggleMilestone={toggleMilestone}
+          releaseId={releaseId}
+          releases={releases}
+          onReleaseChange={setReleaseMembership}
+          type={type}
+          typeOptions={typeOptions}
+          onTypeChange={setType}
+          estScales={estScales}
+          estRequired={estRequired}
+          estValue={estValue}
+          estUnit={estUnit}
+          onEstimateChange={(v, u) => {
+            setEstValue(v);
+            setEstUnit(u);
+            setEstDirty(true);
+            setLastEdited("est");
+          }}
+          estInvalid={estInvalid}
+          onSave={saveBasics}
+          saved={saved}
+          sprintHint={sprintHint}
+          feasibility={feasibility}
+          timeLog={timeLog}
+          onGoTimelog={() => setTab(t.item.detailTabs.indexOf("工时"))}
+        />
       </Box>
       {/* YPJ-104:挂 planned 且无活动 sprint → 提示激活(spec 0105) */}
       <Dialog open={launchAskId !== null} onClose={() => setLaunchAskId(null)}>
