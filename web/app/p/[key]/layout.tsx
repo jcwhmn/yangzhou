@@ -37,7 +37,6 @@ import { ProjectSettingsDialog } from "@/components/ProjectSettingsDialog";
 import {
   ProjectToolbar,
   ProjectToolbarContext,
-  ToolbarActions,
 } from "@/components/ProjectToolbar";
 import {
   Category as CategoryIcon,
@@ -634,32 +633,10 @@ export default function ProjectLayout({
             minWidth: 0,
             display: "flex",
             flexDirection: "column",
-            // 浮动右簇的定位基准;仅详情页需要(其余页不做全局 side effect)
-            position: /^\/p\/[^/]+\/i\/[^/]+$/.test(pathname)
-              ? "relative"
-              : undefined,
           }}
         >
-          {/* YPJ-276:详情页不占流——右簇浮到右上角,右栏顶到原横条位;其余页(quick-add 槽)保持整条 */}
-          {/^\/p\/[^/]+\/i\/[^/]+$/.test(pathname) ? (
-            <Box
-              sx={{
-                position: "absolute",
-                top: 8,
-                right: 16,
-                zIndex: 1,
-                bgcolor: "background.paper",
-                borderRadius: 1,
-              }}
-            >
-              <ToolbarActions
-                projectKey={String(key)}
-                fav={fav}
-                onToggleFav={toggleFav}
-                onOpenSettings={() => setSettingsHubOpen(true)}
-              />
-            </Box>
-          ) : (
+          {/* YPJ-276(用户拍板):详情页不渲染顶栏(工时/收藏/设置三 icon 撤离,右栏顶到页首);其余页(quick-add 槽)保持整条 */}
+          {!/^\/p\/[^/]+\/i\/[^/]+$/.test(pathname) && (
             <ProjectToolbar
               projectKey={String(key)}
               fav={fav}
