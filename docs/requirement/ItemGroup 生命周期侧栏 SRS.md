@@ -23,7 +23,7 @@ sprint 等 ItemGroup 需要一处只读视图,回答「这个组什么时候建�
 
 ### 3.1 组状态史(落库)
 
-- 每次组状态变更一行:`from`(null = 初始进入)/ `to` / `source` / 时刻。`source ∈ created`(建组初始态)`| action`(动作端点)`| cascade`(父组联动重算、改父回退;仅实际变化时写——0111 重算已有不变即跳过语义)。
+- 每次组状态变更一行:`from`(null = 初始进入)/ `to` / `source` / 时刻。`source ∈ created`(建组初始态)`| action`(动作端点、看板拉入自动激活 spec 0117——用户可见的真实迁移)`| cascade`(父组联动重算、改父回退;仅实际变化时写——0111 重算已有不变即跳过语义)。
 - **存量组不回填**(NULL,UI 显示"—");对齐 item_status_history V31 先例(算不出即不造,不写伪数据)。
 - **提取值(started/completed)零物化**:不落列、不建扩展属性机制,读时从史派生——镜像 item 先例(item 表从未有 started/completed 列,LifecycleTimes 读时算)。
 

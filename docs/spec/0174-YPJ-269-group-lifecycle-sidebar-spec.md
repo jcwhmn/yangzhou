@@ -46,6 +46,7 @@ create index idx_group_status_history_group on group_status_history (group_objec
      |---|---|---|
      | create(初始 START,~L330) | created | null |
      | `action()` 迁移处(~L454) | action | 动作前状态 |
+     | 看板拉入自动激活 startGroup(spec 0117,~L767) | action | 动作前状态 |
      | `recomputeParentStatus` 实际变化分支(~L488) | cascade | 变化前状态 |
      | 改父 old parent 回退(~L403) | cascade | 变化前状态 |
    - `GroupDto` += `startedAt/completedAt/firstItemStartedAt/lastItemCompletedAt: String?`(Instant.toString,与甘特 actualStart 同形态);**列表端点 toDto 不派生**(YAGNI),仅 `getGroup()` 详情 enrich。
