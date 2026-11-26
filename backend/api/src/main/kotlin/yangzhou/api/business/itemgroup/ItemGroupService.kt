@@ -4,20 +4,26 @@ import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import yangzhou.api.business.item.ItemService
+import yangzhou.api.business.item.LifecycleTimes
 import yangzhou.api.error.BadRequestException
 import yangzhou.api.error.ConflictException
 import yangzhou.api.error.NotFoundException
 import yangzhou.api.guard.LeaderGuard
+import yangzhou.persistence.GroupStatusHistory
 import yangzhou.persistence.ItemGroup
 import yangzhou.persistence.ItemGroupMember
 import yangzhou.persistence.ItemGroupType
 import yangzhou.persistence.StatusType
+import yangzhou.persistence.repository.GroupStatusHistoryRepository
+import yangzhou.persistence.repository.GroupStatusRepository
 import yangzhou.persistence.repository.ItemGroupMemberHistoryRepository
 import yangzhou.persistence.repository.ItemGroupMemberRepository
 import yangzhou.persistence.repository.ItemGroupRepository
 import yangzhou.persistence.repository.ItemGroupTypeRepository
 import yangzhou.persistence.repository.ItemRepository
+import yangzhou.persistence.repository.ItemStatusHistoryRepository
 import yangzhou.persistence.repository.ProjectRepository
+import yangzhou.persistence.repository.StatusRepository
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
@@ -40,6 +46,10 @@ class ItemGroupService(
     private val itemRepo: ItemRepository,
     private val itemService: ItemService,
     private val memberHistory: ItemGroupMemberHistoryRepository,
+    private val groupStatuses: GroupStatusRepository,
+    private val groupStatusHistories: GroupStatusHistoryRepository,
+    private val itemStatusHistories: ItemStatusHistoryRepository,
+    private val statuses: StatusRepository,
     private val clock: Clock,
 ) {
     data class GroupTypeDto(
@@ -69,6 +79,12 @@ class ItemGroupService(
         val endDate: String? = null,
         /** 父组公开 ID(邻层:类型 level=自身+1 的组);顶层组恒 null(spec 0114 多层泛化)。 */
         val parentGroupId: UUID? = null,
+        val createdAt: String? = null,
+        /** YPJ-269(spec 0174):生命周期派生值零物化——仅 getGroup 详情端点算(SRS §3.2);列表/写端点 toDto 恒 null。 */
+        val startedAt: String? = null,
+        val completedAt: String? = null,
+        val firstItemStartedAt: String? = null,
+        val lastItemCompletedAt: String? = null,
     )
 
     data class CreateGroupRequest(
@@ -114,6 +130,7 @@ class ItemGroupService(
         startDate = startDate?.toString(),
         endDate = endDate?.toString(),
         parentGroupId = parentObjectId,
+        createdAt = createdAt?.toString(),
     )
 
     private fun parseDate(
@@ -333,13 +350,65 @@ class ItemGroupService(
                     parentObjectId = parent?.objectId,
                 ),
             )
+        recordTransition(t, saved, fromName = null, toName = saved.status, source = "created") // YPJ-269:初始进入史行
         return saved.toDto()
     }
 
+    /** YPJ-269(spec 0174):详情端点带生命周期派生值(零物化,SRS §3.2);首/末 item = 直挂成员(与成员表同口径,不含子树)× item LifecycleTimes。 */
     fun getGroup(
         key: String,
         groupId: UUID,
-    ): GroupDto = findGroup(key, groupId).toDto()
+    ): GroupDto {
+        val g = findGroup(key, groupId)
+        val (startIds, finalIds) = lifecycleBoundaryIds(typeOf(key, g.type))
+        val hist = groupStatusHistories.findByGroupObjectIdOrderByCreatedAtAscIdAsc(g.objectId!!)
+        val memberIds = memberships.findByGroupObjectId(g.objectId!!).mapNotNull { it.itemObjectId }
+        val (firstStart, lastEnd) =
+            if (memberIds.isEmpty()) {
+                null to null
+            } else {
+                val pStatuses = statuses.findByProjectObjectIdOrderByPosition(g.projectObjectId)
+                val pStart = pStatuses.filter { it.statusType == StatusType.START }.mapNotNull { it.objectId }.toSet()
+                val pFinal = pStatuses.filter { it.statusType == StatusType.FINAL }.mapNotNull { it.objectId }.toSet()
+                val perItem =
+                    itemStatusHistories.findByItemObjectIdInOrderByCreatedAtAscIdAsc(memberIds).groupBy { it.itemObjectId }.values
+                perItem.mapNotNull { LifecycleTimes.startedAt(it, pStart) }.minOrNull() to
+                    perItem.mapNotNull { LifecycleTimes.completedAt(it, pFinal) }.maxOrNull()
+            }
+        return g.toDto().copy(
+            startedAt = GroupLifecycleTimes.startedAt(hist, startIds)?.toString(),
+            completedAt = GroupLifecycleTimes.completedAt(hist, finalIds)?.toString(),
+            firstItemStartedAt = firstStart?.toString(),
+            lastItemCompletedAt = lastEnd?.toString(),
+        )
+    }
+
+    /** YPJ-269(spec 0174):类型 workflow 的 START/FINAL 态 objectId 集(组生命周期派生边界)。 */
+    private fun lifecycleBoundaryIds(t: ItemGroupType): Pair<Set<UUID>, Set<UUID>> {
+        val sts = groupStatuses.findByGroupTypeIdOrderByPosition(t.id!!)
+        return sts.filter { it.statusType == StatusType.START }.mapNotNull { it.objectId }.toSet() to
+            sts.filter { it.statusType == StatusType.FINAL }.mapNotNull { it.objectId }.toSet()
+    }
+
+    /** YPJ-269(spec 0174):组状态史行——每次状态变更一行(SRS §3.1);source=created(建组初始)| action(动作端点)| cascade(父组联动/改父,仅实际变化时)。 */
+    private fun recordTransition(
+        t: ItemGroupType,
+        g: ItemGroup,
+        fromName: String?,
+        toName: String,
+        source: String,
+    ) {
+        val byName = groupStatuses.findByGroupTypeIdOrderByPosition(t.id!!).associateBy { it.name }
+        val to = byName[toName] ?: error("组状态不存在:$toName") // 名字来自同 workflow,缺失即数据破损(typeOfPid 同口径)
+        groupStatusHistories.save(
+            GroupStatusHistory(
+                groupObjectId = g.objectId!!,
+                fromGroupStatusObjectId = fromName?.let { byName[it]?.objectId },
+                toGroupStatusObjectId = to.objectId,
+                source = source,
+            ),
+        )
+    }
 
     /** PATCH name/日期/父组(spec 0097:status 改走动作端点;0113 增 parentGroupId,null=不动、无置空)。 */
     @Transactional
@@ -401,6 +470,7 @@ class ItemGroupService(
                     workflow.statusNameByType(typeOfPid(pid, oldParent.type), StatusType.START)?.let { startName ->
                         if (oldParent.status != startName) {
                             groups.save(oldParent.copy(status = startName, updatedAt = Instant.now()))
+                            recordTransition(typeOfPid(pid, oldParent.type), oldParent, fromName = oldParent.status, toName = startName, source = "cascade") // YPJ-269:改父回退史行
                             oldParent.parentObjectId?.let { recomputeParentStatus(pid, it) }
                         }
                     }
@@ -451,14 +521,15 @@ class ItemGroupService(
         // spec 0114:非叶层组状态由子组逐层联动推导,不开放手动动作
         if ((t.level ?: 0) > 1) throw ConflictException("父层组状态由子组联动,不支持手动动作")
         val target = workflow.applyAction(t, g.status, function)
-        val saved = groups.save(g.copy(status = target, updatedAt = Instant.now())).toDto()
+        val saved = groups.save(g.copy(status = target, updatedAt = Instant.now()))
+        recordTransition(t, saved, fromName = g.status, toName = target, source = "action") // YPJ-269:动作史行
         // spec 0110(YPJ-159):完成 + 处置同一事务——迁移已落库后逐行 replaceMembership,失败整体回滚(含状态迁移)
         // spec 0114:完成判定按语义「迁移至 FINAL」而非函数字面量——自定义工作流出边 fn=switch,处置同事务照走
         if (workflow.statusType(t, target) == StatusType.FINAL && request != null && request.dispositions.isNotEmpty()) {
             applyDispositions(g, request.dispositions)
         }
         propagateParent(g.copy(status = target))
-        return saved
+        return saved.toDto()
     }
 
     /** spec 0111:子组动作/删除后联动父组状态(同事务);0113 改父复用。定位父后交 recomputeParentStatus。 */
@@ -486,6 +557,7 @@ class ItemGroupService(
         if (workflow.statusType(parentType, parent.status) == wanted) return
         val targetName = workflow.statusNameByType(parentType, wanted) ?: return
         groups.save(parent.copy(status = targetName, updatedAt = Instant.now()))
+        recordTransition(parentType, parent, fromName = parent.status, toName = targetName, source = "cascade") // YPJ-269:联动史行
         // spec 0114:逐层级联到顶(本层变化才向上;不变则链上无新输入,截断)
         parent.parentObjectId?.let { recomputeParentStatus(pid, it) }
     }
@@ -693,7 +765,10 @@ class ItemGroupService(
 
     /** spec 0117:拉入自动开 sprint——planned 经 START 出边迁至 active(复用 workflow 白名单,同事务;无 start 出边的自定义拓扑 409,拉入拒)。 */
     private fun startGroup(g: ItemGroup): ItemGroup {
-        val target = workflow.applyAction(typeOfPid(g.projectObjectId, g.type), g.status, "start")
-        return groups.save(g.copy(status = target, updatedAt = Instant.now()))
+        val t = typeOfPid(g.projectObjectId, g.type)
+        val target = workflow.applyAction(t, g.status, "start")
+        val saved = groups.save(g.copy(status = target, updatedAt = Instant.now()))
+        recordTransition(t, saved, fromName = g.status, toName = target, source = "action") // YPJ-269:看板拉入自动激活也是真实 start(源仍 action,非推导)
+        return saved
     }
 }

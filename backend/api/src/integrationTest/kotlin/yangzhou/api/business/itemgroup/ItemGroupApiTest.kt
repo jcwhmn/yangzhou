@@ -3,6 +3,7 @@ package yangzhou.api.business.itemgroup
 import com.fasterxml.jackson.databind.JsonNode
 import org.springframework.test.web.servlet.client.RestTestClient
 import yangzhou.api.AbstractApiTest
+import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -393,5 +394,110 @@ class ItemGroupApiTest : AbstractApiTest() {
         val created = json.readTree(r.responseBody!!)
         assertEquals(2, created["level"].asInt())
         assertEquals(true, created["timed"].asBoolean())
+    }
+
+    // ---------- YPJ-269(spec 0174):生命周期派生 ----------
+
+    private fun patchStatus(
+        authed: RestTestClient,
+        itemId: String,
+        statusId: String,
+    ): Int = authed
+        .patch()
+        .uri("/api/items/$itemId")
+        .body(mapOf("statusItemId" to statusId))
+        .exchange()
+        .expectBody(String::class.java)
+        .returnResult()
+        .status
+        .value()
+
+    @Test
+    fun `生命周期派生——建组仅created_start_complete派生_reopen取最近_start保留首次`() {
+        val authed = bootstrapAndAuth()
+        createProject(authed, "LCG")
+        val s = createGroup(authed, "LCG", mapOf("typeKey" to "sprint", "name" to "LC"))
+        val gid = s["groupId"].asText()
+
+        // 建组:仅 created 史行,四派生值全 null
+        val d0 = get(authed, "/api/projects/LCG/groups/$gid")
+        assertTrue(d0["startedAt"].isNull)
+        assertTrue(d0["completedAt"].isNull)
+        assertTrue(d0["firstItemStartedAt"].isNull)
+        assertTrue(d0["lastItemCompletedAt"].isNull)
+
+        // start → startedAt 出现、completedAt 仍 null;complete → completedAt 出现
+        assertEquals(200, action(authed, "LCG", gid, "start").status.value())
+        val d1 = get(authed, "/api/projects/LCG/groups/$gid")
+        assertTrue(!d1["startedAt"].isNull)
+        assertTrue(d1["completedAt"].isNull)
+        assertEquals(200, action(authed, "LCG", gid, "complete").status.value())
+        val firstCompleted = get(authed, "/api/projects/LCG/groups/$gid")["completedAt"].asText()
+
+        // reopen→complete:completedAt 取最近(第二次);startedAt 保留首次迁出时刻(不覆写)
+        assertEquals(200, action(authed, "LCG", gid, "reopen").status.value())
+        assertEquals(200, action(authed, "LCG", gid, "complete").status.value())
+        val d2 = get(authed, "/api/projects/LCG/groups/$gid")
+        assertTrue(Instant.parse(d2["completedAt"].asText()).isAfter(Instant.parse(firstCompleted)))
+        assertEquals(d1["startedAt"].asText(), d2["startedAt"].asText())
+
+        // backward→start(组 B):startedAt 保留首次迁出 planned 时刻
+        val b = createGroup(authed, "LCG", mapOf("typeKey" to "sprint", "name" to "B"))
+        val bid = b["groupId"].asText()
+        action(authed, "LCG", bid, "start")
+        val b1 = get(authed, "/api/projects/LCG/groups/$bid")
+        assertEquals(200, action(authed, "LCG", bid, "backward").status.value())
+        assertEquals(200, action(authed, "LCG", bid, "start").status.value())
+        assertEquals(b1["startedAt"].asText(), get(authed, "/api/projects/LCG/groups/$bid")["startedAt"].asText())
+    }
+
+    @Test
+    fun `生命周期派生——首末item取直挂成员min_max_空成员恒null`() {
+        val authed = bootstrapAndAuth()
+        createProject(authed, "LCM")
+        val s = createGroup(authed, "LCM", mapOf("typeKey" to "sprint", "name" to "M"))
+        val gid = s["groupId"].asText()
+
+        // 空成员:组走完生命周期后首末 item 仍 null
+        assertEquals(200, action(authed, "LCM", gid, "start").status.value())
+        assertEquals(200, action(authed, "LCM", gid, "complete").status.value())
+        val dEmpty = get(authed, "/api/projects/LCM/groups/$gid")
+        assertTrue(dEmpty["firstItemStartedAt"].isNull)
+        assertTrue(dEmpty["lastItemCompletedAt"].isNull)
+
+        // 新组 + 直挂成员,推进 item 生命周期:迁出 START → 首 item 开始;迁入 FINAL → 末 item 完成
+        val m = createGroup(authed, "LCM", mapOf("typeKey" to "sprint", "name" to "M2"))
+        val mid = m["groupId"].asText()
+        action(authed, "LCM", mid, "start")
+        val id = createItem(authed, "LCM", "i1")["itemId"].asText()
+        authed
+            .put()
+            .uri("/api/items/$id/group-membership")
+            .body(mapOf("groupId" to mid))
+            .exchange()
+            .expectStatus()
+            .isOk()
+        // YPJ-280:转非起始态缺负责人 409——先指派再迁移(同 LifecycleTimeApiTest.seedd)
+        authed
+            .put()
+            .uri("/api/items/$id/assignee")
+            .body(mapOf("assigneeItemId" to meMemberId(authed)))
+            .exchange()
+            .expectStatus()
+            .isOk()
+        val proj = get(authed, "/api/projects/LCM")
+        val exitStartId = proj["statuses"][1]["statusId"].asText()
+        val finalId = proj["statuses"][4]["statusId"].asText()
+
+        assertEquals(200, patchStatus(authed, id, exitStartId))
+        val itemDto = get(authed, "/api/items/$id")
+        val dHalf = get(authed, "/api/projects/LCM/groups/$mid")
+        assertEquals(itemDto["startedAt"].asText(), dHalf["firstItemStartedAt"].asText())
+        assertTrue(dHalf["lastItemCompletedAt"].isNull)
+
+        assertEquals(200, patchStatus(authed, id, finalId))
+        val itemDone = get(authed, "/api/items/$id")
+        val dFull = get(authed, "/api/projects/LCM/groups/$mid")
+        assertEquals(itemDone["completedAt"].asText(), dFull["lastItemCompletedAt"].asText())
     }
 }

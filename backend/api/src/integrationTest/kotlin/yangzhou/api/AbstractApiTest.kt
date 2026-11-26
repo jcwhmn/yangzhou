@@ -85,6 +85,7 @@ abstract class AbstractApiTest {
             "project_repo",
             "time_entry",
             "item_type",
+            "group_status_history",
             "item_group_type",
             "item_group_member_history",
             "item_group_member",

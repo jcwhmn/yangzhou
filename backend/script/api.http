@@ -612,6 +612,11 @@ Authorization: Bearer {{token}}
 GET {{host}}/api/projects/{{pkey}}/groups/{{sprintId}}
 Authorization: Bearer {{token}}
 
+### 生命周期派生字段(YPJ-269/spec 0174):详情响应增 createdAt/startedAt/completedAt/firstItemStartedAt/lastItemCompletedAt——
+### 零物化,读时从 group_status_history 派生;列表端点恒 null;存量组开始/完成 "" (null)。上帧 start/complete 后重跑本节看值。
+GET {{host}}/api/projects/{{pkey}}/groups/{{sprintId}}
+Authorization: Bearer {{token}}
+
 ### 开始 Sprint(动作端点:planned→active;PATCH 不再管 status)
 POST {{host}}/api/projects/{{pkey}}/groups/{{sprintId}}/actions/start
 Authorization: Bearer {{token}}

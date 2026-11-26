@@ -12,6 +12,7 @@ import yangzhou.persistence.ChecklistItem
 import yangzhou.persistence.Comment
 import yangzhou.persistence.Favorite
 import yangzhou.persistence.GroupStatus
+import yangzhou.persistence.GroupStatusHistory
 import yangzhou.persistence.Item
 import yangzhou.persistence.ItemActivity
 import yangzhou.persistence.ItemAttribute
@@ -122,6 +123,11 @@ interface ItemStatusHistoryRepository : CrudRepository<ItemStatusHistory, Long> 
             ORDER BY h.item_object_id, h.created_at, h.id""",
     )
     fun forProject(projectId: UUID): List<ItemStatusHistory>
+}
+
+/** YPJ-269(spec 0174):组状态史——每次组状态变更一行(from null=初始进入);生命周期派生数据源。 */
+interface GroupStatusHistoryRepository : CrudRepository<GroupStatusHistory, Long> {
+    fun findByGroupObjectIdOrderByCreatedAtAscIdAsc(groupObjectId: UUID): List<GroupStatusHistory>
 }
 
 interface AttributeDefinitionRepository : CrudRepository<AttributeDefinition, Long> {
