@@ -245,6 +245,7 @@ class ItemGroupApiTest : AbstractApiTest() {
         assertEquals("leave", rows[0]["action"].asText())
         assertEquals("join", rows[1]["action"].asText())
         assertEquals("i1", rows[1]["itemTitle"].asText())
+        assertTrue(rows[1]["itemNumber"].asInt() > 0)
         assertEquals("created", rows[2]["source"].asText())
     }
 
@@ -257,7 +258,11 @@ class ItemGroupApiTest : AbstractApiTest() {
         // 模拟存量组:两张史表清空(端点空态,不报错)
         jdbc.update("delete from group_status_history where group_object_id = ?", java.util.UUID.fromString(gid))
         jdbc.update("delete from item_group_member_history where group_object_id = ?", java.util.UUID.fromString(gid))
-        assertEquals(0, get(authed, "/api/projects/GRP/groups/$gid/timeline").size())
+        // 纯空组:无史行也合成「创建」行(item_group.created_at,不造 from→to)
+        val synth = get(authed, "/api/projects/GRP/groups/$gid/timeline")
+        assertEquals(1, synth.size())
+        assertEquals("created", synth[0]["source"].asText())
+        assertTrue(synth[0]["to"] == null || synth[0]["to"].isNull)
 
         val r =
             authed

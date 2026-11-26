@@ -87,7 +87,8 @@ class ItemGroupService(
         val lastItemCompletedAt: String? = null,
     )
 
-    /** YPJ-284(spec 0175):组时间线行——kind=status(组迁移)/member(成员进出);统一时间列,DESC 出参。 */
+    /** YPJ-284(spec 0175):组时间线行——kind=status(组迁移)/member(成员进出);统一时间列,DESC 出参。
+     *  itemNumber 仅 member 行(item 成员);存量组无 created 史行时由后端合成创建行(to=null)。 */
     data class GroupTimelineDto(
         val objectId: UUID,
         val kind: String,
@@ -96,6 +97,7 @@ class ItemGroupService(
         val to: String? = null,
         val source: String? = null,
         val itemTitle: String? = null,
+        val itemNumber: Int? = null,
         val action: String? = null,
     )
 
@@ -422,12 +424,31 @@ class ItemGroupService(
                 ids.minus(titles.keys).takeIf { it.isNotEmpty() }?.let { groups.findAllByObjectIdIn(it) }
                     ?.associateBy { it.objectId }
             mh.forEach { m ->
-                val name = titles[m.itemObjectId]?.title ?: groupNames?.get(m.itemObjectId)?.name ?: "-"
-                rows += GroupTimelineDto(objectId = m.objectId, kind = "member", createdAt = m.addedAt.toString(), itemTitle = name, action = "join")
+                val it0 = titles[m.itemObjectId]
+                val name = it0?.title ?: groupNames?.get(m.itemObjectId)?.name ?: "-"
+                rows += GroupTimelineDto(
+                    objectId = m.objectId,
+                    kind = "member",
+                    createdAt = m.addedAt.toString(),
+                    itemTitle = name,
+                    itemNumber = it0?.number,
+                    action = "join",
+                )
                 m.removedAt?.let { rm ->
-                    rows += GroupTimelineDto(objectId = m.objectId, kind = "member", createdAt = rm.toString(), itemTitle = name, action = "leave")
+                    rows += GroupTimelineDto(
+                        objectId = m.objectId,
+                        kind = "member",
+                        createdAt = rm.toString(),
+                        itemTitle = name,
+                        itemNumber = it0?.number,
+                        action = "leave",
+                    )
                 }
             }
+        }
+        // 存量组无 created 史行:从实体 createdAt 合成创建行(不造 from→to,显示仅「创建」)
+        if (rows.none { it.source == "created" }) {
+            rows += GroupTimelineDto(objectId = g.objectId!!, kind = "status", createdAt = g.createdAt.toString(), source = "created")
         }
         return rows.sortedWith(compareByDescending { it.createdAt })
     }

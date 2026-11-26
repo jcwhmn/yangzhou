@@ -14,6 +14,7 @@ type Row = {
   to?: string | null;
   source?: string | null;
   itemTitle?: string | null;
+  itemNumber?: number | null;
   action?: string | null; // join | leave
 };
 
@@ -57,8 +58,12 @@ export function GroupHistoryLog({
           <Typography key={r.objectId} variant="caption" color="text.secondary">
             {fmtDateTime(r.createdAt)} ·{" "}
             {r.kind === "member"
-              ? `成员 · ${r.action === "leave" ? "−" : "+"} ${r.itemTitle ?? "—"}`
-              : `${SOURCE_ZH[r.source ?? ""] ?? r.source} · ${r.from ?? "—"} → ${r.to}`}
+              ? `成员 · ${r.action === "leave" ? "−" : "+"} ${
+                  r.itemNumber != null ? `${projectKey}-${r.itemNumber} ` : ""
+                }${r.itemTitle ?? "—"}`
+              : r.to
+                ? `${SOURCE_ZH[r.source ?? ""] ?? r.source} · ${r.from ?? "—"} → ${r.to}`
+                : (SOURCE_ZH[r.source ?? ""] ?? r.source ?? "")}
           </Typography>
         ))}
         {rows !== null && rows.length === 0 && (

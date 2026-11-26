@@ -363,7 +363,7 @@
 
 | # | 场景 | 操作 | 期望 |
 |---|---|---|---|
-| M-284-1 | 时间线 DESC | 新建组 → 加成员 → start → complete → reopen → 看详情页下方 | 「时间线」从上到下:操作(completed→active)、操作(active→completed)、操作(planned→active)、成员 · + item、创建(planned) |
-| M-284-2 | 成员移出 | 把成员移出组(回 backlog) | 顶部出现「成员 · − item」行 |
-| M-284-3 | 存量组 | 打开本票上线前建的旧组 | 成员史(2026-10-12 起)使时间线非空;无迁移史的组不显「操作」行,页面无异常;纯空组显「暂无记录」 |
+| M-284-1 | 时间线 DESC | 新建组 → 加成员 → start → complete → reopen → 看详情页下方 | 「时间线」从上到下:操作(completed→active)、操作(active→completed)、操作(planned→active)、成员 · + YPJ-N item名、创建(planned) |
+| M-284-2 | 成员移出 | 把成员移出组(回 backlog) | 顶部出现「成员 · − YPJ-N item名」行 |
+| M-284-3 | 存量组 | 打开本票上线前建的旧组 | 成员史(2026-10-12 起)使时间线非空;底部有「创建」行(取自 item_group.created_at,无 from→to);页面无异常 |
 | M-284-4 | 级联可见性 | 子组改挂到别的父 → 看旧父组详情历史段(或:子组动作触发父组联动) | cascade 迁移行,标签「联动」 |

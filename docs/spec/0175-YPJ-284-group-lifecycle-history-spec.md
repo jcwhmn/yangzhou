@@ -30,18 +30,20 @@ data class GroupTimelineDto(
     val source: String? = null,// status 行;created/action/cascade
     val itemTitle: String? = null, // member 行;item 已删兜底 "-"
     val action: String? = null,    // member 行;join/leave
+    val itemNumber: Int? = null,   // member 行;item 编号(前端拼 code,子组成员无)
 )
 ```
 
 - 排序:统一按 createdAt **DESC**(后进先见,用户拍板);同刻 tie-break 依赖稳定排序(状态行先于成员行入列)。
 - 404:组不存在(对齐组详情)。
+- **创建行兜底**:存量组无 created 史行时,后端从 `item_group.created_at` 合成创建行(source=created,to=null,不造 from→to)——时间线恒含组创建时刻(2026-11-27 用户反馈)。
 
 ## 展示口径
 
 - 区块:详情页下方全宽,标题「时间线」,镜像 item ActivityTab 形态(caption 行,~40 行组件);
-- 行文案:`{时间} · {source中文:创建/操作/联动} · {from ?? "—"} → {to}`(status);`{时间} · 成员 · + {itemTitle}` / `− {itemTitle}`(member);
+- 行文案:`{时间} · {source中文:创建/操作/联动} · {from ?? "—"} → {to}`(status,创建合成行无箭头段);`{时间} · 成员 · + {KEY}-{编号} {item名}` / `− …`(member,item code 必带,2026-11-27 用户反馈「最重要」);
 - 触发重拉:组件自取数,依赖页面 `sprintVer`(数据变更信号;成员进出路径补 bump);
-- 空态:无任何行(纯存量组)显示「暂无记录」,不报错;取数失败同空态兜底。
+- 空态:合成创建行后时间线恒非空;「暂无记录」仅取数失败时可见,不报错。
 
 ## 数据源覆盖(2026-11-26 prod 实锤)
 
@@ -54,6 +56,6 @@ data class GroupTimelineDto(
 ## 验收清单
 
 - [ ] 时间线 DESC:后发生的行在上;覆盖 start/complete/reopen 全动作
-- [ ] 成员进出行:加入/移出各一行,带 item 名;存量组(仅成员史)即有数据
-- [ ] 空态文案,页面无异常;未知组 404
+- [ ] 成员进出行:加入/移出各一行,带 **item code(编号)** 与名;存量组即有数据
+- [ ] 创建行恒在:新组走史行,存量组合成;页面无异常;未知组 404
 - [ ] 改动限 itemgroup slice + sprint 详情页,不动 item 侧
