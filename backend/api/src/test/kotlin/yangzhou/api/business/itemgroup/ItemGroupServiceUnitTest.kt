@@ -10,10 +10,12 @@ import org.springframework.dao.DataIntegrityViolationException
 import yangzhou.api.error.BadRequestException
 import yangzhou.api.error.ConflictException
 import yangzhou.api.error.NotFoundException
+import yangzhou.persistence.GroupStatus
 import yangzhou.persistence.ItemGroup
 import yangzhou.persistence.ItemGroupMember
 import yangzhou.persistence.ItemGroupType
 import yangzhou.persistence.Project
+import yangzhou.persistence.StatusType
 import yangzhou.persistence.repository.ItemGroupMemberHistoryRepository
 import yangzhou.persistence.repository.ItemGroupMemberRepository
 import yangzhou.persistence.repository.ItemGroupRepository
@@ -37,9 +39,13 @@ class ItemGroupServiceUnitTest {
     private val itemRepo = mockk<ItemRepository>(relaxed = true)
     private val itemService = mockk<yangzhou.api.business.item.ItemService>(relaxed = true)
     private val memberHistory = mockk<ItemGroupMemberHistoryRepository>(relaxed = true)
+    private val groupStatuses = mockk<yangzhou.persistence.repository.GroupStatusRepository>(relaxed = true)
+    private val groupStatusHistories = mockk<yangzhou.persistence.repository.GroupStatusHistoryRepository>(relaxed = true)
+    private val itemStatusHistories = mockk<yangzhou.persistence.repository.ItemStatusHistoryRepository>(relaxed = true)
+    private val statuses = mockk<yangzhou.persistence.repository.StatusRepository>(relaxed = true)
 
     private val service =
-        ItemGroupService(leaderGuard, projects, types, workflow, groups, memberships, itemRepo, itemService, memberHistory, Clock.systemUTC())
+        ItemGroupService(leaderGuard, projects, types, workflow, groups, memberships, itemRepo, itemService, memberHistory, groupStatuses, groupStatusHistories, itemStatusHistories, statuses, Clock.systemUTC())
 
     private val project = Project(id = 1L, objectId = UUID(0, 1), workspaceObjectId = UUID(0, 9), key = "CHE", name = "CHE")
     private val sprintType = ItemGroupType(id = 1L, objectId = UUID(0, 2), projectObjectId = UUID(0, 1), typeKey = "sprint", name = "Sprint", level = 1, timed = true, builtin = false)
@@ -58,7 +64,7 @@ class ItemGroupServiceUnitTest {
 
     @BeforeEach
     fun setup() {
-        clearMocks(leaderGuard, projects, types, workflow, groups, memberships, itemRepo, itemService, memberHistory)
+        clearMocks(leaderGuard, projects, types, workflow, groups, memberships, itemRepo, itemService, memberHistory, groupStatuses, groupStatusHistories, itemStatusHistories, statuses)
         every { projects.findByKey("CHE") } returns project
         every { types.findByProjectObjectIdAndTypeKey(UUID(0, 1), "sprint") } returns sprintType
         every { types.findByProjectObjectIdAndTypeKey(UUID(0, 1), "phase") } returns phaseType
@@ -67,6 +73,13 @@ class ItemGroupServiceUnitTest {
         every { groups.findByProjectObjectIdOrderByCreatedAt(UUID(0, 1)) } returns listOf(group("S1"), group("P1", "phase"))
         every { groups.findByProjectObjectIdAndObjectId(UUID(0, 1), any()) } answers { group("S1") }
         every { workflow.startStatusName(any()) } returns "planned"
+        every { groupStatusHistories.save(any()) } answers { firstArg() } // 泛型 save relaxed 返回 Object 会 CCE,显式回传 firstArg
+        // YPJ-269:recordTransition 依 workflow 态名解析 objectId,单测给 sprint 型三态种子
+        every { groupStatuses.findByGroupTypeIdOrderByPosition(any()) } returns listOf(
+            GroupStatus(groupTypeId = 1L, name = "planned", statusType = StatusType.START),
+            GroupStatus(groupTypeId = 1L, name = "active", statusType = StatusType.ACTIVE),
+            GroupStatus(groupTypeId = 1L, name = "completed", statusType = StatusType.FINAL),
+        )
         every { workflow.finalStatusNames(any()) } returns setOf("completed")
         every { itemService.get(any()) } returns mockk()
         // relaxed mock 的泛型 save 返回 Object 代理会 CCE,显式回传首参
