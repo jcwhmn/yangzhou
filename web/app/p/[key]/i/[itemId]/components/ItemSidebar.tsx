@@ -180,48 +180,44 @@ export function ItemSidebar({
         )}
       </Stack>
 
-      {/* 计划起止(YPJ-218:父持子时间线 → 四框禁用) */}
+      {/* 计划起止(YPJ-218:父持子时间线 → 四框禁用;DateInput 段宽固定+双图标≥188px,280 栏内竖排各占满宽) */}
       <Stack spacing={1} sx={{ mt: 2 }}>
-        <Stack direction="row" spacing={1}>
-          <DateInput
-            label="开始日期"
-            size="small"
-            value={startDate}
-            onChange={onStartDate}
-            sx={{ width: 130 }}
-            disabled={timelineLocked}
-          />
-          <TextField
-            label="开始时刻"
-            size="small"
-            type="time"
-            value={startTime}
-            onChange={(e) => onStartTime(e.target.value)}
-            sx={{ width: 118 }}
-            slotProps={{ inputLabel: { shrink: true } }}
-            disabled={timelineLocked}
-          />
-        </Stack>
-        <Stack direction="row" spacing={1}>
-          <DateInput
-            label="截止日期"
-            size="small"
-            value={dueDate}
-            onChange={onDueDate}
-            sx={{ width: 130 }}
-            disabled={timelineLocked}
-          />
-          <TextField
-            label="截止时刻"
-            size="small"
-            type="time"
-            value={dueTime}
-            onChange={(e) => onDueTime(e.target.value)}
-            sx={{ width: 118 }}
-            slotProps={{ inputLabel: { shrink: true } }}
-            disabled={timelineLocked}
-          />
-        </Stack>
+        <DateInput
+          label="开始日期"
+          size="small"
+          value={startDate}
+          onChange={onStartDate}
+          sx={{ width: "100%" }}
+          disabled={timelineLocked}
+        />
+        <TextField
+          label="开始时刻"
+          size="small"
+          type="time"
+          value={startTime}
+          onChange={(e) => onStartTime(e.target.value)}
+          sx={{ width: "100%" }}
+          slotProps={{ inputLabel: { shrink: true } }}
+          disabled={timelineLocked}
+        />
+        <DateInput
+          label="截止日期"
+          size="small"
+          value={dueDate}
+          onChange={onDueDate}
+          sx={{ width: "100%" }}
+          disabled={timelineLocked}
+        />
+        <TextField
+          label="截止时刻"
+          size="small"
+          type="time"
+          value={dueTime}
+          onChange={(e) => onDueTime(e.target.value)}
+          sx={{ width: "100%" }}
+          slotProps={{ inputLabel: { shrink: true } }}
+          disabled={timelineLocked}
+        />
         {timelineLocked && (
           <Typography variant="caption" color="text.secondary">
             已有子项,时间线由子项汇总
