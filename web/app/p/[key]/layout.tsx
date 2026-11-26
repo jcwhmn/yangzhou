@@ -37,6 +37,7 @@ import { ProjectSettingsDialog } from "@/components/ProjectSettingsDialog";
 import {
   ProjectToolbar,
   ProjectToolbarContext,
+  ToolbarActions,
 } from "@/components/ProjectToolbar";
 import {
   Category as CategoryIcon,
@@ -633,14 +634,36 @@ export default function ProjectLayout({
             minWidth: 0,
             display: "flex",
             flexDirection: "column",
+            position: "relative",
           }}
         >
-          <ProjectToolbar
-            projectKey={String(key)}
-            fav={fav}
-            onToggleFav={toggleFav}
-            onOpenSettings={() => setSettingsHubOpen(true)}
-          />
+          {/* YPJ-276:详情页不占流——右簇浮到右上角,右栏顶到原横条位;其余页(quick-add 槽)保持整条 */}
+          {/^\/p\/[^/]+\/i\/[^/]+$/.test(pathname) ? (
+            <Box
+              sx={{
+                position: "absolute",
+                top: 8,
+                right: 16,
+                zIndex: 1,
+                bgcolor: "background.paper",
+                borderRadius: 1,
+              }}
+            >
+              <ToolbarActions
+                projectKey={String(key)}
+                fav={fav}
+                onToggleFav={toggleFav}
+                onOpenSettings={() => setSettingsHubOpen(true)}
+              />
+            </Box>
+          ) : (
+            <ProjectToolbar
+              projectKey={String(key)}
+              fav={fav}
+              onToggleFav={toggleFav}
+              onOpenSettings={() => setSettingsHubOpen(true)}
+            />
+          )}
           <Box sx={{ flex: 1, minWidth: 0 }}>{children}</Box>
         </Box>
         <Dialog

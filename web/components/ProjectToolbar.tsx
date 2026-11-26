@@ -20,6 +20,50 @@ export function useProjectToolbarSlot() {
   return useContext(ProjectToolbarContext);
 }
 
+export function ToolbarActions({
+  projectKey,
+  fav,
+  onToggleFav,
+  onOpenSettings,
+}: {
+  projectKey: string;
+  fav: boolean | null;
+  onToggleFav: () => void;
+  onOpenSettings: () => void;
+}) {
+  return (
+    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+      <MuiLink
+        component={Link}
+        href={`/p/${projectKey}/time`}
+        underline="hover"
+        variant="body2"
+      >
+        {t.toolbar.time}
+      </MuiLink>
+      <IconButton
+        size="small"
+        aria-label="favorite"
+        disabled={fav === null}
+        onClick={onToggleFav}
+      >
+        {fav ? (
+          <StarIcon fontSize="small" />
+        ) : (
+          <StarBorderIcon fontSize="small" />
+        )}
+      </IconButton>
+      <IconButton
+        size="small"
+        aria-label={t.settings.title}
+        onClick={onOpenSettings}
+      >
+        <SettingsOutlinedIcon fontSize="small" />
+      </IconButton>
+    </Box>
+  );
+}
+
 export function ProjectToolbar({
   projectKey,
   fav,
@@ -54,35 +98,12 @@ export function ProjectToolbar({
           gap: 1,
         }}
       />
-      <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-        <MuiLink
-          component={Link}
-          href={`/p/${projectKey}/time`}
-          underline="hover"
-          variant="body2"
-        >
-          {t.toolbar.time}
-        </MuiLink>
-        <IconButton
-          size="small"
-          aria-label="favorite"
-          disabled={fav === null}
-          onClick={onToggleFav}
-        >
-          {fav ? (
-            <StarIcon fontSize="small" />
-          ) : (
-            <StarBorderIcon fontSize="small" />
-          )}
-        </IconButton>
-        <IconButton
-          size="small"
-          aria-label={t.settings.title}
-          onClick={onOpenSettings}
-        >
-          <SettingsOutlinedIcon fontSize="small" />
-        </IconButton>
-      </Box>
+      <ToolbarActions
+        projectKey={projectKey}
+        fav={fav}
+        onToggleFav={onToggleFav}
+        onOpenSettings={onOpenSettings}
+      />
     </Box>
   );
 }
