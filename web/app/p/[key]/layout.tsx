@@ -634,7 +634,10 @@ export default function ProjectLayout({
             minWidth: 0,
             display: "flex",
             flexDirection: "column",
-            position: "relative",
+            // 浮动右簇的定位基准;仅详情页需要(其余页不做全局 side effect)
+            position: /^\/p\/[^/]+\/i\/[^/]+$/.test(pathname)
+              ? "relative"
+              : undefined,
           }}
         >
           {/* YPJ-276:详情页不占流——右簇浮到右上角,右栏顶到原横条位;其余页(quick-add 槽)保持整条 */}
