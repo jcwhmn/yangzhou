@@ -8,6 +8,12 @@ export type Sprint = {
   endDate: string | null;
   parentGroupId: string | null;
   typeKey: string;
+  /** YPJ-269(spec 0174):生命周期派生值,GET /groups/{id} 读时算;列表端点恒 null。 */
+  createdAt: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  firstItemStartedAt: string | null;
+  lastItemCompletedAt: string | null;
 };
 export type Item = {
   itemId: string;

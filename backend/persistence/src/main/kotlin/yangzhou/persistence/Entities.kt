@@ -111,6 +111,20 @@ data class ItemStatusHistory(
     var updatedByObjectId: UUID? = null,
 )
 
+@Table("group_status_history")
+data class GroupStatusHistory(
+    @Id val id: Long? = null,
+    val objectId: UUID = UUID.randomUUID(),
+    val groupObjectId: UUID,
+    val fromGroupStatusObjectId: UUID? = null,
+    val toGroupStatusObjectId: UUID,
+    val source: String,
+    @CreatedDate
+    var createdAt: Instant = Instant.now(),
+    @LastModifiedDate
+    var updatedAt: Instant = Instant.now(),
+)
+
 @Table("comment")
 data class Comment(
     @Id val id: Long? = null,

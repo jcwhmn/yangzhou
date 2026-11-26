@@ -12,6 +12,12 @@ export type Sprint = {
   parentGroupId: string | null;
   /** spec 0114:组类型 key——详情页按自身层位找 L+1 候选/workflow。 */
   typeKey: string;
+  /** YPJ-269(spec 0174):生命周期派生值,GET /groups/{id} 读时算;列表端点恒 null。 */
+  createdAt: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  firstItemStartedAt: string | null;
+  lastItemCompletedAt: string | null;
 };
 
 /** spec 0112:树节点(非叶层组带 isParent 标记)。 */
@@ -41,6 +47,11 @@ type GroupDto = {
   startDate: string | null;
   endDate: string | null;
   parentGroupId: string | null;
+  createdAt: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  firstItemStartedAt: string | null;
+  lastItemCompletedAt: string | null;
 };
 
 type GroupTypeDto = { typeKey: string; name: string; level: number | null };
@@ -70,6 +81,11 @@ function toSprint(g: GroupDto): Sprint {
     endDate: g.endDate,
     parentGroupId: g.parentGroupId,
     typeKey: g.typeKey,
+    createdAt: g.createdAt,
+    startedAt: g.startedAt,
+    completedAt: g.completedAt,
+    firstItemStartedAt: g.firstItemStartedAt,
+    lastItemCompletedAt: g.lastItemCompletedAt,
   };
 }
 
