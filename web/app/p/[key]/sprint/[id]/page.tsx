@@ -335,6 +335,7 @@ export default function SprintPage() {
       }
       setAddOpen(false);
       setItems(await api<Item[]>(`/api/projects/${key}/groups/${id}/items`));
+      sprintVer.current += 1; // YPJ-284:成员进出影响时间线,信号重拉
     } catch (e) {
       setError(e instanceof Error ? e.message : "更新失败");
     } finally {
@@ -475,11 +476,11 @@ export default function SprintPage() {
               }
             />
           </Box>
-          {/* YPJ-284:详情页下方简版历史段(仿 item ActivityTab);status 变化重拉,存量组空态 */}
+          {/* YPJ-284(spec 0175):详情页下方时间线(组迁移+成员进出);ver bump 重拉,存量组经成员史即有数据 */}
           <GroupHistoryLog
             projectKey={key}
             groupId={id}
-            status={sprint.status}
+            ver={sprintVer.current}
           />
         </>
       )}

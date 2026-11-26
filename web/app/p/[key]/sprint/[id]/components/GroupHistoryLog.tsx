@@ -1,6 +1,6 @@
 "use client";
-// YPJ-284:组状态迁移时间线(仿 item ActivityTab 简版,~40 行 caption 行)。
-// 自取数 + 依赖 status 变化重拉(动作后页面已重拉详情,status 必变);ASC 时间线,存量组空态兜底。
+// YPJ-284(spec 0175):组时间线(仿 item ActivityTab 简版)——组迁移 + 成员进出,DESC 后进先见。
+// 自取数;ver=页面数据版本号(sprintVer),任何影响时间线的动作都会 bump → 重拉。存量组经成员史即有数据,纯空显示空态。
 import { useEffect, useState } from "react";
 import { Box, Stack, Typography } from "@mui/material";
 import { api } from "@/lib/api";
@@ -8,10 +8,13 @@ import { fmtDateTime } from "@/components/FactRow";
 
 type Row = {
   objectId: string;
-  from: string | null;
-  to: string;
-  source: string;
+  kind: string; // status | member
   createdAt: string;
+  from?: string | null;
+  to?: string | null;
+  source?: string | null;
+  itemTitle?: string | null;
+  action?: string | null; // join | leave
 };
 
 /** 文案外置:source 中文标签(created=建组初始/action=动作/cascade=联动,SRS §3.1)。 */
@@ -24,16 +27,16 @@ const SOURCE_ZH: Record<string, string> = {
 export function GroupHistoryLog({
   projectKey,
   groupId,
-  status,
+  ver,
 }: {
   projectKey: string;
   groupId: string;
-  status?: string;
+  ver: number;
 }) {
   const [rows, setRows] = useState<Row[] | null>(null);
   useEffect(() => {
     let alive = true;
-    api<Row[]>(`/api/projects/${projectKey}/groups/${groupId}/status-history`)
+    api<Row[]>(`/api/projects/${projectKey}/groups/${groupId}/timeline`)
       .then((r) => {
         if (alive) setRows(r);
       })
@@ -43,22 +46,24 @@ export function GroupHistoryLog({
     return () => {
       alive = false;
     };
-  }, [projectKey, groupId, status]);
+  }, [projectKey, groupId, ver]);
   return (
     <Box sx={{ mt: 3 }}>
       <Typography variant="h6" gutterBottom>
-        状态迁移
+        时间线
       </Typography>
       <Stack spacing={0.5}>
         {(rows ?? []).map((r) => (
           <Typography key={r.objectId} variant="caption" color="text.secondary">
-            {fmtDateTime(r.createdAt)} · {SOURCE_ZH[r.source] ?? r.source} ·{" "}
-            {r.from ?? "—"} → {r.to}
+            {fmtDateTime(r.createdAt)} ·{" "}
+            {r.kind === "member"
+              ? `成员 · ${r.action === "leave" ? "−" : "+"} ${r.itemTitle ?? "—"}`
+              : `${SOURCE_ZH[r.source ?? ""] ?? r.source} · ${r.from ?? "—"} → ${r.to}`}
           </Typography>
         ))}
         {rows !== null && rows.length === 0 && (
           <Typography variant="caption" color="text.secondary">
-            暂无迁移记录
+            暂无记录
           </Typography>
         )}
       </Stack>

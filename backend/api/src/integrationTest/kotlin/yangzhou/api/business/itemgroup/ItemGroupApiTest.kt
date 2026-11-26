@@ -208,7 +208,7 @@ class ItemGroupApiTest : AbstractApiTest() {
     }
 
     @Test
-    fun `组状态迁移时间线——ASC_全动作_名称解析`() {
+    fun `组时间线——DESC_全动作_名称解析`() {
         val authed = bootstrapAndAuth()
         createProject(authed, "GRP")
         val s = createGroup(authed, "GRP", mapOf("typeKey" to "sprint", "name" to "S1"))
@@ -217,33 +217,52 @@ class ItemGroupApiTest : AbstractApiTest() {
         action(authed, "GRP", gid, "complete")
         action(authed, "GRP", gid, "reopen")
 
-        val rows = get(authed, "/api/projects/GRP/groups/$gid/status-history")
+        val rows = get(authed, "/api/projects/GRP/groups/$gid/timeline")
         assertEquals(4, rows.size())
-        // 初始进入 + start/complete/reopen 依次追加;状态名已解析,from=null=初始进入
-        assertEquals("planned", rows[0]["to"].asText())
-        assertEquals("created", rows[0]["source"].asText())
-        assertEquals("planned", rows[1]["from"].asText())
-        assertEquals("active", rows[1]["to"].asText())
-        assertEquals("completed", rows[2]["to"].asText())
-        assertEquals("active", rows[3]["to"].asText()) // 0108:reopen=completed→active(重开撤销内部收尾判断)
-        // ASC:created_at 非降
-        assertTrue(rows[0]["createdAt"].asText() <= rows[3]["createdAt"].asText())
+        // DESC:后进先见——reopen/complete/start/创建 依次向下
+        assertEquals("status", rows[0]["kind"].asText())
+        assertEquals("active", rows[0]["to"].asText()) // 0108:reopen=completed→active(重开撤销内部收尾判断)
+        assertEquals("completed", rows[1]["to"].asText())
+        assertEquals("planned", rows[2]["from"].asText())
+        assertEquals("created", rows[3]["source"].asText())
+        assertEquals("planned", rows[3]["to"].asText())
+        // DESC:后发生的在上
+        assertTrue(rows[0]["createdAt"].asText() >= rows[3]["createdAt"].asText())
     }
 
     @Test
-    fun `组状态史——无史存量组空数组_未知组404`() {
+    fun `组时间线——成员进出_join_leave_带名`() {
         val authed = bootstrapAndAuth()
         createProject(authed, "GRP")
         val s = createGroup(authed, "GRP", mapOf("typeKey" to "sprint", "name" to "S1"))
         val gid = s["groupId"].asText()
-        // 模拟 V72 前存量组:史行清空(端点空态,不报错)
+        val it1 = createItem(authed, "GRP", "i1", estimate = true)["itemId"].asText()
+        assign(authed, it1, gid, "sprint")
+        assign(authed, it1, null, "sprint") // groupId=null+type=摘除
+
+        val rows = get(authed, "/api/projects/GRP/groups/$gid/timeline")
+        assertEquals(3, rows.size()) // leave, join, created(DESC)
+        assertEquals("leave", rows[0]["action"].asText())
+        assertEquals("join", rows[1]["action"].asText())
+        assertEquals("i1", rows[1]["itemTitle"].asText())
+        assertEquals("created", rows[2]["source"].asText())
+    }
+
+    @Test
+    fun `组时间线——无史存量组空数组_未知组404`() {
+        val authed = bootstrapAndAuth()
+        createProject(authed, "GRP")
+        val s = createGroup(authed, "GRP", mapOf("typeKey" to "sprint", "name" to "S1"))
+        val gid = s["groupId"].asText()
+        // 模拟存量组:两张史表清空(端点空态,不报错)
         jdbc.update("delete from group_status_history where group_object_id = ?", java.util.UUID.fromString(gid))
-        assertEquals(0, get(authed, "/api/projects/GRP/groups/$gid/status-history").size())
+        jdbc.update("delete from item_group_member_history where group_object_id = ?", java.util.UUID.fromString(gid))
+        assertEquals(0, get(authed, "/api/projects/GRP/groups/$gid/timeline").size())
 
         val r =
             authed
                 .get()
-                .uri("/api/projects/GRP/groups/${java.util.UUID.randomUUID()}/status-history")
+                .uri("/api/projects/GRP/groups/${java.util.UUID.randomUUID()}/timeline")
                 .exchange()
                 .expectBody(String::class.java)
                 .returnResult()
