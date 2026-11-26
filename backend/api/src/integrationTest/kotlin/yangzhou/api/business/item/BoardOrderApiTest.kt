@@ -140,4 +140,100 @@ class BoardOrderApiTest : AbstractApiTest() {
                 .get("c")
         assertEquals(0L, cnt)
     }
+
+    // ---------- YPJ-285:可见口径对齐(planned 组成员不上板,不参与交换与物化) ----------
+
+    private fun createSprint(
+        authed: RestTestClient,
+        key: String,
+        name: String,
+        start: Boolean,
+    ): String {
+        val gid =
+            json
+                .readTree(
+                    authed
+                        .post()
+                        .uri("/api/projects/$key/groups")
+                        .body(mapOf("typeKey" to "sprint", "name" to name))
+                        .exchange()
+                        .expectStatus()
+                        .isCreated()
+                        .expectBody(String::class.java)
+                        .returnResult()
+                        .responseBody!!,
+                )["groupId"]
+                .asText()
+        if (start) {
+            authed
+                .post()
+                .uri("/api/projects/$key/groups/$gid/actions/start")
+                .exchange()
+                .expectStatus()
+                .isOk()
+        }
+        return gid
+    }
+
+    private fun assignGroup(
+        authed: RestTestClient,
+        itemId: String,
+        groupId: String,
+    ) {
+        authed
+            .put()
+            .uri("/api/items/$itemId/group-membership")
+            .body(mapOf("groupId" to groupId))
+            .exchange()
+            .expectStatus()
+            .isOk()
+    }
+
+    @Test
+    fun `planned组成员不上板_不参与交换与物化`() {
+        val authed = bootstrapAndAuth()
+        createProject(authed, "BOV")
+        val s1 = createSprint(authed, "BOV", "S1", start = true)
+        val s2 = createSprint(authed, "BOV", "S2", start = false)
+        val a = createItem(authed, "BOV", "a")["itemId"].asText()
+        val b = createItem(authed, "BOV", "b")["itemId"].asText()
+        val x = createItem(authed, "BOV", "x")["itemId"].asText()
+        assignGroup(authed, a, s1)
+        assignGroup(authed, b, s1)
+        assignGroup(authed, x, s2)
+
+        // b 上移:可见集只有 a,b(x ∈ planned 组,不可见不参与)——响应不含 x,x 也不被物化
+        val r = orderedOf(authed, "BOV", b, "up")
+        assertEquals(listOf(b to 0, a to 1), r)
+
+        val xRow =
+            jdbc
+                .queryForMap("select count(*) as c from board_item_order where item_object_id = '$x'")
+                .get("c")
+        assertEquals(0L, xRow)
+    }
+
+    @Test
+    fun `非法dir报错由enum字面量生成`() {
+        val authed = bootstrapAndAuth()
+        createProject(authed, "BO6", seedSprint = false)
+        val id = createItem(authed, "BO6", "a")["itemId"].asText()
+        authed
+            .put()
+            .uri("/api/items/$id/board-membership")
+            .body(mapOf("onBoard" to true))
+            .exchange()
+            .expectStatus()
+            .isOk()
+        val body =
+            json.readTree(
+                move(authed, "BO6", id, "left")
+                    .expectStatus()
+                    .isBadRequest()
+                    .expectBody(String::class.java)
+                    .returnResult()
+                    .responseBody!!,
+            )
+        assertTrue(body["message"].asText().contains("允许:up/down"))
+    }
 }
