@@ -70,6 +70,10 @@ create index idx_group_status_history_group on group_status_history (group_objec
 
 ## ③ 手工测试用例(落档 docs/testing/manual-test-cases.md)
 
+### 口径修订(2026-11-26 用户拍板,As-built 前置)
+
+存量组不留白:实际开始回落首 item 开始;FINAL 组实际完成回落末 item 完成;执行时长两态(FINAL=完成区间,进行中=已进行 now−开始)。回落在前端 GroupSidebar 组装(后端四派生字段不变);组是否 FINAL 由页内 workflow FINAL 态名判定。
+
 ### 操作流程(状态×动作真值表,用户视角)
 
 | 状态 | 用户动作 | 侧栏变化 |
