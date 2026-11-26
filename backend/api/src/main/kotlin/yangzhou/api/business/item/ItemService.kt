@@ -7,6 +7,7 @@ import yangzhou.api.business.workday.WorkdayCalculator
 import yangzhou.api.error.BadRequestException
 import yangzhou.api.error.ConflictException
 import yangzhou.api.error.NotFoundException
+import yangzhou.api.general.DisplayEnum
 import yangzhou.persistence.Item
 import yangzhou.persistence.ItemActivity
 import yangzhou.persistence.ItemGroupMember
@@ -220,21 +221,23 @@ class ItemService(
         return get(item.objectId)
     }
 
-    /** YPJ-238(spec 0166 §3.1):看板列内箭头排序——与相邻项交换位次,至多 2 行 position 写;响应带该列全序。 */
+    /** YPJ-238(spec 0166 §3.1):看板列内箭头排序——与相邻项交换位次,至多 2 行 position 写;响应带该列全序。
+     * YPJ-285:可见口径对齐看板展示(仅 active sprint 成员 ∨ onBoard)——planned 组成员不上板,不参与交换。 */
     @Transactional
     fun moveBoardOrder(
         projectKey: String,
         itemId: UUID,
         dir: String,
     ): MoveBoardOrderResponse {
-        if (dir != "up" && dir != "down") throw BadRequestException("dir 非法:$dir(仅 up/down)")
+        val direction = DisplayEnum.parse<BoardMoveDirection>(dir)
         val project = projects.findByKey(projectKey) ?: throw NotFoundException("项目不存在:$projectKey")
         val item = itemRepo.findByObjectId(itemId) ?: throw NotFoundException("item 不存在:$itemId")
         if (item.projectObjectId != project.objectId) throw NotFoundException("item 不属于该项目:$itemId")
         // 列 = 该 item 当前 status 的看板可见子集;buildCtx 按传入列表取成员关系,不扫全项目
         val column = itemRepo.findByProjectObjectIdAndStatusObjectId(project.objectId!!, item.statusObjectId)
         val ctx = buildCtx(project, column)
-        val visible = column.filter { it.onBoard || it.objectId in ctx.currentSprint }
+        // YPJ-285:currentSprint 含 planned 成员(backlog 谓词语义),但看板只展示 active 成员(spec 0117)——交换判定必须对齐展示口径
+        val visible = column.filter { it.onBoard || ctx.currentSprint[it.objectId]?.status == "active" }
         val rowList = boardOrders.findByItemObjectIdIn(visible.mapNotNull { it.objectId })
         val rows = rowList.associateBy { it.itemObjectId }
         // 显示序(含未排:沉底按编号);边界/交换判定一律基于此列表,不用未排序的 visible
@@ -246,20 +249,25 @@ class ItemService(
                 ),
             )
         val idx = ordered.indexOfFirst { it.objectId == itemId }
-        val j = idx + if (dir == "up") -1 else 1
+        val j = idx + if (direction == BoardMoveDirection.UP) -1 else 1
         if (idx < 0 || j < 0 || j >= ordered.size) return response(statusName(ctx, item), ordered)
         // 首次触碰未排序列:未排行按显示序一次性物化(此后每次 move 恒为双行 swap;边界无操作零写入)
+        // position 为列内稀疏 Int,逼近 Int.MAX_VALUE 需全列重编——当前数据规模不可能,不做投机防御(YPJ-285 review #4)
         var next = (rowList.maxOfOrNull { it.position } ?: -1) + 1
         val mutableRows = rows.toMutableMap()
-        for (it in ordered.filter { it.objectId !in rows }.sortedBy { it.number }) {
+        // ordered 已保证未排段在尾部且按 number 升序,无需再 sortedBy(YPJ-285 review #3)
+        for (it in ordered.filter { it.objectId !in rows }) {
             mutableRows[it.objectId!!] = saveRow(it, project.objectId!!, next)
             next++
         }
-        // 纯双行 swap(两行此时均已物化)
-        val moving = ordered[idx]
-        val neighbor = ordered[j]
-        saveRow(mutableRows[moving.objectId]!!, mutableRows[neighbor.objectId]!!.position)
-        saveRow(mutableRows[neighbor.objectId]!!, mutableRows[moving.objectId]!!.position)
+        // 纯双行 swap(两行此时均已物化);写入前显式缓存双方原 position(YPJ-285 review #2)
+        val movingRow = mutableRows[ordered[idx].objectId]!!
+        val neighborRow = mutableRows[ordered[j].objectId]!!
+        val movingPos = movingRow.position
+        val neighborPos = neighborRow.position
+        saveRow(movingRow, neighborPos)
+        saveRow(neighborRow, movingPos)
+        // ordered 传入的是写前快照,response() 按写后新鲜位次重查重排,无须就地改序
         return response(statusName(ctx, item), ordered)
     }
 
@@ -298,7 +306,8 @@ class ItemService(
         for ((_, members) in valid.groupBy { it.statusObjectId!! }) {
             val column = itemRepo.findByProjectObjectIdAndStatusObjectId(project.objectId!!, members[0].statusObjectId!!)
             val ctx = buildCtx(project, column)
-            val visible = column.filter { it.onBoard || it.objectId in ctx.currentSprint }
+            // YPJ-285:与 move 同口径——仅 active sprint 成员 ∨ onBoard(planned 组成员不上板,不参与排序)
+            val visible = column.filter { it.onBoard || ctx.currentSprint[it.objectId]?.status == "active" }
             val visibleIds = visible.mapNotNull { it.objectId }.toSet()
             val applied = members.filter { visibleIds.contains(it.objectId) }
             if (applied.isEmpty()) continue
