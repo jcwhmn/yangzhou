@@ -367,3 +367,17 @@
 | M-284-2 | 成员移出 | 把成员移出组(回 backlog) | 顶部出现「成员 · − YPJ-N item名」行 |
 | M-284-3 | 存量组 | 打开本票上线前建的旧组 | 成员史(2026-10-12 起)使时间线非空;底部有「创建」行(取自 item_group.created_at,无 from→to);页面无异常 |
 | M-284-4 | 级联可见性 | 子组改挂到别的父 → 看旧父组详情历史段(或:子组动作触发父组联动) | cascade 迁移行,标签「联动」 |
+
+## YPJ-135 yz CLI milestone/release list + items open(spec 0176;开发中,待 review)
+
+前置:yz session 指 http://localhost:8081(dev API 在跑,milestone/release 端点旧构建已含);web 3001 在跑;用本票构建的 yz jar(`gradle :cli:jar`,产物 backend/cli/build/libs/yz-*.jar)。CLI 不进容器,无需重建镜像。
+
+| # | 场景 | 步骤 | 预期 |
+|---|---|---|---|
+| M-135-1 | 里程碑列表 | `yz milestone list YPJ` | 表格行与 web 里程碑页一致(id/名称/状态/目标日/剩超);目标日空的行显示 — |
+| M-135-2 | 发布列表 | `yz release list YPJ` | 表格行与 web 发布页一致(版本/阶段/状态/目标日/进度 n/m) |
+| M-135-3 | JSON 原样 | `yz milestone list YPJ --json` | 原始 JSON 数组 |
+| M-135-4 | 开浏览器 | `yz items open YPJ-135` | 浏览器自动打开 `http://localhost:3001/p/YPJ/i/<uuid>`,页面为该票详情 |
+| M-135-5 | 空项目 | 无里程碑/发布的空项目 `yz milestone list <KEY>` / `yz release list <KEY>` | `(无里程碑)` / `(无发布)`,退出 0 |
+| M-135-6 | 不存在的票 | `yz items open YPJ-999` | 报「找不到 item:YPJ-999」非 0 退出,无浏览器动作 |
+| M-135-7 | --web 显式 | `yz items open YPJ-135 --web http://localhost:3001` | 显式覆盖仍打开正确页面 |

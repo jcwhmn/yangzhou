@@ -23,7 +23,7 @@ yz CLI 增三命令,均为只读/导航,零写操作:
   - `GET /api/projects/{key}/milestones` → `MilestoneDto(milestoneId, name, description, owner, status, targetDate, overdue, dueSoon, daysToTarget, gateDone, gateTotal)`;status ∈ planned/in_progress/completed/cancelled;
   - `GET /api/projects/{key}/releases` → `ReleaseDto(releaseId, name, version, stage, status, targetDate, releasedDate, createdAt, overdue, doneCount, totalCount)`;stage ∈ alpha/beta/rc/ga。
 - web 详情路由:`/p/{KEY}/i/{itemId}`(`web/app/p/[key]/i/[itemId]/page.tsx`)。
-- CLI 已有 `resolveItemId(api, ref)`(KEY-N→itemId,UUID 直过)、sprints list 表格范式(`%-36s %-16s %-10s`,中文表头,空列表 `(无 sprint)`)、`--json` 走 `printRaw`。
+- CLI 已有 `resolveItemId(api, ref)`(KEY-N→itemId;KDoc 称「直接给 UUID 也认」,**实锤实现无 UUID 分支**,UUID 实际报「找不到」——现存文档漂移,不属本票修复,本票 usage 文案如实写 KEY-N)、sprints list 表格范式(`%-36s %-16s %-10s`,中文表头,空列表 `(无 sprint)`)、`--json` 走 `printRaw`。
 - 会话只存 API server URL(8080=prod / 8081=dev;AGENTS.md profile 约定 3000+8080、3001+8081 成对)。
 
 ## 详细设计(代码级修改计划)
@@ -90,17 +90,20 @@ items open <KEY-N|itemId> [--web URL]        浏览器打开 web 详情页(端�
 
 ### 4. `items open`
 
+与 items show 同构:resolveItemId + `GET /api/items/{id}` 反查(现状实锤:resolveItemId 无 UUID 分支,故 usage 只写 KEY-N);key 从 number 取前段,不按 ref 形态分支:
+
 ```kotlin
 "items open" -> {
-    val ref = rest.getOrNull(0) ?: error("缺少 item ID(支持 YPJ-58 或 UUID)")
-    val itemId = resolveItemId(api, ref)
-    // KEY-N 直接取前段作 key;UUID 反查 number(items show 同构的 GET /api/items/{id})
-    val key = if (ref.contains('-') && !ref.contains(' ')) ref.substringBefore('-')
-              else api.json("GET", "/api/items/$itemId")["number"].asString().substringBefore('-')
+    val itemId = resolveItemId(api, rest.getOrNull(0) ?: error("缺少 item ID(如 YPJ-58)"))
+    val body = api.json("GET", "/api/items/$itemId")
+    val key = body["number"].asString().substringBefore('-')
     val url = "${webBase(api.requireSession().server, flags)}/p/$key/i/$itemId"
     val opened = runCatching {
-        val d = java.awt.Desktop
-        if (d.isDesktopSupported() && d.getDesktop().isSupported(d.Action.BROWSE)) { d.getDesktop().browse(URI(url)); true } else false
+        if (!java.awt.Desktop.isDesktopSupported()) return@runCatching false
+        val d = java.awt.Desktop.getDesktop()
+        if (!d.isSupported(java.awt.Desktop.Action.BROWSE)) return@runCatching false
+        d.browse(URI(url))
+        true
     }.getOrDefault(false)
     println(if (opened) "已打开浏览器:$url" else "无法自动打开浏览器,请手动打开:$url")
 }
@@ -141,7 +144,7 @@ private fun webBase(server: String, flags: Map<String, String>): String {
 
 ## 手工测试用例(落档 docs/testing/manual-test-cases.md → M-135)
 
-**前置**:dev 容器(3001+8081)运行含本票代码的构建(容器 Image sha 对比 `docker images` 最新);yz session 指 http://localhost:8081。
+**前置**:yz session 指 http://localhost:8081(dev API 在跑,milestone/release 端点旧构建已含);web 3001 在跑;用本票构建的 yz jar(`gradle :cli:jar`)。CLI 不进容器,无需重建镜像。
 
 | # | 步骤 | 预期 |
 |---|---|---|
@@ -150,7 +153,7 @@ private fun webBase(server: String, flags: Map<String, String>): String {
 | M-135-3 | `yz milestone list YPJ --json` | 原始 JSON 数组(printRaw) |
 | M-135-4 | `yz items open YPJ-135` | 浏览器自动打开 `http://localhost:3001/p/YPJ/i/<uuid>`,页面为该票详情 |
 | M-135-5 | 无里程碑/发布的空项目 `yz milestone list <KEY>` / `yz release list <KEY>` | `(无里程碑)` / `(无发布)`,退出 0 |
-| M-135-6 | `yz items open <UUID形式itemId>` | 同 M-135-4(UUID 反查 key 路径) |
+| M-135-6 | `yz items open YPJ-999`(不存在的票) | 报「找不到 item:YPJ-999」非 0 退出,无浏览器动作 |
 | M-135-7 | `yz items open YPJ-135 --web http://localhost:3001` | 显式覆盖仍打开正确页面 |
 
 ## 验收口径

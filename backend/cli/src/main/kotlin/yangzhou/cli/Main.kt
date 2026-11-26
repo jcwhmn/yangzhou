@@ -4,6 +4,7 @@ import tools.jackson.databind.JsonNode
 import java.io.FileDescriptor
 import java.io.FileOutputStream
 import java.io.PrintStream
+import java.net.URI
 
 /** CLI 入口:yz <noun> <verb> [args] [--flags]。瘦壳——逻辑全在 API,这里只有编排与展示。 */
 
@@ -52,11 +53,14 @@ private fun usage() {
           items comment <KEY-N|itemId> <文本...>        给 item 加评论
           items show <KEY-N|itemId> [--json]            单票详情
           items comments <KEY-N|itemId>                 列 item 评论
+          items open <KEY-N> [--web URL]               浏览器打开 web 详情页(8080→3000/8081→3001 自动推导)
           items assign <KEY-N|itemId> <sprint名|UUID|backlog>   挂入/移出 sprint(backlog=移出)
           items branch <KEY-N> <分支名> [--base <基线>] [--items YPJ-B,YPJ-C]   # 从票走补挂(主票建分支)
           sprints create <KEY> <名称>                   建 sprint(planned 起步)
           sprints move <KEY> <名|UUID> <planned|active|completed>   改 sprint 状态
           sprints list <KEY> [--json]                       列 sprint(id/名称/状态/起止)
+          milestone list <KEY> [--json]                里程碑列表(id/名称/状态/目标日/剩超)
+          release list <KEY> [--json]                  发布列表(id/名称/版本/阶段/状态/目标日/进度)
           caps set <属性> [1-4]                        自评能力(不带数字=未评级)
           caps rm <属性>                               移除能力
           caps list [--json]                           能力清单
@@ -405,6 +409,48 @@ private fun run(args: List<String>) {
             }
         }
 
+        "milestone list" -> {
+            val key = rest.getOrNull(0) ?: error("缺少项目 KEY")
+            val body = api.json("GET", "/api/projects/$key/milestones")
+            if (flags.containsKey("json")) return printRaw(body.toString())
+            if (body.size() == 0) return println("(无里程碑)")
+            println("milestoneId                          名称             状态         目标日        剩/超")
+            body.forEach { m ->
+                val td = if (m["targetDate"].isNull || m["targetDate"].isMissingNode) "—" else m["targetDate"].asString()
+                val days =
+                    if (m["daysToTarget"].isNull || m["daysToTarget"].isMissingNode) {
+                        "—"
+                    } else {
+                        val n = m["daysToTarget"].asInt()
+                        when {
+                            n > 0 -> "剩 $n 天"
+                            n == 0 -> "今日"
+                            else -> "超 ${-n} 天"
+                        }
+                    }
+                println("%-36s %-16s %-12s %-12s %s".format(m["milestoneId"].asString(), m["name"].asString(), m["status"].asString(), td, days))
+            }
+        }
+
+        "release list" -> {
+            val key = rest.getOrNull(0) ?: error("缺少项目 KEY")
+            val body = api.json("GET", "/api/projects/$key/releases")
+            if (flags.containsKey("json")) return printRaw(body.toString())
+            if (body.size() == 0) return println("(无发布)")
+            println("releaseId                            名称           版本      阶段      状态         目标日        进度")
+            body.forEach { r ->
+                val td = if (r["targetDate"].isNull || r["targetDate"].isMissingNode) "—" else r["targetDate"].asString()
+                val ver = r["version"]?.takeUnless { it.isNull }?.asString() ?: "—"
+                val stage = r["stage"]?.takeUnless { it.isNull }?.asString() ?: "—"
+                println(
+                    "%-36s %-14s %-9s %-9s %-12s %-12s %s/%s".format(
+                        r["releaseId"].asString(), r["name"].asString(), ver, stage, r["status"].asString(), td,
+                        r["doneCount"].asInt(), r["totalCount"].asInt(),
+                    ),
+                )
+            }
+        }
+
         "items create" -> {
             val key = rest.getOrNull(0) ?: error("缺少项目 KEY")
             val title = rest.getOrNull(1) ?: error("缺少标题")
@@ -479,6 +525,23 @@ private fun run(args: List<String>) {
                 val t = c["createdAt"].asString().replace("T", " ").take(16)
                 println("[$t] ${c["author"].asString()}: ${c["body"].asString()}")
             }
+        }
+
+        "items open" -> {
+            val itemId = resolveItemId(api, rest.getOrNull(0) ?: error("缺少 item ID(如 YPJ-58)"))
+            val body = api.json("GET", "/api/items/$itemId")
+            val key = body["number"].asString().substringBefore('-')
+            val url = "${webBase(api.requireSession().server, flags)}/p/$key/i/$itemId"
+            // headless/无桌面环境不打断:URL 本身就是 CLI 的一等输出,打印由人接手(spec 0176)
+            val opened =
+                runCatching {
+                    if (!java.awt.Desktop.isDesktopSupported()) return@runCatching false
+                    val d = java.awt.Desktop.getDesktop()
+                    if (!d.isSupported(java.awt.Desktop.Action.BROWSE)) return@runCatching false
+                    d.browse(URI(url))
+                    true
+                }.getOrDefault(false)
+            println(if (opened) "已打开浏览器:$url" else "无法自动打开浏览器,请手动打开:$url")
         }
 
         "items comment" -> {
@@ -739,6 +802,19 @@ private fun resolveItemId(api: ApiClient, ref: String): String {
         }
     }
     error("找不到 item:$ref")
+}
+
+/** items open 的 web 基址(spec 0176):--web 优先;否则按 profile 端口约定推导(8080→3000、8081→3001);推导不出 fail-fast 引导 --web。internal 供 WebUrlTest 直测(同 boardorderMoves 惯例)。 */
+internal fun webBase(
+    server: String,
+    flags: Map<String, String>,
+): String {
+    flags["web"]?.let { return it.trimEnd('/') }
+    val uri = runCatching { URI(server) }.getOrNull() ?: error("API 地址无法解析:$server(用 --web <URL> 指定 web 地址)")
+    val webPort =
+        mapOf(8080 to 3000, 8081 to 3001)[uri.port]
+            ?: error("无法从 API 地址推导 web 地址($server);用 --web <URL> 显式指定")
+    return "http://${uri.host ?: "localhost"}:$webPort"
 }
 
 private fun feasibility(api: ApiClient, key: String?, flags: Map<String, String>) {
