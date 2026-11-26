@@ -58,7 +58,8 @@ test("item 表单动态下拉 + 在用删除守卫 409", async ({ page, projectK
     "Feature",
   );
 
-  // 面板删在用类型 → 409 错误条带计数(两段确认)
+  // 面板删在用类型 → 409 错误条带计数(两段确认);详情页无顶栏(YPJ-276 撤离),先回看板开设置
+  await page.goto(`/p/${projectKey}`);
   const panel = await openPanel(page);
   const feat = panel.getByTestId("item-type-row").filter({ hasText: "feat" });
   await feat.getByRole("button", { name: "删除 feat" }).click();
