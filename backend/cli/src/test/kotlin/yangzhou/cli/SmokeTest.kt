@@ -34,7 +34,8 @@ class SmokeTest {
         // usage 完整性锚点:主干命令集;新命令合并时同步追加(YPJ-115: sprints move / items assign)
         for (anchor in listOf(
             "login", "use", "attrs create", "members add", "teams add", "projects create", "projects delete",
-            "items create", "items list", "items show", "items comments", "items move", "items comment", "items branch", "sprints create", "sprints list",
+            "items create", "items list", "items show", "items comments", "items open", "items move", "items comment", "items branch", "sprints create", "sprints list",
+            "milestone list", "release list",
             "caps set", "caps rm", "caps list", "feasibility", "candidates", "assign", "log", "export", "import",
         )) {
             assertTrue(out.contains(anchor), "usage 缺:$anchor")
