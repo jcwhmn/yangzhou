@@ -161,6 +161,11 @@ private fun webBase(server: String, flags: Map<String, String>): String {
 - 后端验证:`gradle :cli:build`(含 SmokeTest/WebUrlTest)绿;CLI 无 integrationTest 面。
 - 用户验收 = M-135 用例逐条勾;过 → PR。
 
-## As-built
+## As-built(2026-11-28)
 
-(完工后补)
+- 与 spec 差异:
+  - `webBase` 可见性 `private` → `internal`(供 WebUrlTest 直测,随 boardorderMoves 惯例;实现时编译即发现);
+  - items open 为统一路径(resolveItemId + `GET /api/items/{id}` 反查 number),不按 ref 形态分支——实锺 resolveItemId 无 UUID 直过(见现状事实节修正),usage 只写 KEY-N;
+  - 其余(表格列、端口映射、fail-fast 文案、SmokeTest 锚点、WebUrlTest 3 例)与 spec 一致。
+- 验证:`gradle :cli:build` 绿(SmokeTest 6 + WebUrlTest 3 + 既有 17 例);用户 prod 实跑 `yz milestone list YPJ` 与 web 一致(总评 looks good);M-135-5 未验(prod 无空项目不造数据,PR 注明)。
+- 遗留:resolveItemId KDoc 漂移未修(超本票范围);CLI 网络路径自动化轨未建(待 CLI 票持续出现再立项)。

@@ -368,7 +368,7 @@
 | M-284-3 | 存量组 | 打开本票上线前建的旧组 | 成员史(2026-10-12 起)使时间线非空;底部有「创建」行(取自 item_group.created_at,无 from→to);页面无异常 |
 | M-284-4 | 级联可见性 | 子组改挂到别的父 → 看旧父组详情历史段(或:子组动作触发父组联动) | cascade 迁移行,标签「联动」 |
 
-## YPJ-135 yz CLI milestone/release list + items open(spec 0176;开发中,待 review)
+## YPJ-135 yz CLI milestone/release list + items open(spec 0176;已验收 2026-11-28)
 
 前置:yz session 指 http://localhost:8081(dev API 在跑,milestone/release 端点旧构建已含);web 3001 在跑;用本票构建的 yz jar(`gradle :cli:jar`,产物 backend/cli/build/libs/yz-*.jar)。CLI 不进容器,无需重建镜像。
 
@@ -381,3 +381,9 @@
 | M-135-5 | 空项目 | 无里程碑/发布的空项目 `yz milestone list <KEY>` / `yz release list <KEY>` | `(无里程碑)` / `(无发布)`,退出 0 |
 | M-135-6 | 不存在的票 | `yz items open YPJ-999` | 报「找不到 item:YPJ-999」非 0 退出,无浏览器动作 |
 | M-135-7 | --web 显式 | `yz items open YPJ-135 --web http://localhost:3001` | 显式覆盖仍打开正确页面 |
+
+验收留痕(2026-11-28,prod):
+
+- [x] M-135-1 用户实跑 `yz milestone list YPJ`,输出两行与 web 一致(甘特图功能落地 in_progress 2026-12-01 剩 4 天 / first completed 2026-10-18 超 40 天);用户总评「looks good」
+- [x] 其余各例用户主路径通过(总评 looks good,未逐条留痕;M-135-5 prod 跳过——不为验收建垃圾项目,空分支单行 print 与 list 主体同构)
+- 注:用户实跑走的是已装 `yz` 命令(shim 指向本仓构建产物)
