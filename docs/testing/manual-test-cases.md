@@ -345,3 +345,16 @@
 | 9 | milestone/release | 挂接/摘除/清空 | 正常 |
 | 10 | 工时汇总 | 计时中 + 有记录 | 总工时与 tab 一致;计时 chip;「工时明细→」落工时 tab |
 | 11 | e2e 回归 | 全量 e2e | 绿(selector 预判不破) |
+
+## YPJ-269 ItemGroup 生命周期侧栏(spec 0174;开发中,待 review)
+
+| # | 场景 | 操作 | 期望 |
+|---|---|---|---|
+| M-269-1 | 空态 | 新建 sprint 组 → 打开详情右栏 | 仅创建时刻有值;开始/完成/时长/首末 item 均“—” |
+| M-269-2 | start/complete | start 动作→看右栏;complete→再看 | 实际开始=动作时刻;完成后实际完成出现,执行时长出现 |
+| M-269-3 | 最近口径 | complete→reopen→再 complete | 实际完成=第二次完成时刻;实际开始不变(首次) |
+| M-269-4 | 首次口径 | active→backward→再 start | 实际开始不变(首次迁出 planned 时刻) |
+| M-269-5 | 首末 item | 组内 item 推进生命周期(开始/完成) | 首 item 开始=min 成员实际开始;末 item 完成=max 成员实际完成 |
+| M-269-6 | 存量组 | 打开本票上线前建的旧组 | 开始/完成=“—”;首末 item 按成员 item 史能考尽考 |
+| M-269-7 | 空成员组 | 无成员组 start→complete | 首末 item 恒“—”,页面无异常 |
+| M-269-8 | release 回归 | releases 列表及 release 相关操作 | 行为不变,无报错 |
