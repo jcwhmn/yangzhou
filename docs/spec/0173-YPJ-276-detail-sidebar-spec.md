@@ -106,4 +106,10 @@ page.tsx(状态与回调全部留 page,新组件只收 props——沿 TimeLogTab
 
 - 右栏宽 280 暂定,用户验收实感后可调(spec 2.1)
 - 终态 closeReason chip 归右栏状态区(2.2 假设,待复核)
-- As-built 完工后补
+
+## 7. As-built(2026-11-26 完工)
+
+- 实现与 §2 一致;PR #266。改动:`ItemSidebar.tsx`(新)、`ItemHeader.tsx`(瘦身为纯导航)、`page.tsx`(主列收敛+sidebar 上行)、`layout.tsx`(详情页撤顶栏)、`ProjectToolbar.tsx`(抽 ToolbarActions)、`texts.ts`、e2e 两处(board V13-S4 改 280 弹窗语义;item-type 回看板开设置)。
+- **施工实锤**:原 240px「右栏」实为左列 Box 内嵌块(132 临时位置),从未真正靠右——已挪为 flex 兄弟节点才成立。
+- **布局变更(用户拍板)**:详情页撤顶栏(工时/收藏/设置三 icon 移除,不再占流);入口从看板页顶栏/左侧导航进。
+- e2e 全量绿(本地+CI);手工用例全过。taste 类打磨(右栏内部视觉、字段分区)用户拍板后续再改。
