@@ -310,19 +310,23 @@ login/bootstrap 是公开端点不走此链,但**登录本身需查 status**:dis
 - CLI:无新命令;login 传 ct=cli;30d 免重登语义保持。
 - api.http:两子票各自同步新增端点段(仓规:改 REST API 必同步)。
 
-## 7. 子票拆分(R8 更新;票已建 2026-11-28晚)
+## 7. 子票拆分(R8 细化:7 张垂直切片;已建票进新 sprint V34)
 
 | # | 子票 | 票号 | 内容端到端 | 预估 | 依赖 | 分支名预留 |
 |---|---|---|---|---|---|---|
-| S1 | 后端·多账号与令牌治理 | YPJ-288 | §3.1(member 列+黑名单+叉表含 scope CHECK)、§4 全部、api.http、单测/integrationTest | 1.5d | 无 | feat/YPJ-288-accounts-tokens |
-| S2 | 后端·项目授权矩阵 | YPJ-289 | §3.2 池表去角色迁移、§5 全部(三级守卫/viewer 去向/可见性)、api.http、测试 | 2d | S1 | feat/YPJ-289-project-authz |
-| S3 | web·账号与成员管理 UI | YPJ-290 | 登录 clientType、401 行为、全局成员管理页、项目内建号流程、自助改密、登录落地规则(refresh 已 defer) | 1.5d | S1 | feat/YPJ-290-web-accounts |
-| S4 | web·项目权限 UI | YPJ-291 | 项目成员管理 UI(池+角色)、403 页面、导航隐藏、空态 | 1d | S2 | feat/YPJ-291-web-project-authz |
+| S1 | 后端·账号基座(status/黑名单/叉表/admin 判定) | YPJ-288 | §3.1 三表迁移+backfill、requireAdmin 守卫、JwtAuthFilter 新链、ct 分型、自助改密 | 1d | 无 | feat/YPJ-288-account-foundation |
+| S2 | 后端·账号治理 API | YPJ-293 | §4.4 全部端点、whoami 角色集(前端导航/落地依赖) | 1d | S1 | feat/YPJ-293-account-admin-api |
+| S3 | 后端·项目授权矩阵 | YPJ-289 | §3.2 去角色迁移+backfill、三级守卫平移、可见性、建/删项目 | 1.5d | S1 | feat/YPJ-289-project-authz |
+| S4 | 后端·viewer 作业语义 | YPJ-294 | item 级门、删除门、viewer 建号去向强制、看板/归组门 | 0.5d | S3 | feat/YPJ-294-viewer-item-semantics |
+| S5 | web·认证与会话 | YPJ-295 | clientType、自助改密 UI、登录落地规则、收藏过滤 | 0.5d | S1/S2 | feat/YPJ-295-web-auth-landing |
+| S6 | web·全局成员管理页 | YPJ-290 | admin 场景页、全局成员目录、停用候选提示 | 1d | S2 | feat/YPJ-290-web-member-admin |
+| S7 | web·项目成员管理与权限 UI | YPJ-291 | 项目内建号 checkbox、池与角色管理、403 页、导航隐藏、空态 | 1d | S2/S3/S4 | feat/YPJ-291-web-project-authz |
 
-- 父票 166 不直接产码;随子票全 Done 而 Done。
-- 子票说明文档约定(用户拍板):子票开工时各写简短说明(做什么/怎么做/引用本文件节号),落 `docs/spec/0177-s{N}-YPJ-{n}-{slug}.md` 一页以内;不重复主文档。
-- **挂 sprint 待用户定(V33 或新 sprint)**:现均留 backlog;落定后挂 sprint + `items schedule` 设预计起止(排期纪律①②)。
-- defer 存档票:YPJ-292 邀请自建账号(backlog)。
+- 合计 6.5d;7 张 ≥6 → 用户拍板(2026-11-28 深夜)**建新 sprint V34(planned)专做本功能**;父票 166 随迁;7 票已挂 V34 并按依赖序铺排 schedule(2026-11-29 起)。
+- 原 4 票(288/289/290/291)重定 scope+更名;新增 293/294/295。
+- **V33(修补与基建)保持 active**,其收口与其余成员去向由用户执行(本票迁出不触发自动迁移)。
+- 临时语义:S2 项目内建号暂挂既有 LeaderGuard,S3 平移 requireEditor(中间态无安全洞:leader⊂editor)。
+- 子票说明文档约定不变(`docs/spec/0177-s{N}-*.md`,开工时写);defer 存档票 YPJ-292 留 backlog 不进 sprint。
 
 ## 8. 手工测试用例(主路径;子票说明文档各自带自己的 M-166-x 明细)
 
