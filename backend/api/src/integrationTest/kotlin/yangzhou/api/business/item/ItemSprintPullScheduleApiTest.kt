@@ -173,12 +173,23 @@ class ItemSprintPullScheduleApiTest : AbstractApiTest() {
         val id = item(authed, "今天票", "8" to "hour")
         pull(authed, id, sid)
         val d = detail(authed, id)
-        // 新建项目默认工作制+全天窗:start=现在(周末顺延周一),due=start+8h;关键断言=due 在未来(不立刻超期)
+        // 新建项目默认工作制+全天窗(工作日 24h,周末整天跳过):start=现在(不落过去),
+        // due=按工作小时铺算——跨周末时壁钟差 = 预估 + 周末整天(A52 台账:裸壁钟差断言周五晚必红)
         val start = java.time.LocalDateTime.parse(d["startDate"].asText())
         val due = java.time.LocalDateTime.parse(d["dueDate"].asText())
         assertTrue(!start.isBefore(java.time.LocalDateTime.now().minusMinutes(1)), "start 应为现在/未来:$start")
         assertTrue(due.isAfter(start), "due 应晚于 start")
-        assertTrue(java.time.Duration.between(start, due).toMinutes() == 480L, "8h 铺算:$start~$due")
+        val wallMinutes = java.time.Duration.between(start, due).toMinutes()
+        val weekendMinutes =
+            generateSequence(start.toLocalDate()) { it.plusDays(1) }
+                .takeWhile { !it.isAfter(due.toLocalDate()) }
+                .filter { it.dayOfWeek == java.time.DayOfWeek.SATURDAY || it.dayOfWeek == java.time.DayOfWeek.SUNDAY }
+                .count() * 24L * 60 // start/due 均落在工作日窗口内,区间内周末整天全被引擎跳过
+        val workMinutes = wallMinutes - weekendMinutes
+        assertTrue(
+            kotlin.math.abs(workMinutes - 480L) <= 2, // due 被 API 舍入到分钟,容 ±2 分钟
+            "8h 铺算(扣除周末整天):$start~$due wall=$wallMinutes weekend=$weekendMinutes",
+        )
     }
 
     @Test
