@@ -84,7 +84,8 @@ test.describe("estimateRequired=true——三途径缺预估弹补录", () => {
     await expect(fillDlg).toBeVisible();
     await fillDlg.getByRole("button", { name: "提交", exact: true }).click();
     await expect(page.getByRole("dialog")).toHaveCount(0);
-    await expect(page.getByText("EG 补录丙")).toBeVisible();
+    // 断言 item 链接而非全页文本:组时间线 caption 含同名标题,getByText 全页子串必撞(YPJ-284)
+    await expect(page.getByRole("link", { name: "EG 补录丙" })).toBeVisible();
   });
 });
 

@@ -110,9 +110,10 @@ test("完成组→处置弹窗列出非终态成员(Done 不列),默认全转入
   await expect(page.getByText("进行中成员")).toBeVisible();
   await page.goto(`/p/${projectKey}/sprint/${doneGid}`);
   // 0109 缺口断言:完成组页只显示 Done 成员,被转出的非终态成员不再出现
-  await expect(page.getByText("终态成员")).toBeVisible();
-  await expect(page.getByText("待办成员")).toHaveCount(0);
-  await expect(page.getByText("进行中成员")).toHaveCount(0);
+  // 断言 item 链接而非全页文本:时间线 caption 会留 +- 历史行,被转出成员的 caption 合法存在(YPJ-284)
+  await expect(page.getByRole("link", { name: "终态成员" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "待办成员" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "进行中成员" })).toHaveCount(0);
 });
 
 // 0108:重开 = 撤销内部收尾判断(timed 模板 completed→active;确认制;纯状态迁移)
