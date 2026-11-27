@@ -22,16 +22,18 @@ class MemberBlacklistService(
     /** 与 cli token 同寿命:黑名单窗 = CLI TTL(30d),过期后该成员旧 token 本身也已过期(§4.3)。 */
     private val ttl: Duration = Duration.ofHours(cliTtlHours)
 
-    /** 禁用/重置密码/自助改密:upsert(每成员至多一行,唯一约束)。 */
+    /** 禁用/重置密码/自助改密:upsert(每成员至多一行,唯一约束)。createdAt 一并刷新——每次事件重踢(行间新签 token 也得死);截秒在 filter 比较处统一做。 */
     @Transactional
     fun upsert(memberId: Long) {
         val existing = blacklists.findByMemberId(memberId)
-        val expiresAt = clock.instant() + ttl
-        if (existing != null) {
-            blacklists.save(existing.copy(expiresAt = expiresAt))
-        } else {
-            blacklists.save(MemberBlacklist(memberId = memberId, expiresAt = expiresAt))
-        }
+        val now = clock.instant()
+        val row =
+            if (existing != null) {
+                existing.copy(createdAt = now, expiresAt = now + ttl)
+            } else {
+                MemberBlacklist(memberId = memberId, expiresAt = now + ttl, createdAt = now)
+            }
+        blacklists.save(row)
     }
 
     /** 复职:删行(用户强调,§4.3)。 */

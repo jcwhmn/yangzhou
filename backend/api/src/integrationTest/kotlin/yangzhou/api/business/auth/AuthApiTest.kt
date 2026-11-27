@@ -124,9 +124,10 @@ class AuthApiTest : AbstractApiTest() {
     fun `黑名单有效行即拒,过期行顺带清理`() {
         val authed = bootstrapAndAuth()
         val memberId = "(select id from member where username = 'me')"
+        // created_at 强制 +1s:iat 为秒精度,kickSecond 必须 > token iat 秒才杀(spec 0177 §4.3 精化语义)
         jdbc.execute(
-            "insert into member_blacklist (object_id, member_id, expires_at) " +
-                "values (gen_random_uuid(), $memberId, now() + interval '10 days')",
+            "insert into member_blacklist (object_id, member_id, expires_at, created_at) " +
+                "values (gen_random_uuid(), $memberId, now() + interval '10 days', now() + interval '1 second')",
         )
         authed
             .get()

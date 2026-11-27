@@ -58,9 +58,11 @@ class JwtServiceUnitTest {
     }
 
     @Test
-    fun `verify 返回 subject,无效 token 返回 null`() {
+    fun `verify 返回 subject+iat,无效 token 返回 null`() {
         val s = service()
-        assertEquals("sub-3", s.verify(s.generate("sub-3", ClientType.WEB)))
+        val v = s.verify(s.generate("sub-3", ClientType.WEB))
+        assertEquals("sub-3", v?.subject)
+        kotlin.test.assertNotNull(v?.issuedAt)
         kotlin.test.assertNull(s.verify("not-a-token"))
     }
 }

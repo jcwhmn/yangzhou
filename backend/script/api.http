@@ -3278,7 +3278,19 @@ Content-Type: application/json
 
 > {% client.assert(response.status === 401, "旧密码应 401,实际 " + response.status); %}
 
-### 改回原密码(整文件可重复跑)
+### [负例] new < 8 位 → 400(pwToken2 仍有效,必须在「改回」之前——改密也踢自己)
+PUT {{host}}/api/members/me/password
+Authorization: Bearer {{pwToken2}}
+Content-Type: application/json
+
+{
+  "oldPassword": "spec177-pass",
+  "newPassword": "short"
+}
+
+> {% client.assert(response.status === 400, "短密码应 400,实际 " + response.status); %}
+
+### 改回原密码(整文件可重复跑;改后 pwToken2 即死,故放节末)
 PUT {{host}}/api/members/me/password
 Authorization: Bearer {{pwToken2}}
 Content-Type: application/json
@@ -3287,15 +3299,3 @@ Content-Type: application/json
   "oldPassword": "spec177-pass",
   "newPassword": "secret123"
 }
-
-### [负例] new < 8 位 → 400
-PUT {{host}}/api/members/me/password
-Authorization: Bearer {{pwToken2}}
-Content-Type: application/json
-
-{
-  "oldPassword": "secret123",
-  "newPassword": "short"
-}
-
-> {% client.assert(response.status === 400, "短密码应 400,实际 " + response.status); %}

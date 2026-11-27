@@ -21,10 +21,10 @@
 | MemberStatus enum;Member 加 `status` | persistence/Entities.kt | enum+VARCHAR+CHECK(仓规);role 不引枚举,随 ProjectMember.ROLE_* 常量先例(§3.3) |
 | MemberBlacklist / MemberRole 实体+repo | Entities.kt + Repositories.kt | 实体主构造 id/objectId/createdAt/updatedAt;FK 用 member_id bigint + 级联(spec SQL 原文) |
 | AdminGuard.requireAdmin() | api/guard/AdminGuard.kt | 查 principal(member objectId)→ member_role 行;无行 403。S2 的 25 处 requireLeader 平移不动它 |
-| 过滤链 | JwtAuthFilter(改) | 注入 MemberRepository + MemberBlacklistRepository:两次单行索引查询(§4.2 允许);黑名单行存在且过期 → 顺带删行后放行(惰性清理) |
+| 过滤链 | JwtAuthFilter(改) | 注入 MemberRepository + MemberBlacklistRepository:两次单行索引查询(§4.2 允许);黑名单行存在且过期 → 顺带删行后放行(惰性清理)。**语义精化(请复核)**:黑名单只杀签发早于踢出时刻的 token(踢出秒 > iat 秒即拒,两侧截秒——iat 本就是秒精度;created_at 微秒且 @CreatedDate 审计 insert 会覆写显式值,截秒必须在比较处做)——若按 §4.2 A 表字面「有有效行即拒」,禁用/重置/自助改密后重登的新 token 也被拒 = 自锁到行过期(30d),与 §4.3「需重登」矛盾;同秒互视为新(1s 窗口,可接受) |
 | ct 分型 | JwtService(改)+ application.yml | `generate(subject, clientType)`;verify 不看 ct;`ttl-hours-web/-cli` 缺省回退 `ttl-hours` |
 | disabled 拒登 / bootstrap 落 admin 行 | AuthService(改) | login 补 status 检查(BadCredentials→401);bootstrap 建号同时插 (admin, NULL) 行(§2.3 A 表) |
-| 黑名单写语义 | business/member/MemberBlacklistService.kt(新) | upsert(memberId,TTL=cli 30d)/delete/有效行判定;自助改密在 MemberService 调 upsert |
+| 黑名单写语义 | business/member/MemberBlacklistService.kt(新) | upsert(memberId,TTL=cli 30d)/delete/有效行判定;自助改密在 MemberService 调 upsert。upsert 同时刷新 createdAt(每次事件重踢,行间新 token 也得死) | |
 | 自助改密 | MemberService + MemberController | `me/password`;密 Hash 存 BCrypt;old 错抛 BadCredentials |
 | CLI clientType | cli/ApiClient.kt | 两处 payload 加一键 |
 

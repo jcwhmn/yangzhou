@@ -84,6 +84,8 @@ class MemberAuthFoundationApiTest : AbstractApiTest() {
         val authed = bootstrapAndAuth()
         val oldToken = login("me", "secret123")["token"].asText()
 
+        // 踢出前越过秒界:iat 为秒精度,同秒签发的旧 token 不会被 kickSecond 杀(spec 0177 §4.3 精化语义)
+        Thread.sleep(1100)
         authed
             .put()
             .uri("/api/members/me/password")
@@ -100,6 +102,16 @@ class MemberAuthFoundationApiTest : AbstractApiTest() {
             .exchange()
             .expectStatus()
             .isUnauthorized()
+
+        // 踢后重登的新 token 必须可用(否则自助改密=自锁 30d;spec 0177 §4.3 iat 精化)
+        val freshToken = login("me", "newpass456")["token"].asText()
+        rest
+            .get()
+            .uri("/api/members")
+            .header("Authorization", "Bearer " + freshToken)
+            .exchange()
+            .expectStatus()
+            .isOk()
 
         // 新密码可登,旧密码不可登
         assertEquals("me", login("me", "newpass456")["username"].asText())

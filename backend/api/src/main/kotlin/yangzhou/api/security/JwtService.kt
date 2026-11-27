@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.core.env.Environment
 import org.springframework.stereotype.Component
 import java.time.Duration
+import java.time.Instant
 import java.util.Date
 
 /** 客户端分型(spec 0177 §4.1):web 8h / cli 30d;yz CLI 恒传 cli。 */
@@ -19,6 +20,12 @@ enum class ClientType {
         fun from(value: String?): ClientType = if (value == "cli") CLI else WEB
     }
 }
+
+/** 验签结果:subject + 签发时刻(黑名单按 iat 分新旧 token,spec 0177 §4.2/§4.3 语义精化)。 */
+data class VerifiedToken(
+    val subject: String,
+    val issuedAt: Instant,
+)
 
 @Component
 class JwtService(
@@ -49,14 +56,15 @@ class JwtService(
         .signWith(key)
         .compact()
 
-    /** 校验并返回 subject;无效/过期返回 null。ct 仅影响签发侧 TTL,验签不分型(存量无 ct token 按 web,§4.1)。 */
-    fun verify(token: String): String? = try {
+    /** 校验并返回 subject+iat;无效/过期返回 null。 */
+    fun verify(token: String): VerifiedToken? = try {
         Jwts
             .parser()
             .verifyWith(key)
             .build()
             .parseSignedClaims(token)
-            .payload.subject
+            .payload
+            .let { VerifiedToken(it.subject, it.issuedAt.toInstant()) }
     } catch (_: Exception) {
         null
     }
