@@ -114,6 +114,8 @@ abstract class AbstractApiTest {
             "attribute_definition",
             "team_member",
             "team",
+            "member_role",
+            "member_blacklist",
             "member",
             "workspace",
         ).forEach { jdbc.execute("delete from $it") }
@@ -135,10 +137,11 @@ abstract class AbstractApiTest {
     protected fun login(
         username: String,
         password: String,
+        extra: Map<String, Any?> = emptyMap(),
     ): JsonNode = rest
         .post()
         .uri("/api/auth/login")
-        .body(mapOf("username" to username, "password" to password))
+        .body(mapOf("username" to username, "password" to password) + extra)
         .exchange()
         .expectStatus()
         .isOk()

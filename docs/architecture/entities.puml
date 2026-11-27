@@ -12,6 +12,14 @@ class Member {
   username: String?
   displayName: String
   githubUsername: String?
+  status: String
+}
+class MemberBlacklist {
+  expiresAt: Instant
+}
+class MemberRole {
+  role: String
+  projectId: Long?
 }
 class AttributeDefinition {
   name: String
@@ -199,8 +207,11 @@ Team "1" *-- "*" TeamMember
 TeamMember "*" *-- "1" Member
 Member "1" *-- "*" Comment : 发布
 Member "1" *-- "*" Favorite : 收藏
+Member "1" *-- "0..1" MemberBlacklist : 黑名单
+Member "1" *-- "*" MemberRole : 角色叉表
 
 Workspace "1" *-- "*" Project
+Project "1" *-- "0..1" MemberRole : 项目级角色(S2 启用)
 
 Member "1" *-- "*" Capability
 Capability "*" *-- "1" AttributeDefinition
@@ -337,5 +348,19 @@ note right of Member
   (@EnableJdbcAuditing 统一写入;
   by 存 member.object_id uuid;V41 起带 FK(RESTRICT),
   append-only/日志表除外)。
+end note
+note right of MemberRole
+  spec 0177(S1):统一角色叉表。
+  role ∈ {admin,editor,viewer};
+  admin 仅 workspace 级(project_id
+  NULL),editor/viewer 必关联项目
+  (CHECK 落库);admin 兕底判定
+  只住守卫单缝(AdminGuard)。
+end note
+note right of MemberBlacklist
+  spec 0177(S1)§4.3:每成员至多
+  一行,禁用/重置密码/自助改密入列
+  (踢全部会话),复职删行;自动过期,
+  过期行请求链读时顺带删。
 end note
 @enduml

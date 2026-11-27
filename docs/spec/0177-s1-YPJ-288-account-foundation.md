@@ -17,7 +17,7 @@
 
 | 件 | 位置 | 说明 |
 |---|---|---|
-| V73__member_auth_foundation.sql | persistence/migration | 三段 DDL + `insert into member_role select gen_random_uuid(), id, 'admin', null from member where password_hash is not null`(先例 V30+) |
+| V73__member_auth_foundation.sql | persistence/migration | 三段 DDL + `insert into member_role select gen_random_uuid(), id, 'admin', null from member where password_hash is not null`(先例 V30+)。**偏离 §3.1 原文**:member.status 存 enum name 大写 `ACTIVE/DISABLED`(SD JDBC 4 默认按 name 映射,随 status_type='START' 先例;spec 原文小写会违 CHECK),role 值仍小写(随 ProjectMember.ROLE_* 先例) | |
 | MemberStatus enum;Member 加 `status` | persistence/Entities.kt | enum+VARCHAR+CHECK(仓规);role 不引枚举,随 ProjectMember.ROLE_* 常量先例(§3.3) |
 | MemberBlacklist / MemberRole 实体+repo | Entities.kt + Repositories.kt | 实体主构造 id/objectId/createdAt/updatedAt;FK 用 member_id bigint + 级联(spec SQL 原文) |
 | AdminGuard.requireAdmin() | api/guard/AdminGuard.kt | 查 principal(member objectId)→ member_role 行;无行 403。S2 的 25 处 requireLeader 平移不动它 |

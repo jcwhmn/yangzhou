@@ -8,10 +8,23 @@ import org.springframework.stereotype.Component
 import java.time.Duration
 import java.util.Date
 
+/** 客户端分型(spec 0177 §4.1):web 8h / cli 30d;yz CLI 恒传 cli。 */
+enum class ClientType {
+    WEB,
+    CLI,
+    ;
+
+    companion object {
+        /** 缺省 web;非法值按 web(TTL 兜底,无攻击面)。 */
+        fun from(value: String?): ClientType = if (value == "cli") CLI else WEB
+    }
+}
+
 @Component
 class JwtService(
     @Value("\${yangzhou.jwt.secret}") secret: String,
-    @Value("\${yangzhou.jwt.ttl-hours}") ttlHours: Long,
+    @Value("\${yangzhou.jwt.ttl-hours-web:\${yangzhou.jwt.ttl-hours}}") webTtlHours: Long,
+    @Value("\${yangzhou.jwt.ttl-hours-cli:\${yangzhou.jwt.ttl-hours}}") cliTtlHours: Long,
     profiles: Environment,
 ) {
     init {
@@ -22,17 +35,21 @@ class JwtService(
     }
 
     private val key = Keys.hmacShaKeyFor(secret.toByteArray())
-    private val ttl: Duration = Duration.ofHours(ttlHours)
+    private val ttls = mapOf(ClientType.WEB to Duration.ofHours(webTtlHours), ClientType.CLI to Duration.ofHours(cliTtlHours))
 
-    fun generate(subject: String): String = Jwts
+    fun generate(
+        subject: String,
+        clientType: ClientType,
+    ): String = Jwts
         .builder()
         .subject(subject)
+        .claim("ct", clientType.name.lowercase())
         .issuedAt(Date())
-        .expiration(Date(System.currentTimeMillis() + ttl.toMillis()))
+        .expiration(Date(System.currentTimeMillis() + ttls.getValue(clientType).toMillis()))
         .signWith(key)
         .compact()
 
-    /** 校验并返回 subject;无效/过期返回 null。 */
+    /** 校验并返回 subject;无效/过期返回 null。ct 仅影响签发侧 TTL,验签不分型(存量无 ct token 按 web,§4.1)。 */
     fun verify(token: String): String? = try {
         Jwts
             .parser()

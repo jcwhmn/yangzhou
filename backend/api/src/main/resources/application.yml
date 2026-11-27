@@ -15,7 +15,9 @@ server:
 yangzhou:
   jwt:
     secret: ${YANGZHOU_JWT_SECRET:yangzhou-dev-secret-0123456789abcdef0123456789abcdef}
-    ttl-hours: 720 # 30 天(2026-11-21 用户拍板):yz CLI 会话免每日重登;改后需容器 rebuild 生效
+    ttl-hours: 720 # 30 天(2026-11-21 用户拍板):兼容缺省,分键未设时回退;改后需容器 rebuild 生效
+    ttl-hours-web: 8 # spec 0177 §4.1:web 会话 8h;存量无 ct token 不受影响
+    ttl-hours-cli: 720 # cli 30d(M-166-5):CLI 免每日重登,与 web 登录不互踢
   github:
     # 轮询同步(分支/PR 关联 + 事件→状态映射移列)——仅作兑底;按需拉取
     # (yz log / item 详情提交历史)不依赖此开关。关闭:poll-enabled: false。

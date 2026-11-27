@@ -38,6 +38,7 @@ data class Member(
     val color: String? = null,
     val lastProjectKey: String? = null,
     val githubUsername: String? = null,
+    val status: MemberStatus = MemberStatus.ACTIVE,
     @CreatedDate
     var createdAt: Instant = Instant.now(),
     @LastModifiedDate
@@ -47,6 +48,43 @@ data class Member(
     @LastModifiedBy
     var updatedByObjectId: UUID? = null,
 )
+
+/** spec 0177(S1):账号状态;disabled 登录与请求链即拒(§2.3 A 表)。 */
+enum class MemberStatus {
+    ACTIVE,
+    DISABLED,
+}
+
+/** spec 0177(S1)§4.3:member 级黑名单(禁用/重置密码/自助改密入列);每成员至多一行,过期行惰性清理。 */
+@Table("member_blacklist")
+data class MemberBlacklist(
+    @Id val id: Long? = null,
+    val objectId: UUID = UUID.randomUUID(),
+    val memberId: Long,
+    val expiresAt: Instant,
+    @CreatedDate
+    var createdAt: Instant = Instant.now(),
+)
+
+/** spec 0177(S1)§3.1:统一角色叉表。admin 仅 workspace 级(project_id NULL);editor/viewer 必关联项目(CHECK 落库)。role 不引枚举,随 ProjectMember.ROLE_* 常量先例(§3.3)。 */
+@Table("member_role")
+data class MemberRole(
+    @Id val id: Long? = null,
+    val objectId: UUID = UUID.randomUUID(),
+    val memberId: Long,
+    val role: String = ROLE_ADMIN,
+    val projectId: Long? = null,
+    @CreatedDate
+    var createdAt: Instant = Instant.now(),
+    @LastModifiedDate
+    var updatedAt: Instant = Instant.now(),
+) {
+    companion object {
+        const val ROLE_ADMIN = "admin"
+        const val ROLE_EDITOR = "editor"
+        const val ROLE_VIEWER = "viewer"
+    }
+}
 
 @Table("team")
 data class Team(
