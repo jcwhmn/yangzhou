@@ -3249,11 +3249,9 @@ Content-Type: application/json
   "newPassword": "spec177-pass"
 }
 
-### [预期 401] 改密后旧 token 被黑名单拒绝
-GET {{host}}/api/members
-Authorization: Bearer {{pwToken}}
-
-> {% client.assert(response.status === 401, "改密后旧会话应 401,实际 " + response.status); %}
+### 旧 token 即刻失效的确定性断言不在本文件:HTTP 客户端无法 sleep,login 与改密同秒时
+### 旧 token(iat 同秒)按「同秒视为新」语义存活 ≤1s(spec 0177 §4.3 精化);该分支由
+### MemberAuthFoundationApiTest(Thread.sleep 越秒界)确定性覆盖。此处直接重登:
 
 ### 新密码重登
 POST {{host}}/api/auth/login
