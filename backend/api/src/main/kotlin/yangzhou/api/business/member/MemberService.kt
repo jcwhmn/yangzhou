@@ -1,6 +1,8 @@
 package yangzhou.api.business.member
 
+import org.springframework.security.authentication.BadCredentialsException
 import org.springframework.security.core.context.SecurityContextHolder
+import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import yangzhou.api.business.workspace.WorkspaceService
@@ -36,6 +38,8 @@ class MemberService(
     private val timeEntries: TimeEntryRepository,
     private val projectViews: ProjectViewRepository,
     private val notifications: NotificationRepository,
+    private val encoder: PasswordEncoder,
+    private val blacklist: MemberBlacklistService,
 ) {
     data class MemberResponse(
         val memberId: UUID,
@@ -119,6 +123,24 @@ class MemberService(
     }
 
     fun requireMember(memberId: UUID): Member = members.findByObjectId(memberId) ?: throw NotFoundException("成员不存在")
+
+    /**
+     * spec 0177(S1)§4.4:自助改密。验 old(错 → 401);改后黑名单 upsert——
+     * 踢所有会话含当前,需重登(R7 拍板「踢」)。≥8 位由 Bean Validation 在请求线上拦。
+     */
+    @Transactional
+    fun changeMyPassword(
+        oldPassword: String,
+        newPassword: String,
+    ) {
+        val member = current()
+        // 登录账号必有 passwordHash(虚拟成员无法登录至此);防御式兜底同一文案
+        if (member.passwordHash == null || !encoder.matches(oldPassword, member.passwordHash)) {
+            throw BadCredentialsException("原密码错误")
+        }
+        members.save(member.copy(passwordHash = encoder.encode(newPassword), updatedAt = Instant.now()))
+        blacklist.upsert(member.id!!)
+    }
 
     /**
      * V6:设 GitHub 用户名(把 PR 作者/分支创建者映射回成员);空串 = 清除。

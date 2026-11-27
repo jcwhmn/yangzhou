@@ -3219,3 +3219,81 @@ Content-Type: application/json
 ### 清场:删一次性项目(force 物理删)
 DELETE {{host}}/api/projects/{{key274}}?force=true
 Authorization: Bearer {{token}}
+
+### ============================================================
+### ============ 22. spec 0177(S1)认证基座(YPJ-288;节内自含:自带登录,先跑「登录」即可单跑本节) ============
+### ============================================================
+### 注意:自助改密会黑名单踢所有会话(含当前),改完即重登;节末把密码改回原值,整文件可重复跑。
+
+### CLI 分型登录(ct=cli → TTL 30d;web 缺省 8h)
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "me",
+  "password": "secret123",
+  "clientType": "cli"
+}
+
+> {%
+    client.global.set("pwToken", response.body.token);
+ %}
+
+### 自助改密(≥8 位;成功踢所有会话,上面刚拿的 pwToken 即刻失效)
+PUT {{host}}/api/members/me/password
+Authorization: Bearer {{pwToken}}
+Content-Type: application/json
+
+{
+  "oldPassword": "secret123",
+  "newPassword": "spec177-pass"
+}
+
+### 旧 token 即刻失效的确定性断言不在本文件:HTTP 客户端无法 sleep,login 与改密同秒时
+### 旧 token(iat 同秒)按「同秒视为新」语义存活 ≤1s(spec 0177 §4.3 精化);该分支由
+### MemberAuthFoundationApiTest(Thread.sleep 越秒界)确定性覆盖。此处直接重登:
+
+### 新密码重登
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "me",
+  "password": "spec177-pass",
+  "clientType": "cli"
+}
+
+> {% client.global.set("pwToken2", response.body.token); %}
+
+### [预期 401] 旧密码不能再登
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "me",
+  "password": "secret123"
+}
+
+> {% client.assert(response.status === 401, "旧密码应 401,实际 " + response.status); %}
+
+### [负例] new < 8 位 → 400(pwToken2 仍有效,必须在「改回」之前——改密也踢自己)
+PUT {{host}}/api/members/me/password
+Authorization: Bearer {{pwToken2}}
+Content-Type: application/json
+
+{
+  "oldPassword": "spec177-pass",
+  "newPassword": "short"
+}
+
+> {% client.assert(response.status === 400, "短密码应 400,实际 " + response.status); %}
+
+### 改回原密码(整文件可重复跑;改后 pwToken2 即死,故放节末)
+PUT {{host}}/api/members/me/password
+Authorization: Bearer {{pwToken2}}
+Content-Type: application/json
+
+{
+  "oldPassword": "spec177-pass",
+  "newPassword": "secret123"
+}

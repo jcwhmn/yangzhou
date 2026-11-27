@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
+import yangzhou.api.security.ClientType
 
 @RestController
 @RequestMapping("/api")
@@ -16,10 +17,12 @@ class AuthController(
     @PostMapping("/auth/bootstrap")
     fun bootstrap(
         @Valid @RequestBody request: BootstrapRequest,
-    ): ResponseEntity<AuthService.TokenResponse> = ResponseEntity.status(HttpStatus.CREATED).body(authService.bootstrap(request.username, request.password))
+    ): ResponseEntity<AuthService.TokenResponse> = ResponseEntity
+        .status(HttpStatus.CREATED)
+        .body(authService.bootstrap(request.username, request.password, ClientType.from(request.clientType)))
 
     @PostMapping("/auth/login")
     fun login(
         @Valid @RequestBody request: LoginRequest,
-    ): ResponseEntity<AuthService.TokenResponse> = ResponseEntity.ok(authService.login(request.username, request.password))
+    ): ResponseEntity<AuthService.TokenResponse> = ResponseEntity.ok(authService.login(request.username, request.password, ClientType.from(request.clientType)))
 }

@@ -41,7 +41,14 @@ class ApiClient private constructor(
                     .header("Content-Type", "application/json")
                     .POST(
                         HttpRequest.BodyPublishers.ofString(
-                            mapper.writeValueAsString(mapOf("username" to username, "password" to password)),
+                            // spec 0177 §4.1:yz CLI 恒传 clientType=cli → token ct=cli,TTL 30d(§2.3 D 表)
+                            mapper.writeValueAsString(
+                                mapOf(
+                                    "username" to username,
+                                    "password" to password,
+                                    "clientType" to "cli",
+                                ),
+                            ),
                         ),
                     ).build(),
                 HttpResponse.BodyHandlers.ofString(),

@@ -35,7 +35,8 @@ test("V12-S3 Sprint 全链路——建/指派/开始/完成/backlog/历史 @smok
     .getByRole("link", { name: /Sprint 42/ })
     .first()
     .click();
-  await expect(page.getByText("E2E 冒烟 item")).toBeVisible();
+  // 断言 item 链接而非全页文本:组时间线 caption 含同名标题,getByText 全页子串必撞(YPJ-284)
+  await expect(page.getByRole("link", { name: "E2E 冒烟 item" })).toBeVisible();
 
   // backlog 不含已指派 item
   await page.goto(`/p/${projectKey}/backlog`);
@@ -126,10 +127,10 @@ test("V13-S3 拉入对话框——多选勾入/移出 + 详情回链", async ({
     .check();
   await page.getByRole("button", { name: "完成", exact: true }).click();
   await expect(page.getByRole("dialog")).toBeHidden();
-  await expect(page.getByText("E2E 冒烟 item")).toBeVisible();
+  await expect(page.getByRole("link", { name: "E2E 冒烟 item" })).toBeVisible();
 
-  // 详情回链:点 sprint 名跳回 sprint 页
-  await page.getByText("E2E 冒烟 item").first().click();
+  // 详情回链:点 item 名进详情(不再 .first():caption 不再造成多命中)
+  await page.getByRole("link", { name: "E2E 冒烟 item" }).click();
   await page.getByRole("link", { name: "Sprint 43" }).click(); // V65 删箭头后缀
   await expect(page).toHaveURL(/\/sprint\/[0-9a-f-]{36}/);
 

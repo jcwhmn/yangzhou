@@ -7,8 +7,10 @@ import io.mockk.verify
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
+import org.springframework.security.authentication.BadCredentialsException
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.context.SecurityContextHolder
+import org.springframework.security.crypto.password.PasswordEncoder
 import yangzhou.api.business.workspace.WorkspaceService
 import yangzhou.api.error.BadRequestException
 import yangzhou.api.error.ConflictException
@@ -44,6 +46,8 @@ class MemberServiceUnitTest {
     private val timeEntries = mockk<TimeEntryRepository>(relaxed = true)
     private val projectViews = mockk<ProjectViewRepository>(relaxed = true)
     private val notifications = mockk<NotificationRepository>(relaxed = true)
+    private val encoder = mockk<PasswordEncoder>(relaxed = true)
+    private val blacklist = mockk<MemberBlacklistService>(relaxed = true)
     private val service =
         MemberService(
             members,
@@ -57,6 +61,8 @@ class MemberServiceUnitTest {
             timeEntries,
             projectViews,
             notifications,
+            encoder,
+            blacklist,
         )
 
     private val wsId = UUID(0, 9)
@@ -92,6 +98,8 @@ class MemberServiceUnitTest {
             timeEntries,
             projectViews,
             notifications,
+            encoder,
+            blacklist,
         )
         every { workspaceService.required() } returns Workspace(id = 1L, objectId = wsId)
         every { members.findByObjectId(virtual.objectId) } returns virtual
@@ -249,6 +257,39 @@ class MemberServiceUnitTest {
         fun missingMemberRejected() {
             every { members.findByObjectId(any()) } returns null
             assertFailsWith<NotFoundException> { service.setLastProjectKey(UUID.randomUUID(), "x") }
+        }
+    }
+
+    @Nested
+    inner class ChangeMyPassword {
+        private val me = member(id = 1L, name = "me", passwordHash = "old-hash")
+
+        private fun loginAs() {
+            SecurityContextHolder.getContext().authentication =
+                UsernamePasswordAuthenticationToken(me.objectId.toString(), null, emptyList())
+            every { members.findByObjectId(me.objectId) } returns me
+        }
+
+        @Test
+        fun wrongOldPasswordRejected() {
+            // spec 0177 §2.3 B 表:old 错 → 401(BadCredentials)
+            loginAs()
+            every { encoder.matches("wrong", "old-hash") } returns false
+            assertFailsWith<BadCredentialsException> { service.changeMyPassword("wrong", "new-pass-123") }
+        }
+
+        @Test
+        fun successRehashesAndKicksAllSessions() {
+            // spec §4.3 R7 拍板「踢」:改密成功 → 黑名单 upsert,含当前会话
+            loginAs()
+            every { encoder.matches("old", "old-hash") } returns true
+            every { encoder.encode("new-pass-123") } returns "new-hash"
+            every { members.save(any()) } answers { firstArg() }
+            service.changeMyPassword("old", "new-pass-123")
+            verify {
+                members.save(withArg { assertEquals("new-hash", it.passwordHash) })
+                blacklist.upsert(me.id!!)
+            }
         }
     }
 }

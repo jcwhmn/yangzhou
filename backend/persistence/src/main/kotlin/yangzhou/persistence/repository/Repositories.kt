@@ -26,6 +26,8 @@ import yangzhou.persistence.ItemGroupType
 import yangzhou.persistence.ItemStatusHistory
 import yangzhou.persistence.ItemType
 import yangzhou.persistence.Member
+import yangzhou.persistence.MemberBlacklist
+import yangzhou.persistence.MemberRole
 import yangzhou.persistence.Milestone
 import yangzhou.persistence.MilestoneItem
 import yangzhou.persistence.Notification
@@ -882,4 +884,16 @@ interface BoardItemOrderRepository : CrudRepository<BoardItemOrder, Long> {
         projectObjectId: UUID,
         itemObjectIds: Collection<UUID>,
     )
+}
+
+/** spec 0177(S1)§4.3:member 级黑名单;每成员至多一行(唯一约束)。 */
+interface MemberBlacklistRepository : CrudRepository<MemberBlacklist, Long> {
+    fun findByMemberId(memberId: Long): MemberBlacklist?
+
+    fun deleteByMemberId(memberId: Long)
+}
+
+/** spec 0177(S1)§3.1:统一角色叉表;S2 启用 project 级查询。 */
+interface MemberRoleRepository : CrudRepository<MemberRole, Long> {
+    fun findByMemberId(memberId: Long): List<MemberRole>
 }
