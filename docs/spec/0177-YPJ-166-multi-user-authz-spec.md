@@ -324,7 +324,7 @@ login/bootstrap 是公开端点不走此链,但**登录本身需查 status**:dis
 
 - 合计 6.5d;7 张 ≥6 → 用户拍板(2026-11-28 深夜)**建新 sprint V34(planned)专做本功能**;父票 166 随迁;7 票已挂 V34 并按依赖序铺排 schedule(2026-11-29 起)。
 - 原 4 票(288/289/290/291)重定 scope+更名;新增 293/294/295。
-- **V33(修补与基建)保持 active**,其收口与其余成员去向由用户执行(本票迁出不触发自动迁移)。
+- **V33(修补与基建)已退回 planned**(2026-11-28 深夜,`actions/backward`;再开工重新 start 即可)。UI 未暴露 backward/reopen 等组动作按钮的缺口已立 backlog 票 YPJ-296(P3)。
 - 临时语义:S2 项目内建号暂挂既有 LeaderGuard,S3 平移 requireEditor(中间态无安全洞:leader⊂editor)。
 - 子票说明文档约定不变(`docs/spec/0177-s{N}-*.md`,开工时写);defer 存档票 YPJ-292 留 backlog 不进 sprint。
 
