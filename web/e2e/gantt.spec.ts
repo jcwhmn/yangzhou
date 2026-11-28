@@ -15,7 +15,12 @@ import {
 async function pickScope(page: import("@playwright/test").Page, label: string) {
   await expect(async () => {
     // 重试轮清场:上轮菜单若开着,Escape 关掉,避免 trigger 点击变成 toggle 关菜单
-    if (await page.getByRole("listbox").isVisible().catch(() => false)) {
+    if (
+      await page
+        .getByRole("listbox")
+        .isVisible()
+        .catch(() => false)
+    ) {
       await page.keyboard.press("Escape");
     }
     await page.getByTestId("gantt-scope").click();
