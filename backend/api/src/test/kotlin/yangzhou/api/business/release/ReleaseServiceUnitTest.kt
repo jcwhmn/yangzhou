@@ -7,7 +7,7 @@ import org.junit.jupiter.api.BeforeEach
 import yangzhou.api.error.BadRequestException
 import yangzhou.api.error.ConflictException
 import yangzhou.api.error.NotFoundException
-import yangzhou.api.guard.LeaderGuard
+import yangzhou.api.guard.ProjectGuard
 import yangzhou.persistence.Item
 import yangzhou.persistence.Member
 import yangzhou.persistence.Project
@@ -42,11 +42,11 @@ class ReleaseServiceUnitTest {
     private val members = mockk<MemberRepository>(relaxed = true)
     private val items = mockk<ItemRepository>(relaxed = true)
     private val statuses = mockk<yangzhou.persistence.repository.StatusRepository>(relaxed = true)
-    private val leaderGuard = mockk<LeaderGuard>(relaxed = true)
+    private val projectGuard = mockk<ProjectGuard>(relaxed = true)
     private val memberService = mockk<yangzhou.api.business.member.MemberService>(relaxed = true)
     private val clock = Clock.fixed(Instant.parse("2026-11-20T00:00:00Z"), ZoneOffset.UTC)
     private val service =
-        ReleaseService(projects, releases, releaseItems, releaseItemHistories, members, items, statuses, leaderGuard, memberService, clock)
+        ReleaseService(projects, releases, releaseItems, releaseItemHistories, members, items, statuses, projectGuard, memberService, clock)
 
     private val project = Project(id = 1L, objectId = UUID(0, 1), workspaceObjectId = UUID(0, 9), key = "CHE", name = "CHE")
     private val r = Release(id = 1L, objectId = UUID(0, 2), projectObjectId = UUID(0, 1), name = "1.0", stage = "rc")
@@ -56,7 +56,7 @@ class ReleaseServiceUnitTest {
 
     @BeforeEach
     fun setup() {
-        clearMocks(projects, releases, leaderGuard)
+        clearMocks(projects, releases, projectGuard)
         every { projects.findByKey("CHE") } returns project
         every { releases.findByProjectObjectIdAndObjectId(UUID(0, 1), r.objectId) } returns r
         every { memberService.current() } returns Member(workspaceObjectId = UUID(0, 9), username = "me", passwordHash = null, displayName = "我")

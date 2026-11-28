@@ -17,12 +17,17 @@ import java.util.UUID
 @RequestMapping("/api")
 class AttributeController(
     private val service: AttributeService,
+    private val adminGuard: yangzhou.api.guard.AdminGuard,
 ) {
+    /** S3(YPJ-299)矩阵行 31/Q15:属性词表管理 admin only(GET 保持登录即可)。 */
     @PostMapping("/attributes")
     @ResponseStatus(HttpStatus.CREATED)
     fun create(
         @Valid @RequestBody request: CreateAttributeRequest,
-    ): AttributeService.AttributeDto = service.create(request.name.trim(), request.kind, request.leveled, request.parentId)
+    ): AttributeService.AttributeDto {
+        adminGuard.requireAdmin()
+        return service.create(request.name.trim(), request.kind, request.leveled, request.parentId)
+    }
 
     @GetMapping("/attributes")
     fun list(): List<AttributeService.AttributeDto> = service.list()
@@ -31,11 +36,17 @@ class AttributeController(
     fun update(
         @PathVariable attributeId: UUID,
         @RequestBody request: UpdateAttributeRequest,
-    ): AttributeService.AttributeDto = service.update(attributeId, request.kind, request.leveled, request.parentObjectId, request.unassign)
+    ): AttributeService.AttributeDto {
+        adminGuard.requireAdmin() // S3(YPJ-299)行 31
+        return service.update(attributeId, request.kind, request.leveled, request.parentObjectId, request.unassign)
+    }
 
     @DeleteMapping("/attributes/{attributeId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun delete(
         @PathVariable attributeId: UUID,
-    ) = service.delete(attributeId)
+    ) {
+        adminGuard.requireAdmin() // S3(YPJ-299)行 31
+        service.delete(attributeId)
+    }
 }

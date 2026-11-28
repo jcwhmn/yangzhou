@@ -249,6 +249,8 @@ note right of ProjectMember
   有行 = 仅池内可指派/进候选。
   删成员:本表行随 FK 级联清,
   item.assignee 由 FK 置空(V5)。
+  S3(YPJ-299):role 列已去(V74),
+  池行只表成员资格,角色在 member_role。
 end note
 note right of Milestone
   V14(spec 0011):独立表,非 ItemGroup(PRD §9)。

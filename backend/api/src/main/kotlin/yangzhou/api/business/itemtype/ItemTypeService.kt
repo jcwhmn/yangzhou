@@ -5,7 +5,7 @@ import org.springframework.transaction.annotation.Transactional
 import yangzhou.api.error.BadRequestException
 import yangzhou.api.error.ConflictException
 import yangzhou.api.error.NotFoundException
-import yangzhou.api.guard.LeaderGuard
+import yangzhou.api.guard.ProjectGuard
 import yangzhou.persistence.ItemType
 import yangzhou.persistence.repository.ItemRepository
 import yangzhou.persistence.repository.ItemTypeRepository
@@ -19,7 +19,7 @@ class ItemTypeService(
     private val projects: ProjectRepository,
     private val itemTypes: ItemTypeRepository,
     private val items: ItemRepository,
-    private val leaderGuard: LeaderGuard,
+    private val projectGuard: ProjectGuard,
 ) {
     data class ItemTypeDto(
         val typeKey: String,
@@ -47,7 +47,7 @@ class ItemTypeService(
         key: String,
         request: CreateItemTypeRequest,
     ): ItemTypeDto {
-        leaderGuard.requireLeader(key)
+        projectGuard.requireEditor(key)
         val typeKey =
             request.typeKey?.trim().takeUnless { it.isNullOrEmpty() }
                 ?: throw BadRequestException("typeKey 必填")
@@ -69,7 +69,7 @@ class ItemTypeService(
         typeKey: String,
         request: UpdateItemTypeRequest,
     ): ItemTypeDto {
-        leaderGuard.requireLeader(key)
+        projectGuard.requireEditor(key)
         val pid = project(key).objectId!!
         val t =
             itemTypes.findByProjectObjectIdAndTypeKey(pid, typeKey)
@@ -84,7 +84,7 @@ class ItemTypeService(
         key: String,
         typeKey: String,
     ) {
-        leaderGuard.requireLeader(key)
+        projectGuard.requireEditor(key)
         val pid = project(key).objectId!!
         val t =
             itemTypes.findByProjectObjectIdAndTypeKey(pid, typeKey)

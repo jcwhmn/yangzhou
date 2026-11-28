@@ -191,6 +191,9 @@ interface ProjectMemberRepository : CrudRepository<ProjectMember, Long> {
         projectObjectId: UUID,
         memberObjectId: UUID,
     ): ProjectMember?
+
+    /** S3(YPJ-299):成员的池行全集(可见性过滤/requirePoolEditor 交集用)。 */
+    fun findByMemberObjectId(memberObjectId: UUID): List<ProjectMember>
 }
 
 interface CommentRepository : CrudRepository<Comment, Long> {
@@ -909,4 +912,7 @@ interface MemberRoleRepository : CrudRepository<MemberRole, Long> {
         memberId: Long,
         role: String,
     )
+
+    /** S3(YPJ-299):成员在某项目的全部角色行(池角色读/授收 upsert 用)。 */
+    fun findByMemberIdAndProjectId(memberId: Long, projectId: Long): List<MemberRole>
 }

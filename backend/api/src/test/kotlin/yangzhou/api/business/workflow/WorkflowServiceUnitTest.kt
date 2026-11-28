@@ -25,9 +25,9 @@ import kotlin.test.assertTrue
 class WorkflowServiceUnitTest {
     private val projects = mockk<ProjectRepository>(relaxed = true)
     private val statuses = mockk<StatusRepository>(relaxed = true)
-    private val leaderGuard = mockk<yangzhou.api.guard.LeaderGuard>(relaxed = true)
+    private val projectGuard = mockk<yangzhou.api.guard.ProjectGuard>(relaxed = true)
     private val mapper = ObjectMapper()
-    private val service = WorkflowService(leaderGuard, projects, statuses, mapper)
+    private val service = WorkflowService(projectGuard, projects, statuses, mapper)
 
     private val project = Project(id = 1L, objectId = UUID(0, 1), workspaceObjectId = UUID(0, 9), key = "CHE", name = "CHE")
     private val todo = Status(id = 1L, objectId = UUID(0, 1), projectObjectId = UUID(0, 1), name = "To Do", statusType = StatusType.START, position = 0)

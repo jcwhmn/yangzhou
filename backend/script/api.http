@@ -353,12 +353,12 @@ Content-Type: application/json
   "memberId": "{{meId}}"
 }
 
-### 设 leader(YPJ-102;创建者已是 leader,幂等确认)
+### 设 editor(YPJ-299 S3:池去角色化,授/收角色写 member_role)
 PUT {{host}}/api/projects/{{pkey}}/members/{{meId}}/role
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
-{"role":"leader"}
+{"role":"editor"}
 
 ### ============ 7. Item ============
 
@@ -2274,14 +2274,14 @@ Content-Type: application/json
 GET {{host}}/api/version
 Authorization: Bearer {{token}}
 
-### [预期 409] 唯一 leader 自撤(YPJ-102;先设好接任者)
+### 自撤 editor(YPJ-299 S3:最后 leader 保护废除,admin 兜底,自撤放行)
 PUT {{host}}/api/projects/{{pkey}}/members/{{meId}}/role
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {"role":"member"}
 
-> {% client.assert(response.status === 409, "预期 409,实际 " + response.status); %}
+> {% client.assert(response.status === 200, "预期 200,实际 " + response.status); %}
 ### ============================================================
 ### ============ 19. Workflow 状态进行态(YPJ-120;spec 0089) ============
 ### ============================================================

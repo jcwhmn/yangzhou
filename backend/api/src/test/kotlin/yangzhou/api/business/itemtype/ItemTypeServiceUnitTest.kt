@@ -9,7 +9,7 @@ import yangzhou.api.error.BadRequestException
 import yangzhou.api.error.ConflictException
 import yangzhou.api.error.ForbiddenException
 import yangzhou.api.error.NotFoundException
-import yangzhou.api.guard.LeaderGuard
+import yangzhou.api.guard.ProjectGuard
 import yangzhou.persistence.ItemType
 import yangzhou.persistence.Project
 import yangzhou.persistence.repository.ItemRepository
@@ -25,8 +25,8 @@ class ItemTypeServiceUnitTest {
     private val projects = mockk<ProjectRepository>(relaxed = true)
     private val itemTypes = mockk<ItemTypeRepository>(relaxed = true)
     private val items = mockk<ItemRepository>(relaxed = true)
-    private val leaderGuard = mockk<LeaderGuard>(relaxed = true)
-    private val service = ItemTypeService(projects, itemTypes, items, leaderGuard)
+    private val projectGuard = mockk<ProjectGuard>(relaxed = true)
+    private val service = ItemTypeService(projects, itemTypes, items, projectGuard)
 
     private val pid = UUID(0, 1)
     private val project = Project(id = 1, objectId = pid, workspaceObjectId = UUID(0, 9), key = "CHE", name = "CHE")
@@ -74,7 +74,7 @@ class ItemTypeServiceUnitTest {
 
         @Test
         fun nonLeaderRejected() {
-            every { leaderGuard.requireLeader("CHE") } throws ForbiddenException("需要项目 leader 权限")
+            every { projectGuard.requireEditor("CHE") } throws ForbiddenException("需要项目 editor 权限")
             assertFailsWith<ForbiddenException> { service.create("CHE", ItemTypeService.CreateItemTypeRequest("feat", "Feature")) }
         }
     }

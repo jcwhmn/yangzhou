@@ -24,8 +24,9 @@ class ProjectMemberServiceUnitTest {
     private val projects = mockk<ProjectRepository>(relaxed = true)
     private val members = mockk<MemberRepository>(relaxed = true)
     private val projectMembers = mockk<ProjectMemberRepository>(relaxed = true)
-    private val leaderGuard = mockk<yangzhou.api.guard.LeaderGuard>(relaxed = true)
-    private val service = ProjectMemberService(leaderGuard, projects, members, projectMembers)
+    private val projectGuard = mockk<yangzhou.api.guard.ProjectGuard>(relaxed = true)
+    private val memberRoles = mockk<yangzhou.persistence.repository.MemberRoleRepository>(relaxed = true)
+    private val service = ProjectMemberService(projectGuard, projects, members, projectMembers, memberRoles)
 
     private val project = Project(id = 1L, objectId = UUID(0, 1), workspaceObjectId = UUID(0, 9), key = "CHE", name = "CHE")
     private val member =

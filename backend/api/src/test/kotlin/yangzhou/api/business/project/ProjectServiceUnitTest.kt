@@ -50,10 +50,10 @@ class ProjectServiceUnitTest {
     private val checklists = mockk<yangzhou.persistence.repository.ChecklistItemRepository>(relaxed = true)
     private val memberRepo = mockk<yangzhou.persistence.repository.MemberRepository>(relaxed = true)
     private val timeEntries = mockk<yangzhou.persistence.repository.TimeEntryRepository>(relaxed = true)
-    private val leaderGuard = mockk<yangzhou.api.guard.LeaderGuard>(relaxed = true)
+    private val adminGuard = mockk<yangzhou.api.guard.AdminGuard>(relaxed = true)
     private val service =
         ProjectService(
-            leaderGuard,
+            adminGuard,
             projects,
             statuses,
             workflowRules,
