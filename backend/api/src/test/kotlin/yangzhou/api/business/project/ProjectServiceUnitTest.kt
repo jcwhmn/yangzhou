@@ -37,6 +37,7 @@ class ProjectServiceUnitTest {
     private val deletions = mockk<ProjectDeletionRepository>(relaxed = true)
     private val members = mockk<MemberService>(relaxed = true)
     private val projectMembers = mockk<ProjectMemberRepository>(relaxed = true)
+    private val memberRoles = mockk<yangzhou.persistence.repository.MemberRoleRepository>(relaxed = true)
     private val groupTypes = mockk<ItemGroupTypeRepository>(relaxed = true)
     private val itemTypes = mockk<yangzhou.persistence.repository.ItemTypeRepository>(relaxed = true)
     private val groupWorkflow = mockk<yangzhou.api.business.itemgroup.GroupWorkflowService>(relaxed = true)
@@ -62,6 +63,7 @@ class ProjectServiceUnitTest {
             deletions,
             members,
             projectMembers,
+            memberRoles,
             groupTypes,
             itemTypes,
             groupWorkflow,
@@ -109,6 +111,7 @@ class ProjectServiceUnitTest {
             every { workflowRules.save(any<yangzhou.persistence.ProjectWorkflowRule>()) } answers
                 { firstArg<yangzhou.persistence.ProjectWorkflowRule>() }
             every { projectMembers.save(any<yangzhou.persistence.ProjectMember>()) } answers { firstArg() }
+            every { memberRoles.save(any<yangzhou.persistence.MemberRole>()) } answers { firstArg() }
             every { groupTypes.save(any<yangzhou.persistence.ItemGroupType>()) } answers { firstArg() }
             every { statuses.findByProjectObjectIdOrderByPosition(UUID(0, 1)) } returns defaultStatuses(UUID(0, 1))
             val saved = service.create("CHE", "CHE")
@@ -117,6 +120,13 @@ class ProjectServiceUnitTest {
             verify(exactly = 0) { groupTypes.save(any()) } // YPJ-165:不再种 release,组类型全由用户自配
             verify(exactly = 4) { itemTypes.save(any()) } // YPJ-177:item type 四值全种 builtin
             verify { projectMembers.save(any()) } // 0047 创建者入池
+            verify {
+                memberRoles.save(
+                    match<yangzhou.persistence.MemberRole> {
+                        it.memberId == 5L && it.role == "editor" && it.projectId == 1L
+                    },
+                )
+            } // YPJ-300 创建即管 (creator, editor, project)
         }
     }
 
@@ -140,9 +150,42 @@ class ProjectServiceUnitTest {
 
         @Test
         fun listSkipsBrokenProjects() {
+            every { adminGuard.isAdmin() } returns true
             every { projects.findAll() } returns listOf(che)
             every { statuses.findByProjectObjectIdOrderByPosition(UUID(0, 1)) } throws RuntimeException("boom")
             assertEquals(emptyList(), service.list()) // 组装失败跳过,不炸整列表
+        }
+
+        @Test
+        fun listAdminSeesAllNonAdminFilteredToPoolAndRoles() {
+            val other = che.copy(id = 2L, objectId = UUID(0, 2), key = "OTH")
+            every { statuses.findByProjectObjectIdOrderByPosition(any()) } returns emptyList()
+            every { projects.findByKey("OTH") } returns other
+
+            // admin 全量(行 6)
+            every { adminGuard.isAdmin() } returns true
+            every { projects.findAll() } returns listOf(che, other)
+            assertEquals(listOf("CHE", "OTH"), service.list().map { it.key })
+
+            // 非 admin:池行∪角色行过滤(OTH 无行不可见;workspace admin 行 projectId=null 不计入可见性)
+            every { adminGuard.isAdmin() } returns false
+            every { projects.findAll() } returns listOf(che, other)
+            every { projectMembers.findByMemberObjectId(UUID(0, 5)) } returns
+                listOf(yangzhou.persistence.ProjectMember(projectObjectId = UUID(0, 1), memberObjectId = UUID(0, 5)))
+            every { projects.findByObjectId(UUID(0, 1)) } returns che
+            every { memberRoles.findByMemberId(5L) } returns
+                listOf(
+                    yangzhou.persistence.MemberRole(memberId = 5L, role = "admin", projectId = null),
+                    yangzhou.persistence.MemberRole(memberId = 5L, role = "viewer", projectId = 2L),
+                )
+            every { projects.findAllById(setOf(1L, 2L)) } returns listOf(che, other)
+            assertEquals(listOf("CHE", "OTH"), service.list().map { it.key })
+
+            // 角色行交集剔除:OTH viewer 行改无(仅池行 CHE)
+            every { memberRoles.findByMemberId(5L) } returns
+                listOf(yangzhou.persistence.MemberRole(memberId = 5L, role = "admin", projectId = null))
+            every { projects.findAllById(setOf(1L)) } returns listOf(che)
+            assertEquals(listOf("CHE"), service.list().map { it.key })
         }
 
         @Test

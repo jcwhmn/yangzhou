@@ -19,20 +19,29 @@ class ProjectController(
     private val service: ProjectService,
     private val excelExportService: ExcelExportService,
     private val feasibilityService: yangzhou.api.business.feasibility.FeasibilityService,
+    private val projectGuard: yangzhou.api.guard.ProjectGuard,
 ) {
+    /** 矩阵行 25:建项目 = admin ∨ editor-anywhere(创建即管在 service 落 creator editor 行)。 */
     @PostMapping("/projects")
     @ResponseStatus(HttpStatus.CREATED)
     fun create(
         @Valid @RequestBody request: CreateProjectRequest,
-    ): ProjectService.ProjectDto = service.create(request.key.trim(), request.name.trim())
+    ): ProjectService.ProjectDto {
+        projectGuard.requireEditorAnywhere()
+        return service.create(request.key.trim(), request.name.trim())
+    }
 
     @GetMapping("/projects")
     fun list(): List<ProjectService.ProjectDto> = service.list()
 
+    /** 矩阵行 7/8:直访 requireMember(NotFound 先于 403,守卫内解析)。 */
     @GetMapping("/projects/{key}")
     fun get(
         @PathVariable key: String,
-    ): ProjectService.ProjectDto = service.get(key)
+    ): ProjectService.ProjectDto {
+        projectGuard.requireMember(key)
+        return service.get(key)
+    }
 
     /** YPJ-151:项目设置(release/milestone 启停);null=不改。 */
     @PatchMapping("/projects/{key}/settings")

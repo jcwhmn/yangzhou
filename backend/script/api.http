@@ -3801,3 +3801,283 @@ Authorization: Bearer {{token}}
 ### 清场:删一次性项目(key 寻址;.force 物理删)
 DELETE {{host}}/api/projects/{{s2ProjectKey}}?force=true
 Authorization: Bearer {{token}}
+
+### ============ 24. spec 0177(S3-b)可见性与建删项目门(YPJ-300;节内自含:自建项目/账号,节末清场;跑过「登录」后可单跑本节) ============
+### 前置:8082 必须已重建为含 S3 代码的 jar(项目直访/目录/建项目门是 S3 新增;旧 jar 部分负例必绿得假)
+### ============================================================
+### 本节验证(矩阵行 3a/3b/4/5/6/7/8/25):列表过滤、直访门、池列表门、目录门、
+### 他人编辑门(C1)、建项目门+创建即管、删项目门;§4.4 两端点归切片 c(§25)。
+
+### 节首自登录(节内重登,单跑不依赖 §1 token 存活)
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "me",
+  "password": "secret123"
+}
+
+> {% client.global.set("token", response.body.token); %}
+
+### admin 建基础项目 S3A(创建者入池+editor 行)
+POST {{host}}/api/projects
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "key": "S3A{{run}}",
+  "name": "S3-b 基础场"
+}
+
+> {%
+    client.global.set("s3AId", response.body.projectId);
+    client.global.set("s3AKey", response.body.key);
+ %}
+
+### 建真账号 s3bee(将授 editor)
+POST {{host}}/api/members
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "displayName": "S3bee{{run}}",
+  "username": "s3bee{{run}}",
+  "password": "secret123"
+}
+
+> {%
+    client.global.set("s3BeeId", response.body.memberId);
+    client.assert(response.body.virtual === false, "s3bee 应为真账号");
+ %}
+
+### s3bee 入池 S3A
+POST {{host}}/api/projects/{{s3AKey}}/members
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "memberId": "{{s3BeeId}}"
+}
+
+### admin 授 s3bee editor
+PUT {{host}}/api/projects/{{s3AKey}}/members/{{s3BeeId}}/role
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "role": "editor"
+}
+
+### s3bee 自登录
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "s3bee{{run}}",
+  "password": "secret123"
+}
+
+> {%
+    client.global.set("s3BeeToken", response.body.token);
+    client.global.set("token", response.body.token);
+ %}
+
+### s3bee 建项目 S3B(editor-anywhere 门正向 → 201)
+POST {{host}}/api/projects
+Authorization: Bearer {{s3BeeToken}}
+Content-Type: application/json
+
+{
+  "key": "S3B{{run}}",
+  "name": "S3-b editor 自建"
+}
+
+> {%
+    client.global.set("s3BKey", response.body.key);
+    client.assert(response.body.key === "S3B{{run}}", "editor 建项目应 201");
+ %}
+
+### s3bee whoami:创建即管(projectRoles 含 S3A+S3B 两行 editor)
+GET {{host}}/api/members/me
+Authorization: Bearer {{s3BeeToken}}
+
+> {%
+    const roles = response.body.projectRoles;
+    client.assert(roles.length === 2, "创建即管应恰两行,实际 " + roles.length);
+    client.assert(roles.every(r => r.role === "editor"), "两行都应为 editor");
+ %}
+
+### 建真账号 s3cat(纯池成员,不授角色)
+POST {{host}}/api/members
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "displayName": "S3cat{{run}}",
+  "username": "s3cat{{run}}",
+  "password": "secret123"
+}
+
+> {%
+    client.global.set("s3CatId", response.body.memberId);
+    client.global.set("s3CatToken", "");
+ %}
+
+### s3cat 入池 S3A
+POST {{host}}/api/projects/{{s3AKey}}/members
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "memberId": "{{s3CatId}}"
+}
+
+### s3cat 自登录
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "s3cat{{run}}",
+  "password": "secret123"
+}
+
+> client.global.set("s3CatToken", response.body.token);
+
+### [负例] s3cat 建项目 403(行 25,无 editor 行)
+POST {{host}}/api/projects
+Authorization: Bearer {{s3CatToken}}
+Content-Type: application/json
+
+{
+  "key": "S3C{{run}}",
+  "name": "不应存在"
+}
+
+> {% client.assert(response.status === 403, "池成员建项目应 403,实际 " + response.status); %}
+
+### [负例] s3cat 目录 403(行 3b)
+GET {{host}}/api/members
+Authorization: Bearer {{s3CatToken}}
+
+> {% client.assert(response.status === 403, "纯池成员读目录应 403,实际 " + response.status); %}
+
+### s3bee 目录 200(editor-anywhere 正向)
+GET {{host}}/api/members
+Authorization: Bearer {{s3BeeToken}}
+
+> {% client.assert(response.status === 200, "editor 读目录应 200,实际 " + response.status); %}
+
+### s3cat 直访 S3A 200(池行,行 7)
+GET {{host}}/api/projects/{{s3AKey}}
+Authorization: Bearer {{s3CatToken}}
+
+> {% client.assert(response.status === 200, "池成员直访应 200,实际 " + response.status); %}
+
+### [负例] s3cat 直访 S3B 403(存在但无行,行 8)
+GET {{host}}/api/projects/{{s3BKey}}
+Authorization: Bearer {{s3CatToken}}
+
+> {% client.assert(response.status === 403, "无行者直访存在项目应 403,实际 " + response.status); %}
+
+### [负例] s3cat 直访不存在项目 404(NotFound 先于 403)
+GET {{host}}/api/projects/ZZ{{run}}
+Authorization: Bearer {{s3CatToken}}
+
+> {% client.assert(response.status === 404, "直访不存在项目应 404,实际 " + response.status); %}
+
+### 列表过滤(行 6):admin 全量含 S3B
+GET {{host}}/api/projects
+Authorization: Bearer {{token}}
+
+> {%
+    client.assert(response.body.some(p => p.key === "S3B{{run}}"), "admin 列表应含 S3B");
+ %}
+
+### 列表过滤:s3cat 不含 S3B、含 S3A
+GET {{host}}/api/projects
+Authorization: Bearer {{s3CatToken}}
+
+> {%
+    client.assert(!response.body.some(p => p.key === "S3B{{run}}"), "s3cat 列表不应含 S3B");
+    client.assert(response.body.some(p => p.key === "S3A{{run}}"), "s3cat 列表应含池项目 S3A");
+ %>
+
+### 池列表门(行 3a):s3cat 读 S3A 池 200
+GET {{host}}/api/projects/{{s3AKey}}/members
+Authorization: Bearer {{s3CatToken}}
+
+> {% client.assert(response.status === 200, "池成员读池列表应 200,实际 " + response.status); %}
+
+### [负例] s3cat 读 S3B 池列表 403(无行)
+GET {{host}}/api/projects/{{s3BKey}}/members
+Authorization: Bearer {{s3CatToken}}
+
+> {% client.assert(response.status === 403, "无行者读他项目池列表应 403,实际 " + response.status); %}
+
+### [负例] 他人编辑门(行 4/5,C1):s3cat 改 s3bee 能力 403
+PUT {{host}}/api/members/{{s3BeeId}}/capabilities
+Authorization: Bearer {{s3CatToken}}
+Content-Type: application/json
+
+{
+  "attribute": "K{{run}}",
+  "level": 2
+}
+
+> {% client.assert(response.status === 403, "无 editor 行改他人能力应 403,实际 " + response.status); %}
+
+### [负例] 他人编辑门:s3cat 改 s3bee github-username 403
+PUT {{host}}/api/members/{{s3BeeId}}/github-username
+Authorization: Bearer {{s3CatToken}}
+Content-Type: application/json
+
+{
+  "githubUsername": "cat-gh"
+}
+
+> {% client.assert(response.status === 403, "无 editor 行改他人 github 应 403,实际 " + response.status); %}
+
+### [正例] 他人编辑门:s3bee(池交集 editor)改 s3cat 能力 200(先建词表)
+POST {{host}}/api/attributes
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "K{{run}}",
+  "kind": "skill",
+  "leveled": true
+}
+
+### s3bee 改 s3cat 能力(同池交集 → 200)
+PUT {{host}}/api/members/{{s3CatId}}/capabilities
+Authorization: Bearer {{s3BeeToken}}
+Content-Type: application/json
+
+{
+  "attribute": "K{{run}}",
+  "level": 2
+}
+
+> {% client.assert(response.status === 200, "池交集 editor 改他人能力应 200,实际 " + response.status); %}
+
+### [负例] 删项目门(C3):s3bee(editor)删 S3B 403
+DELETE {{host}}/api/projects/{{s3BKey}}
+Authorization: Bearer {{s3BeeToken}}
+
+> {% client.assert(response.status === 403, "editor 删项目应 403,实际 " + response.status); %}
+
+### 清场:admin 删 S3B(204,C3 正向)与 S3A
+DELETE {{host}}/api/projects/{{s3BKey}}?force=true
+Authorization: Bearer {{token}}
+
+### 清场:删 S3A
+DELETE {{host}}/api/projects/{{s3AKey}}?force=true
+Authorization: Bearer {{token}}
+
+### 清场:删 s3bee / s3cat
+DELETE {{host}}/api/members/{{s3BeeId}}
+Authorization: Bearer {{token}}
+
+### 清场:删 s3cat
+DELETE {{host}}/api/members/{{s3CatId}}
+Authorization: Bearer {{token}}
