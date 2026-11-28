@@ -1404,10 +1404,10 @@ GET {{host}}/api/projects/{{pkey}}/board
 Authorization: Bearer {{token}}
 
 ### ============ 12. GitHub(V6 配置 + V16-2 按需拉取;轮询兑底见 application.yml yangzhou.github) ============
-### 前置:本节正例需 GitHub PAT(test 容器未配时建分支 400「GitHub API 错误(401)」,后续补挂请求因变量未回填级联未解析,属预期;配 PAT 后整节可绿)
+### 前置(2026-11-28 修正):①CLI 跑须 `-e <env>` 激活环境,且 `-v/-p` 显式指 env 文件(ijhttp 不自动发现);②token 真值在 gitignored http-client.private.env.json;③挂载仓须真实存在且 PAT 可写(现挂 jcwhmn/demo,可废弃沙盒)。缺任一 → 建分支 400「GitHub API 错误(401/404)」→ attachRepo/attachRef 不回填 → 补挂例级联未解析,属预期
 
 ### 配 workspace PAT(永不回显,只回尾 4 位)
-# token 真值放 http-client.private.env.json(gitignored 不入库);private 同名 env 自动覆盖
+# token 真值放 http-client.private.env.json(gitignored 不入库);private 同名 env 自动覆盖;CLI 未激活 env 时会把字面量存进 workspace——见节头前置①
 PUT {{host}}/api/workspace/github-token
 Authorization: Bearer {{token}}
 Content-Type: application/json
@@ -1422,14 +1422,22 @@ Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-  "repo": "octo/r"
+  "repo": "jcwhmn/demo"
 }
 
 > {%
     client.global.set("repoId", response.body.repoId);
 %}
 
-### 建 item 分支(YPJ-27:422→409 已存在,404→400 基线不存在,其余 GitHub 错→400 可操作)
+### 幂等清场:直连 GitHub 删上一轮残留(204=已删,422=本无;其余=PAT/权限问题,让建分支自然报错)
+DELETE https://api.github.com/repos/jcwhmn/demo/git/refs/heads/ypj-27-scratch
+Authorization: Bearer {{github-token}}
+
+> {%
+    client.assert(response.status === 204 || response.status === 422, "清场应 204/422,实际 " + response.status);
+%}
+
+### 建 item 分支(YPJ-27:422→409 已存在,404→400 基线不存在,其余 GitHub 错→400 可操作;上方清场后不应见 409)
 POST {{host}}/api/items/{{itemId}}/branches
 Authorization: Bearer {{token}}
 Content-Type: application/json
@@ -1446,16 +1454,19 @@ Content-Type: application/json
 %}
 
 
-### YPJ-85 webhook(匿名;签名 = sha256=hex(HMAC-SHA256(secret, rawBody)),secret 启动时 env 注入)
-# 正例:命中挂载仓(pkey 已挂 octo/r)→ 202 {"status":"accepted"};未配 PAT 也 202(仅 WARN 跳过同步)
+### YPJ-85 webhook(匿名;签名 = sha256=hex(HMAC-SHA256(secret, rawBody)),secret 启动时 env 注入;实现:secret 未配置一律 403 全拒)
+# test 容器已在 compose 配 YANGZHOU_GITHUB_WEBHOOK_SECRET=test-webhook-secret;body 与 secret 均固定 → 签名可预计算硬编码
+# 正例:命中挂载仓(pkey 已挂 jcwhmn/demo)→ 202 {"status":"accepted"}
 POST {{host}}/api/github/webhook
 X-GitHub-Event: push
-X-Hub-Signature-256: sha256=0000000000000000000000000000000000000000000000000000000000000000
+X-Hub-Signature-256: sha256=190d777796abafc64162bbc1cdbb5bf24d3d60c199b446f4f59a38e43e0b4a06
 Content-Type: application/json
 
-{"repository":{"full_name":"octo/r"}}
+{"repository":{"full_name":"jcwhmn/demo"}}
 
-### [预期 403] 签名错/缺(未配 secret 或签名不符,一律 403)
+> {% client.assert(response.status === 202, "正例应 202 accepted,实际 " + response.status); %}
+
+### [预期 403] 签名错/缺(secret 已配但签名不符,一律 403;secret 未配置同样 403 全拒)
 POST {{host}}/api/github/webhook
 X-GitHub-Event: push
 X-Hub-Signature-256: sha256=deadbeef
@@ -1465,13 +1476,15 @@ Content-Type: application/json
 
 > {% client.assert(response.status === 403, "预期 403,实际 " + response.status); %}
 
-### [预期 200] 忽略未知事件({"status":"ignored"};未知 repo 同样 200 ignored)
+### [预期 200] 忽略未知事件({"status":"ignored"};未知 repo 同样 200 ignored;签名须合法)
 POST {{host}}/api/github/webhook
 X-GitHub-Event: issues
-X-Hub-Signature-256: sha256=0000000000000000000000000000000000000000000000000000000000000000
+X-Hub-Signature-256: sha256=e53b67f8d2a63efc56d78cbe2aa2ce3399e279f73393ec58384ae3ca8ff112f8
 Content-Type: application/json
 
 {"repository":{"full_name":"octo/r"}}
+
+> {% client.assert(response.status === 200, "未知事件应 200 ignored,实际 " + response.status); %}
 
 ### YPJ-39 建从票(供下方补挂;handler 存 itemId2)
 POST {{host}}/api/projects/{{pkey}}/items
@@ -1487,8 +1500,7 @@ Content-Type: application/json
 %}
 
 ### YPJ-39 补挂既有分支到从票(纯库操作不走 GitHub;404 未入册 / 409 重复、PR 行、跨项目未挂载)
-### repo/branch 由上方建分支请求回填;须先跑建分支
-### 建分支 409=分支已存在(换名或沿用);只要建分支成功过一次,回填变量即在
+### repo/branch 由上方建分支请求回填;须同轮先跑建分支(CLI/复刻每轮从零,变量不跨轮持久)
 POST {{host}}/api/items/{{itemId2}}/git-refs
 Authorization: Bearer {{token}}
 Content-Type: application/json
@@ -2219,7 +2231,7 @@ Content-Type: application/json
 
 > {% client.assert(response.status === 409, "预期 409,实际 " + response.status); %}
 
-### [预期 409] PR 行不可补挂(ref 是 PR 号而非分支;需该 PR 已被轮询入册,未入册则 404)
+### [预期 409/404] PR 行不可补挂(ref 是 PR 号而非分支;PR 入册靠轮询,测试环境不保证已入册 → 已入册 409,未入册 404,均合法)
 POST {{host}}/api/items/{{itemId}}/git-refs
 Authorization: Bearer {{token}}
 Content-Type: application/json
@@ -2229,7 +2241,7 @@ Content-Type: application/json
   "ref": "1001"
 }
 
-> {% client.assert(response.status === 409, "预期 409,实际 " + response.status); %}
+> {% client.assert(response.status === 409 || response.status === 404, "预期 409/404,实际 " + response.status); %}
 
 ### [预期 400] 非 custom 词表挂 item 属性(YPJ-103)
 PUT {{host}}/api/items/{{itemId}}/attributes
@@ -3290,7 +3302,7 @@ DELETE {{host}}/api/projects/BO238?force=true
 Authorization: Bearer {{token}}
 
 ### ============ 21. YPJ-274 item 关闭理由(spec 0167;节内自建前置) ============
-### 建一次性 S0 项目(自动带三态 workflow:To Do / In Progress / Done)
+### 建一次性项目(默认 workflow 现 5 态:To Do/In Progress/In Review/QA/Done,后续票所加;脚本按名取态,与态数无关)
 POST {{host}}/api/projects
 Authorization: Bearer {{token}}
 Content-Type: application/json
@@ -3416,7 +3428,7 @@ Authorization: Bearer {{token}}
     client.log("close_reason_changed 留痕 ✓");
 %}
 
-### [负例①] 非终态带理由 → 400
+### [负例①] 转非终态却带 closeReason → 400(spec 0167 行为矩阵;2026-11-28 探针+spec 双实锉,原注释「非终态带理由」不准)
 PATCH {{host}}/api/items/{{item274a}}
 Authorization: Bearer {{token}}
 Content-Type: application/json
@@ -3434,16 +3446,18 @@ Content-Type: application/json
 
 > {% client.assert(response.status === 400, "非法枚举应 400,实际 " + response.status); %}
 
-### [负例③] 非终态票只改理由 → 400
+### [正例⑤] reopen(Done→In Progress)→ 200,理由清空(spec 0167 行为矩阵:reopen 清空两列)
+### 2026-11-28 探针修正:原断言 400 无 spec 依据,body 实为纯 reopen,后端行为一直正确
 PATCH {{host}}/api/items/{{item274a}}
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 { "statusItemId": "{{st274prog}}" }
 
-> {% client.assert(response.status === 400, "预期 400,实际 " + response.status); %}
+> {% client.assert(response.status === 200, "reopen 应 200,实际 " + response.status);
+   if (response.body.closeReason !== null) throw new Error("reopen 应清空,实际:" + response.body.closeReason); %}
 
-### (接上,此时为 In Progress)
+### [负例③] 非终态票带 closeReason(不动状态)→ 400(此时票确为 In Progress,上方 reopen 已就位)
 PATCH {{host}}/api/items/{{item274a}}
 Authorization: Bearer {{token}}
 Content-Type: application/json
@@ -3558,9 +3572,11 @@ Content-Type: application/json
 GET {{host}}/api/members/me
 Authorization: Bearer {{token}}
 
-> {% client.global.set("s2AdminId", response.body.memberId);
->    client.assert(response.body.admin === true, "bootstrap 账号应 admin");
->    client.assert(Array.isArray(response.body.projectRoles), "projectRoles 应为数组"); %}
+> {%
+    client.global.set("s2AdminId", response.body.memberId);
+    client.assert(response.body.admin === true, "bootstrap 账号应 admin");
+    client.assert(Array.isArray(response.body.projectRoles), "projectRoles 应为数组");
+ %}
 
 ### 建一次性项目(挂池用)
 POST {{host}}/api/projects
@@ -3572,8 +3588,10 @@ Content-Type: application/json
   "name": "S2 治理演示"
 }
 
-> {% client.global.set("s2ProjectId", response.body.projectId);
->    client.global.set("s2ProjectKey", response.body.key); %}
+> {%
+    client.global.set("s2ProjectId", response.body.projectId);
+    client.global.set("s2ProjectKey", response.body.key);
+ %}
 
 ### 建真账号(挂项目池;C8)
 POST {{host}}/api/members
@@ -3587,8 +3605,10 @@ Content-Type: application/json
   "projectIds": ["{{s2ProjectId}}"]
 }
 
-> {% client.global.set("s2MemberId", response.body.memberId);
->    client.assert(response.body.virtual === false, "真账号 virtual=false"); %}
+> {%
+    client.global.set("s2MemberId", response.body.memberId);
+    client.assert(response.body.virtual === false, "真账号 virtual=false");
+ %}
 
 ### [负例] 重名成员 409
 POST {{host}}/api/members
