@@ -2,6 +2,16 @@
 
 > 主 spec:`docs/spec/0177-YPJ-166-multi-user-authz-spec.md` §2 矩阵 / §3.2 / §5 / §2.3 C 表。S1(已合)/S2(已合)续篇:账号基座与治理 API 已落,本票落**项目级授权**——池去角色化、三级守卫平移、可见性、建/删项目门、§4.4 两个 project-scoped 端点。
 
+## §0 切片映射(2026-11-28 用户拍板拆分;开放决策 1–5 全同意)
+
+| 切片 | 票号 | 范围 |
+|---|---|---|
+| a 授权地基 | **YPJ-299** | V74 迁移、ProjectGuard 四门、LeaderGuard 删/25 处平移、milestone/attribute 补门、池 setRole rework、守卫单测+平移集成测试 |
+| b 可见性与门 | **YPJ-300** | 列表过滤、直访门、建删项目门+创建即管、目录两级门、capabilities/github 他人编辑门 |
+| c 两端点 | **YPJ-301** | POST /projects/{key}/members/account、PUT /projects/{key}/members/{memberId}/credentials |
+
+依赖:a→b、a→c(b/c 互不依赖);一子票一分支一 PR(仓规),本文档总纲随 a 的 PR 入 main。
+
 ## ⚠️ 架构偏离/契约变更显要标注
 
 1. **LeaderGuard 废除**(父 spec ⚠️-2 已拍板):R2「无 leader 放行」与「最后 leader 保护」两条规则删除;25 个 `requireLeader` 调用点平移 `requireEditor`(语义扩张 leader→editor,R2 grill 拍板,非新偏离)。
