@@ -85,8 +85,82 @@
 
 ## 验收
 
-- [ ] `gradle build` + `integrationTest` 双绿
-- [ ] 全端点对照主 spec §2 矩阵逐个标门(猎场#2 清单,审计表随 PR)
-- [ ] `rg "requireLeader|WorkspaceGuard" backend --g '*.kt'` 清零
-- [ ] api.http §24 全绿(8082);既有节回归不破
-- [ ] 开放决策 1–5 经用户确认
+- [x] `gradle build` + `integrationTest` 双绿(a 片 #277;b 片 #278 会话全量绿,顺带修 A60 潜伏红)
+- [x] 全端点对照主 spec §2 矩阵逐个标门(审计表原定「随 PR」,#277/#278 均漏带,2026-11-29 补入下方 As-built 节随 docs commit 入 main)
+- [x] `rg "requireLeader|WorkspaceGuard" backend --g '*.kt'` 清零(a 片验,b 片复核 2026-11-29)
+- [x] api.http §24 全绿(8082);既有节回归不破(421 请求 0 失败,agent 复刻+用户 CLI 双确认)
+- [x] 开放决策 1–5 经用户确认(2026-11-28 拍板)
+- [ ] §4.4 两端点全分支(c 片 YPJ-301,验收随该票)
+
+## As-built 审计表:全端点 × 门(S3 落地实况,2026-11-29;b 片合并后补)
+
+门缩写:admin=requireAdmin / E=requireEditor / EA=requireEditorAnywhere / M=requireMember / PE=requirePoolEditor。
+直访语义(随 #278 合并确认):项目不存在 404(NotFound 先行)/存在但无权 403「无权访问该项目」。
+
+### 成员域 MemberController
+
+| 端点 | 门 | 矩阵行 | 落地 |
+|---|---|---|---|
+| GET /api/members/me(whoami) | 登录即可;projectRoles 查 member_role | 1 | S1/S2 |
+| GET /api/members(全局目录) | EA | 3b | b ⚠️纯池成员/viewer 403(web 中间态归 S6) |
+| POST /api/members(建号) | admin | 24/30 | S2 |
+| PUT /api/members/{id}/credentials(全局) | admin | 30 | S2 |
+| PUT /api/members/{id}/status | admin | 27 | S2 |
+| PUT /api/members/{id}/admin | admin(最后 admin 守卫) | 29 | S2 |
+| DELETE /api/members/{id} | admin(非终态引用守卫) | 28 | S2 |
+| PUT /api/members/me/password | 本人(踢全会话) | 2 | S1 |
+| PUT /api/members/me/last-project | 登录即可 | — | 既有 |
+| PUT /api/members/{id}/last-project | 登录即可(现状;矩阵无行) | — | 既有 |
+| PUT /api/members/{id}/github-username | 本人∨admin∨PE | 4/5 | b |
+| GET /api/members/{id}/capabilities | 登录即可(矩阵无读门) | — | 既有 |
+| PUT /api/members/{id}/capabilities | 本人∨admin∨PE | 4/5 | b |
+| DELETE /api/members/{id}/capabilities/{attr} | 本人∨admin∨PE | 4/5 | b |
+
+### 项目域 ProjectController/Service
+
+| 端点 | 门 | 矩阵行 | 落地 |
+|---|---|---|---|
+| POST /api/projects | EA;创建即管 (creator, editor) 行+入池 | 25 | b |
+| GET /api/projects | 可见性过滤(service 内联:池∪角色;admin 全量) | 6 | b |
+| GET /api/projects/{key} | M | 7/8 | b |
+| PATCH /api/projects/{key}/settings | 无门(现状;矩阵无行,归类待定) | — | 未接线 |
+| GET /api/projects/{key}/deletion-preview | 无门(CLI admin 链路;删项目本身有门) | — | 未接线 |
+| DELETE /api/projects/{key} | admin(C3) | 26 | a |
+| GET /api/projects/{key}/gantt、export.xlsx | 无门(读门归 S4) | — | 未接线(S4) |
+
+### 项目池 ProjectMemberController
+
+| 端点 | 门 | 矩阵行 | 落地 |
+|---|---|---|---|
+| GET /api/projects/{key}/members | M | 3a | b |
+| POST /api/projects/{key}/members | E | 21 | a |
+| DELETE /api/projects/{key}/members/{memberId} | E(出池即撤角色) | 21 | a |
+| PUT /api/projects/{key}/members/{memberId}/role | E;editor\|viewer\|member 三值;虚拟 400 | 21/Q19 | a |
+| POST /api/projects/{key}/members/account | E(必带凭据;username 唯一/重名 409) | §4.4 开放决策1 | **c 待做** |
+| PUT /api/projects/{key}/members/{memberId}/credentials | E(目标池内 404;虚拟 409) | §4.4 开放决策2 | **c 待做** |
+
+### workflow / itemtype / itemgroup / release / github / milestone(写门,均为 a 片 requireLeader→requireEditor 平移)
+
+| 端点 | 门 | 行 | 备注 |
+|---|---|---|---|
+| POST /api/projects/{key}/statuses;PATCH/DELETE /api/statuses/{statusId} | E | 17 | WorkflowService ×3 |
+| PUT /api/projects/{key}/transitions | E | 18 | WorkflowService ×1 |
+| GET /api/projects/{key}/transitions、statuses 读 | 无门(读门归 S4) | — | |
+| POST/PATCH/DELETE /api/projects/{key}/item-types[/{typeKey}] | E | 19 | ItemTypeService ×3;GET 无门 |
+| POST /api/projects/{key}/group-types;PATCH/DELETE /{typeKey};PUT /{typeKey}/workflow | E | 20 | ItemGroupService ×4;GET 无门 |
+| POST /api/projects/{key}/groups;PATCH/DELETE /{groupId};POST /{groupId}/actions/{function} | E | 20 | ItemGroupService ×4;GET 无门 |
+| PUT /api/items/{itemId}/group-membership、/board-membership | 无门(item 级) | 13 | S4 |
+| POST/PATCH/DELETE /api/projects/{key}/releases[/{releaseId}] | E | 22 | ReleaseService ×3;GET/history/membership 读无门;PUT /items/{id}/release-membership 无门(S4) |
+| POST /api/projects/{key}/repos;DELETE /{repoId};PUT /api/projects/{key}/workflow-rules | E | 23 | GithubConfigService ×3;GET/列表无门;workspace github-token 三端点 workspace 级无门(矩阵无行) |
+| POST/PATCH/DELETE /api/projects/{key}/milestones[/{id}];PUT /{id}/items(归置) | E(a 片补门,原无门) | 16 | MilestoneService ×4;GET 两读端点无门(S4) |
+
+### attribute 词表 AttributeController
+
+| 端点 | 门 | 行 | 落地 |
+|---|---|---|---|
+| POST/PATCH/DELETE /api/attributes[...] | admin | 31 | a |
+| GET 词表 | 登录即可 | 31 注 | a(开放决策 5) |
+
+### item 级(行 9-15)与看板读端点 | 无门 | 9-15 | S4(YPJ-294)全量接线
+
+S3 欠账清零:除上表「c 待做」两条(归 YPJ-301)与「未接线/S4」既有范围外,矩阵行 1-31 已标门端点全部落地。
