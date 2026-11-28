@@ -29,6 +29,7 @@ backend `gradle ktlintFormat`、web `npm run format`;CI 有 format check,格式�
 - 验收过 → agent 开 PR → 用户审阅合并 → agent 走合并回合(workflow.md)
 - 后端「验证绿」定义:`gradle build` + `integrationTest` 绿 + bootRun 能启动(临时端口验证,起后即停;integrationTest 需 Docker,CI 兕底 nightly)
 - 编码完成后**停**:功能代码+测试代码写完即停,等用户 build/debug,通过后再 PR
+- **交付前自检 = 只信跑过的检查**(2026-11-28,YPJ-299):停之前跑完廉价项——backend `gradle ktlintFormat` + `compileTestKotlin`、web `npm run format`;没跑的检查必然把红漏到用户端(ktlint 格式错实锤一次)
 
 ## 手工测试用例落档(2026-11-20 定,YPJ-244 验收复盘)
 
@@ -44,4 +45,12 @@ backend `gradle ktlintFormat`、web `npm run format`;CI 有 format check,格式�
 4. 每个结论先设计反证探针——明确「什么证据能推翻它」,证实与证伪都做。
 5. UI 双路径/状态相关行为(保存/另存、点击语义)必须写「状态×动作→行为」真值表进 spec;结果级描述不算设计完成。
 6. 品味型交互(两可设计如点击语义)动工前摆两方案给用户拍板或给可点原型,agent 不代选。
+
+## 动工前勘察实锤(2026-11-28,YJJ-299 复盘)
+
+设计落在实况上,编码才是翻译。写 spec/动码前逐项 rg/读码实锤:
+
+1. 调用点计数对照票面(`rg -c`);2. 下一个迁移号(ls migration);3. **可抄范式**:最近似的迁移 SQL/守卫/测试脚手架直接抄(先例即正确性);4. 实体键型差异:列名/键型对照实体属性(池表 UUID 列 vs 叉表 bigint 的坑,V41 FK-objectId 改造);5. 前端引用面(rg 关键字,判断契约变更冲击);6. 既有 repository 查询盘点,新查询用派生查询。
+
+配套两条:多处同构平移用 sed/python 批量替换后 rg 验残留,禁逐处手敲;变量用角色语义名(禁单字母),重复请求链收小助手保断言单行可读。
 7. 交用户复验前,agent 先做最小数据探针(查库/直调确认写入已发生);「测试绿」≠「数据落了」。
