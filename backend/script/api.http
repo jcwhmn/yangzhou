@@ -3297,3 +3297,236 @@ Content-Type: application/json
   "oldPassword": "spec177-pass",
   "newPassword": "secret123"
 }
+
+### ============================================================
+### ============ 23. spec 0177(S2)账号治理(YPJ-293;节内自含:自建项目/账号,节末清场;跑过「登录」后可单跑本节) ============
+### ============================================================
+### 注意:禁用/重置密码都会黑名单踢会话;节内自建 dev2 账号演示,节末删号清场,整文件可重复跑。
+
+### whoami(admin=true;形状=身份+admin+projectRoles)
+GET {{host}}/api/members/me
+Authorization: Bearer {{token}}
+
+> {% client.global.set("s2AdminId", response.body.memberId);
+>    client.assert(response.body.admin === true, "bootstrap 账号应 admin");
+>    client.assert(Array.isArray(response.body.projectRoles), "projectRoles 应为数组"); %}
+
+### 建一次性项目(挂池用)
+POST {{host}}/api/projects
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "key": "s2demo{{run}}",
+  "name": "S2 治理演示"
+}
+
+> {% client.global.set("s2ProjectId", response.body.projectId);
+>    client.global.set("s2ProjectKey", response.body.key); %}
+
+### 建真账号(挂项目池;C8)
+POST {{host}}/api/members
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "displayName": "S2账号dev2{{run}}",
+  "username": "s2dev2{{run}}",
+  "password": "secret123",
+  "projectIds": ["{{s2ProjectId}}"]
+}
+
+> {% client.global.set("s2MemberId", response.body.memberId);
+>    client.assert(response.body.virtual === false, "真账号 virtual=false"); %}
+
+### [负例] 重名成员 409
+POST {{host}}/api/members
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "displayName": "S2账号dev2{{run}}",
+  "username": "s2dev2x{{run}}",
+  "password": "secret123",
+  "projectIds": ["{{s2ProjectId}}"]
+}
+
+> {% client.assert(response.status === 409, "重名应 409,实际 " + response.status); %}
+
+### [负例] username 占用 409
+POST {{host}}/api/members
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "displayName": "S2账号别人{{run}}",
+  "username": "s2dev2{{run}}",
+  "password": "secret123",
+  "projectIds": ["{{s2ProjectId}}"]
+}
+
+> {% client.assert(response.status === 409, "username 占用应 409,实际 " + response.status); %}
+
+### [负例] 缺项目(C8)400
+POST {{host}}/api/members
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "displayName": "S2无项目{{run}}",
+  "username": "s2noproj{{run}}",
+  "password": "secret123"
+}
+
+> {% client.assert(response.status === 400, "缺项目应 400,实际 " + response.status); %}
+
+### [负例] 密码 <8 位 400
+POST {{host}}/api/members
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "displayName": "S2短密码{{run}}",
+  "username": "s2short{{run}}",
+  "password": "short7",
+  "projectIds": ["{{s2ProjectId}}"]
+}
+
+> {% client.assert(response.status === 400, "短密码应 400,实际 " + response.status); %}
+
+### 新账号登录(池内成员可登;存 token 供 403 负例)
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "s2dev2{{run}}",
+  "password": "secret123"
+}
+
+> {% client.global.set("s2Token", response.body.token); %}
+
+### [负例] 非 admin 调治理端点 403
+PUT {{host}}/api/members/{{s2AdminId}}/status
+Authorization: Bearer {{s2Token}}
+Content-Type: application/json
+
+{
+  "status": "disabled"
+}
+
+> {% client.assert(response.status === 403, "非 admin 应 403,实际 " + response.status); %}
+
+### 重置密码(真人:踢会话;存新 token)
+PUT {{host}}/api/members/{{s2MemberId}}/credentials
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "password": "secret456"
+}
+
+> {% client.assert(response.status === 200, "重置应 200,实际 " + response.status); %}
+
+### 旧密码已 401,新密码重登
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "s2dev2{{run}}",
+  "password": "secret456"
+}
+
+> {% client.global.set("s2Token", response.body.token); %}
+
+### 禁用 dev2(黑名单 upsert;其 token 随即失效)
+PUT {{host}}/api/members/{{s2MemberId}}/status
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "status": "disabled"
+}
+
+> {% client.assert(response.body.status === "DISABLED", "禁用后 status=DISABLED"); %}
+
+### [负例] 被禁账号旧 token 401(filter 链)
+GET {{host}}/api/projects
+Authorization: Bearer {{s2Token}}
+
+> {% client.assert(response.status === 401, "被禁账号 token 应 401,实际 " + response.status); %}
+
+### [负例] 被禁账号登录 401「账号已禁用」
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "s2dev2{{run}}",
+  "password": "secret456"
+}
+
+> {% client.assert(response.status === 401, "disabled 登录应 401,实际 " + response.status); %}
+
+### [负例] 最后 admin 禁用自己 409
+PUT {{host}}/api/members/{{s2AdminId}}/status
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "status": "disabled"
+}
+
+> {% client.assert(response.status === 409, "最后 admin 自禁应 409,实际 " + response.status); %}
+
+### 复职 dev2(黑名单删行)
+PUT {{host}}/api/members/{{s2MemberId}}/status
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "status": "active"
+}
+
+> {% client.assert(response.body.status === "ACTIVE", "复职后 status=ACTIVE"); %}
+
+### 授 admin 给 dev2
+PUT {{host}}/api/members/{{s2MemberId}}/admin
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "admin": true
+}
+
+### 收回 dev2 的 admin
+PUT {{host}}/api/members/{{s2MemberId}}/admin
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "admin": false
+}
+
+### [负例] 最后 admin 自收 409
+PUT {{host}}/api/members/{{s2AdminId}}/admin
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "admin": false
+}
+
+> {% client.assert(response.status === 409, "最后 admin 自收应 409,实际 " + response.status); %}
+
+### [负例] admin 自删 409
+DELETE {{host}}/api/members/{{s2AdminId}}
+Authorization: Bearer {{token}}
+
+> {% client.assert(response.status === 409, "自删应 409,实际 " + response.status); %}
+
+### 清场:删 dev2(真账号可删;S2 放开)
+DELETE {{host}}/api/members/{{s2MemberId}}
+Authorization: Bearer {{token}}
+
+### 清场:删一次性项目(key 寻址;.force 物理删)
+DELETE {{host}}/api/projects/{{s2ProjectKey}}?force=true
+Authorization: Bearer {{token}}

@@ -3,6 +3,7 @@ package yangzhou.api.guard
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Service
 import yangzhou.api.error.ForbiddenException
+import yangzhou.persistence.Member
 import yangzhou.persistence.MemberRole
 import yangzhou.persistence.repository.MemberRepository
 import yangzhou.persistence.repository.MemberRoleRepository
@@ -18,15 +19,23 @@ class AdminGuard(
     private val members: MemberRepository,
     private val memberRoles: MemberRoleRepository,
 ) {
-    fun requireAdmin() {
+    /** admin 判定单缝(spec 0177 §5):whoami/最后 admin 计数等业务侧读写一律走此守卫,不散落查叉表。 */
+    fun isAdmin(): Boolean {
         val objectId = currentMemberObjectId()
-        val member = members.findByObjectId(objectId) ?: throw ForbiddenException(MESSAGE)
-        val isAdmin =
-            memberRoles
-                .findByMemberId(member.id!!)
-                .any { it.role == MemberRole.ROLE_ADMIN && it.projectId == null }
-        if (!isAdmin) throw ForbiddenException(MESSAGE)
+        val member = members.findByObjectId(objectId) ?: return false
+        return isAdminMember(member)
     }
+
+    fun requireAdmin() {
+        if (!isAdmin()) throw ForbiddenException(MESSAGE)
+    }
+
+    /** workspace 级 admin 行数(最后 admin 守卫用)。 */
+    fun countWorkspaceAdmins(): Int = memberRoles.findByRoleAndProjectIdIsNull(MemberRole.ROLE_ADMIN).size
+
+    private fun isAdminMember(member: Member): Boolean = memberRoles
+        .findByMemberId(member.id!!)
+        .any { it.role == MemberRole.ROLE_ADMIN && it.projectId == null }
 
     private fun currentMemberObjectId(): UUID {
         val principal =
