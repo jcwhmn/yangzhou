@@ -16,6 +16,14 @@ services:
       - "8081:8080"
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    healthcheck:
+      # bash /dev/tcp 探针(镜像无 curl/wget);GET /api/version permitAll,回 200 即健康
+      # CMD 直呼 bash(CMD-SHELL 走 /bin/sh=dash,/dev/tcp 为 bash 专属)
+      test: ["CMD", "bash", "-c", 'exec 3<>/dev/tcp/localhost/8080 && printf "GET /api/version HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n" >&3 && head -1 <&3 | grep -q " 200 "']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
 
   web:
     build: ../../web
@@ -26,4 +34,5 @@ services:
     ports:
       - "3001:3000"
     depends_on:
-      - api
+      api:
+        condition: service_healthy

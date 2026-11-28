@@ -12,7 +12,7 @@
 # 文件末尾「负例区」的红色(409)是预期行为,故意演示约束生效。
 # 提示:注释里不写双花括号变量引用——IDEA 会对注释也做变量替换,未替换就报「请求无效」。
 
-### ============ 0. Bootstrap(仅首次部署跑一次;之后再跑会 409 已初始化,属预期) ============
+### ============ 0. Bootstrap(仅首次部署跑一次;之后再跑会 409 已初始化,同样绿) ============
 
 POST {{host}}/api/auth/bootstrap
 Content-Type: application/json
@@ -21,6 +21,8 @@ Content-Type: application/json
   "username": "me",
   "password": "secret123"
 }
+
+> {% client.assert(response.status === 201 || response.status === 409, "bootstrap 应 201 或 409(已初始化),实际 " + response.status); %}
 
 ### ============ 1. 登录(生成 token 与本轮唯一后缀) ============
 
@@ -72,13 +74,13 @@ Authorization: Bearer {{token}}
 GET {{host}}/api/projects/{{pkey}}/gantt?scope=all
 Authorization: Bearer {{token}}
 
-### item 排期时刻级(YPJ-208/spec 0138:date-only 由后端按工作日界默认 09:00/18:00;datetime 原样;handler 存 pkey208)
+### item 排期时刻级(YPJ-208/spec 0138:date-only 由后端按工作日界默认 09:00/18:00;datetime 原样;handler 存 item208)
 POST {{host}}/api/projects/{{pkey}}/items
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-  "title": "208 排期时刻 item {{pkey208}}"
+  "title": "208 排期时刻 item {{pkey}}"
 }
 
 > {%
@@ -124,9 +126,13 @@ Content-Type: application/json
   "startDate": "not-a-date"
 }
 
-### [预期 400] 甘特数据——未知项目
+> {% client.assert(response.status === 400, "预期 400,实际 " + response.status); %}
+
+### [预期 404] 甘特数据——未知项目
 GET {{host}}/api/projects/NOPE77/gantt
 Authorization: Bearer {{token}}
+
+> {% client.assert(response.status === 404, "预期 404,实际 " + response.status); %}
 
 ### 项目设置——关 milestone 开关(YPJ-151;null=不改)
 PATCH {{host}}/api/projects/{{pkey}}/settings
@@ -972,6 +978,8 @@ Content-Type: application/json
 DELETE {{host}}/api/projects/{{pkey}}/group-types/{{l1Key}}
 Authorization: Bearer {{token}}
 
+> {% client.assert(response.status === 409, "预期 409,实际 " + response.status); %}
+
 ### 建 Milestone(handler 存变量 milestoneId;targetDate 可选,格式 yyyy-MM-dd;description/owner 可选,owner = 成员 uuid)
 POST {{host}}/api/projects/{{pkey}}/milestones
 Authorization: Bearer {{token}}
@@ -1082,6 +1090,8 @@ Content-Type: application/json
   "stage": "dev"
 }
 
+> {% client.assert(response.status === 400, "预期 400,实际 " + response.status); %}
+
 ### 事后补建 release(US-R5,spec 0135;status=released 直接落终态;handler 存 backfillId)
 POST {{host}}/api/projects/{{pkey}}/releases
 Authorization: Bearer {{token}}
@@ -1112,6 +1122,8 @@ Content-Type: application/json
   "releasedDate": "2999-01-01"
 }
 
+> {% client.assert(response.status === 400, "预期 400,实际 " + response.status); %}
+
 ### [预期 409] 终态冻结(已 released 的 release 改名)
 PATCH {{host}}/api/projects/{{pkey}}/releases/{{releaseId}}
 Authorization: Bearer {{token}}
@@ -1121,9 +1133,13 @@ Content-Type: application/json
   "name": "试图改已发布的 {{run}}"
 }
 
+> {% client.assert(response.status === 409, "预期 409,实际 " + response.status); %}
+
 ### [预期 409] 终态不可删(已 released)
 DELETE {{host}}/api/projects/{{pkey}}/releases/{{releaseId}}
 Authorization: Bearer {{token}}
+
+> {% client.assert(response.status === 409, "预期 409,实际 " + response.status); %}
 
 ### 甘特范围——group/milestone/release 正例与负例(YPJ-220/spec 0141;原在文件头部,因依赖分组/里程碑/发布数据整体后移至此——fresh run 时这些数据尚未创建,handler 必崩,2026-11-19 修复)
 
@@ -1166,17 +1182,25 @@ Authorization: Bearer {{token}}
 GET {{host}}/api/projects/{{pkey}}/gantt?scope=foo
 Authorization: Bearer {{token}}
 
+> {% client.assert(response.status === 400, "预期 400,实际 " + response.status); %}
+
 ### [预期 400] 甘特范围负例——group 无 scopeIds
 GET {{host}}/api/projects/{{pkey}}/gantt?scope=group
 Authorization: Bearer {{token}}
+
+> {% client.assert(response.status === 400, "预期 400,实际 " + response.status); %}
 
 ### [预期 400] 甘特范围负例——scopeIds 坏格式
 GET {{host}}/api/projects/{{pkey}}/gantt?scope=group&scopeIds=not-a-uuid
 Authorization: Bearer {{token}}
 
+> {% client.assert(response.status === 400, "预期 400,实际 " + response.status); %}
+
 ### [预期 404] 甘特范围负例——scopeId 好格式但不存在
 GET {{host}}/api/projects/{{pkey}}/gantt?scope=group&scopeIds=00000000-0000-0000-0000-000000000000
 Authorization: Bearer {{token}}
+
+> {% client.assert(response.status === 404, "预期 404,实际 " + response.status); %}
 
 ### [预期 409] 非法迁移(released 无法回 planned;此处用新建 planned 直改 status=released 已覆盖正向,反向由终态冻结拦截)
 
@@ -1231,6 +1255,8 @@ Content-Type: application/json
 ### [预期 409] release 下仍有挂接 item,拒删
 DELETE {{host}}/api/projects/{{pkey}}/releases/{{releaseBId}}
 Authorization: Bearer {{token}}
+
+> {% client.assert(response.status === 409, "预期 409,实际 " + response.status); %}
 
 ### 建 gate item(spec 0116 票 2,US-M7;自含,存 gateItemId)
 POST {{host}}/api/projects/{{pkey}}/items
@@ -1299,6 +1325,8 @@ Content-Type: application/json
 DELETE {{host}}/api/projects/{{pkey}}/item-types/feat
 Authorization: Bearer {{token}}
 
+> {% client.assert(response.status === 409, "预期 409,实际 " + response.status); %}
+
 ### 迁移后删 item type(把 feat 件改回 task)
 PATCH {{host}}/api/items/{{itemFeatId}}
 Authorization: Bearer {{token}}
@@ -1315,6 +1343,8 @@ Authorization: Bearer {{token}}
 ### [预期 409] 删在用 item type(修订:种子无特权;task 在用——item 已迁移回 task)
 DELETE {{host}}/api/projects/{{pkey}}/item-types/task
 Authorization: Bearer {{token}}
+
+> {% client.assert(response.status === 409, "预期 409,实际 " + response.status); %}
 
 ### [预期 204] 删空占位 type(goal 无引用;种子=初始化占位皆可删)
 DELETE {{host}}/api/projects/{{pkey}}/item-types/goal
@@ -1339,6 +1369,15 @@ Content-Type: application/json
   "groupId": "{{sprintId}}",
   "groupType": "sprint"
 }
+
+### [预期 400] 完成+处置——处置行 itemId 不属于本组(整体回滚,组仍 active;spec 0110)
+POST {{host}}/api/projects/{{pkey}}/groups/{{sprintId}}/actions/complete
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{"dispositions":[{"itemId":"00000000-0000-0000-0000-000000000000","targetGroupId":null}]}
+
+> {% client.assert(response.status === 400, "预期 400,实际 " + response.status); %}
 
 ### 完成 Sprint + 处置同事务(spec 0110:dispositions 随 complete 一次落库;targetGroupId=null 回池)
 POST {{host}}/api/projects/{{pkey}}/groups/{{sprintId}}/actions/complete
@@ -1365,9 +1404,10 @@ GET {{host}}/api/projects/{{pkey}}/board
 Authorization: Bearer {{token}}
 
 ### ============ 12. GitHub(V6 配置 + V16-2 按需拉取;轮询兑底见 application.yml yangzhou.github) ============
+### 前置(2026-11-28 修正):①CLI 跑须 `-e <env>` 激活环境,且 `-v/-p` 显式指 env 文件(ijhttp 不自动发现);②token 真值在 gitignored http-client.private.env.json;③挂载仓须真实存在且 PAT 可写(现挂 jcwhmn/demo,可废弃沙盒)。缺任一 → 建分支 400「GitHub API 错误(401/404)」→ attachRepo/attachRef 不回填 → 补挂例级联未解析,属预期
 
 ### 配 workspace PAT(永不回显,只回尾 4 位)
-# token 真值放 http-client.private.env.json(gitignored 不入库);private 同名 env 自动覆盖
+# token 真值放 http-client.private.env.json(gitignored 不入库);private 同名 env 自动覆盖;CLI 未激活 env 时会把字面量存进 workspace——见节头前置①
 PUT {{host}}/api/workspace/github-token
 Authorization: Bearer {{token}}
 Content-Type: application/json
@@ -1382,14 +1422,22 @@ Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-  "repo": "octo/r"
+  "repo": "jcwhmn/demo"
 }
 
 > {%
     client.global.set("repoId", response.body.repoId);
 %}
 
-### 建 item 分支(YPJ-27:422→409 已存在,404→400 基线不存在,其余 GitHub 错→400 可操作)
+### 幂等清场:直连 GitHub 删上一轮残留(204=已删,422=本无;其余=PAT/权限问题,让建分支自然报错)
+DELETE https://api.github.com/repos/jcwhmn/demo/git/refs/heads/ypj-27-scratch
+Authorization: Bearer {{github-token}}
+
+> {%
+    client.assert(response.status === 204 || response.status === 422, "清场应 204/422,实际 " + response.status);
+%}
+
+### 建 item 分支(YPJ-27:422→409 已存在,404→400 基线不存在,其余 GitHub 错→400 可操作;上方清场后不应见 409)
 POST {{host}}/api/items/{{itemId}}/branches
 Authorization: Bearer {{token}}
 Content-Type: application/json
@@ -1406,16 +1454,19 @@ Content-Type: application/json
 %}
 
 
-### YPJ-85 webhook(匿名;签名 = sha256=hex(HMAC-SHA256(secret, rawBody)),secret 启动时 env 注入)
-# 正例:命中挂载仓(pkey 已挂 octo/r)→ 202 {"status":"accepted"};未配 PAT 也 202(仅 WARN 跳过同步)
+### YPJ-85 webhook(匿名;签名 = sha256=hex(HMAC-SHA256(secret, rawBody)),secret 启动时 env 注入;实现:secret 未配置一律 403 全拒)
+# test 容器已在 compose 配 YANGZHOU_GITHUB_WEBHOOK_SECRET=test-webhook-secret;body 与 secret 均固定 → 签名可预计算硬编码
+# 正例:命中挂载仓(pkey 已挂 jcwhmn/demo)→ 202 {"status":"accepted"}
 POST {{host}}/api/github/webhook
 X-GitHub-Event: push
-X-Hub-Signature-256: sha256=0000000000000000000000000000000000000000000000000000000000000000
+X-Hub-Signature-256: sha256=190d777796abafc64162bbc1cdbb5bf24d3d60c199b446f4f59a38e43e0b4a06
 Content-Type: application/json
 
-{"repository":{"full_name":"octo/r"}}
+{"repository":{"full_name":"jcwhmn/demo"}}
 
-### [预期 403] 签名错/缺(未配 secret 或签名不符,一律 403)
+> {% client.assert(response.status === 202, "正例应 202 accepted,实际 " + response.status); %}
+
+### [预期 403] 签名错/缺(secret 已配但签名不符,一律 403;secret 未配置同样 403 全拒)
 POST {{host}}/api/github/webhook
 X-GitHub-Event: push
 X-Hub-Signature-256: sha256=deadbeef
@@ -1423,13 +1474,17 @@ Content-Type: application/json
 
 {"repository":{"full_name":"octo/r"}}
 
-### [预期 200] 忽略未知事件({"status":"ignored"};未知 repo 同样 200 ignored)
+> {% client.assert(response.status === 403, "预期 403,实际 " + response.status); %}
+
+### [预期 200] 忽略未知事件({"status":"ignored"};未知 repo 同样 200 ignored;签名须合法)
 POST {{host}}/api/github/webhook
 X-GitHub-Event: issues
-X-Hub-Signature-256: sha256=0000000000000000000000000000000000000000000000000000000000000000
+X-Hub-Signature-256: sha256=e53b67f8d2a63efc56d78cbe2aa2ce3399e279f73393ec58384ae3ca8ff112f8
 Content-Type: application/json
 
 {"repository":{"full_name":"octo/r"}}
+
+> {% client.assert(response.status === 200, "未知事件应 200 ignored,实际 " + response.status); %}
 
 ### YPJ-39 建从票(供下方补挂;handler 存 itemId2)
 POST {{host}}/api/projects/{{pkey}}/items
@@ -1445,8 +1500,7 @@ Content-Type: application/json
 %}
 
 ### YPJ-39 补挂既有分支到从票(纯库操作不走 GitHub;404 未入册 / 409 重复、PR 行、跨项目未挂载)
-### repo/branch 由上方建分支请求回填;须先跑建分支
-### 建分支 409=分支已存在(换名或沿用);只要建分支成功过一次,回填变量即在
+### repo/branch 由上方建分支请求回填;须同轮先跑建分支(CLI/复刻每轮从零,变量不跨轮持久)
 POST {{host}}/api/items/{{itemId2}}/git-refs
 Authorization: Bearer {{token}}
 Content-Type: application/json
@@ -1534,13 +1588,19 @@ Authorization: Bearer {{token}}
 GET {{host}}/api/projects/{{pkey}}/time-report?from=2026-11-14T00:00:00Z&to=2026-11-01T00:00:00Z
 Authorization: Bearer {{token}}
 
+> {% client.assert(response.status === 400, "预期 400,实际 " + response.status); %}
+
 ### [预期 400] 非法时间格式(须完整 ISO-8601 时刻)
 GET {{host}}/api/projects/{{pkey}}/time-report?from=2026-11-14
 Authorization: Bearer {{token}}
 
+> {% client.assert(response.status === 400, "预期 400,实际 " + response.status); %}
+
 ### [预期 404] 未知项目
 GET {{host}}/api/projects/NOPE/time-report
 Authorization: Bearer {{token}}
+
+> {% client.assert(response.status === 404, "预期 404,实际 " + response.status); %}
 
 ### 工时建议(V16-3:分支 commit 时间轴 → 草稿;人确认后走上方起止补录)
 GET {{host}}/api/items/{{itemId}}/time-entry-suggestions
@@ -1645,6 +1705,8 @@ Content-Type: application/json
   "startedAt": "2026-10-07T01:00:00Z"
 }
 
+> {% client.assert(response.status === 400, "预期 400,实际 " + response.status); %}
+
 ### [预期 400] endedAt 不晚于 startedAt
 POST {{host}}/api/items/{{itemId}}/time-entries
 Authorization: Bearer {{token}}
@@ -1656,6 +1718,8 @@ Content-Type: application/json
   "endedAt": "2026-10-07T01:00:00Z"
 }
 
+> {% client.assert(response.status === 400, "预期 400,实际 " + response.status); %}
+
 ### [预期 409] 重复加入池
 POST {{host}}/api/projects/{{pkey}}/members
 Authorization: Bearer {{token}}
@@ -1664,6 +1728,8 @@ Content-Type: application/json
 {
   "memberId": "{{memberId1}}"
 }
+
+> {% client.assert(response.status === 409, "预期 409,实际 " + response.status); %}
 
 ### [预期 409] 指派池外成员(小王已被移出池;消息「该成员不在项目成员中」)
 PUT {{host}}/api/items/{{itemId}}/assignee
@@ -1674,6 +1740,8 @@ Content-Type: application/json
   "assigneeItemId": "{{memberId2}}"
 }
 
+> {% client.assert(response.status === 409, "预期 409,实际 " + response.status); %}
+
 ### [预期 404] 未知成员入池
 POST {{host}}/api/projects/{{pkey}}/members
 Authorization: Bearer {{token}}
@@ -1682,6 +1750,8 @@ Content-Type: application/json
 {
   "memberId": "00000000-0000-0000-0000-000000000000"
 }
+
+> {% client.assert(response.status === 404, "预期 404,实际 " + response.status); %}
 
 ### [预期 409] 指派到已完成 Sprint(0114 起 PUT group-membership;原 /items/{id}/sprint 端点已废)
 PUT {{host}}/api/items/{{itemId}}/group-membership
@@ -1692,12 +1762,21 @@ Content-Type: application/json
   "groupId": "{{sprintId}}"
 }
 
-### [预期 409] 删除非空 Sprint(成员关系即历史,先空才能删)
-DELETE {{host}}/api/projects/{{pkey}}/groups/{{sprintId}}
-Authorization: Bearer {{token}}
+> {% client.assert(response.status === 409, "预期 409,实际 " + response.status); %}
 
-### [预期 409] 开第二个 in_progress Milestone(0..1 current,先完成或取消)
-PATCH {{host}}/api/projects/{{pkey}}/milestones/{{milestoneId}}
+### 建守卫里程碑 M_A(handler 存 msGuardA;M_A 将持 current)
+POST {{host}}/api/projects/{{pkey}}/milestones
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "守卫A {{run}}"
+}
+
+> {% client.global.set("msGuardA", response.body.milestoneId); %}
+
+### M_A → in_progress(正例)
+PATCH {{host}}/api/projects/{{pkey}}/milestones/{{msGuardA}}
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
@@ -1705,14 +1784,78 @@ Content-Type: application/json
   "status": "in_progress"
 }
 
-### [预期 409] 终态 Milestone 再迁移/改名(历史保留)
-PATCH {{host}}/api/projects/{{pkey}}/milestones/{{milestoneId}}
+### 建守卫里程碑 M_B(handler 存 msGuardB)
+POST {{host}}/api/projects/{{pkey}}/milestones
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "守卫B {{run}}"
+}
+
+> {% client.global.set("msGuardB", response.body.milestoneId); %}
+
+### [预期 409] 开第二个 in_progress Milestone(M_A 已 current;0..1 守卫)
+PATCH {{host}}/api/projects/{{pkey}}/milestones/{{msGuardB}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "status": "in_progress"
+}
+
+> {% client.assert(response.status === 409, "预期 409,实际 " + response.status); %}
+
+### M_B → completed(铺垫终态守卫;终态=completed,非 done)
+PATCH {{host}}/api/projects/{{pkey}}/milestones/{{msGuardB}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "status": "completed"
+}
+
+### [预期 409] 终态 Milestone 再迁移(历史保留,禁回 in_progress)
+PATCH {{host}}/api/projects/{{pkey}}/milestones/{{msGuardB}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "status": "in_progress"
+}
+
+> {% client.assert(response.status === 409, "预期 409,实际 " + response.status); %}
+
+### M_A → completed(正例;腾出 current,供下方自含终态守卫站使用)
+PATCH {{host}}/api/projects/{{pkey}}/milestones/{{msGuardA}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "status": "completed"
+}
+
+### [预期 409] 终态 Milestone 再迁移(历史保留,禁回 in_progress)
+PATCH {{host}}/api/projects/{{pkey}}/milestones/{{msGuardA}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "status": "in_progress"
+}
+
+> {% client.assert(response.status === 409, "预期 409,实际 " + response.status); %}
+
+### [预期 409] 终态 Milestone 改名(历史保留,终态不可编辑)
+PATCH {{host}}/api/projects/{{pkey}}/milestones/{{msGuardA}}
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
   "name": "改历史"
 }
+
+> {% client.assert(response.status === 409, "预期 409,实际 " + response.status); %}
 
 ### [预期 409] 删终态 Milestone(spec 0116 §6 #1:终态守卫,自含建站→完成→删)
 POST {{host}}/api/projects/{{pkey}}/milestones
@@ -1753,25 +1896,37 @@ Authorization: Bearer {{token}}
 GET {{host}}/api/projects/{{pkey}}/metrics/throughput?from=2026-09-01T00:00:00Z&to=2026-12-31T00:00:00Z&bucket=month
 Authorization: Bearer {{token}}
 
+> {% client.assert(response.status === 400, "预期 400,实际 " + response.status); %}
+
 ### [预期 400] metrics:from 晚于 to
 GET {{host}}/api/projects/{{pkey}}/metrics/flow-times?from=2026-12-31T00:00:00Z&to=2026-09-01T00:00:00Z
 Authorization: Bearer {{token}}
+
+> {% client.assert(response.status === 400, "预期 400,实际 " + response.status); %}
 
 ### [预期 404] metrics:未知项目
 GET {{host}}/api/projects/NOPE/metrics/workload
 Authorization: Bearer {{token}}
 
+> {% client.assert(response.status === 404, "预期 404,实际 " + response.status); %}
+
 ### [预期 404] metrics:未知 sprint
 GET {{host}}/api/projects/{{pkey}}/metrics/burndown?groupId=00000000-0000-0000-0000-000000000000
 Authorization: Bearer {{token}}
+
+> {% client.assert(response.status === 404, "预期 404,实际 " + response.status); %}
 
 ### [预期 404] metrics:scope-change 组不存在(YPJ-54)
 GET {{host}}/api/projects/{{pkey}}/metrics/scope-change?groupId=00000000-0000-0000-0000-000000000000
 Authorization: Bearer {{token}}
 
+> {% client.assert(response.status === 404, "预期 404,实际 " + response.status); %}
+
 ### [预期 400] metrics:reopen-rate from > to(YPJ-54)
 GET {{host}}/api/projects/{{pkey}}/metrics/reopen-rate?from=2026-12-31T00:00:00Z&to=2026-09-01T00:00:00Z
 Authorization: Bearer {{token}}
+
+> {% client.assert(response.status === 400, "预期 400,实际 " + response.status); %}
 
 ### 建 L2 组挂 epic 样例组(sprint2 类型=本文件演化后的 level 2;handler 存 l2ForYPJ56)
 POST {{host}}/api/projects/{{pkey}}/groups
@@ -1821,6 +1976,8 @@ Content-Type: application/json
   "sprintId": "{{completedSprintId}}"
 }
 
+> {% client.assert(response.status === 409, "预期 409,实际 " + response.status); %}
+
 ### [预期 404] 建 item 带未知 sprint(item 不落库,YPJ-56)
 POST {{host}}/api/projects/{{pkey}}/items
 Authorization: Bearer {{token}}
@@ -1831,7 +1988,9 @@ Content-Type: application/json
   "sprintId": "00000000-0000-0000-0000-000000000000"
 }
 
-### [预期 409] 视图同名
+> {% client.assert(response.status === 404, "预期 404,实际 " + response.status); %}
+
+### [预期 201] 视图同名(服务端不约束唯一;产品要唯一另票)
 POST {{host}}/api/projects/{{pkey}}/views
 Authorization: Bearer {{token}}
 Content-Type: application/json
@@ -1839,6 +1998,8 @@ Content-Type: application/json
 {
   "name": "我的进行中 v2"
 }
+
+> {% client.assert(response.status === 201, "预期 201,实际 " + response.status); %}
 
 ### [预期 400] 视图 filters 非 JSON 对象
 POST {{host}}/api/projects/{{pkey}}/views
@@ -1850,6 +2011,8 @@ Content-Type: application/json
   "filters": ["a"]
 }
 
+> {% client.assert(response.status === 400, "预期 400,实际 " + response.status); %}
+
 ### [预期 404] 改不存在/非本人视图
 PATCH {{host}}/api/projects/{{pkey}}/views/00000000-0000-0000-0000-000000000000
 Authorization: Bearer {{token}}
@@ -1858,6 +2021,8 @@ Content-Type: application/json
 {
   "name": "hijack"
 }
+
+> {% client.assert(response.status === 404, "预期 404,实际 " + response.status); %}
 
 ### ============ 15. 项目删除(YPJ-60;preview 计数 → force 删除 → 404) ============
 
@@ -1887,9 +2052,13 @@ Authorization: Bearer {{token}}
 GET {{host}}/api/projects/ZZZZZZ/deletion-preview
 Authorization: Bearer {{token}}
 
+> {% client.assert(response.status === 404, "预期 404,实际 " + response.status); %}
+
 ### [预期 404] 删除:未知项目
 DELETE {{host}}/api/projects/ZZZZZZ
 Authorization: Bearer {{token}}
+
+> {% client.assert(response.status === 404, "预期 404,实际 " + response.status); %}
 
 ### ============ 16. 全局搜索(YPJ-63;标题/描述/编号 ILIKE,编号直达解析同源) ============
 
@@ -1923,7 +2092,7 @@ Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-  "displayName": "池外小王"
+  "displayName": "池外小王{{run}}"
 }
 
 > {%
@@ -1961,6 +2130,8 @@ Content-Type: application/json
   "assigneeItemId": "{{poolnegMember}}"
 }
 
+> {% client.assert(response.status === 409, "预期 409,实际 " + response.status); %}
+
 ### [预期 409] 真空池指派(先 jdbc:delete from project_member where project_id=...;或删掉自己的池行后重试)
 PUT {{host}}/api/items/{{poolnegItem}}/assignee
 Authorization: Bearer {{token}}
@@ -1970,9 +2141,13 @@ Content-Type: application/json
   "assigneeItemId": "{{poolnegMember}}"
 }
 
+> {% client.assert(response.status === 409, "预期 409,实际 " + response.status); %}
+
 ### [预期 400] 路径参数类型不合法——number 打 UUID 端点(spec 0059,曾 500)
 GET {{host}}/api/items/YPJ-1
 Authorization: Bearer {{token}}
+
+> {% client.assert(response.status === 400, "预期 400,实际 " + response.status); %}
 
 ### ============================================================
 ### ============ 18. 附件(YPJ-50;presign 直传,字节不经后端) ============
@@ -2017,6 +2192,8 @@ Content-Type: application/json
   "sizeBytes": 999999999999
 }
 
+> {% client.assert(response.status === 400, "预期 400,实际 " + response.status); %}
+
 ### [预期 400] 非法扩展(白名单外)
 POST {{host}}/api/items/{{itemId}}/attachments
 Authorization: Bearer {{token}}
@@ -2028,6 +2205,8 @@ Content-Type: application/json
   "sizeBytes": 1024
 }
 
+> {% client.assert(response.status === 400, "预期 400,实际 " + response.status); %}
+
 ### [预期 404] 补挂未入册分支(只可补挂 yangzhou 已关联的分支;repo 取建分支回填的实际挂载仓)
 POST {{host}}/api/items/{{itemId}}/git-refs
 Authorization: Bearer {{token}}
@@ -2037,6 +2216,8 @@ Content-Type: application/json
   "repo": "{{attachRepo}}",
   "ref": "no-such-branch"
 }
+
+> {% client.assert(response.status === 404, "预期 404,实际 " + response.status); %}
 
 ### [预期 409] 重复补挂(同票同分支连发两次,第二次中)
 POST {{host}}/api/items/{{itemId2}}/git-refs
@@ -2048,7 +2229,9 @@ Content-Type: application/json
   "ref": "{{attachRef}}"
 }
 
-### [预期 409] PR 行不可补挂(ref 是 PR 号而非分支;需该 PR 已被轮询入册,未入册则 404)
+> {% client.assert(response.status === 409, "预期 409,实际 " + response.status); %}
+
+### [预期 409/404] PR 行不可补挂(ref 是 PR 号而非分支;PR 入册靠轮询,测试环境不保证已入册 → 已入册 409,未入册 404,均合法)
 POST {{host}}/api/items/{{itemId}}/git-refs
 Authorization: Bearer {{token}}
 Content-Type: application/json
@@ -2057,6 +2240,8 @@ Content-Type: application/json
   "repo": "{{attachRepo}}",
   "ref": "1001"
 }
+
+> {% client.assert(response.status === 409 || response.status === 404, "预期 409/404,实际 " + response.status); %}
 
 ### [预期 400] 非 custom 词表挂 item 属性(YPJ-103)
 PUT {{host}}/api/items/{{itemId}}/attributes
@@ -2068,6 +2253,8 @@ Content-Type: application/json
     { "attribute": "{{attrA}}", "value": "x" }
   ]
 }
+
+> {% client.assert(response.status === 400, "预期 400,实际 " + response.status); %}
 
 ### [预期 400] 同词表重复挂(YPJ-103)
 PUT {{host}}/api/items/{{itemId}}/attributes
@@ -2081,6 +2268,8 @@ Content-Type: application/json
   ]
 }
 
+> {% client.assert(response.status === 400, "预期 400,实际 " + response.status); %}
+
 ### 版本号(YPJ-101;构建期 git tag 注入,无 tag=dev)
 GET {{host}}/api/version
 Authorization: Bearer {{token}}
@@ -2091,6 +2280,8 @@ Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {"role":"member"}
+
+> {% client.assert(response.status === 409, "预期 409,实际 " + response.status); %}
 ### ============================================================
 ### ============ 19. Workflow 状态进行态(YPJ-120;spec 0089) ============
 ### ============================================================
@@ -2136,12 +2327,11 @@ Content-Type: application/json
 ### 跨类型归属正交:item 挂 sprint 后再挂 release,两者共存(响应 sprintId 与 releaseId 同时非空)
 ### PUT {{host}}/api/items/{{itemId}}/group-membership {"groupId": "{{releaseId}}", "groupType": "release"}
 
-### [预期 400] 完成+处置——处置行 itemId 不属于本组(整体回滚,组仍 active;spec 0110)
-POST {{host}}/api/projects/{{pkey}}/groups/{{sprintId}}/actions/complete
+### [预期 204] 删空 Sprint(item 已移出,组内空;非空删除 409 守卫见上方挂 item 负例)
+DELETE {{host}}/api/projects/{{pkey}}/groups/{{sprintId}}
 Authorization: Bearer {{token}}
-Content-Type: application/json
 
-{"dispositions":[{"itemId":"00000000-0000-0000-0000-000000000000","targetGroupId":null}]}
+> {% client.assert(response.status === 204, "预期 204,实际 " + response.status); %}
 
 ### ============================================================
 ### ============ 20. 组多层(YPJ-163;spec 0114) ============
@@ -2206,6 +2396,8 @@ Content-Type: application/json
   "name": "超层"
 }
 
+> {% client.assert(response.status === 400, "预期 400,实际 " + response.status); %}
+
 ### [预期 400] Sprint(L1)建漏父——上层存在时叶层必挂父
 POST {{host}}/api/projects/{{pkey163}}/groups
 Authorization: Bearer {{token}}
@@ -2216,6 +2408,8 @@ Content-Type: application/json
   "name": "S漏父 {{run}}"
 }
 
+> {% client.assert(response.status === 400, "预期 400,实际 " + response.status); %}
+
 ### [预期 400] Feature(L2)建漏父——存在 level-3 时 L2 也必挂父
 POST {{host}}/api/projects/{{pkey163}}/groups
 Authorization: Bearer {{token}}
@@ -2225,6 +2419,8 @@ Content-Type: application/json
   "typeKey": "feat163",
   "name": "F漏父 {{run}}"
 }
+
+> {% client.assert(response.status === 400, "预期 400,实际 " + response.status); %}
 
 ### 建 Epic 1(顶层无父;handler 存 epic1Id163)
 POST {{host}}/api/projects/{{pkey163}}/groups
@@ -2264,6 +2460,8 @@ Content-Type: application/json
   "name": "S越级 {{run}}",
   "parentGroupId": "{{epic1Id163}}"
 }
+
+> {% client.assert(response.status === 400, "预期 400,实际 " + response.status); %}
 
 ### 建 Feature 1 挂 Epic 1(handler 存 feat1Id163)
 POST {{host}}/api/projects/{{pkey163}}/groups
@@ -2319,6 +2517,8 @@ Content-Type: application/json
   "parentGroupId": "{{epic2Id163}}"
 }
 
+> {% client.assert(response.status === 400, "预期 400,实际 " + response.status); %}
+
 ### Feature 改父正例:F1 从 Epic 1 改挂 Epic 2 → 200(子树 S1 随迁;新旧父链逐层重算状态)
 PATCH {{host}}/api/projects/{{pkey163}}/groups/{{feat1Id163}}
 Authorization: Bearer {{token}}
@@ -2331,6 +2531,8 @@ Content-Type: application/json
 ### [预期 409] Epic 手动动作——非叶层状态由子组联动
 POST {{host}}/api/projects/{{pkey163}}/groups/{{epic1Id163}}/actions/start
 Authorization: Bearer {{token}}
+
+> {% client.assert(response.status === 409, "预期 409,实际 " + response.status); %}
 
 ### 建 item(handler 存 itemId163)
 POST {{host}}/api/projects/{{pkey163}}/items
@@ -2354,13 +2556,19 @@ Content-Type: application/json
   "groupId": "{{feat1Id163}}"
 }
 
+> {% client.assert(response.status === 409, "预期 409,实际 " + response.status); %}
+
 ### [预期 409] 删含子组——Epic 2 下仍有 Feature
 DELETE {{host}}/api/projects/{{pkey163}}/groups/{{epic2Id163}}
 Authorization: Bearer {{token}}
 
+> {% client.assert(response.status === 409, "预期 409,实际 " + response.status); %}
+
 ### [预期 409] 删中层类型 feat163——上层 epic163 仍存在(中间链 guard)
 DELETE {{host}}/api/projects/{{pkey163}}/group-types/feat163
 Authorization: Bearer {{token}}
+
+> {% client.assert(response.status === 409, "预期 409,实际 " + response.status); %}
 
 ### ---------- spec 0115(YPJ-164):workflow 可编辑(本节自含:自带项目/类型;先跑「登录」即可单跑本节;重跑本节前先重跑「登录」刷新 run 后缀) ----------
 
@@ -2417,6 +2625,8 @@ Content-Type: application/json
  {"name":"active","transitions":[]}
 ]
 
+> {% client.assert(response.status === 409, "预期 409,实际 " + response.status); %}
+
 ### [预期 409] 出边目标越界(target 不在本类型状态集)
 PUT {{host}}/api/projects/{{pkey164}}/group-types/{{wtypeKey164}}/workflow
 Authorization: Bearer {{token}}
@@ -2427,6 +2637,8 @@ Content-Type: application/json
  {"name":"active","transitions":[]},
  {"name":"completed","transitions":[]}
 ]
+
+> {% client.assert(response.status === 409, "预期 409,实际 " + response.status); %}
 
 ### [预期 409] 未注册动作函数(注册表外 function 不放行)
 PUT {{host}}/api/projects/{{pkey164}}/group-types/{{wtypeKey164}}/workflow
@@ -2439,6 +2651,8 @@ Content-Type: application/json
  {"name":"completed","transitions":[]}
 ]
 
+> {% client.assert(response.status === 409, "预期 409,实际 " + response.status); %}
+
 ### [预期 409] 意图违规(complete 边目标必须是 FINAL 态,指向 planned 被静态预检拦下)
 PUT {{host}}/api/projects/{{pkey164}}/group-types/{{wtypeKey164}}/workflow
 Authorization: Bearer {{token}}
@@ -2450,6 +2664,8 @@ Content-Type: application/json
  {"name":"completed","transitions":[]}
 ]
 
+> {% client.assert(response.status === 409, "预期 409,实际 " + response.status); %}
+
 ### [预期 400] label 超长(21 字 > 20 上限)
 PUT {{host}}/api/projects/{{pkey164}}/group-types/{{wtypeKey164}}/workflow
 Authorization: Bearer {{token}}
@@ -2460,6 +2676,8 @@ Content-Type: application/json
  {"name":"active","transitions":[]},
  {"name":"completed","transitions":[]}
 ]
+
+> {% client.assert(response.status === 400, "预期 400,实际 " + response.status); %}
 
 ### [预期 409] 关口硬门禁——gate 有未终态禁完成(自含:建 item→建站→推进→挂接→完成)
 POST {{host}}/api/projects/{{pkey}}/items
@@ -2510,6 +2728,8 @@ Content-Type: application/json
   "status": "completed"
 }
 
+> {% client.assert(response.status === 409, "预期 409,实际 " + response.status); %}
+
 
 ### ============ 负例:看板拉入(YPJ-173,spec 0117) ============
 
@@ -2556,6 +2776,8 @@ Content-Type: application/json
   "onBoard": true
 }
 
+> {% client.assert(response.status === 409, "预期 409,实际 " + response.status); %}
+
 ### api.http:settings 工作日历(切片 b)
 PATCH {{host}}/api/projects/{{pkey}}/settings
 Authorization: Bearer {{token}}
@@ -2590,6 +2812,8 @@ Content-Type: application/json
   "workMode": "bogus"
 }
 
+> {% client.assert(response.status === 400, "预期 400,实际 " + response.status); %}
+
 ### [预期 400] 工作日历倒挂
 PATCH {{host}}/api/projects/{{pkey}}/settings
 Authorization: Bearer {{token}}
@@ -2599,6 +2823,8 @@ Content-Type: application/json
   "workdayStart": "18:00",
   "workdayEnd": "09:00"
 }
+
+> {% client.assert(response.status === 400, "预期 400,实际 " + response.status); %}
 
 ### ============ 负例区(YPJ-180 工作量刻度) ============
 
@@ -2614,6 +2840,8 @@ Content-Type: application/json
   ]
 }
 
+> {% client.assert(response.status === 400, "预期 400,实际 " + response.status); %}
+
 ### [预期 400] 零档
 PATCH {{host}}/api/projects/{{pkey}}/settings
 Authorization: Bearer {{token}}
@@ -2622,6 +2850,8 @@ Content-Type: application/json
 {
   "estimateScales": []
 }
+
+> {% client.assert(response.status === 400, "预期 400,实际 " + response.status); %}
 
 ### [预期 400] value=0
 PATCH {{host}}/api/projects/{{pkey}}/settings
@@ -2634,6 +2864,8 @@ Content-Type: application/json
   ]
 }
 
+> {% client.assert(response.status === 400, "预期 400,实际 " + response.status); %}
+
 ### [预期 400] 预估单给其一(YPJ-186)
 PATCH {{host}}/api/items/{{itemId}}
 Authorization: Bearer {{token}}
@@ -2642,6 +2874,8 @@ Content-Type: application/json
 {
   "estimateValue": "5"
 }
+
+> {% client.assert(response.status === 400, "预期 400,实际 " + response.status); %}
 
 ### [预期 400] 预估非法单位(YPJ-186)
 PATCH {{host}}/api/items/{{itemId}}
@@ -2653,6 +2887,8 @@ Content-Type: application/json
   "estimateUnit": "month"
 }
 
+> {% client.assert(response.status === 400, "预期 400,实际 " + response.status); %}
+
 ### [预期 400] 预估 value=0(YPJ-186)
 PATCH {{host}}/api/items/{{itemId}}
 Authorization: Bearer {{token}}
@@ -2662,6 +2898,8 @@ Content-Type: application/json
   "estimateValue": "0",
   "estimateUnit": "hour"
 }
+
+> {% client.assert(response.status === 400, "预期 400,实际 " + response.status); %}
 
 ### ============ spec 0148(YPJ-233):甘特行排序(本节自含:自带项目,变量带 233 后缀;先跑「登录」即可单跑本节) ============
 
@@ -2925,6 +3163,8 @@ Content-Type: application/json
 
 { "dueDate": "2026-12-01" }
 
+> {% client.assert(response.status === 400, "预期 400,实际 " + response.status); %}
+
 ### [正例] start+due 同发 → 200(排期窗口;date-only due = 当日日末 23:59:59)
 PATCH {{host}}/api/items/{{item245}}
 Authorization: Bearer {{token}}
@@ -2952,6 +3192,8 @@ Authorization: Bearer {{token}}
 Content-Type: application/json
 
 { "startDate": "" }
+
+> {% client.assert(response.status === 400, "预期 400,实际 " + response.status); %}
 
 ### 清场:删一次性项目(.force 物理删)
 DELETE {{host}}/api/projects/{{key245}}?force=true
@@ -3044,6 +3286,8 @@ Content-Type: application/json
 
 {"itemId": "11111111-1111-1111-1111-111111111111", "dir": "up"}
 
+> {% client.assert(response.status === 404, "预期 404,实际 " + response.status); %}
+
 ### [负例] dir 非法 → 400
 POST {{host}}/api/projects/{{key238}}/board-order/move
 Authorization: Bearer {{token}}
@@ -3051,12 +3295,14 @@ Content-Type: application/json
 
 {"itemId": "{{item238a}}", "dir": "sideways"}
 
+> {% client.assert(response.status === 400, "预期 400,实际 " + response.status); %}
+
 ### 清场:删一次性项目(force 物理删)
 DELETE {{host}}/api/projects/BO238?force=true
 Authorization: Bearer {{token}}
 
 ### ============ 21. YPJ-274 item 关闭理由(spec 0167;节内自建前置) ============
-### 建一次性 S0 项目(自动带三态 workflow:To Do / In Progress / Done)
+### 建一次性项目(默认 workflow 现 5 态:To Do/In Progress/In Review/QA/Done,后续票所加;脚本按名取态,与态数无关)
 POST {{host}}/api/projects
 Authorization: Bearer {{token}}
 Content-Type: application/json
@@ -3182,7 +3428,7 @@ Authorization: Bearer {{token}}
     client.log("close_reason_changed 留痕 ✓");
 %}
 
-### [负例①] 非终态带理由 → 400
+### [负例①] 转非终态却带 closeReason → 400(spec 0167 行为矩阵;2026-11-28 探针+spec 双实锉,原注释「非终态带理由」不准)
 PATCH {{host}}/api/items/{{item274a}}
 Authorization: Bearer {{token}}
 Content-Type: application/json
@@ -3200,14 +3446,18 @@ Content-Type: application/json
 
 > {% client.assert(response.status === 400, "非法枚举应 400,实际 " + response.status); %}
 
-### [负例③] 非终态票只改理由 → 400
+### [正例⑤] reopen(Done→In Progress)→ 200,理由清空(spec 0167 行为矩阵:reopen 清空两列)
+### 2026-11-28 探针修正:原断言 400 无 spec 依据,body 实为纯 reopen,后端行为一直正确
 PATCH {{host}}/api/items/{{item274a}}
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 { "statusItemId": "{{st274prog}}" }
 
-### (接上,此时为 In Progress)
+> {% client.assert(response.status === 200, "reopen 应 200,实际 " + response.status);
+   if (response.body.closeReason !== null) throw new Error("reopen 应清空,实际:" + response.body.closeReason); %}
+
+### [负例③] 非终态票带 closeReason(不动状态)→ 400(此时票确为 In Progress,上方 reopen 已就位)
 PATCH {{host}}/api/items/{{item274a}}
 Authorization: Bearer {{token}}
 Content-Type: application/json
@@ -3297,3 +3547,257 @@ Content-Type: application/json
   "oldPassword": "spec177-pass",
   "newPassword": "secret123"
 }
+
+### ============================================================
+### ============ 23. spec 0177(S2)账号治理(YPJ-293;节内自含:自建项目/账号,节末清场;跑过「登录」后可单跑本节) ============
+### 前置:8082 必须已重建为含 S2 代码的 jar(whoami/治理端点是 S2 新增;旧 jar 本节必级联红)
+### ============================================================
+### 注意:禁用/重置密码都会黑名单踢会话;节内自建 dev2 账号演示,节末删号清场,整文件可重复跑。
+
+### 节首自登录(§21/22 改密会拉黑 §1 的 token;节内重登,整文件按序跑不级联 401)
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "me",
+  "password": "secret123"
+}
+
+> {%
+    client.global.set("token", response.body.token);
+    client.global.set("meId", response.body.memberId);
+ %}
+
+### whoami(admin=true;形状=身份+admin+projectRoles)
+GET {{host}}/api/members/me
+Authorization: Bearer {{token}}
+
+> {%
+    client.global.set("s2AdminId", response.body.memberId);
+    client.assert(response.body.admin === true, "bootstrap 账号应 admin");
+    client.assert(Array.isArray(response.body.projectRoles), "projectRoles 应为数组");
+ %}
+
+### 建一次性项目(挂池用)
+POST {{host}}/api/projects
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "key": "S2{{run}}",
+  "name": "S2 治理演示"
+}
+
+> {%
+    client.global.set("s2ProjectId", response.body.projectId);
+    client.global.set("s2ProjectKey", response.body.key);
+ %}
+
+### 建真账号(挂项目池;C8)
+POST {{host}}/api/members
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "displayName": "S2账号dev2{{run}}",
+  "username": "s2dev2{{run}}",
+  "password": "secret123",
+  "projectIds": ["{{s2ProjectId}}"]
+}
+
+> {%
+    client.global.set("s2MemberId", response.body.memberId);
+    client.assert(response.body.virtual === false, "真账号 virtual=false");
+ %}
+
+### [负例] 重名成员 409
+POST {{host}}/api/members
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "displayName": "S2账号dev2{{run}}",
+  "username": "s2dev2x{{run}}",
+  "password": "secret123",
+  "projectIds": ["{{s2ProjectId}}"]
+}
+
+> {% client.assert(response.status === 409, "重名应 409,实际 " + response.status); %}
+
+### [负例] username 占用 409
+POST {{host}}/api/members
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "displayName": "S2账号别人{{run}}",
+  "username": "s2dev2{{run}}",
+  "password": "secret123",
+  "projectIds": ["{{s2ProjectId}}"]
+}
+
+> {% client.assert(response.status === 409, "username 占用应 409,实际 " + response.status); %}
+
+### [负例] 缺项目(C8)400
+POST {{host}}/api/members
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "displayName": "S2无项目{{run}}",
+  "username": "s2noproj{{run}}",
+  "password": "secret123"
+}
+
+> {% client.assert(response.status === 400, "缺项目应 400,实际 " + response.status); %}
+
+### [负例] 密码 <8 位 400
+POST {{host}}/api/members
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "displayName": "S2短密码{{run}}",
+  "username": "s2short{{run}}",
+  "password": "short7",
+  "projectIds": ["{{s2ProjectId}}"]
+}
+
+> {% client.assert(response.status === 400, "短密码应 400,实际 " + response.status); %}
+
+### 新账号登录(池内成员可登;存 token 供 403 负例)
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "s2dev2{{run}}",
+  "password": "secret123"
+}
+
+> {% client.global.set("s2Token", response.body.token); %}
+
+### [负例] 非 admin 调治理端点 403
+PUT {{host}}/api/members/{{s2AdminId}}/status
+Authorization: Bearer {{s2Token}}
+Content-Type: application/json
+
+{
+  "status": "disabled"
+}
+
+> {% client.assert(response.status === 403, "非 admin 应 403,实际 " + response.status); %}
+
+### 重置密码(真人:踢会话;存新 token)
+PUT {{host}}/api/members/{{s2MemberId}}/credentials
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "password": "secret456"
+}
+
+> {% client.assert(response.status === 200, "重置应 200,实际 " + response.status); %}
+
+### 旧密码已 401,新密码重登
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "s2dev2{{run}}",
+  "password": "secret456"
+}
+
+> {% client.global.set("s2Token", response.body.token); %}
+
+### 禁用 dev2(黑名单 upsert;其 token 随即失效)
+PUT {{host}}/api/members/{{s2MemberId}}/status
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "status": "disabled"
+}
+
+> {% client.assert(response.body.status === "disabled", "禁用后 status=disabled"); %}
+
+### [负例] 被禁账号旧 token 401(filter 链)
+GET {{host}}/api/projects
+Authorization: Bearer {{s2Token}}
+
+> {% client.assert(response.status === 401, "被禁账号 token 应 401,实际 " + response.status); %}
+
+### [负例] 被禁账号登录 401「账号已禁用」
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "s2dev2{{run}}",
+  "password": "secret456"
+}
+
+> {% client.assert(response.status === 401, "disabled 登录应 401,实际 " + response.status); %}
+
+### [负例] 最后 admin 禁用自己 409
+PUT {{host}}/api/members/{{s2AdminId}}/status
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "status": "disabled"
+}
+
+> {% client.assert(response.status === 409, "最后 admin 自禁应 409,实际 " + response.status); %}
+
+### 复职 dev2(黑名单删行)
+PUT {{host}}/api/members/{{s2MemberId}}/status
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "status": "active"
+}
+
+> {% client.assert(response.body.status === "active", "复职后 status=active"); %}
+
+### 授 admin 给 dev2
+PUT {{host}}/api/members/{{s2MemberId}}/admin
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "admin": true
+}
+
+### 收回 dev2 的 admin
+PUT {{host}}/api/members/{{s2MemberId}}/admin
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "admin": false
+}
+
+### [负例] 最后 admin 自收 409
+PUT {{host}}/api/members/{{s2AdminId}}/admin
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "admin": false
+}
+
+> {% client.assert(response.status === 409, "最后 admin 自收应 409,实际 " + response.status); %}
+
+### [负例] admin 自删 409
+DELETE {{host}}/api/members/{{s2AdminId}}
+Authorization: Bearer {{token}}
+
+> {% client.assert(response.status === 409, "自删应 409,实际 " + response.status); %}
+
+### 清场:删 dev2(真账号可删;S2 放开)
+DELETE {{host}}/api/members/{{s2MemberId}}
+Authorization: Bearer {{token}}
+
+### 清场:删一次性项目(key 寻址;.force 物理删)
+DELETE {{host}}/api/projects/{{s2ProjectKey}}?force=true
+Authorization: Bearer {{token}}

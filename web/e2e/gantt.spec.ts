@@ -9,13 +9,24 @@ import {
   fillDate,
 } from "./support/helpers";
 
-/** UI 切范围(YPJ-220)。依赖缺省 board 后,旧用例需显式切「全部」复现全量语义。 */
+/** UI 切范围(YPJ-220)。依赖缺省 board 后,旧用例需显式切「全部」复现全量语义。
+ *  A54(2026-11-28):固定 300ms 在首载窗口(冷 JVM/负载)不够,option 点击被动画/重挂吞掉(族内第 2 次红,
+ *  trace+帧实锤:点击已派发、菜单未关、无重拉)。改为整段重试环:以「菜单关闭」为选择生效信号,吞点自动重来。 */
 async function pickScope(page: import("@playwright/test").Page, label: string) {
-  await page.getByTestId("gantt-scope").click();
-  // MUI Menu 淡入期(~200ms)会吞下层点击(仓库已知陷阱),先等动画落定再点
-  await page.waitForTimeout(300);
-  await page.getByRole("option", { name: label }).click();
-  await expect(page.getByRole("listbox")).toBeHidden();
+  await expect(async () => {
+    // 重试轮清场:上轮菜单若开着,Escape 关掉,避免 trigger 点击变成 toggle 关菜单
+    if (
+      await page
+        .getByRole("listbox")
+        .isVisible()
+        .catch(() => false)
+    ) {
+      await page.keyboard.press("Escape");
+    }
+    await page.getByTestId("gantt-scope").click();
+    await page.getByRole("option", { name: label }).click();
+    await expect(page.getByRole("listbox")).toBeHidden();
+  }).toPass({ timeout: 15_000 });
 }
 
 /** YPJ-245(SRS §10.6):FINAL 行默认折叠进「已完成(N)」组;断言 FINAL 行视觉前先展开。 */

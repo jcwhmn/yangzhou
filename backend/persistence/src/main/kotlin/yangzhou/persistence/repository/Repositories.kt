@@ -896,4 +896,17 @@ interface MemberBlacklistRepository : CrudRepository<MemberBlacklist, Long> {
 /** spec 0177(S1)§3.1:统一角色叉表;S2 启用 project 级查询。 */
 interface MemberRoleRepository : CrudRepository<MemberRole, Long> {
     fun findByMemberId(memberId: Long): List<MemberRole>
+
+    /** S2(YPJ-293):workspace 级 admin 行(whoami/最后 admin 守卫);role 传 MemberRole.ROLE_ADMIN。 */
+    fun findByRoleAndProjectIdIsNull(role: String): List<MemberRole>
+
+    fun findByMemberIdAndRoleAndProjectIdIsNull(
+        memberId: Long,
+        role: String,
+    ): MemberRole?
+
+    fun deleteByMemberIdAndRoleAndProjectIdIsNull(
+        memberId: Long,
+        role: String,
+    )
 }

@@ -25,6 +25,9 @@ class MemberController(
     private val capabilityService: CapabilityService,
     private val adminGuard: AdminGuard,
 ) {
+    @GetMapping("/members/me")
+    fun me(): MemberService.WhoamiResponse = memberService.whoami()
+
     @GetMapping("/members")
     fun list(): List<MemberService.MemberResponse> = memberService.list()
 
@@ -33,9 +36,39 @@ class MemberController(
     fun create(
         @Valid @RequestBody request: CreateMemberRequest,
     ): MemberService.MemberResponse {
-        // spec 0177(S1):建虚拟成员 = 全局治理(矩阵行 30)→ 收权 admin only
+        // spec 0177(S1/S2):建号 = 全局治理(矩阵行 24/30)→ admin only
         adminGuard.requireAdmin()
-        return memberService.createVirtual(request.displayName.trim())
+        return memberService.create(request.displayName.trim(), request.username, request.password, request.projectIds)
+    }
+
+    /** S2 §4.4:重置凭据——真人重置密码(踢会话),虚拟设凭据即升级。 */
+    @PutMapping("/members/{memberId}/credentials")
+    fun resetCredentials(
+        @PathVariable memberId: UUID,
+        @Valid @RequestBody request: ResetCredentialsRequest,
+    ): MemberService.MemberResponse {
+        adminGuard.requireAdmin()
+        return memberService.resetCredentials(memberId, request.username, request.password)
+    }
+
+    /** S2 §4.4:禁用/复职(黑名单写语义);最后 admin 不可禁用自己。 */
+    @PutMapping("/members/{memberId}/status")
+    fun setStatus(
+        @PathVariable memberId: UUID,
+        @Valid @RequestBody request: SetMemberStatusRequest,
+    ): MemberService.MemberResponse {
+        adminGuard.requireAdmin()
+        return memberService.setStatus(memberId, request.status)
+    }
+
+    /** S2 §4.4:授/收 workspace admin;最后 admin 不可收。 */
+    @PutMapping("/members/{memberId}/admin")
+    fun setAdmin(
+        @PathVariable memberId: UUID,
+        @Valid @RequestBody request: SetMemberAdminRequest,
+    ): MemberService.MemberResponse {
+        adminGuard.requireAdmin()
+        return memberService.setAdmin(memberId, request.admin)
     }
 
     @DeleteMapping("/members/{memberId}")
@@ -95,6 +128,28 @@ class MemberController(
 
 data class CreateMemberRequest(
     @field:NotBlank val displayName: String,
+    val username: String? = null,
+    @field:Size(min = 8, message = "密码至少 8 位")
+    val password: String? = null,
+    val projectIds: List<UUID>? = null,
+)
+
+/** S2 §4.4:重置凭据(真人重置/虚拟升级,均 ≥8 位)。 */
+data class ResetCredentialsRequest(
+    val username: String? = null,
+    @field:NotBlank
+    @field:Size(min = 8, message = "密码至少 8 位")
+    val password: String,
+)
+
+/** S2 §4.4:禁用/复职(active/disabled;请求线收小写,service 归一映射)。 */
+data class SetMemberStatusRequest(
+    @field:NotBlank val status: String,
+)
+
+/** S2 §4.4:授/收 workspace admin。 */
+data class SetMemberAdminRequest(
+    val admin: Boolean,
 )
 
 data class SetLastProjectRequest(
