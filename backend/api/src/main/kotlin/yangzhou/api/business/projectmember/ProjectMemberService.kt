@@ -54,8 +54,9 @@ class ProjectMemberService(
         return member.toDto()
     }
 
-    /** 按加入顺序(id 自增即加入序)。 */
+    /** 按加入顺序(id 自增即加入序)。行 3a:池列表读门 requireMember(池成员/viewer/editor/admin 可读)。 */
     fun list(projectKey: String): List<MemberDto> {
+        projectGuard.requireMember(projectKey)
         val project = projects.findByKey(projectKey) ?: throw NotFoundException("项目不存在:$projectKey")
         return projectMembers.findByProjectObjectIdOrderByIdAsc(project.objectId!!).map {
             val member =

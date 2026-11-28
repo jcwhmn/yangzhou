@@ -24,12 +24,17 @@ class MemberController(
     private val memberService: MemberService,
     private val capabilityService: CapabilityService,
     private val adminGuard: AdminGuard,
+    private val projectGuard: yangzhou.api.guard.ProjectGuard,
 ) {
     @GetMapping("/members/me")
     fun me(): MemberService.WhoamiResponse = memberService.whoami()
 
+    /** 矩阵行 3b(⚠️-3):全局成员目录 = admin ∨ editor-anywhere;纯池成员/viewer 403(web 中间态归 S6)。 */
     @GetMapping("/members")
-    fun list(): List<MemberService.MemberResponse> = memberService.list()
+    fun list(): List<MemberService.MemberResponse> {
+        projectGuard.requireEditorAnywhere()
+        return memberService.list()
+    }
 
     @PostMapping("/members")
     @ResponseStatus(HttpStatus.CREATED)
@@ -99,11 +104,15 @@ class MemberController(
         @RequestBody request: SetLastProjectRequest,
     ): MemberService.MemberResponse = memberService.setLastProjectKey(memberId, request.key)
 
+    /** 矩阵行 4/5(C1):本人恒可;他人 = admin ∨ 池交集 editor(requirePoolEditor)。 */
     @PutMapping("/members/{memberId}/github-username")
     fun setGithubUsername(
         @PathVariable memberId: UUID,
         @Valid @RequestBody request: SetGithubUsernameRequest,
-    ): MemberService.MemberResponse = memberService.setGithubUsername(memberId, request.githubUsername)
+    ): MemberService.MemberResponse {
+        requireSelfOrPoolEditor(memberId)
+        return memberService.setGithubUsername(memberId, request.githubUsername)
+    }
 
     // ---------- 成员维度能力(虚拟成员/我 通用) ----------
 
@@ -116,14 +125,25 @@ class MemberController(
     fun upsertCapability(
         @PathVariable memberId: UUID,
         @Valid @RequestBody request: UpsertCapabilityRequest,
-    ): CapabilityService.CapabilityDto = capabilityService.upsertFor(memberService.requireMember(memberId), request.attribute.trim(), request.level)
+    ): CapabilityService.CapabilityDto {
+        requireSelfOrPoolEditor(memberId)
+        return capabilityService.upsertFor(memberService.requireMember(memberId), request.attribute.trim(), request.level)
+    }
 
     @DeleteMapping("/members/{memberId}/capabilities/{attribute}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun deleteCapability(
         @PathVariable memberId: UUID,
         @PathVariable attribute: String,
-    ) = capabilityService.deleteFor(memberService.requireMember(memberId), attribute)
+    ) {
+        requireSelfOrPoolEditor(memberId)
+        capabilityService.deleteFor(memberService.requireMember(memberId), attribute)
+    }
+
+    /** 行 4/5:目标==me 放行,否则池交集 editor 门。 */
+    private fun requireSelfOrPoolEditor(memberId: UUID) {
+        if (memberId != memberService.current().objectId) projectGuard.requirePoolEditor(memberId)
+    }
 }
 
 data class CreateMemberRequest(

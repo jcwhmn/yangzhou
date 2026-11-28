@@ -13,10 +13,12 @@ import yangzhou.api.error.BadRequestException
 import yangzhou.api.error.ConflictException
 import yangzhou.api.error.NotFoundException
 import yangzhou.api.guard.AdminGuard
+import yangzhou.persistence.MemberRole
 import yangzhou.persistence.Project
 import yangzhou.persistence.ProjectWorkflowRule
 import yangzhou.persistence.Status
 import yangzhou.persistence.StatusType
+import yangzhou.persistence.repository.MemberRoleRepository
 import yangzhou.persistence.repository.ProjectDeletionRepository
 import yangzhou.persistence.repository.ProjectRepository
 import yangzhou.persistence.repository.ProjectWorkflowRuleRepository
@@ -85,6 +87,7 @@ class ProjectService(
     private val deletions: ProjectDeletionRepository,
     private val members: yangzhou.api.business.member.MemberService,
     private val projectMembers: yangzhou.persistence.repository.ProjectMemberRepository,
+    private val memberRoles: MemberRoleRepository,
     private val groupTypes: yangzhou.persistence.repository.ItemGroupTypeRepository,
     private val itemTypes: yangzhou.persistence.repository.ItemTypeRepository,
     private val groupWorkflow: yangzhou.api.business.itemgroup.GroupWorkflowService,
@@ -139,11 +142,15 @@ class ProjectService(
         val saved = defaultStatuses(project.objectId!!).map { statuses.save(it) }
         seedDefaultRules(project.objectId!!, saved)
         // 0047:创建者自动入池(池=合法指派范围,保证创建者至少能给自己指派)
-        // S3(YPJ-299):池去角色化,池行只表成员资格;「创建即管 (creator, editor) 行」归切片 b(YPJ-300)
+        // S3(YPJ-300):创建即管——创建者落 (creator, editor, project) 行(矩阵行 25;池行+角色行)
+        val me = members.current()
         projectMembers.save(
             yangzhou.persistence.ProjectMember(
-                projectObjectId = project.objectId!!, memberObjectId = members.current().objectId!!,
+                projectObjectId = project.objectId!!, memberObjectId = me.objectId!!, // 唯一凭据者语义沿用(create 内既有用法)
             ),
+        )
+        memberRoles.save(
+            yangzhou.persistence.MemberRole(memberId = me.id!!, role = MemberRole.ROLE_EDITOR, projectId = project.id!!),
         )
         // YPJ-165(spec 0131):不再种子 release 组类型(旧组实现已拆,Release 将以独立实体重建,PRD v1.2);
         // 组结构由用户「加 level」自配
@@ -154,10 +161,23 @@ class ProjectService(
         return get(key)
     }
 
-    fun list(): List<ProjectDto> = projects.findAll().map { it.key }.mapNotNull { key ->
-        runCatching { get(key) }
-            .onFailure { log.warn("项目组装失败,列表中跳过 key={}", key, it) }
-            .getOrNull()
+    /** 可见性(矩阵行 6):admin 全量;否则角色行∪池行过滤(私有可见性,组装前先按 id 筛,省全量组装)。 */
+    fun list(): List<ProjectDto> {
+        val candidates =
+            if (adminGuard.isAdmin()) {
+                projects.findAll()
+            } else {
+                val me = members.current()
+                val poolIds = projectMembers.findByMemberObjectId(me.objectId!!)
+                    .mapNotNull { projects.findByObjectId(it.projectObjectId)?.id }
+                val roleIds = memberRoles.findByMemberId(me.id!!).mapNotNull { it.projectId }
+                projects.findAllById((poolIds + roleIds).toSet()).sortedBy { it.id } // 与 findAll 同为建项序
+            }
+        return candidates.map { it.key }.mapNotNull { key ->
+            runCatching { get(key) }
+                .onFailure { log.warn("项目组装失败,列表中跳过 key={}", key, it) }
+                .getOrNull()
+        }
     }
 
     fun get(key: String): ProjectDto {
