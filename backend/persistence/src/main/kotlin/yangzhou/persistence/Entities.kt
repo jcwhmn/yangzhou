@@ -257,7 +257,6 @@ data class ProjectMember(
     val objectId: UUID = UUID.randomUUID(),
     val projectObjectId: UUID,
     val memberObjectId: UUID,
-    val role: String = ROLE_MEMBER,
     @CreatedDate
     var createdAt: Instant = Instant.now(),
     @LastModifiedDate
@@ -266,12 +265,7 @@ data class ProjectMember(
     var createdByObjectId: UUID? = null,
     @LastModifiedBy
     var updatedByObjectId: UUID? = null,
-) {
-    companion object {
-        const val ROLE_MEMBER = "member"
-        const val ROLE_LEADER = "leader"
-    }
-}
+)
 
 /** YPJ-138(spec 0097 S1):每状态恰属一类(START 起点 / FINAL 终态 / ACTIVE 进行)。 */
 enum class StatusType {

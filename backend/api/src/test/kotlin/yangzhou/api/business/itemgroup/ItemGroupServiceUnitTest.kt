@@ -30,7 +30,7 @@ import kotlin.test.assertFailsWith
 
 /** spec 0097 S2 单测:统一组服务(类型 CRUD 守卫/组 CRUD/动作白名单/归属按类型正交)。原 GroupTypeServiceUnitTest 14 例语义迁移。 */
 class ItemGroupServiceUnitTest {
-    private val leaderGuard = mockk<yangzhou.api.guard.LeaderGuard>(relaxed = true)
+    private val projectGuard = mockk<yangzhou.api.guard.ProjectGuard>(relaxed = true)
     private val projects = mockk<ProjectRepository>(relaxed = true)
     private val types = mockk<ItemGroupTypeRepository>(relaxed = true)
     private val workflow = mockk<GroupWorkflowService>(relaxed = true)
@@ -45,7 +45,7 @@ class ItemGroupServiceUnitTest {
     private val statuses = mockk<yangzhou.persistence.repository.StatusRepository>(relaxed = true)
 
     private val service =
-        ItemGroupService(leaderGuard, projects, types, workflow, groups, memberships, itemRepo, itemService, memberHistory, groupStatuses, groupStatusHistories, itemStatusHistories, statuses, Clock.systemUTC())
+        ItemGroupService(projectGuard, projects, types, workflow, groups, memberships, itemRepo, itemService, memberHistory, groupStatuses, groupStatusHistories, itemStatusHistories, statuses, Clock.systemUTC())
 
     private val project = Project(id = 1L, objectId = UUID(0, 1), workspaceObjectId = UUID(0, 9), key = "CHE", name = "CHE")
     private val sprintType = ItemGroupType(id = 1L, objectId = UUID(0, 2), projectObjectId = UUID(0, 1), typeKey = "sprint", name = "Sprint", level = 1, timed = true, builtin = false)
@@ -64,7 +64,7 @@ class ItemGroupServiceUnitTest {
 
     @BeforeEach
     fun setup() {
-        clearMocks(leaderGuard, projects, types, workflow, groups, memberships, itemRepo, itemService, memberHistory, groupStatuses, groupStatusHistories, itemStatusHistories, statuses)
+        clearMocks(projectGuard, projects, types, workflow, groups, memberships, itemRepo, itemService, memberHistory, groupStatuses, groupStatusHistories, itemStatusHistories, statuses)
         every { projects.findByKey("CHE") } returns project
         every { types.findByProjectObjectIdAndTypeKey(UUID(0, 1), "sprint") } returns sprintType
         every { types.findByProjectObjectIdAndTypeKey(UUID(0, 1), "phase") } returns phaseType

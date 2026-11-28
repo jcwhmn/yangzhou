@@ -12,7 +12,7 @@ import yangzhou.api.business.workspace.WorkspaceService
 import yangzhou.api.error.BadRequestException
 import yangzhou.api.error.ConflictException
 import yangzhou.api.error.NotFoundException
-import yangzhou.api.guard.LeaderGuard
+import yangzhou.api.guard.AdminGuard
 import yangzhou.persistence.Project
 import yangzhou.persistence.ProjectWorkflowRule
 import yangzhou.persistence.Status
@@ -76,7 +76,7 @@ internal fun ganttWalkOrder(
 /** Project = 编号(key-N)+ workflow + 视图容器(ADR-0001)。 */
 @Service
 class ProjectService(
-    private val leaderGuard: LeaderGuard,
+    private val adminGuard: AdminGuard,
     private val projects: ProjectRepository,
     private val statuses: StatusRepository,
     private val workflowRules: ProjectWorkflowRuleRepository,
@@ -139,10 +139,10 @@ class ProjectService(
         val saved = defaultStatuses(project.objectId!!).map { statuses.save(it) }
         seedDefaultRules(project.objectId!!, saved)
         // 0047:创建者自动入池(池=合法指派范围,保证创建者至少能给自己指派)
-        // 0047+R1(spec 0081):创建者自动入池,且为项目 leader
+        // S3(YPJ-299):池去角色化,池行只表成员资格;「创建即管 (creator, editor) 行」归切片 b(YPJ-300)
         projectMembers.save(
             yangzhou.persistence.ProjectMember(
-                projectObjectId = project.objectId!!, memberObjectId = members.current().objectId!!, role = yangzhou.persistence.ProjectMember.ROLE_LEADER,
+                projectObjectId = project.objectId!!, memberObjectId = members.current().objectId!!,
             ),
         )
         // YPJ-165(spec 0131):不再种子 release 组类型(旧组实现已拆,Release 将以独立实体重建,PRD v1.2);
@@ -271,7 +271,7 @@ class ProjectService(
     /** YPJ-60:物理删除项目及全部从属数据(含回收站软删 item);FK 依赖序见 spec 0046。 */
     @Transactional
     fun delete(key: String) {
-        leaderGuard.requireLeader(key)
+        adminGuard.requireAdmin() // C3:删项目仅 admin(spec 0177 行 26)
         val project = projects.findByKey(key) ?: throw NotFoundException("项目不存在:$key")
         val pid = project.objectId ?: error("no id")
         deletions.purgeRequirements(pid)

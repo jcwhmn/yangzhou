@@ -8,7 +8,7 @@ import tools.jackson.databind.ObjectMapper
 import yangzhou.api.error.BadRequestException
 import yangzhou.api.error.ConflictException
 import yangzhou.api.error.NotFoundException
-import yangzhou.api.guard.LeaderGuard
+import yangzhou.api.guard.ProjectGuard
 import yangzhou.persistence.Status
 import yangzhou.persistence.StatusType
 import yangzhou.persistence.repository.ProjectRepository
@@ -23,7 +23,7 @@ import java.util.UUID
 
 @Service
 class WorkflowService(
-    private val leaderGuard: LeaderGuard,
+    private val projectGuard: ProjectGuard,
     private val projects: ProjectRepository,
     private val statuses: StatusRepository,
     private val mapper: ObjectMapper,
@@ -51,7 +51,7 @@ class WorkflowService(
     @Transactional
     fun createStatus(projectKey: String, name: String, icon: String?, statusType: StatusType, position: Int?, requireCloseReason: Boolean): StatusDto {
         val project = projects.findByKey(projectKey) ?: throw NotFoundException("项目不存在:$projectKey")
-        leaderGuard.requireLeader(project.objectId!!)
+        projectGuard.requireEditor(project.objectId!!)
         val projectObjectId = project.objectId!!
         val existing = statuses.findByProjectObjectIdOrderByPosition(projectObjectId)
         if (existing.any { it.name == name }) throw ConflictException("状态名已存在:$name")
@@ -71,7 +71,7 @@ class WorkflowService(
     @Transactional
     fun updateStatus(statusId: UUID, name: String?, icon: String?, statusType: StatusType?, position: Int?, requireCloseReason: Boolean?): StatusDto {
         val status = statuses.findByObjectId(statusId) ?: throw NotFoundException("状态不存在")
-        leaderGuard.requireLeader(status.projectObjectId)
+        projectGuard.requireEditor(status.projectObjectId)
         try {
             val updated = statuses.save(
                 status.copy(
@@ -92,7 +92,7 @@ class WorkflowService(
     @Transactional
     fun deleteStatus(statusId: UUID) {
         val status = statuses.findByObjectId(statusId) ?: throw NotFoundException("状态不存在")
-        leaderGuard.requireLeader(status.projectObjectId)
+        projectGuard.requireEditor(status.projectObjectId)
         try {
             statuses.delete(status) // 内嵌出边随行删除;他状态指向本状态的出边由调用方整表替换维护
             assertHasStartAndFinal(status.projectObjectId)
@@ -122,7 +122,7 @@ class WorkflowService(
     @Transactional
     fun replaceTransitions(projectKey: String, list: List<TransitionDto>): List<TransitionDto> {
         val project = projects.findByKey(projectKey) ?: throw NotFoundException("项目不存在:$projectKey")
-        leaderGuard.requireLeader(project.objectId!!)
+        projectGuard.requireEditor(project.objectId!!)
         val projectObjectId = project.objectId!!
         val byName = statuses.findByProjectObjectIdOrderByPosition(projectObjectId).associateBy { it.name }
         list.forEach { t ->

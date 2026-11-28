@@ -6,7 +6,7 @@ import yangzhou.api.business.member.MemberService
 import yangzhou.api.error.BadRequestException
 import yangzhou.api.error.ConflictException
 import yangzhou.api.error.NotFoundException
-import yangzhou.api.guard.LeaderGuard
+import yangzhou.api.guard.ProjectGuard
 import yangzhou.persistence.Release
 import yangzhou.persistence.ReleaseItem
 import yangzhou.persistence.ReleaseItemHistory
@@ -36,7 +36,7 @@ class ReleaseService(
     private val members: MemberRepository,
     private val items: ItemRepository,
     private val statuses: StatusRepository,
-    private val leaderGuard: LeaderGuard,
+    private val projectGuard: ProjectGuard,
     private val memberService: MemberService,
     private val clock: Clock,
 ) {
@@ -143,7 +143,7 @@ class ReleaseService(
         key: String,
         request: CreateReleaseRequest,
     ): ReleaseDto {
-        leaderGuard.requireLeader(key)
+        projectGuard.requireEditor(key)
         val name = request.name?.trim().takeUnless { it.isNullOrEmpty() } ?: throw BadRequestException("name 必填")
         val stage = validateStage(request.stage)
         // US-R5(spec 0135):事后补建——status=released 直接落终态;其余值非法(缺省 planned)
@@ -178,7 +178,7 @@ class ReleaseService(
         releaseId: UUID,
         request: UpdateReleaseRequest,
     ): ReleaseDto {
-        leaderGuard.requireLeader(key)
+        projectGuard.requireEditor(key)
         val r = find(key, releaseId)
         if (r.status == "released") throw ConflictException("终态 release 不可编辑(历史保留;补发内容请新建 release)")
         if (request.status != null && request.status !in transitions.keys) {
@@ -217,7 +217,7 @@ class ReleaseService(
         key: String,
         releaseId: UUID,
     ) {
-        leaderGuard.requireLeader(key)
+        projectGuard.requireEditor(key)
         val r = find(key, releaseId)
         if (r.status == "released") throw ConflictException("终态 release 不可删除(历史保留)")
         // US-R3(spec 0133):有成员拒删(PRD §5.1「有成员才拒绝」)——先摘空再删

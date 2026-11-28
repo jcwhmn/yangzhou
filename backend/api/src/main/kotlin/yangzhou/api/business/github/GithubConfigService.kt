@@ -7,7 +7,7 @@ import yangzhou.api.business.workspace.WorkspaceService
 import yangzhou.api.error.BadRequestException
 import yangzhou.api.error.ConflictException
 import yangzhou.api.error.NotFoundException
-import yangzhou.api.guard.LeaderGuard
+import yangzhou.api.guard.ProjectGuard
 import yangzhou.persistence.ProjectRepo
 import yangzhou.persistence.ProjectWorkflowRule
 import yangzhou.persistence.repository.ProjectRepoRepository
@@ -27,7 +27,7 @@ val GITHUB_EVENT_TYPES = VcsEvent.entries.map { it.wire }
  */
 @Service
 class GithubConfigService(
-    private val leaderGuard: LeaderGuard,
+    private val projectGuard: ProjectGuard,
     private val workspaces: WorkspaceRepository,
     private val projects: ProjectRepository,
     private val repos: ProjectRepoRepository,
@@ -80,7 +80,7 @@ class GithubConfigService(
         projectKey: String,
         repo: String,
     ): RepoDto {
-        leaderGuard.requireLeader(projectKey)
+        projectGuard.requireEditor(projectKey)
         val project = requireProject(projectKey)
         val trimmed = repo.trim()
         if (!Regex("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$").matches(trimmed)) {
@@ -98,7 +98,7 @@ class GithubConfigService(
         projectKey: String,
         repoId: UUID,
     ) {
-        leaderGuard.requireLeader(projectKey)
+        projectGuard.requireEditor(projectKey)
         val project = requireProject(projectKey)
         val repo = repos.findByObjectId(repoId) ?: throw NotFoundException("仓库挂载不存在")
         if (repo.projectObjectId != project.objectId) throw NotFoundException("仓库挂载不存在")
@@ -132,7 +132,7 @@ class GithubConfigService(
         projectKey: String,
         input: List<RuleInput>,
     ): List<RuleDto> {
-        leaderGuard.requireLeader(projectKey)
+        projectGuard.requireEditor(projectKey)
         val project = requireProject(projectKey)
         val validStatuses = statuses.findByProjectObjectIdOrderByPosition(project.objectId!!).associateBy { it.objectId }
         input.forEach { rule ->

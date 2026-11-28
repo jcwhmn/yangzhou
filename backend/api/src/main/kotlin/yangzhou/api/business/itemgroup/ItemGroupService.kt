@@ -8,7 +8,7 @@ import yangzhou.api.business.item.LifecycleTimes
 import yangzhou.api.error.BadRequestException
 import yangzhou.api.error.ConflictException
 import yangzhou.api.error.NotFoundException
-import yangzhou.api.guard.LeaderGuard
+import yangzhou.api.guard.ProjectGuard
 import yangzhou.persistence.GroupStatusHistory
 import yangzhou.persistence.ItemGroup
 import yangzhou.persistence.ItemGroupMember
@@ -37,7 +37,7 @@ import java.util.UUID
  */
 @Service
 class ItemGroupService(
-    private val leaderGuard: LeaderGuard,
+    private val projectGuard: ProjectGuard,
     private val projects: ProjectRepository,
     private val types: ItemGroupTypeRepository,
     private val workflow: GroupWorkflowService,
@@ -197,7 +197,7 @@ class ItemGroupService(
         key: String,
         request: CreateGroupTypeRequest,
     ): GroupTypeDto {
-        leaderGuard.requireLeader(key)
+        projectGuard.requireEditor(key)
         val typeKey =
             request.typeKey?.trim().takeUnless { it.isNullOrEmpty() }
                 ?: throw BadRequestException("typeKey 必填")
@@ -233,7 +233,7 @@ class ItemGroupService(
         typeKey: String,
         request: UpdateGroupTypeRequest,
     ): GroupTypeDto {
-        leaderGuard.requireLeader(key)
+        projectGuard.requireEditor(key)
         val t = typeOf(key, typeKey)
         val name =
             request.name?.trim().takeUnless { it.isNullOrEmpty() }
@@ -247,7 +247,7 @@ class ItemGroupService(
         key: String,
         typeKey: String,
     ) {
-        leaderGuard.requireLeader(key)
+        projectGuard.requireEditor(key)
         val pid = project(key).objectId!!
         val t =
             types.findByProjectObjectIdAndTypeKey(pid, typeKey)
@@ -280,7 +280,7 @@ class ItemGroupService(
         typeKey: String,
         requests: List<GroupWorkflowService.StatusTransitionsRequest>,
     ): List<GroupWorkflowService.GroupStatusDto> {
-        leaderGuard.requireLeader(key)
+        projectGuard.requireEditor(key)
         return workflow.updateWorkflow(typeOf(key, typeKey), requests)
     }
 
@@ -317,7 +317,7 @@ class ItemGroupService(
         key: String,
         request: CreateGroupRequest,
     ): GroupDto {
-        leaderGuard.requireLeader(key)
+        projectGuard.requireEditor(key)
         val typeKey =
             request.typeKey?.trim().takeUnless { it.isNullOrEmpty() }
                 ?: throw BadRequestException("typeKey 必填")
@@ -487,7 +487,7 @@ class ItemGroupService(
         groupId: UUID,
         request: UpdateGroupRequest,
     ): GroupDto {
-        leaderGuard.requireLeader(key)
+        projectGuard.requireEditor(key)
         val g = findGroup(key, groupId)
         val pid = g.projectObjectId
         val name = request.name?.trim()
@@ -557,7 +557,7 @@ class ItemGroupService(
         key: String,
         groupId: UUID,
     ) {
-        leaderGuard.requireLeader(key)
+        projectGuard.requireEditor(key)
         val g = findGroup(key, groupId)
         // spec 0111:父组含子组不可删(先删子组)
         if (g.objectId != null && groups.findAllByProjectObjectIdAndParentObjectId(g.projectObjectId, g.objectId).isNotEmpty()) {
@@ -585,7 +585,7 @@ class ItemGroupService(
         function: String,
         request: GroupActionRequest? = null,
     ): GroupDto {
-        leaderGuard.requireLeader(key)
+        projectGuard.requireEditor(key)
         val g = findGroup(key, groupId)
         val t = typeOf(key, g.type)
         // spec 0114:非叶层组状态由子组逐层联动推导,不开放手动动作

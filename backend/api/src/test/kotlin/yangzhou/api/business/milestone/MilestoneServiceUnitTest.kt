@@ -41,7 +41,8 @@ class MilestoneServiceUnitTest {
     private val items = mockk<ItemRepository>(relaxed = true)
     private val statuses = mockk<StatusRepository>(relaxed = true)
     private val clock = Clock.fixed(Instant.parse("2026-11-12T00:00:00Z"), ZoneOffset.UTC)
-    private val service = MilestoneService(projects, milestones, members, milestoneItems, items, statuses, clock)
+    private val projectGuard = mockk<yangzhou.api.guard.ProjectGuard>(relaxed = true)
+    private val service = MilestoneService(projects, milestones, members, milestoneItems, items, statuses, clock, projectGuard)
 
     private val project = Project(id = 1L, objectId = UUID(0, 1), workspaceObjectId = UUID(0, 9), key = "CHE", name = "CHE")
     private val m = Milestone(id = 1L, objectId = UUID(0, 1), projectObjectId = UUID(0, 1), name = "M1")

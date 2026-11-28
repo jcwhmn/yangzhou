@@ -1,6 +1,6 @@
 # spec 0177-S2 — YPJ-293 后端·账号治理 API
 
-> 主 spec:`docs/spec/0177-YPJ-166-multi-user-authz-spec.md` §4.4 / §2.3 B 表 / §7。S1 子文档(`0177-s1`)的续篇:S1 做地基(status/黑名单机制/自助改密),本票做**治理端点全套 + whoami**。
+> 主 spec:`docs/spec/0177-YPJ-166-multi-user-authz-spec.md` §4.4 / §2.3 B 表 / §7。S1 子文档(`0178`)的续篇:S1 做地基(status/黑名单机制/自助改密),本票做**治理端点全套 + whoami**。
 
 ## ① 需求(范围/非目标)
 

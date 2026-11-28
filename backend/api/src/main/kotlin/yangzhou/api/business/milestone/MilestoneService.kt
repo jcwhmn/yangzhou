@@ -51,6 +51,7 @@ class MilestoneService(
     private val items: ItemRepository,
     private val statuses: StatusRepository,
     private val clock: Clock,
+    private val projectGuard: yangzhou.api.guard.ProjectGuard,
 ) {
     data class MilestoneDto(
         val milestoneId: UUID,
@@ -153,6 +154,7 @@ class MilestoneService(
         key: String,
         request: CreateMilestoneRequest,
     ): MilestoneDto {
+        projectGuard.requireEditor(key) // S3(YPJ-299)行 16:milestone 管理 editor+(原无门,补门)
         val p = project(key)
         val name = request.name?.trim().takeUnless { it.isNullOrEmpty() } ?: throw BadRequestException("name 必填")
         val saved =
@@ -174,6 +176,7 @@ class MilestoneService(
         milestoneId: UUID,
         request: UpdateMilestoneRequest,
     ): MilestoneDto {
+        projectGuard.requireEditor(key) // S3(YPJ-299)行 16
         val m = find(key, milestoneId)
         if (request.status != null && request.status !in statusValues) {
             throw BadRequestException("status 只能是 planned/in_progress/completed/cancelled")
@@ -249,6 +252,7 @@ class MilestoneService(
         key: String,
         milestoneId: UUID,
     ) {
+        projectGuard.requireEditor(key) // S3(YPJ-299)行 16
         val m = find(key, milestoneId)
         // spec 0116 §6 #1(2026-11-12 拍板):终态守卫——UI 置灰之外 API 层也拦,防脚本误删历史
         if (m.status in terminalStatuses) throw ConflictException("终态 milestone 不可删除(历史保留)")
@@ -301,6 +305,7 @@ class MilestoneService(
         milestoneId: UUID,
         request: SetMilestoneItemsRequest,
     ): List<GateItemDto> {
+        projectGuard.requireEditor(key) // S3(YPJ-299)行 16:归置属管理门
         val p = project(key)
         val m = milestones.findByProjectObjectIdAndObjectId(p.objectId!!, milestoneId) ?: throw NotFoundException("milestone 不存在")
         val ids = request.itemIds.distinct()
